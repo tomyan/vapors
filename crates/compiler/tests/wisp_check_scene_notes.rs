@@ -50,17 +50,94 @@ fn a_mesh_no_rule_colours_is_noted_at_its_tag() {
     );
 }
 
-#[test]
-fn a_mesh_a_rule_or_its_style_colours_is_not_noted() {
-    // Given: by class, by a directive's class, by tag, by `style`
-    let style = "<style>\n.hull { color: red; }\n.lit { color: blue; }\nmesh.wheel { color: black; }\n</style>\n";
-    let tags = "<Mesh class=\"hull\" />\n<Mesh class:lit={on} />\n<Mesh class=\"wheel\" />\n<Mesh style=\"color: red\" />";
+/// The notes for a page of `style` rules and `tags`.
+fn notes_for(test: &str, style: &str, tags: &str) -> Vec<String> {
+    let (output, _) = checked(test, &format!("<style>\n{style}\n</style>\n{tags}"));
+    notes(&output)
+}
 
-    // When
-    let (output, _) = checked("scene_note_declared", &format!("{style}{tags}"));
+#[test]
+fn a_mesh_coloured_by_its_class_is_not_noted() {
+    let notes = notes_for(
+        "scene_note_class",
+        ".hull { color: red; }",
+        "<Mesh class=\"hull\" />",
+    );
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn a_mesh_coloured_by_a_directives_class_is_not_noted() {
+    let notes = notes_for(
+        "scene_note_toggle",
+        ".lit { color: blue; }",
+        "<Mesh class:lit={on} />",
+    );
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn a_mesh_coloured_by_its_tag_and_class_is_not_noted() {
+    let notes = notes_for(
+        "scene_note_tag",
+        "mesh.wheel { color: black; }",
+        "<Mesh class=\"wheel\" />",
+    );
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn a_mesh_coloured_by_its_literal_style_is_not_noted() {
+    let notes = notes_for("scene_note_style", "", "<Mesh style=\"color: red\" />");
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn a_mesh_coloured_through_var_is_not_noted() {
+    // Given: the `--craft-body` pattern
+    let style = ".hull { color: var(--craft-body); }";
 
     // Then
-    assert_eq!(notes(&output), Vec::<String>::new(), "{output:?}");
+    let notes = notes_for("scene_note_var", style, "<Mesh class=\"hull\" />");
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn a_mesh_given_only_a_custom_property_is_noted() {
+    let notes = notes_for(
+        "scene_note_custom",
+        ".hull { --craft-body: red; }",
+        "<Mesh class=\"hull\" />",
+    );
+    assert_eq!(notes.len(), 1, "{notes:?}");
+}
+
+#[test]
+fn a_mesh_whose_colour_rule_only_inherits_is_noted() {
+    for value in ["inherit", "currentcolor", "unset"] {
+        let style = format!(".hull {{ color: {value}; }}");
+        let notes = notes_for("scene_note_inherit", &style, "<Mesh class=\"hull\" />");
+        assert_eq!(notes.len(), 1, "{value}: {notes:?}");
+    }
+}
+
+#[test]
+fn a_mesh_under_an_element_this_file_colours_is_not_noted() {
+    // Given: the HUD around the scene declares the colour here
+    let tags = "<div class=\"hud\"><Scene><Group><Mesh /></Group></Scene></div>";
+
+    // Then
+    let notes = notes_for("scene_note_ancestor", ".hud { color: white; }", tags);
+    assert_eq!(notes, Vec::<String>::new());
+}
+
+#[test]
+fn meshes_in_an_if_a_snippet_and_a_group_are_noted() {
+    // Given
+    let tags = "{if on}<Mesh />{/if}\n{snippet row()}<Mesh />{/snippet}\n<Group><Mesh /></Group>";
+
+    // Then
+    assert_eq!(notes_for("scene_note_blocks", "", tags).len(), 3);
 }
 
 #[test]
