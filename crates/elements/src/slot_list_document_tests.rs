@@ -28,6 +28,8 @@ fn page_with_one_added(count: usize) -> Document {
         })
         .collect();
     doc.update(VIEWPORT).expect("updates");
+    // the hits gathered, so the insert patches them in place
+    doc.painted.as_ref().expect("painted").kept_hits();
     let added = doc.create_element("div");
     doc.insert_before(body, added, Some(made[count / 2]));
     doc.update(VIEWPORT).expect("updates");
@@ -35,50 +37,12 @@ fn page_with_one_added(count: usize) -> Document {
 }
 
 /// Every per-slot list the document keeps outside layout (the box list
-/// and its keys: `layout/rebuild_capacity_tests.rs`): name, length,
-/// capacity.
+/// and its keys: `layout/rebuild_capacity_tests.rs`), as its owners
+/// name them: name, length, capacity.
 fn lists(doc: &Document) -> Vec<(&'static str, usize, usize)> {
-    let painted = doc.painted.as_ref().expect("painted");
-    let placement = &painted.from.placement;
-    let order = &painted.order;
-    let mut found = vec![
-        (
-            "kept_boxes",
-            painted.kept_boxes.len(),
-            painted.kept_boxes.capacity(),
-        ),
-        (
-            "placement.rects",
-            placement.rects.len(),
-            placement.rects.capacity(),
-        ),
-        (
-            "placement.paddings",
-            placement.paddings.len(),
-            placement.paddings.capacity(),
-        ),
-        (
-            "placement.offsets",
-            placement.offsets.len(),
-            placement.offsets.capacity(),
-        ),
-        ("placement.up", placement.up.len(), placement.up.capacity()),
-        (
-            "placement.containing",
-            placement.containing.len(),
-            placement.containing.capacity(),
-        ),
-        (
-            "placement.marks",
-            placement.marks.len(),
-            placement.marks.capacity(),
-        ),
-    ];
-    found.extend(order.clips.slot_lists());
-    found.extend(order.tree.slot_lists());
-    found.extend(painted.stackings.slot_lists());
-    found.extend(doc.kept.as_ref().expect("styled").styles.slot_lists());
-    found
+    let mut lists = doc.painted.as_ref().expect("painted").slot_lists();
+    lists.extend(doc.kept.as_ref().expect("styled").styles.slot_lists());
+    lists
 }
 
 #[test]
@@ -95,4 +59,32 @@ fn every_per_slot_list_grows_by_a_quarter_when_an_element_is_added() {
         over.is_empty(),
         "lists with over a quarter's slack: {over:?}"
     );
+}
+
+#[test]
+fn the_kept_hits_grow_by_a_quarter_when_a_patch_adds_one() {
+    // Given: 200 divs, one hidden (no hit), the hits gathered
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet("t.css", ".gone { visibility: hidden; }")
+        .expect("parses");
+    let body = doc.body();
+    let made: Vec<NodeId> = (0..200)
+        .map(|_| {
+            let div = doc.create_element("div");
+            doc.append(body, div);
+            div
+        })
+        .collect();
+    doc.set_attribute(made[100], "class", "gone");
+    doc.update(VIEWPORT).expect("updates");
+    doc.painted.as_ref().expect("painted").kept_hits();
+
+    // When: shown again, a patch that adds its hit in place
+    doc.set_attribute(made[100], "class", "");
+    doc.update(VIEWPORT).expect("updates");
+
+    // Then
+    let painted = doc.painted.as_ref().expect("painted");
+    let hits = painted.kept_hits().slot_lists()[0];
+    assert!(hits.2 * 4 <= hits.1 * 5 + 4, "{hits:?}");
 }

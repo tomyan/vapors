@@ -4,8 +4,14 @@
 //! an edit adds would double each one: at 16,384 rows the kept boxes'
 //! list (about 740 bytes a slot) went from 48.6 MB to 97.3 MB for one
 //! added row (property 8, docs/perf/memory-per-element-2026-11-14.md).
-//! A quarter bounds the slack at 25% and keeps one copy per growth
-//! amortised over a quarter of the list's length in pushes.
+//! While a list grows its slack stays within a quarter of its length,
+//! and each growth's copy is amortised over a quarter of its length in
+//! pushes. A shorter length keeps the capacity: freed slots are taken
+//! again by the next boxes (the free list), so a list never shrinks.
+//!
+//! A kept per-slot list is a [`SlotList`], whose only growth goes
+//! through here, so no list can double behind it; and each owner names
+//! its lists in one `slot_lists`, which the growth test reads.
 
 /// The capacity a list of `len` entries needs to grow to for `wanted`:
 /// unchanged when it holds them, else the larger of `wanted` and a
@@ -33,6 +39,86 @@ pub(crate) fn resize<T: Clone>(list: &mut Vec<T>, len: usize, value: T) {
 pub(crate) fn resize_with<T>(list: &mut Vec<T>, len: usize, make: impl FnMut() -> T) {
     reserve(list, len);
     list.resize_with(len, make);
+}
+
+/// A kept list of one entry per slot: a `Vec` read as a slice, grown
+/// only by a quarter (`resize`, `resize_with`, `splice`).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SlotList<T>(Vec<T>);
+
+impl<T> Default for SlotList<T> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T> std::ops::Deref for SlotList<T> {
+    type Target = [T];
+    fn deref(&self) -> &[T] {
+        &self.0
+    }
+}
+
+impl<T> std::ops::DerefMut for SlotList<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        &mut self.0
+    }
+}
+
+/// A list made whole (a first build), its capacity cut to its length.
+impl<T> From<Vec<T>> for SlotList<T> {
+    fn from(mut list: Vec<T>) -> Self {
+        list.shrink_to_fit();
+        Self(list)
+    }
+}
+
+/// A list made whole (a first build), its capacity cut to its length.
+impl<T> FromIterator<T> for SlotList<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(items: I) -> Self {
+        let mut list: Vec<T> = items.into_iter().collect();
+        list.shrink_to_fit();
+        Self(list)
+    }
+}
+
+impl<T> SlotList<T> {
+    /// `len` entries, the new ones `value`, grown by a quarter.
+    pub(crate) fn resize(&mut self, len: usize, value: T)
+    where
+        T: Clone,
+    {
+        resize(&mut self.0, len, value);
+    }
+
+    /// `len` entries, the new ones made by `make`, grown by a quarter.
+    pub(crate) fn resize_with(&mut self, len: usize, make: impl FnMut() -> T) {
+        resize_with(&mut self.0, len, make);
+    }
+
+    /// The entries in `range` replaced by `items`, grown by a quarter;
+    /// the entries taken out.
+    pub(crate) fn splice(
+        &mut self,
+        range: std::ops::Range<usize>,
+        items: impl IntoIterator<Item = T>,
+    ) -> Vec<T> {
+        let items: Vec<T> = items.into_iter().collect();
+        let wanted = self.0.len() - range.len() + items.len();
+        reserve(&mut self.0, wanted);
+        self.0.splice(range, items).collect()
+    }
+
+    /// The entries from `start` on, taken out; the capacity is kept.
+    pub(crate) fn drain_from(&mut self, start: usize) -> std::vec::Drain<'_, T> {
+        self.0.drain(start..)
+    }
+
+    /// Its name, length and capacity, for an owner's `slot_lists`.
+    #[cfg(test)]
+    pub(crate) fn named(&self, name: &'static str) -> (&'static str, usize, usize) {
+        (name, self.0.len(), self.0.capacity())
+    }
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@
 //! beside its clips: its clip parent's when that does not scroll, else
 //! the clip parent itself.
 
-use crate::slot_list;
+use crate::slot_list::SlotList;
 use rustc_hash::FxHashSet;
 
 use crate::clip_tree::ClipTree;
@@ -31,9 +31,9 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 /// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
-    own: Vec<Option<BoxRect>>,
-    inner: Vec<Option<BoxRect>>,
-    frame: Vec<usize>,
+    own: SlotList<Option<BoxRect>>,
+    inner: SlotList<Option<BoxRect>>,
+    frame: SlotList<usize>,
 }
 
 impl Clips {
@@ -41,17 +41,17 @@ impl Clips {
     #[cfg(test)]
     pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
         vec![
-            ("clips.own", self.own.len(), self.own.capacity()),
-            ("clips.inner", self.inner.len(), self.inner.capacity()),
-            ("clips.frame", self.frame.len(), self.frame.capacity()),
+            self.own.named("clips.own"),
+            self.inner.named("clips.inner"),
+            self.frame.named("clips.frame"),
         ]
     }
     /// Every box's clips; the slots that redid.
     pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
-            own: vec![None; tree.len()],
-            inner: vec![None; tree.len()],
-            frame: vec![PAGE; tree.len()],
+            own: vec![None; tree.len()].into(),
+            inner: vec![None; tree.len()].into(),
+            frame: vec![PAGE; tree.len()].into(),
         };
         let mut redone = Vec::new();
         if tree.len() > 0 {
@@ -63,9 +63,9 @@ impl Clips {
     /// `self` for `len` slots, the `freed` ones' clips cleared: an order
     /// splice (`order_splice.rs`); the added slots are redone after.
     pub(crate) fn spliced(&mut self, len: usize, freed: impl Iterator<Item = usize>) {
-        slot_list::resize(&mut self.own, len, None);
-        slot_list::resize(&mut self.inner, len, None);
-        slot_list::resize(&mut self.frame, len, PAGE);
+        self.own.resize(len, None);
+        self.inner.resize(len, None);
+        self.frame.resize(len, PAGE);
         for slot in freed {
             (self.own[slot], self.inner[slot], self.frame[slot]) = (None, None, PAGE);
         }
@@ -76,9 +76,9 @@ impl Clips {
     #[cfg(test)]
     pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
-            own: vec![None; inner.len()],
-            inner,
-            frame,
+            own: vec![None; inner.len()].into(),
+            inner: inner.into(),
+            frame: frame.into(),
         }
     }
 
