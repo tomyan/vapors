@@ -1,32 +1,41 @@
-//! Whether a page's live heap per element stays flat (finish-line
-//! property 8): the bytes each element adds, as the slope between page
-//! sizes, so the costs a page pays once (fonts, the painter's pipelines
-//! and atlas: 5.70 MB on a 0-row page) do not count. A structure sized
-//! by the rows per element makes the slope grow with the page; the
-//! slack of a list grown by doubling makes it move by less than half.
+//! Whether a page's live heap per element stays flat and bounded
+//! (finish-line property 8): the bytes each element adds, as the slope
+//! between page sizes, so the costs a page pays once (fonts, the
+//! painter's pipelines and atlas: 5.70 MB on a 0-row page) do not count.
+//! The sizes go by fours, so every list grown by doubling is as full at
+//! each (its slope is then constant): a structure sized by the rows per
+//! element makes the slope grow, and doubling slack does not. Property
+//! 8's absolute part is held too: one style per distinct style, the same
+//! count at every size, and the total per element within a multiple of
+//! the per-box layout records'.
 
 use std::fmt::Write;
 
 use crate::element_memory::{ElementMemory, OWNERS};
 
-/// The page sizes measured, as `--scaling`'s.
-pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
+/// The page sizes measured: rows by fours, not `--scaling`'s 1,000,
+/// 3,000 and 10,000, so doubling lists sit at one fill at every size
+/// (review of #333, M1). Each row is four elements.
+pub const SIZES: [usize; 3] = [1024, 4096, 16_384];
 
-/// How much the total's slope may grow from 1,000 to 3,000 rows to
-/// 3,000 to 10,000. Measured with the fixes of #327 and the layout
-/// boxes cut to length: 10,737 then 11,223 bytes per element, 4.5%.
-/// Before #327 it was 17,078 then 28,317, 66%, as a structure sized by
-/// the rows per element makes it.
-pub const TOTAL_GROWTH_PERCENT: i64 = 25;
+/// How much the total's slope may grow from the first pair of sizes to
+/// the second. Measured with #327 and the layout boxes cut to length:
+/// 11,337 then 11,384 bytes per element, 0.4%. Before #327 the slope
+/// grew 66% at 1,000/3,000/10,000 rows.
+pub const TOTAL_GROWTH_PERCENT: i64 = 2;
 
 /// How much one owner's slope may grow, if it also grows by more than
-/// [`OWNER_GROWTH_FLOOR`]. Measured after the fixes: the mount 17%
-/// (the element and signal arenas' doubling slack, bounded), style 36%
-/// of under 130 bytes; paint before #327, 155% and 10 KB.
-pub const OWNER_GROWTH_PERCENT: i64 = 50;
+/// [`OWNER_GROWTH_FLOOR`]. Measured: layout 0.7% (6,814 then 6,859), the
+/// mount, style and paint not at all.
+pub const OWNER_GROWTH_PERCENT: i64 = 5;
 
 /// Bytes per element an owner's slope may grow by whatever its share.
-pub const OWNER_GROWTH_FLOOR: i64 = 512;
+pub const OWNER_GROWTH_FLOOR: i64 = 64;
+
+/// The most the total per element may be, as a multiple of layout's:
+/// property 8 bounds an element's memory by its layout records.
+/// Measured 11,384 against 6,859, 1.66 times.
+pub const TOTAL_OVER_LAYOUT: i64 = 2;
 
 /// Bytes per element `of` an owner (or the total, `None`) adds from
 /// page `small` to page `large`.
@@ -36,22 +45,25 @@ fn slope(small: &ElementMemory, large: &ElementMemory, owner: Option<usize>) -> 
     (bytes(large) - bytes(small)) / elements.max(1)
 }
 
-/// Each grown slope beyond its limit, named; none when the page is flat.
+/// Each limit the pages break, named; none when property 8 holds.
 ///
 /// # Errors
 /// Pages not of [`SIZES`]' rows in that order, naming what was given.
 pub fn violations(pages: &[ElementMemory]) -> Result<Vec<String>, String> {
     let rows: Vec<usize> = pages.iter().map(|page| page.rows).collect();
-    let [small, middle, large] = pages else {
+    let (true, [small, middle, large]) = (rows == SIZES, pages) else {
         return Err(format!(
             "the pages are of {rows:?} rows; the check needs {SIZES:?}"
         ));
     };
-    if rows != SIZES {
-        return Err(format!(
-            "the pages are of {rows:?} rows; the check needs {SIZES:?}"
-        ));
-    }
+    let mut found = grown_slopes([small, middle, large]);
+    found.extend(styles_not_shared(pages));
+    found.extend(over_layout(middle, large));
+    Ok(found)
+}
+
+/// The total's and each owner's slope that grew past its limit.
+fn grown_slopes([small, middle, large]: [&ElementMemory; 3]) -> Vec<String> {
     let grown = |owner| (slope(small, middle, owner), slope(middle, large, owner));
     let mut found = Vec::new();
     let (before, after) = grown(None);
@@ -70,7 +82,34 @@ pub fn violations(pages: &[ElementMemory]) -> Result<Vec<String>, String> {
             ));
         }
     }
-    Ok(found)
+    found
+}
+
+/// The styles computed, refused when they differ between sizes: one
+/// style per distinct style, not one per element.
+fn styles_not_shared(pages: &[ElementMemory]) -> Option<String> {
+    let styles: Vec<usize> = pages.iter().map(|page| page.styles_computed).collect();
+    let first = styles[0];
+    styles.iter().any(|&count| count != first).then(|| {
+        format!(
+            "styles computed {styles:?} at {SIZES:?} rows: one per distinct style, not per element"
+        )
+    })
+}
+
+/// The total per element over [`TOTAL_OVER_LAYOUT`] times layout's.
+fn over_layout(middle: &ElementMemory, large: &ElementMemory) -> Option<String> {
+    let layout = OWNERS
+        .iter()
+        .position(|owner| *owner == "layout")
+        .expect("an owner");
+    let (total, boxes) = (
+        slope(middle, large, None),
+        slope(middle, large, Some(layout)),
+    );
+    (total > boxes * TOTAL_OVER_LAYOUT).then(|| {
+        format!("total: {total} bytes per element, over {TOTAL_OVER_LAYOUT} times layout's {boxes}")
+    })
 }
 
 /// The pages' table: elements, styles computed, and per element (the

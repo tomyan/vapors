@@ -80,13 +80,13 @@ fn a_small_owner_growing_by_under_the_floor_is_not_named() {
 #[test]
 fn pages_of_other_sizes_are_refused_naming_them() {
     // Given
-    let wrong: Vec<ElementMemory> = [1000, 3000].iter().map(|&rows| page(rows, flat)).collect();
+    let wrong: Vec<ElementMemory> = [1024, 4096].iter().map(|&rows| page(rows, flat)).collect();
 
     // When
     let refused = violations(&wrong).expect_err("two sizes");
 
     // Then
-    assert!(refused.contains("[1000, 3000]"), "{refused}");
+    assert!(refused.contains("[1024, 4096]"), "{refused}");
 }
 
 #[test]
@@ -97,10 +97,49 @@ fn the_table_shows_each_page_s_bytes_per_element_from_the_page_before() {
     // When
     let shown = table(&measured);
 
-    // Then: 3,000 rows add 8,000 elements of 11,000 bytes each
+    // Then: 4,096 rows add 12,288 elements of 11,000 bytes each
     let line = shown
         .lines()
-        .find(|line| line.starts_with("| 3000 |"))
+        .find(|line| line.starts_with("| 4096 |"))
         .expect("a row");
     assert!(line.contains("| 11000 |"), "{line}");
+}
+
+#[test]
+fn a_style_computed_per_element_is_named() {
+    // Given: the largest page computes a style for each of its rows
+    let mut measured = pages(flat);
+    measured[2].styles_computed = SIZES[2];
+
+    // When
+    let found = violations(&measured).expect("the sizes");
+
+    // Then
+    assert!(
+        found
+            .iter()
+            .any(|line| line.starts_with("styles computed [4, 4, 16384]")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_total_over_twice_layout_per_element_is_named() {
+    // Given: 9 KB of paint an element beside 7 KB of layout, flat
+    let heavy = |elements: i64| {
+        let mut owners = flat(elements);
+        owners[3] = 9000 * elements;
+        owners
+    };
+
+    // When
+    let found = violations(&pages(heavy)).expect("the sizes");
+
+    // Then
+    assert!(
+        found
+            .iter()
+            .any(|line| line.starts_with("total: 18000 bytes per element, over 2 times")),
+        "{found:?}"
+    );
 }

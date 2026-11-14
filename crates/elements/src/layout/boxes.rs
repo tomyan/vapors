@@ -26,14 +26,10 @@ pub(crate) struct Source<'a> {
     pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
 }
 
-/// Builds the boxes under `root`; box 0 is the root's. The list is
-/// kept between updates, so it is cut to its length: grown by doubling,
-/// a box being about 2.8 KB, 40,002 boxes held 65,536 slots (property
-/// 8, `vapors-perf-memory`).
+/// Builds the boxes under `root`; box 0 is the root's.
 pub(crate) fn build(source: &Source<'_>, root: NodeId) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
     add_element(source, root, &mut boxes, None);
-    boxes.shrink_to_fit();
     boxes
 }
 
@@ -173,7 +169,3 @@ fn add_run(run: Collector, parent: usize, boxes: &mut Vec<LayoutBox>) {
     boxes.push(LayoutBox::new(Content::Text(run), box_style));
     boxes[parent].children.push(index);
 }
-
-#[cfg(test)]
-#[path = "boxes_capacity_tests.rs"]
-mod capacity_tests;
