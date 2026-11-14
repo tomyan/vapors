@@ -24,22 +24,6 @@ fn from_sorted_keeps_the_order_across_blocks() {
 }
 
 #[test]
-fn from_sorted_holds_about_one_slot_per_item() {
-    // Given: 10,000 rows' entries, as the extents index holds
-    let len = 10_000;
-
-    // When
-    let blocks = counted(len);
-
-    // Then: each block holds at most a block's slots, not the list's
-    assert!(
-        blocks.capacity() <= len + CAP,
-        "{} slots for {len} items",
-        blocks.capacity()
-    );
-}
-
-#[test]
 fn partition_point_finds_the_first_item_failing_the_predicate_in_any_block() {
     // Given
     let blocks = counted(3 * CAP);

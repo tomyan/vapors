@@ -9,7 +9,10 @@
 //! so a block count up to the item count keeps every search
 //! logarithmic and every move under `CAP`. A position is a block and an
 //! offset, valid until the next insert or remove; the end is the
-//! position after the last block. The layout lane's sum tree
+//! position after the last block. No block holds over `CAP` slots and a
+//! removal halves one left under a quarter full: at most four slots an
+//! item and one block more on every path (`blocks_capacity_tests.rs`).
+//! The layout lane's sum tree
 //! (`docs/plans/splice-layout.md`) may converge with this type later.
 
 /// The most items in a block: 128 entries of 48 bytes are 6 KB,
@@ -59,16 +62,17 @@ pub(crate) struct Blocks<T> {
 }
 
 impl<T> Blocks<T> {
-    /// The list of `items`, already in order.
-    /// Each block is made with a block's slots: splitting the list's
-    /// own `Vec` would leave each head with the capacity of everything
-    /// after it, n²/256 slots in all (395,632 for 10,000 items).
+    /// The list of `items`, already in order, each block made with `CAP`
+    /// slots (splitting the list's own `Vec` left each head the capacity
+    /// of all after it: 395,632 slots for 10,000 items).
     pub(crate) fn from_sorted(items: Vec<T>) -> Self {
         let len = items.len();
         let mut chunks = Vec::with_capacity(len.div_ceil(CAP));
         let mut items = items.into_iter();
         while items.len() > 0 {
-            chunks.push(items.by_ref().take(CAP).collect());
+            let mut block = Vec::with_capacity(CAP);
+            block.extend(items.by_ref().take(CAP));
+            chunks.push(block);
         }
         Self {
             chunks,
@@ -88,12 +92,6 @@ impl<T> Blocks<T> {
     /// How many blocks hold the items.
     pub(crate) fn block_count(&self) -> usize {
         self.chunks.len()
-    }
-
-    /// Slots the blocks hold, used or not.
-    #[cfg(test)]
-    pub(crate) fn capacity(&self) -> usize {
-        self.chunks.iter().map(Vec::capacity).sum()
     }
 
     /// Items moved by every insert and remove so far.
@@ -211,3 +209,7 @@ mod tests;
 #[cfg(test)]
 #[path = "blocks_edit_tests.rs"]
 mod edit_tests;
+
+#[cfg(test)]
+#[path = "blocks_capacity_tests.rs"]
+mod capacity_tests;
