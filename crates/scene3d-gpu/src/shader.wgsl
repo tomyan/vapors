@@ -1,6 +1,8 @@
 // The scene's one pipeline: positions through the mesh's world matrix
 // and the camera's view-projection, filled with the mesh's colour times
-// each vertex's shade (docs/plans/one-scene.md D4), its alpha kept.
+// each vertex's shade (docs/plans/one-scene.md D4), its alpha kept. The
+// multiply is on the sRGB-encoded channels, as the racer's baked shades
+// were; not linear light.
 
 struct Camera {
     view_projection: mat4x4<f32>,

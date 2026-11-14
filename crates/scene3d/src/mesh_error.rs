@@ -64,7 +64,11 @@ pub enum MeshError {
 pub(crate) const MAX_BUFFER_BYTES: usize = 256 * 1024 * 1024;
 
 /// A vertex as uploaded: its position's three floats, then its shade.
-const VERTEX_BYTES: usize = std::mem::size_of::<Vec3>() + std::mem::size_of::<f32>();
+/// The one answer to the vertex's size: the size check here, the
+/// renderer's upload and its pipeline's stride all use it, and
+/// `vapors-scene3d-gpu`'s `geometry_tests.rs` and `pipeline_tests.rs`
+/// fail when the upload or the attributes disagree with it.
+pub const VERTEX_BYTES: usize = std::mem::size_of::<Vec3>() + std::mem::size_of::<f32>();
 const INDEX_BYTES: usize = std::mem::size_of::<u32>();
 
 /// Refuses buffers of `positions` and `indices` that exceed

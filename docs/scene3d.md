@@ -41,7 +41,7 @@ the field; nothing is clamped.
 ```rust
 let scene = Rc::new(RefCell::new(Scene::new()));
 let meshes = Rc::new(RefCell::new(Meshes::new()));
-let square = meshes.borrow_mut().geometry(positions, indices)?; // a GeometryHandle
+let square = meshes.borrow_mut().geometry(positions, indices, shades)?; // a GeometryHandle
 let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
 let surface = app.mount("view", Box::new(renderer))?;
 ```
@@ -54,7 +54,9 @@ let surface = app.mount("view", Box::new(renderer))?;
   unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
 - `Meshes::geometry(positions, indices, shades)` takes a shade from 0
   to 1 for each position (one-scene D4, row R1): the vertex is drawn
-  in that fraction of the node's colour, so one CSS colour gives a
+  in that fraction of the node's colour (multiplied on the
+  sRGB-encoded channels, as the racer's baked shades were; not linear
+  light), so one CSS colour gives a
   shaded solid without lights or normals; the shade does not follow
   the camera. Not one shade per position, or one outside 0 to 1, is
   refused; there is no default. It validates triangles and returns a

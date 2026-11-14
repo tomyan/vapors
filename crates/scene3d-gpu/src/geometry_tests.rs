@@ -88,3 +88,28 @@ fn a_mesh_whose_geometry_is_not_uploaded_has_no_buffers() {
         })
     );
 }
+
+#[test]
+fn each_uploaded_vertex_is_the_size_the_scene_checks() {
+    // Given
+    let mut meshes = Meshes::new();
+    let geometry = meshes
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![0.5; 3],
+        )
+        .unwrap();
+
+    // When
+    let bytes = vertex_bytes(meshes.get(geometry.id()).expect("held"));
+
+    // Then
+    assert_eq!(
+        bytes.len(),
+        3 * vapors_scene3d::VERTEX_BYTES,
+        "the upload writes {} bytes for 3 vertices; VERTEX_BYTES is {}: change both together (vapors-scene3d mesh_error.rs and geometry.rs)",
+        bytes.len(),
+        vapors_scene3d::VERTEX_BYTES
+    );
+}

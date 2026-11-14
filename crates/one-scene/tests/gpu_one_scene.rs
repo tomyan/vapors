@@ -26,8 +26,7 @@ const GEOMETRY_BYTES: u64 = 24 * 16 + 36 * 4 + 4 * 16 + 6 * 4;
 
 /// Frame 0's surface work: the geometry, four mesh uniforms, the
 /// camera's 64 bytes, and 112 more outside the scene renderer (measured
-/// 2026-11-14: 808 in all before the cube had its own vertices a face; not
-/// derived).
+/// 2026-11-14; not derived): 1112 in all.
 const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 64 + 112;
 
 /// The surface's own draw in the composition, beside the meshes'.

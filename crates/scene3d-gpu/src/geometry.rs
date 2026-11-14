@@ -94,12 +94,17 @@ impl GpuGeometry {
     }
 }
 
-fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
-    // each vertex: its position's three floats, then its shade
-    let positions: Vec<u8> = (geometry.positions().iter().zip(geometry.shades()))
+/// Each vertex's position's three floats, then its shade
+/// ([`vapors_scene3d::VERTEX_BYTES`] a vertex).
+fn vertex_bytes(geometry: &Geometry) -> Vec<u8> {
+    (geometry.positions().iter().zip(geometry.shades()))
         .flat_map(|(position, shade)| position.extend(*shade).to_array())
         .flat_map(f32::to_le_bytes)
-        .collect();
+        .collect()
+}
+
+fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
+    let positions = vertex_bytes(geometry);
     let indices: Vec<u8> = geometry
         .indices()
         .iter()
