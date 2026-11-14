@@ -270,3 +270,24 @@ fn a_second_watch_of_one_anchor_is_refused() {
     // Then
     assert!(refused.contains("already watched"), "{refused}");
 }
+
+#[test]
+fn a_mesh_under_a_refused_anchor_style_reports_nothing_until_it_is_fixed() {
+    // Given: drawn red; then the scene anchor declares a `color` it
+    // does not read, which the mesh would inherit
+    let (mut doc, mesh, seen) = watched(
+        ".body { color: #ff0000; }\n.bad { color: #0000ff; }\n.bad mesh { color: inherit; }",
+    );
+    updated(&mut doc);
+    let scene = doc.parent(mesh).expect("in the scene");
+    doc.set_attribute(scene, "class", "stage bad");
+
+    // When
+    let refused = refusals(&mut doc).join("\n");
+    doc.set_attribute(scene, "class", "stage");
+    updated(&mut doc);
+
+    // Then: the refused update reported nothing, and the fix nothing new
+    assert!(refused.contains("<scene class=\"stage bad\">"), "{refused}");
+    assert_eq!(*seen.borrow(), [RED]);
+}

@@ -41,6 +41,23 @@ impl Document {
         )
     }
 
+    /// Whether `node` is watched and an ancestor's style is refused: the
+    /// mesh may inherit the refused value, so its sink hears nothing
+    /// until the restyle that fixes the ancestor reaches it.
+    pub(crate) fn held_back(&self, node: NodeId) -> bool {
+        let kept = self.kept.as_ref().expect("restyle sets it");
+        let refused = |ancestor: &NodeId| kept.refused.get(ancestor).is_some_and(|r| !r.is_empty());
+        self.sinks.contains_key(&node) && self.chain(node).iter().skip(1).any(refused)
+    }
+
+    /// Keeps `node` as its sink last heard it: no `Used`, no refusal of
+    /// its own, its kept appearance unchanged.
+    pub(crate) fn hold(&mut self, node: NodeId) {
+        let kept = self.kept.as_mut().expect("restyle sets it");
+        kept.used.remove(&node);
+        kept.refused.insert(node, Vec::new());
+    }
+
     /// Drops the sinks in `node`'s subtree, which is being removed.
     pub(crate) fn drop_sinks(&mut self, node: NodeId) {
         if self.sinks.is_empty() {

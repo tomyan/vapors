@@ -17,6 +17,10 @@ impl Document {
             return false;
         };
         let found = scene_used(self.element_styles(node), &context);
+        if found.is_ok() && self.held_back(node) {
+            self.hold(node);
+            return true;
+        }
         let old = self.scene_used(node);
         let refused = match &found {
             Ok(used) => self.report_appearance(node, old, used),
