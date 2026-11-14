@@ -863,14 +863,16 @@ Lane frames are lighter than scroll frames:
   keeps today's placement for its children (correct, O(rows after)),
   counted as a decline, `LaneFramePixel`; a lane whose framing flips
   has its children placed and their clips redone, O(children), rare.
-- A lane with a scroll container inside one of its children is not
-  framed: a scroll frame's shift is worked out from the frame it is in
-  when frames are made, and a lane frame is resolved later. This is a
-  counted decline (`LaneFrameScroller`) of that lane alone: its
-  children keep today's placement (correct, O(rows after)) and the
-  page is laid out and painted as before. Real pages put scrollers in
-  rows (the touche shell does), so lifting it, with scroll frames
-  composing their shift on read, is a follow-up to measure.
+- A lane with a scroll container inside one of its children is framed
+  too (4e; until 4e it was a counted decline, `LaneFrameScroller`).
+  Real pages put scrollers in rows: the touche shell does, and so does
+  the rows page `--scaling Insert` measures (each row's `.value` hides
+  its overflow). A scroll frame's shift was worked out from the frame
+  it is in when frames were made, and a lane frame is resolved later,
+  so a scroll frame inside a row would hold a shift that an insert
+  above it makes stale. From 4e a scroll frame whose outer frame is a
+  lane frame, or a scroll frame under one, keeps only what is its own
+  (section 11.2, "Scroll frames under a lane frame").
 
 ### 11.2 What each side does
 
@@ -914,6 +916,25 @@ Lane frames are lighter than scroll frames:
   the drawing steps, the extents index and the hits by its edits, the
   new child's steps added and the removed child's taken out, O(that
   child's steps).
+- **Scroll frames under a lane frame** (4e): a scroll frame whose
+  outer frame is a lane frame, or such a scroll frame, keeps its own
+  part only: its scroll shift and the clip it gives its content, in its
+  outer frame's coordinates (`Clips::inner`, which already is). Its
+  shift and clip on the page are composed when it is read: the outer
+  frame's, resolved (a lane frame's from its lane, section 11.1), plus
+  its own, memoised with the lane frames until the next update, as
+  `Frames::at` does for them. Made and updated as today
+  (`frames_update.rs`), only the stored part is relative, so an insert
+  above the row changes no stored frame, and a scroll inside the row
+  updates that frame and the ones nested in it alone. Each frame's
+  index of the scroll containers in it (`frames_nested.rs`) is in that
+  frame's coordinates, so a row's index is untouched by an insert and
+  culling finds a row's scrollers through the row's frame. The frames
+  are told which frames are lane frames when they are made
+  (`FrameInputs`), as placement decided them, so making a frame does
+  not resolve a lane frame. The scroller sets in `FrameFacts`, the
+  isolated owners' noting of them (`note_scrollers`) and the
+  `LaneFrameScroller` decline go.
 - **Hits** (4d): the kept hits are by frame; a hit test asks the
   frames that can show at its point (`Frames::meeting`, which finds a
   lane's rows through `between`) and tests their hits alone, the last
@@ -934,6 +955,7 @@ Lane frames are lighter than scroll frames:
 | 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged |
 | 4c | Layout leaves starts out of later children's layouts; the layout check derives them | the layout check derives every start |
 | 4d | Culling and hits through `between`; the lane's extents entry | hits through `between` match the scan |
+| 4e | Scroll frames under a lane frame composed on read; the `LaneFrameScroller` decline goes | the rows page's list framed (`lanes_framed` above 0 for `--scaling Insert`); the Chromium paint comparisons, the frames, placement and kept-paint checks unchanged with a scroller in a framed row |
 
 4b, 4c and 4d are separate stacked pull requests, each reviewed alone,
 then folded into 4d and gated once, so main never carries 4b's added
