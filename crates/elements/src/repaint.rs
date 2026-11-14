@@ -4,8 +4,6 @@
 
 use std::mem::take;
 
-use vapors_scene::Scene;
-
 use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
@@ -67,12 +65,7 @@ impl<'a> Repaint<'a> {
         let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
         crate::paint_outline::paint_outline(layout_box, rect, input, &mut self.scratch);
         painted.slabs = take(&mut self.scratch.slabs);
-        KeptBox {
-            from,
-            own,
-            outline: take(&mut self.scratch.scene),
-            thumb: Scene::new(),
-        }
+        KeptBox::new(from, own, take(&mut self.scratch.scene))
     }
 
     /// Paints the thumbs of the scroll containers `slots` into their
@@ -89,7 +82,7 @@ impl<'a> Repaint<'a> {
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
             painted.items_built += thumb.items().len();
-            kept_mut(painted, slot).thumb = thumb;
+            kept_mut(painted, slot).set_thumb(thumb);
         }
     }
 }

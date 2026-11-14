@@ -177,8 +177,12 @@ pub struct Scene {
 impl Scene {
     /// An empty scene.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            clips: Vec::new(),
+            clip: None,
+        }
     }
 
     /// Appends `item`, over everything before it, under the current
