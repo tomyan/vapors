@@ -917,6 +917,23 @@ Lane frames are lighter than scroll frames:
 | Slice | Content | Accepted when |
 |---|---|---|
 | 4a | This note (approved by the lead, 2026-11-14; ships with 4b) | reviewed |
-| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged; `--scaling Insert` `paint` within 2% across sizes |
-| 4c | Layout leaves starts out of later children's layouts; the layout check derives them | `layout` within 2% across sizes for Insert and FlexInsert |
-| 4d | Culling and hits through `between`; the lane's extents entry | every phase but `accessibility` within 2% across sizes |
+| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged |
+| 4c | Layout leaves starts out of later children's layouts; the layout check derives them | the layout check derives every start |
+| 4d | Culling and hits through `between`; the lane's extents entry | hits through `between` match the scan |
+
+4b, 4c and 4d are separate stacked pull requests, each reviewed alone,
+then folded into 4d and gated once, so main never carries 4b's added
+per-row cost alone. Measured on 4b alone (instructions per extra row,
+1000 to 3000 rows, base to 4b): Insert accessibility 9406 to 9849,
+layout 964 to 1632, paint 11,883 to 12,319; FlexInsert accessibility
+1770 to 3358, layout 605 to 945, paint 2818 to 3297. Each lane frame
+read by the take folds the lane once (O(B log n)); an insert's
+reshaped walk makes the extents index afresh, now one frame index per
+row; and the start writes stay until 4c.
+
+The folded 4b+4c+4d is accepted when, for `--scaling Insert` and
+`FlexInsert`, every phase but `accessibility` is within 2% across sizes,
+and `accessibility` is within its ceiling (`INSERT_A11Y_PER_ROW`,
+`FLEX_INSERT_A11Y_PER_ROW`) and no more per row than the base, without
+raising either; any term left over the base is reported before the
+gate.
