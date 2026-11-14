@@ -1,10 +1,45 @@
 //! The measurement's own targets, passes and pipelines, for the
-//! methods the renderer does not have (MSAA, the corner prototype).
+//! methods the renderer does not have (MSAA, the corner prototype), and
+//! the renderer's target for the methods it has.
 
-use vapors_gpu_harness::Gpu;
+use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_renderer::pipelines::{render_pipeline, shader_module};
+use vapors_renderer::{FrameEncoder, Target, clear};
+use vapors_scene::Color;
 
-const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+use crate::cases::PAGE;
+
+/// The page's pixels after `draw` records into a renderer target of
+/// `viewport` cleared to the page colour.
+pub fn drawn_on(
+    gpu: &Gpu,
+    viewport: vapors_scene::Size,
+    draw: impl FnOnce(&Target<'_>),
+) -> Vec<u8> {
+    let page = Color::from_rgba8(PAGE[0], PAGE[1], PAGE[2], PAGE[3]);
+    let target = clear(
+        &gpu.device,
+        &gpu.queue,
+        viewport.width,
+        viewport.height,
+        page,
+    );
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
+    draw(&Target {
+        device: &gpu.device,
+        queue: &gpu.queue,
+        encoder: &encoder,
+        view: &view,
+        viewport,
+        scissor: None,
+    });
+    encoder.submit(&gpu.queue).expect("no draw refused");
+    read_rgba8(&gpu.device, &gpu.queue, &target)
+}
+
+/// The format of every target here, `clear`'s as well.
+pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 /// A target of `size` with `samples` samples a pixel; a single-sample
 /// one can be read back.
@@ -92,31 +127,38 @@ pub fn pipeline_of(
         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
         write_mask: wgpu::ColorWrites::ALL,
     })];
-    render_pipeline(
-        device,
-        &wgpu::RenderPipelineDescriptor {
-            label: Some("aa_methods"),
-            layout: None,
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &buffers,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &targets,
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: samples,
-                ..Default::default()
-            },
-            multiview_mask: None,
-            cache: None,
+    render_pipeline(device, &descriptor(&shader, &buffers, &targets, samples))
+}
+
+fn descriptor<'a>(
+    shader: &'a wgpu::ShaderModule,
+    buffers: &'a [Option<wgpu::VertexBufferLayout<'a>>],
+    targets: &'a [Option<wgpu::ColorTargetState>],
+    samples: u32,
+) -> wgpu::RenderPipelineDescriptor<'a> {
+    let options = wgpu::PipelineCompilationOptions::default;
+    wgpu::RenderPipelineDescriptor {
+        label: Some("aa_methods"),
+        layout: None,
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_main"),
+            compilation_options: options(),
+            buffers,
         },
-    )
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some("fs_main"),
+            compilation_options: options(),
+            targets,
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState {
+            count: samples,
+            ..Default::default()
+        },
+        multiview_mask: None,
+        cache: None,
+    }
 }

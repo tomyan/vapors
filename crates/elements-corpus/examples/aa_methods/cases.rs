@@ -69,6 +69,39 @@ pub fn closed_cases() -> [ClosedCase; 4] {
     ]
 }
 
+/// The closed forms at a quarter-pixel stroke (#345 review, M4): a
+/// circle and a rect, for the closed-form pipeline's ramp.
+pub fn sub_pixel_closed_cases() -> [ClosedCase; 2] {
+    use vapors_shapes::Geometry::{Ellipse, Rect};
+    let case = |name, path, geometry| ClosedCase {
+        shape: Icon {
+            name,
+            path,
+            stroke: 0.25,
+        },
+        geometry,
+    };
+    [
+        case(
+            "0.25px circle",
+            "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0z",
+            Ellipse {
+                centre: [8.0, 8.0],
+                radii: [6.0, 6.0],
+            },
+        ),
+        case(
+            "0.25px rect",
+            "M3 4h10v8h-10z",
+            Rect {
+                origin: [3.0, 4.0],
+                size: [10.0, 8.0],
+                radius: [0.0, 0.0],
+            },
+        ),
+    ]
+}
+
 pub const ICONS: [Icon; 10] = [
     icon("open", "M1.5 4.5v8h13v-7h-6l-1.5-1.5h-5.5z"),
     icon("paste", "M5 3H3v11h10V3h-2M5.5 2h5v2.5h-5z"),

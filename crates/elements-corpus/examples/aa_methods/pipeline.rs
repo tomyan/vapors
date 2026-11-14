@@ -2,12 +2,13 @@
 //! with its outline moved half a device pixel out and coverage from its
 //! triangles' corner wedges, the exact-corner method S3b chose (S3a3).
 
-use vapors_gpu_harness::{Gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, MeshEntries, MeshPipeline, MeshShape, Target, clear};
+use vapors_gpu_harness::Gpu;
+use vapors_renderer::{MeshEntries, MeshPipeline, MeshShape};
 use vapors_scene::{Color, Size};
 use vapors_shapes::{IconPath, MeshTriangle, Paint, tessellate};
 
-use crate::cases::{CELL, Icon, PAGE, Placement, transform};
+use crate::cases::{CELL, Icon, Placement, transform};
+use crate::offscreen::drawn_on;
 
 /// `icon` stroked and tessellated within `tolerance_px` device pixels
 /// at `scale` device pixels per unit.
@@ -40,47 +41,29 @@ pub fn drawn(
     ink: [u8; 4],
     tolerance_px: f32,
 ) -> Vec<u8> {
-    let viewport = size(icons.len(), placement);
-    let page = Color::from_rgba8(PAGE[0], PAGE[1], PAGE[2], PAGE[3]);
-    let target = clear(
-        &gpu.device,
-        &gpu.queue,
-        viewport.width,
-        viewport.height,
-        page,
-    );
-    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
-    let encoder = FrameEncoder::new(&gpu.device);
-    let on = Target {
-        device: &gpu.device,
-        queue: &gpu.queue,
-        encoder: &encoder,
-        view: &view,
-        viewport,
-        scissor: None,
-    };
-    let mut entries = MeshEntries::new(&gpu.device);
     let meshes: Vec<_> = icons
         .iter()
         .map(|icon| mesh(icon, tolerance_px, scale(placement)))
         .collect();
-    let written: Vec<_> = meshes
-        .iter()
-        .map(|m| entries.write(&on, m).expect("room"))
-        .collect();
     let colour = Color::from_rgba8(ink[0], ink[1], ink[2], ink[3]);
-    let items: Vec<_> = (0u32..)
-        .zip(&written)
-        .map(|(at, entry)| {
-            let shape = MeshShape::new(transform(placement, at), colour)
-                .expect("drawable")
-                .expect("has area");
-            (shape, entry)
-        })
-        .collect();
-    MeshPipeline::new(&gpu.device, target.format()).draw(&on, &mut entries, &items);
-    encoder.submit(&gpu.queue).expect("no draw refused");
-    read_rgba8(&gpu.device, &gpu.queue, &target)
+    drawn_on(gpu, size(icons.len(), placement), |on| {
+        let mut entries = MeshEntries::new(on.device);
+        let written: Vec<_> = meshes
+            .iter()
+            .map(|m| entries.write(on, m).expect("room"))
+            .collect();
+        let items: Vec<_> = (0u32..)
+            .zip(&written)
+            .map(|(at, entry)| (shape(transform(placement, at), colour), entry))
+            .collect();
+        MeshPipeline::new(on.device, crate::offscreen::FORMAT).draw(on, &mut entries, &items);
+    })
+}
+
+fn shape(transform: [f32; 6], colour: Color) -> MeshShape {
+    MeshShape::new(transform, colour)
+        .expect("drawable")
+        .expect("has area")
 }
 
 /// The device pixels per unit the placement draws at, for flattening:
