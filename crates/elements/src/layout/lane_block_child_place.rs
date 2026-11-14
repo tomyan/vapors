@@ -7,8 +7,8 @@
 
 use taffy::util::MaybeResolve;
 use taffy::{
-    AlignItemsKeyword, AlignmentSafety, Direction, LayoutOutput, Overflow, Point, Rect, Size,
-    TextAlign,
+    AlignItemsKeyword, AlignmentSafety, Contain, Direction, LayoutOutput, Overflow, Point, Rect,
+    Size, TextAlign,
 };
 
 use super::lane_block::Container;
@@ -132,7 +132,7 @@ pub(super) fn contribution(
     placing: &Placing,
 ) -> ([f64; 2], [f64; 2]) {
     let rect = output.scrollable_overflow_rect;
-    let propagates = propagates(item);
+    let propagates = propagates(item.overflow, item.contain);
     let end = end_extent(placing.size, rect, propagates);
     if end.width <= 0.0 || end.height <= 0.0 {
         return (
@@ -155,19 +155,19 @@ pub(super) fn contribution(
     (along, across)
 }
 
-/// On which axes the child's own overflow reaches its parent (34-41).
-fn propagates(item: &Item) -> Point<bool> {
-    let scrolls = item.overflow.x.is_scroll_container() || item.overflow.y.is_scroll_container();
-    let contained = item.contain.contains_scrollable_overflow();
-    let on = |overflow: Overflow| !scrolls && !contained && overflow == Overflow::Visible;
+/// On which axes a child's own overflow reaches its parent (34-41).
+pub(super) fn propagates(overflow: Point<Overflow>, contain: Contain) -> Point<bool> {
+    let scrolls = overflow.x.is_scroll_container() || overflow.y.is_scroll_container();
+    let contained = contain.contains_scrollable_overflow();
+    let on = |axis: Overflow| !scrolls && !contained && axis == Overflow::Visible;
     Point {
-        x: on(item.overflow.x),
-        y: on(item.overflow.y),
+        x: on(overflow.x),
+        y: on(overflow.y),
     }
 }
 
 /// How far the child's box or overflow ends past its start (42-45).
-fn end_extent(size: Size<f32>, rect: Rect<f32>, propagates: Point<bool>) -> Size<f32> {
+pub(super) fn end_extent(size: Size<f32>, rect: Rect<f32>, propagates: Point<bool>) -> Size<f32> {
     Size {
         width: if propagates.x {
             size.width.max(rect.right)
@@ -183,7 +183,7 @@ fn end_extent(size: Size<f32>, rect: Rect<f32>, propagates: Point<bool>) -> Size
 }
 
 /// How far before its start the child's overflow begins (49-52).
-fn start_extent(rect: Rect<f32>, propagates: Point<bool>) -> Point<f32> {
+pub(super) fn start_extent(rect: Rect<f32>, propagates: Point<bool>) -> Point<f32> {
     Point {
         x: if propagates.x {
             rect.left.min(0.0)

@@ -4,8 +4,10 @@
 //! quarter, so Taffy's f32 running sums and the fold's f64 sums agree
 //! to the bit.
 
-use compare::{Compared, compare};
-use page::{element, page};
+use compare::compare;
+
+use crate::layout::lane_compare::Compared;
+use crate::layout::lane_page::{element, page};
 
 use crate::lane_decline::LaneDecline;
 
@@ -13,8 +15,6 @@ use crate::lane_decline::LaneDecline;
 mod compare;
 #[path = "lane_block_decline_tests.rs"]
 mod declines;
-#[path = "lane_block_page.rs"]
-mod page;
 
 /// The page's block-in-block containers were all answered as Taffy
 /// did, each asked once, for its layout.
@@ -176,4 +176,24 @@ fn flex_items_ask_blocks_size_queries_and_short_answers() {
         declined: vec![],
     };
     assert_eq!(compared, expected);
+}
+
+#[test]
+fn a_scroll_container_with_an_empty_child_is_laid_out() {
+    // Given: a scrolling list holding a child of no width, which adds
+    // nothing to the list's overflow
+    let css = "body { margin: 0; } .list { height: 40px; overflow: auto; } \
+               .row { height: 20px; } .empty { width: 0; height: 10px; }";
+    let mut doc = page(css, |doc, body| {
+        let list = element(doc, body, "list", None);
+        element(doc, list, "row", Some("row"));
+        element(doc, list, "empty", None);
+        element(doc, list, "row", Some("row"));
+    });
+
+    // When
+    let compared = compare(&mut doc);
+
+    // Then: html, body, the list and its two rows
+    assert_all_laid_out(&compared, 5);
 }

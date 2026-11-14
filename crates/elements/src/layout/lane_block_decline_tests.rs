@@ -2,8 +2,8 @@
 //! page still answered as Taffy did.
 
 use super::compare::compare;
-use super::page::{element, page};
 use crate::lane_decline::LaneDecline;
+use crate::layout::lane_page::{element, page};
 
 #[test]
 fn an_empty_child_declines_its_container_as_collapsing_through() {

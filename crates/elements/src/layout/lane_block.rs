@@ -10,7 +10,7 @@
 //! `=0.15.1` pin in `Cargo.toml` makes a bump a re-read of these lines.
 //!
 //! Taffy is MIT licensed, and the mirrored lines in the
-//! `lane_block*.rs` modules carry its notice:
+//! `lane_block*.rs` and `lane_flex*.rs` modules carry its notice:
 //!
 //! Copyright (c) 2018 Visly Inc. Copyright (c) 2026 Taffy Authors.
 //! Permission is hereby granted, free of charge, to any person
