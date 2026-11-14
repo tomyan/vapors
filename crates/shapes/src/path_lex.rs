@@ -120,7 +120,7 @@ impl<'a> Cursor<'a> {
         self.skip_separator();
         let start = self.at;
         self.skip_sign();
-        let mantissa = self.digits() + self.fraction();
+        let mantissa = self.digits() + self.fraction()?;
         if mantissa == 0 {
             self.at = start;
             return Err(self.expected("a number", "write the argument as digits such as 4 or -1.5"));
@@ -129,7 +129,8 @@ impl<'a> Cursor<'a> {
         let text = &self.text[start..self.at];
         let value: f32 = text.parse().unwrap_or(f32::NAN);
         if value.is_finite() {
-            return Ok(value);
+            // -0 draws as 0, so it is 0: one canonical form for one shape.
+            return Ok(if value == 0.0 { 0.0 } else { value });
         }
         self.at = start;
         Err(self.error(format!(
@@ -157,12 +158,20 @@ impl<'a> Cursor<'a> {
         self.at - start
     }
 
-    fn fraction(&mut self) -> usize {
+    /// The digits after a decimal point; at least one must follow the
+    /// point, as Chromium reads it (`1.` is refused).
+    fn fraction(&mut self) -> Result<usize, PathError> {
         if self.peek() != Some(b'.') {
-            return 0;
+            return Ok(0);
         }
         self.advance();
-        self.digits()
+        let digits = self.digits();
+        if digits == 0 {
+            return Err(self.error(
+                "expected a digit after the decimal point to make a number such as 1.5; Chromium refuses 1.",
+            ));
+        }
+        Ok(digits)
     }
 
     fn exponent(&mut self) -> Result<(), PathError> {

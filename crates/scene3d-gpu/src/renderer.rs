@@ -77,8 +77,9 @@ impl SurfaceRenderer for SceneRenderer {
 }
 
 impl Mounted {
-    /// Writes the slot of each mesh node that does not hold the node's
-    /// current world version: new, moved, or in a grown buffer.
+    /// Writes the slot of each shown mesh node that does not hold the
+    /// node's current world version: new, moved, recoloured, or in a
+    /// grown buffer. A hidden node's slot is written once it is shown.
     fn write_slots(
         &mut self,
         frame: &SurfaceFrame<'_>,
@@ -87,7 +88,7 @@ impl Mounted {
     ) -> Result<(), FrameError> {
         let ids: Vec<NodeId> = nodes.iter().map(|mesh| mesh.node).collect();
         self.slots.assign(frame.device, &self.pipeline, &ids)?;
-        for mesh in nodes {
+        for mesh in nodes.iter().filter(|mesh| mesh.visible) {
             let version = scene.world_version(mesh.node)?;
             if !self.slots.holds(mesh.node, version) {
                 let world = scene.world(mesh.node)?;
@@ -106,6 +107,7 @@ impl Mounted {
     ) -> Result<(), FrameError> {
         let draws = nodes
             .iter()
+            .filter(|mesh| mesh.visible)
             .map(|mesh| Ok((self.offset(mesh.node), self.geometry.get(mesh)?)))
             .collect::<Result<Vec<_>, FrameError>>()?;
         let pass = Pass {

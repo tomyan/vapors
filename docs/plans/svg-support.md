@@ -723,6 +723,8 @@ and compositing batch; V13 to V17 and V20 to V23 follow by demand.
 
 ## 6. Decisions for Tom
 
+**Decided 2026-11-13 (Tom): D1 to D10 all as recommended.** D1 (a) flatten at build time, tolerance per entry; D2 (a) closed forms analytic, paths and masks through a coverage texture (S2's shapes antialias by a half-pixel outline extrusion, #306); D3 layers built in V11; D4 (a) `<use>` by compile-time expansion with the ancestor-rule refusal; D5 the two filter sets; D6 (a) atlas upright, outlines under a transform; D7 SMIL out; D8 (a) hit testing by the painted shape; D9 (a) bound presentation attributes refused; D10 (a) after property 9, V1 to V7 first.
+
 **D1. Curves: flattened at build time, or evaluated in the shader.**
 (a) Flatten at build time at a tolerance for the entry's largest
 scale, recorded per entry; a draw past that scale tessellates again at

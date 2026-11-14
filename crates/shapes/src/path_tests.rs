@@ -1,5 +1,6 @@
-//! The icon subset of SVG path data: what parses to which commands.
-//! Arcs are in `path_arc_tests.rs`, refusals in
+//! The subset of SVG path data: what parses to which commands.
+//! Arcs are in `path_arc_tests.rs`, curves in `path_curve_tests.rs`,
+//! the pen's segments in `path_pen_tests.rs`, refusals in
 //! `path_refusals_tests.rs`.
 
 use zeno::{Command, Point};

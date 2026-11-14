@@ -94,6 +94,9 @@ impl Document {
         let may_keep = |node| kept.may_keep_layout(node);
         let (boxes, built) = self.boxes.rebuild(&source, root, scale, &may_keep);
         self.counts.boxes_built = built.count();
+        self.counts.children_edited = built.edits.edited;
+        self.counts.children_edits_declined = built.edits.declined;
+        self.counts.children_edit_decline = built.edits.decline;
         debug_assert!(
             !boxes.boxes.is_empty() || kept.used[&root].layout.display == taffy::Display::None,
             "no boxes built while html is shown: a box build dropped the root"
@@ -118,6 +121,7 @@ impl Document {
         let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
+        changed.scroll_states = done.states_changed;
         self.made_from(placement, viewport.scale)
     }
 

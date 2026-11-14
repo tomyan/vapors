@@ -129,6 +129,7 @@ macro_rules! paint_tests {
 
 paint_tests![
     clipping,
+    icon_curves_paint,
     icons_paint,
     outline_paint,
     paint_boxes,
