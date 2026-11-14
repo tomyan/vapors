@@ -6,6 +6,7 @@
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod keyed;
+pub mod rows;
 
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
@@ -13,7 +14,7 @@ use std::rc::Rc;
 use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_scene3d::{CameraHandle, Colour, Meshes, Projection, Scene, Transform, Vec3};
-use vapors_scene3d_gpu::SceneRenderer;
+use vapors_scene3d_gpu::{RendererLog, SceneRenderer};
 use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
@@ -31,6 +32,7 @@ pub struct Rig {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    pub log: Rc<RendererLog>,
     pub page: ScenePage,
     pub signals: Signals,
 }
@@ -51,6 +53,8 @@ pub struct Stage {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    /// The renderer's log: whether it was dropped.
+    pub log: Rc<RendererLog>,
 }
 
 impl Stage {
@@ -62,6 +66,7 @@ impl Stage {
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));
         let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
+        let log = renderer.log();
         let surface = app.mount("view", Box::new(renderer)).unwrap();
         Self {
             doc,
@@ -69,6 +74,7 @@ impl Stage {
             scene,
             meshes,
             surface,
+            log,
         }
     }
 }
@@ -83,6 +89,7 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
         } = Stage::new();
         let square = square(&meshes);
         let signals = Signals {
@@ -113,6 +120,7 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
             page,
             signals,
         }

@@ -5,7 +5,7 @@ use crate::draw::{MeshNode, Pass, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
-use crate::{FrameError, depth};
+use crate::{FrameError, RendererLog, depth};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
@@ -18,6 +18,7 @@ pub struct SceneRenderer {
     meshes: Rc<RefCell<Meshes>>,
     mounted: Option<Mounted>,
     depth: Option<wgpu::TextureView>,
+    log: Rc<RendererLog>,
 }
 
 /// What `mount` builds.
@@ -37,7 +38,20 @@ impl SceneRenderer {
             meshes,
             mounted: None,
             depth: None,
+            log: Rc::default(),
         }
+    }
+
+    /// Its log, which outlives it: whether it has been dropped.
+    #[must_use]
+    pub fn log(&self) -> Rc<RendererLog> {
+        Rc::clone(&self.log)
+    }
+}
+
+impl Drop for SceneRenderer {
+    fn drop(&mut self) {
+        self.log.drop_renderer();
     }
 }
 

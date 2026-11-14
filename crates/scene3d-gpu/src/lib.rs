@@ -22,10 +22,12 @@ mod depth;
 mod draw;
 mod error;
 mod geometry;
+mod log;
 mod pipeline;
 mod renderer;
 mod slot_table;
 mod slots;
 
 pub use error::FrameError;
+pub use log::RendererLog;
 pub use renderer::SceneRenderer;
