@@ -6,7 +6,7 @@
 use vapors_renderer::ClosedFormShape;
 use vapors_scene::{Color, Rect, Shape, ShapeKind, ShapeRef};
 use vapors_shapes::{
-    FillRule, Geometry, IconPath, MeshVertex, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
+    FillRule, Geometry, IconPath, MeshTriangle, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
     hash_bytes, tessellate,
 };
 
@@ -181,7 +181,7 @@ fn an_item_scaled_to_nothing_draws_nothing() {
 }
 
 /// A filled triangle's mesh, as the tessellator builds it.
-pub(crate) fn triangle_mesh() -> &'static [[MeshVertex; 3]] {
+pub(crate) fn triangle_mesh() -> &'static [MeshTriangle] {
     let path = IconPath::parse("M0 0L4 0L0 4z").expect("parses");
     let mesh =
         tessellate("a.wisp:9", &path, Paint::Fill(FillRule::NonZero), 0.05).expect("tessellated");

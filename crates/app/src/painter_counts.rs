@@ -37,10 +37,10 @@ pub struct FrameCounts {
     /// viewport.
     pub shapes: GpuWork,
     /// Mesh shape runs: one draw per item, the run's instances and the
-    /// viewport; and the frame's upload of mesh entries' vertices,
+    /// viewport; and the frame's upload of mesh entries' triangles,
     /// with the entry buffer's growth and compaction.
     pub meshes: GpuWork,
-    /// Bytes of mesh entries' vertices uploaded at the frame's start:
+    /// Bytes of mesh entries' triangles uploaded at the frame's start:
     /// those registered since the last frame; 0 on a frame that
     /// registers nothing, and for closed forms, which upload nothing.
     pub shape_bytes_uploaded: u64,
@@ -74,7 +74,7 @@ pub struct FrameCounts {
     pub batches_kept: u64,
     /// Bytes held in the pipelines' kept buffers after the frame: the
     /// batches it drew (those it did not draw are released), and every
-    /// mesh entry's vertices, which the painter keeps for its life.
+    /// mesh entry's triangles, which the painter keeps for its life.
     pub retained_bytes: u64,
     /// Glyph and icon lookups in the atlas: 0 on a frame whose text and
     /// icon batches are all kept.

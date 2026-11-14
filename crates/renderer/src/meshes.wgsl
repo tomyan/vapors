@@ -1,37 +1,46 @@
-// Mesh items: an entry's triangles, each vertex with its own three edge
-// distances (crates/shapes/src/mesh.rs: 0 on an outline edge's corners,
-// the altitude opposite, FAR on all three for an edge two triangles
-// share) and its triangle's edge normals, under an item's affine
-// transform. The vertex shader rebuilds an outline vertex's two edge
-// normals from its miter offset, moves it half a device pixel out
-// across both in device space (the device miter, clamped at SVG's
-// limit of 4), and takes the move's projection on each edge normal off
-// that edge's distance, so the distances stay exact for the moved
-// triangle and go negative past the true outline. The fragment shader
-// takes coverage as 0.5 plus the distance to the nearest outline edge
-// in device pixels: 0.5 on the outline, the ramp half a pixel either
-// side, as Chromium draws an edge. Each distance is affine across its
-// triangle, so its screen gradient from dpdx/dpdy is exact.
+// Mesh items: an entry's triangles, one instance each, every corner
+// with its wedge (crates/shapes/src/mesh.rs: the outward unit normals
+// of the two outline edges bounding it and whether it is convex (1),
+// reflex (-1) or inside (0)), under an item's affine transform. The
+// vertex shader picks its corner by vertex index and moves an outline
+// corner half a device pixel out across both its lines in device space
+// (the device miter, clamped at SVG's limit of 4). The fragment shader
+// takes coverage as 0.5 plus the least, over the triangle's outline
+// corners, of the corner's wedge distance in device pixels (convex: the
+// nearer of its two lines; reflex: the farther): 0.5 on the outline,
+// the ramp half a pixel either side, round every corner as Chromium
+// draws it. Each line's distance is affine across the triangle, so its
+// screen gradient from dpdx/dpdy of the position is exact.
 
-struct Vertex {
-    @location(0) position: vec2<f32>,
-    @location(1) normal: vec2<f32>,
-    @location(2) edges: vec3<f32>,
-    @location(3) normal0: vec2<f32>,
-    @location(4) normal1: vec2<f32>,
-    @location(5) normal2: vec2<f32>,
+struct Triangle {
+    @location(0) position0: vec2<f32>,
+    @location(1) normals0: vec4<f32>,
+    @location(2) kind0: f32,
+    @location(3) position1: vec2<f32>,
+    @location(4) normals1: vec4<f32>,
+    @location(5) kind1: f32,
+    @location(6) position2: vec2<f32>,
+    @location(7) normals2: vec4<f32>,
+    @location(8) kind2: f32,
 }
 
-struct Instance {
-    @location(6) linear: vec4<f32>, // a, b, c, d of matrix(a, b, c, d, e, f)
-    @location(7) place: vec4<f32>,  // e, f, 1 / (a d - b c), unused
-    @location(8) colour: vec4<f32>,
+struct Item {
+    @location(9) linear: vec4<f32>, // a, b, c, d of matrix(a, b, c, d, e, f)
+    @location(10) place: vec4<f32>, // e, f, 1 / (a d - b c), unused
+    @location(11) colour: vec4<f32>,
 }
 
+// Each corner as two vec4s: its normals, then its position and kind.
 struct Out {
     @builtin(position) position: vec4<f32>,
-    @location(0) edges: vec3<f32>,
-    @location(1) @interpolate(flat) colour: vec4<f32>,
+    @location(0) local: vec2<f32>,
+    @location(1) @interpolate(flat) normals0: vec4<f32>,
+    @location(2) @interpolate(flat) at0: vec4<f32>,
+    @location(3) @interpolate(flat) normals1: vec4<f32>,
+    @location(4) @interpolate(flat) at1: vec4<f32>,
+    @location(5) @interpolate(flat) normals2: vec4<f32>,
+    @location(6) @interpolate(flat) at2: vec4<f32>,
+    @location(7) @interpolate(flat) colour: vec4<f32>,
 }
 
 struct View {
@@ -41,23 +50,12 @@ struct View {
 
 @group(0) @binding(0) var<uniform> view: View;
 
-// An edge two triangles share carries FAR (1e6) on all three corners;
-// a real distance is never within half of it.
-const FAR_BELOW: f32 = 5.0e5;
 // How far the outline moves out, device pixels: the ramp's outer half.
 const HALF: f32 = 0.5;
 // SVG's miter limit: a corner moves at most this many times HALF.
 const MITER_LIMIT: f32 = 4.0;
-
-// The unit vectors m with n . m = 1: a vertex's two outline edges'
-// normals rebuilt from its miter offset n (one, twice, when |n| = 1; a
-// clamped miter's are the ones its clamped length would have).
-fn edge_normals(n: vec2<f32>) -> array<vec2<f32>, 2> {
-    let length2 = dot(n, n);
-    let across = sqrt(max(length2 - 1.0, 0.0));
-    let side = vec2(-n.y, n.x) * across;
-    return array((n + side) / length2, (n - side) / length2);
-}
+// A wedge distance no fragment reaches: an inside corner's.
+const FAR: f32 = 1e9;
 
 // m, a normal in the mesh's units, as a unit normal on the device.
 fn on_device(m: vec2<f32>, l: vec4<f32>, inverse: f32) -> vec2<f32> {
@@ -65,15 +63,15 @@ fn on_device(m: vec2<f32>, l: vec4<f32>, inverse: f32) -> vec2<f32> {
     return normalize(vec2(l.w * m.x - l.y * m.y, -l.z * m.x + l.x * m.y) * inverse);
 }
 
-// The move, in the mesh's units, that carries a vertex with miter
-// offset n half a device pixel out across both its outline edges.
-fn local_move(n: vec2<f32>, l: vec4<f32>, inverse: f32) -> vec2<f32> {
-    if (dot(n, n) < 1e-12) {
+// The move, in the mesh's units, that carries a corner with normals n
+// and kind `kind` half a device pixel out across both its lines.
+fn local_move(n: vec4<f32>, kind: f32, l: vec4<f32>, inverse: f32) -> vec2<f32> {
+    if (kind == 0.0) {
         return vec2(0.0);
     }
-    let m = edge_normals(n);
-    let u = array(on_device(m[0], l, inverse), on_device(m[1], l, inverse));
-    var miter = (u[0] + u[1]) / max(1.0 + dot(u[0], u[1]), 1e-6) * HALF;
+    let u0 = on_device(n.xy, l, inverse);
+    let u1 = on_device(n.zw, l, inverse);
+    var miter = (u0 + u1) / max(1.0 + dot(u0, u1), 1e-6) * HALF;
     let limit = MITER_LIMIT * HALF;
     if (length(miter) > limit) {
         miter = normalize(miter) * limit;
@@ -83,27 +81,51 @@ fn local_move(n: vec2<f32>, l: vec4<f32>, inverse: f32) -> vec2<f32> {
 }
 
 @vertex
-fn vs_main(vertex: Vertex, instance: Instance) -> Out {
-    let l = instance.linear;
-    let inverse = instance.place.z;
-    let moved = local_move(vertex.normal, l, inverse);
-    let local = vertex.position + moved;
-    let pixel = vec2(l.x * local.x + l.z * local.y, l.y * local.x + l.w * local.y) + instance.place.xy;
+fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
+    let positions = array(t.position0, t.position1, t.position2);
+    let normals = array(t.normals0, t.normals1, t.normals2);
+    let kinds = array(t.kind0, t.kind1, t.kind2);
+    let l = item.linear;
+    let local = positions[corner] + local_move(normals[corner], kinds[corner], l, item.place.z);
+    let pixel = vec2(l.x * local.x + l.z * local.y, l.y * local.x + l.w * local.y) + item.place.xy;
     let on_target = pixel + view.shift;
     var out: Out;
     out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
-    let taken = vec3(dot(moved, vertex.normal0), dot(moved, vertex.normal1), dot(moved, vertex.normal2));
-    out.edges = vertex.edges - taken;
-    out.colour = instance.colour;
+    out.local = local;
+    out.normals0 = t.normals0;
+    out.at0 = vec4(t.position0, t.kind0, 0.0);
+    out.normals1 = t.normals1;
+    out.at1 = vec4(t.position1, t.kind1, 0.0);
+    out.normals2 = t.normals2;
+    out.at2 = vec4(t.position2, t.kind2, 0.0);
+    out.colour = item.colour;
     return out;
+}
+
+// One line's distance at p in device pixels, inside positive: the line
+// through `corner` with outward unit normal m.
+fn line(m: vec2<f32>, corner: vec2<f32>, p: vec2<f32>, across_x: vec2<f32>, across_y: vec2<f32>) -> f32 {
+    let rate = max(length(vec2(dot(m, across_x), dot(m, across_y))), 1e-20);
+    return -dot(m, p - corner) / rate;
+}
+
+// A corner's wedge distance at p in device pixels, inside positive.
+fn wedge(n: vec4<f32>, at: vec4<f32>, p: vec2<f32>, across_x: vec2<f32>, across_y: vec2<f32>) -> f32 {
+    if (at.z == 0.0) {
+        return FAR;
+    }
+    let d0 = line(n.xy, at.xy, p, across_x, across_y);
+    let d1 = line(n.zw, at.xy, p, across_x, across_y);
+    return select(max(d0, d1), min(d0, d1), at.z > 0.0);
 }
 
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let across = sqrt(dpdx(in.edges) * dpdx(in.edges) + dpdy(in.edges) * dpdy(in.edges));
-    let far = in.edges >= vec3(FAR_BELOW);
-    let pixels = select(in.edges / max(across, vec3(1e-20)), vec3(1e9), far);
-    let nearest = min(pixels.x, min(pixels.y, pixels.z));
-    let coverage = clamp(0.5 + nearest, 0.0, 1.0);
+    let across_x = dpdx(in.local);
+    let across_y = dpdy(in.local);
+    let w0 = wedge(in.normals0, in.at0, in.local, across_x, across_y);
+    let w1 = wedge(in.normals1, in.at1, in.local, across_x, across_y);
+    let w2 = wedge(in.normals2, in.at2, in.local, across_x, across_y);
+    let coverage = clamp(0.5 + min(w0, min(w1, w2)), 0.0, 1.0);
     return vec4(in.colour.rgb, in.colour.a * coverage);
 }

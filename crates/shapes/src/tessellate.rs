@@ -1,9 +1,8 @@
 //! The tessellator (docs/plans/one-scene.md 1.2): a path that is not a
 //! closed form becomes triangles through lyon, fills under their rule
 //! and strokes with SVG's default miter joins (limit 4) and butt caps.
-//! `mesh_edges` then gives each triangle its own vertices with the
-//! distances, normals and shifts the fragment shader takes coverage
-//! from after the transform.
+//! `mesh_edges` then gives each triangle's corners the outline wedges
+//! the fragment shader takes coverage from after the transform.
 
 use lyon_tessellation::geometry_builder::{BuffersBuilder, VertexBuffers};
 use lyon_tessellation::path::{LineCap, LineJoin, Path};
@@ -13,17 +12,17 @@ use lyon_tessellation::{
 };
 
 use crate::canonical::{FillRule, Paint};
-use crate::mesh::MeshVertex;
-use crate::mesh_edges::triangles_with_edges;
+use crate::mesh::MeshTriangle;
+use crate::mesh_edges::mesh_triangles;
 use crate::path::IconPath;
 use crate::tessellate_path::lyon_path;
 
-/// Triangles with their edge distances, three vertices each, and the
-/// tolerance they were flattened at.
+/// Triangles with their corners' wedges, and the tolerance they were
+/// flattened at.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mesh {
     /// The triangles, in no particular order.
-    pub triangles: Vec<[MeshVertex; 3]>,
+    pub triangles: Vec<MeshTriangle>,
     /// The flattening tolerance, viewBox units: a draw whose scale
     /// would show a coarser flattening than this tessellates again
     /// (svg-support D1, the per-entry record).
@@ -60,7 +59,7 @@ pub fn tessellate(
         Paint::Stroke { width } => stroke(&lyon_path, width, tolerance, &mut buffers),
     }
     .map_err(|error| format!("the shape at {site} cannot be tessellated: {error}"))?;
-    let triangles = triangles_with_edges(&buffers.vertices, &buffers.indices)
+    let triangles = mesh_triangles(&buffers.vertices, &buffers.indices)
         .map_err(|error| format!("the shape at {site} cannot be tessellated: {error}"))?;
     if triangles.is_empty() {
         return Err(no_area(site, paint));

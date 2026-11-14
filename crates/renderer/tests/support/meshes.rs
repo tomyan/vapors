@@ -7,15 +7,15 @@
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::{FrameEncoder, MeshEntries, MeshPipeline, MeshShape, Target, clear};
 use vapors_scene::{Color, Size};
-use vapors_shapes::{FillRule, IconPath, MeshVertex, Paint, tessellate};
+use vapors_shapes::{FillRule, IconPath, MeshTriangle, Paint, tessellate};
 
 pub const SIDE: u32 = 32;
 
 /// A mesh's triangles, its transform and its colour.
-pub type Drawn = (Vec<[MeshVertex; 3]>, [f32; 6], Color);
+pub type Drawn = (Vec<MeshTriangle>, [f32; 6], Color);
 
 /// `data` filled (nonzero) or stroked `stroke` wide, tessellated.
-pub fn mesh(data: &str, stroke: Option<f32>) -> Vec<[MeshVertex; 3]> {
+pub fn mesh(data: &str, stroke: Option<f32>) -> Vec<MeshTriangle> {
     let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
     let paint = stroke.map_or(Paint::Fill(FillRule::NonZero), |width| Paint::Stroke {
         width,
@@ -73,10 +73,7 @@ pub fn coverage(meshes: &[Drawn]) -> Vec<f32> {
 }
 
 /// `mesh` in white under `transform`.
-pub fn white(
-    mesh: Vec<[MeshVertex; 3]>,
-    transform: [f32; 6],
-) -> (Vec<[MeshVertex; 3]>, [f32; 6], Color) {
+pub fn white(mesh: Vec<MeshTriangle>, transform: [f32; 6]) -> (Vec<MeshTriangle>, [f32; 6], Color) {
     (mesh, transform, Color::from_rgba8(255, 255, 255, 255))
 }
 
@@ -96,8 +93,8 @@ pub fn assert_at(coverage: &[f32], (x, y): (u32, u32), expected: f32, what: &str
 
 /// How far device point `p` lies outside `mesh` drawn under
 /// `transform`, device pixels; 0 inside. The outline is the mesh's own
-/// outline edges (those not FAR), so the oracle needs no curve maths.
-pub fn outside_by(mesh: &[[MeshVertex; 3]], m: [f32; 6], p: [f32; 2]) -> f32 {
+/// outline edges, so the oracle needs no curve maths.
+pub fn outside_by(mesh: &[MeshTriangle], m: [f32; 6], p: [f32; 2]) -> f32 {
     let to_device = |q: [f32; 2]| {
         [
             m[0] * q[0] + m[2] * q[1] + m[4],
@@ -106,7 +103,7 @@ pub fn outside_by(mesh: &[[MeshVertex; 3]], m: [f32; 6], p: [f32; 2]) -> f32 {
     };
     let inside = mesh
         .iter()
-        .any(|t| contains(t.map(|v| to_device(v.position)), p));
+        .any(|t| contains(t.corners.map(|c| to_device(c.position)), p));
     if inside {
         return 0.0;
     }
@@ -120,7 +117,7 @@ pub fn outside_by(mesh: &[[MeshVertex; 3]], m: [f32; 6], p: [f32; 2]) -> f32 {
 /// coverage.
 pub fn assert_nothing_past_half_a_pixel(
     coverage: &[f32],
-    mesh: &[[MeshVertex; 3]],
+    mesh: &[MeshTriangle],
     transform: [f32; 6],
     what: &str,
 ) {
@@ -140,12 +137,11 @@ pub fn assert_nothing_past_half_a_pixel(
     }
 }
 
-fn outline_segments(mesh: &[[MeshVertex; 3]]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
+fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
     mesh.iter().flat_map(|t| {
-        (0..3).filter_map(move |edge| {
-            let outline = t[0].edges[edge] < vapors_shapes::FAR_EDGE;
-            outline.then(|| [t[(edge + 1) % 3].position, t[(edge + 2) % 3].position])
-        })
+        (0..3)
+            .filter(|&edge| t.on_outline(edge))
+            .map(|edge| [1, 2].map(|k| t.corners[(edge + k) % 3].position))
     })
 }
 

@@ -6,7 +6,7 @@
 //! item's culling bounds (`Item::bounds`, its own grown by the fringe).
 
 use vapors_scene::{Item, Rect, Shape};
-use vapors_shapes::{Geometry, MeshVertex};
+use vapors_shapes::{Geometry, MeshTriangle};
 
 /// How far outside the outline the closed-form ramp covers, device
 /// pixels (`closed_forms.wgsl`: coverage 0.5 minus the distance).
@@ -45,11 +45,11 @@ fn local_box(geometry: &Geometry, by: f32) -> [[f32; 2]; 2] {
     [[lo[0] - by, lo[1] - by], [hi[0] + by, hi[1] + by]]
 }
 
-/// The box of a mesh's vertices: its outline (the extrusion past it
+/// The box of a mesh's corners: its outline (the extrusion past it
 /// draws only the ramp, which the half pixel added after the transform
 /// holds).
-fn mesh_box(triangles: &[[MeshVertex; 3]]) -> [[f32; 2]; 2] {
-    let points = triangles.iter().flatten().map(|v| v.position);
+fn mesh_box(triangles: &[MeshTriangle]) -> [[f32; 2]; 2] {
+    let points = triangles.iter().flat_map(|t| t.corners).map(|c| c.position);
     points.fold(
         [[f32::INFINITY; 2], [f32::NEG_INFINITY; 2]],
         |[lo, hi], p| {

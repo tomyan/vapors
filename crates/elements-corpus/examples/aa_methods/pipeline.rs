@@ -1,17 +1,17 @@
-//! The analytic method (one-scene 1.2): each icon tessellated and drawn
-//! by the mesh pipeline, its outline moved half a device pixel out and
-//! coverage from the nearest outline edge's distance.
+//! The mesh pipeline (one-scene 1.2): each icon tessellated and drawn
+//! with its outline moved half a device pixel out and coverage from its
+//! triangles' corner wedges, the exact-corner method S3b chose (S3a3).
 
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_renderer::{FrameEncoder, MeshEntries, MeshPipeline, MeshShape, Target, clear};
 use vapors_scene::{Color, Size};
-use vapors_shapes::{IconPath, MeshVertex, Paint, tessellate};
+use vapors_shapes::{IconPath, MeshTriangle, Paint, tessellate};
 
 use crate::cases::{CELL, Icon, PAGE, Placement, transform};
 
 /// `icon` stroked and tessellated within `tolerance_px` device pixels
 /// at `scale` device pixels per unit.
-pub fn mesh(icon: &Icon, tolerance_px: f32, scale: f32) -> Vec<[MeshVertex; 3]> {
+pub fn mesh(icon: &Icon, tolerance_px: f32, scale: f32) -> Vec<MeshTriangle> {
     let path = IconPath::parse(icon.path).expect("touche's icons parse");
     let paint = if icon.stroke > 0.0 {
         Paint::Stroke { width: icon.stroke }

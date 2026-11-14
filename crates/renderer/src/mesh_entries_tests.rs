@@ -1,56 +1,56 @@
-//! A mesh entry's bytes: each field of each vertex at its
-//! `offset_of!`, a vertex `size_of::<MeshVertex>()` long, padded to 16.
+//! A mesh entry's bytes: each field of each corner at its
+//! `offset_of!`, a triangle `size_of::<MeshTriangle>()` long, padded to
+//! 16.
 
 use std::mem::offset_of;
 
-use vapors_shapes::MeshVertex;
+use vapors_shapes::{INSIDE, MeshCorner, MeshTriangle};
 
-use super::{VERTEX_BYTES, vertex_bytes};
+use super::{TRIANGLE_BYTES, corner_offset, triangle_bytes};
 
 fn float_at(bytes: &[u8], at: usize) -> f32 {
     f32::from_le_bytes(bytes[at..at + 4].try_into().expect("four bytes"))
 }
 
 #[test]
-fn each_field_is_at_its_offset_in_a_vertex_of_its_size() {
-    // Given: one triangle whose third vertex's values are all distinct
-    let blank = MeshVertex {
+fn each_field_is_at_its_offset_in_a_triangle_of_its_size() {
+    // Given: two triangles, the second's third corner's values distinct
+    let blank = MeshCorner {
         position: [0.0; 2],
-        normal: [0.0; 2],
-        edges: [0.0; 3],
-        edge_normals: [[0.0; 2]; 3],
+        normals: [[0.0; 2]; 2],
+        kind: INSIDE,
     };
-    let third = MeshVertex {
+    let third = MeshCorner {
         position: [1.0, 2.0],
-        normal: [3.0, 4.0],
-        edges: [5.0, 6.0, 7.0],
-        edge_normals: [[8.0, 9.0], [10.0, 11.0], [12.0, 13.0]],
+        normals: [[3.0, 4.0], [5.0, 6.0]],
+        kind: 7.0,
     };
+    let triangles = [
+        MeshTriangle {
+            corners: [blank; 3],
+        },
+        MeshTriangle {
+            corners: [blank, blank, third],
+        },
+    ];
 
     // When
-    let bytes = vertex_bytes(&[[blank, blank, third]]);
+    let bytes = triangle_bytes(&triangles);
 
     // Then
-    let start = 2 * size_of::<MeshVertex>();
-    assert_eq!(VERTEX_BYTES, size_of::<MeshVertex>() as u64);
+    let start = corner_offset(1, 2);
+    assert_eq!(
+        start,
+        size_of::<MeshTriangle>() + 2 * size_of::<MeshCorner>()
+    );
+    assert_eq!(TRIANGLE_BYTES, size_of::<MeshTriangle>() as u64);
     assert_eq!(
         bytes.len(),
-        (3 * size_of::<MeshVertex>()).next_multiple_of(16)
+        (2 * size_of::<MeshTriangle>()).next_multiple_of(16)
     );
-    assert_eq!(
-        float_at(&bytes, start + offset_of!(MeshVertex, position) + 4),
-        2.0
-    );
-    assert_eq!(
-        float_at(&bytes, start + offset_of!(MeshVertex, normal)),
-        3.0
-    );
-    assert_eq!(
-        float_at(&bytes, start + offset_of!(MeshVertex, edges) + 8),
-        7.0
-    );
-    assert_eq!(
-        float_at(&bytes, start + offset_of!(MeshVertex, edge_normals) + 20),
-        13.0
-    );
+    let at = |field: usize, k: usize| float_at(&bytes, start + field + 4 * k);
+    assert_eq!(at(offset_of!(MeshCorner, position), 1), 2.0);
+    assert_eq!(at(offset_of!(MeshCorner, normals), 0), 3.0);
+    assert_eq!(at(offset_of!(MeshCorner, normals), 3), 6.0);
+    assert_eq!(at(offset_of!(MeshCorner, kind), 0), 7.0);
 }

@@ -26,7 +26,7 @@ mod tessellate_path;
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
 pub use classify::{Classified, classify};
 pub use geometry::{Geometry, check_geometry};
-pub use mesh::{FAR_EDGE, MeshVertex, check_mesh};
+pub use mesh::{CONVEX, INSIDE, MeshCorner, MeshTriangle, REFLEX, check_mesh};
 pub use path::{IconPath, PathError};
 pub use segment::{Pen, Segment, non_finite, to_zeno};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};

@@ -5,8 +5,8 @@ use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_renderer::{ClosedFormPipeline, ClosedFormShape, FrameEncoder, Target, clear};
 use vapors_scene::Color;
 
-use crate::analytic::size;
 use crate::cases::{ClosedCase, PAGE, Placement, transform};
+use crate::pipeline::size;
 
 /// `cases` drawn by the closed-form pipeline in `ink` under `placement`.
 pub fn drawn(gpu: &Gpu, cases: &[ClosedCase], placement: &Placement, ink: [u8; 4]) -> Vec<u8> {

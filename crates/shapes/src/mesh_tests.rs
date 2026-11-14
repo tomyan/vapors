@@ -3,49 +3,31 @@
 
 use super::*;
 
-/// A corner: its position, normal and edge distances, with its
-/// triangle's `edge_normals`.
-const fn v(
-    position: [f32; 2],
-    normal: [f32; 2],
-    edges: [f32; 3],
-    edge_normals: [[f32; 2]; 3],
-) -> MeshVertex {
-    MeshVertex {
+const fn corner(position: [f32; 2], normals: [[f32; 2]; 2]) -> MeshCorner {
+    MeshCorner {
         position,
-        normal,
-        edges,
-        edge_normals,
+        normals,
+        kind: CONVEX,
     }
 }
 
-const F: f32 = FAR_EDGE;
-
-/// A unit square as two triangles (0 1 2) and (0 2 3) sharing the
-/// diagonal 0-2; each corner's normal is its miter offset (1, 1).
-/// Triangle (0, 1, 2): edge 0 is 1-2 (outline, outward +x), edge 1 is
-/// 2-0 (the diagonal, far), edge 2 is 0-1 (outline, outward -y).
-/// Triangle (0, 2, 3): edge 0 is 2-3 (outward +y), edge 1 is 3-0
-/// (outward -x), edge 2 is 0-2 (far).
-fn square() -> Vec<[MeshVertex; 3]> {
-    let (a, b, c, d) = ([0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]);
-    let first = [[1.0, -0.0], [0.0, 0.0], [0.0, -1.0]];
-    let second = [[0.0, 1.0], [-1.0, 0.0], [0.0, 0.0]];
+/// A unit square as two triangles (a b c) and (a c d) sharing the
+/// diagonal a-c; every corner is convex, its wedge bounded by the two
+/// sides that meet there (outward -y, +x, +y, -x along a-b, b-c, c-d,
+/// d-a).
+fn square() -> Vec<MeshTriangle> {
+    let (up, right, down, left) = ([0.0, -1.0], [1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]);
+    let a = corner([0.0, 0.0], [left, up]);
+    let b = corner([1.0, 0.0], [up, right]);
+    let c = corner([1.0, 1.0], [right, down]);
+    let d = corner([0.0, 1.0], [down, left]);
     vec![
-        [
-            v(a, [-1.0, -1.0], [1.0, F, 0.0], first),
-            v(b, [1.0, -1.0], [0.0, F, 0.0], first),
-            v(c, [1.0, 1.0], [0.0, F, 1.0], first),
-        ],
-        [
-            v(a, [-1.0, -1.0], [1.0, 0.0, F], second),
-            v(c, [1.0, 1.0], [0.0, 1.0, F], second),
-            v(d, [-1.0, 1.0], [0.0, 0.0, F], second),
-        ],
+        MeshTriangle { corners: [a, b, c] },
+        MeshTriangle { corners: [a, c, d] },
     ]
 }
 
-fn refused(triangles: &[[MeshVertex; 3]], reason: &str) {
+fn refused(triangles: &[MeshTriangle], reason: &str) {
     assert_eq!(
         check_mesh(triangles).as_ref().map_err(String::as_str),
         Err(reason)
@@ -53,14 +35,16 @@ fn refused(triangles: &[[MeshVertex; 3]], reason: &str) {
 }
 
 #[test]
-fn a_square_of_two_triangles_with_its_diagonal_far_passes() {
+fn a_square_of_two_triangles_with_convex_corners_passes() {
     assert_eq!(check_mesh(&square()), Ok(()));
 }
 
 #[test]
-fn the_layout_is_position_normal_edges_edge_normals() {
-    assert_eq!(size_of::<MeshVertex>(), 52);
-    assert_eq!(std::mem::offset_of!(MeshVertex, edge_normals), 28);
+fn the_layout_is_position_normals_kind_three_corners_a_triangle() {
+    assert_eq!(size_of::<MeshCorner>(), 28);
+    assert_eq!(std::mem::offset_of!(MeshCorner, normals), 8);
+    assert_eq!(std::mem::offset_of!(MeshCorner, kind), 24);
+    assert_eq!(size_of::<MeshTriangle>(), 84);
 }
 
 #[test]
@@ -69,68 +53,14 @@ fn a_mesh_with_no_triangles_is_refused() {
 }
 
 #[test]
-fn a_shared_edge_far_on_two_corners_only_would_seam_and_is_refused() {
-    // Given: the diagonal at 0 on its two corners, as the one-scalar
-    // rule would write it
-    let mut mesh = square();
-    mesh[0][0].edges[1] = 0.0;
-    mesh[0][2].edges[1] = 0.0;
-
-    // When, Then
-    refused(
-        &mesh,
-        "triangle 0 edge 1 is far on corners [false, true, false] but an edge is far on all three or none",
-    );
-}
-
-#[test]
-fn a_distance_that_the_positions_do_not_give_is_refused() {
-    // Given: corner 0's altitude to edge 0 written as 2.8 on a square of
-    // side 1
-    let mut mesh = square();
-    mesh[0][0].edges[0] = 2.8;
-
-    // When, Then
-    refused(
-        &mesh,
-        "triangle 0 corner 0 distance 2.8 to edge 0 should be 1 from the positions",
-    );
-}
-
-#[test]
-fn an_edge_normal_the_positions_do_not_give_is_refused() {
-    // Given: edge 0 (outward +x) given a normal half as long at corner 1
-    let mut mesh = square();
-    mesh[0][1].edge_normals[0] = [0.5, 0.0];
-
-    // When, Then
-    refused(
-        &mesh,
-        "triangle 0 corner 1 normal [0.5, 0.0] of edge 0 should be [1.0, -0.0], its outward unit normal from the positions",
-    );
-}
-
-#[test]
-fn a_normal_on_a_far_edge_is_refused() {
-    // Given
-    let mut mesh = square();
-    mesh[1][2].edge_normals[2] = [1.0, 0.0];
-
-    // When, Then
-    refused(
-        &mesh,
-        "triangle 1 corner 2 normal [1.0, 0.0] of far edge 2 is not zero; a far edge stays far",
-    );
-}
-#[test]
 fn a_value_that_is_not_finite_is_refused_naming_the_field() {
     // Given
     let mut nan_position = square();
-    nan_position[1][1].position = [f32::NAN, 1.0];
-    let mut infinite_edge = square();
-    infinite_edge[0][2].edges = [0.0, F, f32::INFINITY];
-    let mut nan_normal = square();
-    nan_normal[0][0].normal = [f32::NAN, 0.0];
+    nan_position[1].corners[1].position = [f32::NAN, 1.0];
+    let mut infinite_normal = square();
+    infinite_normal[0].corners[2].normals[1] = [0.0, f32::INFINITY];
+    let mut nan_kind = square();
+    nan_kind[0].corners[0].kind = f32::NAN;
 
     // When, Then
     refused(
@@ -138,20 +68,17 @@ fn a_value_that_is_not_finite_is_refused_naming_the_field() {
         "triangle 1 corner 1 position [NaN, 1.0] is not finite",
     );
     refused(
-        &infinite_edge,
-        "triangle 0 corner 2 edges [0.0, 1000000.0, inf] is not finite",
+        &infinite_normal,
+        "triangle 0 corner 2 normals [1.0, 0.0, 0.0, inf] is not finite",
     );
-    refused(
-        &nan_normal,
-        "triangle 0 corner 0 normal [NaN, 0.0] is not finite",
-    );
+    refused(&nan_kind, "triangle 0 corner 0 kind [NaN] is not finite");
 }
 
 #[test]
 fn a_triangle_without_area_is_refused() {
     // Given
     let mut mesh = square();
-    mesh[0][2].position = [2.0, 0.0];
+    mesh[0].corners[2].position = [2.0, 0.0];
 
     // When, Then
     refused(
@@ -161,21 +88,94 @@ fn a_triangle_without_area_is_refused() {
 }
 
 #[test]
-fn a_corner_on_the_outline_that_does_not_move_out_is_refused() {
-    // Given: corner 1 with no normal, which would leave the hard outer
-    // edge the extrusion is for, and corner 1 moving inwards
-    let mut zero = square();
-    zero[0][1].normal = [0.0, 0.0];
-    let mut inward = square();
-    inward[0][1].normal = [-1.0, 1.0];
+fn a_kind_that_is_none_of_the_three_is_refused() {
+    // Given
+    let mut mesh = square();
+    mesh[1].corners[2].kind = 0.5;
 
     // When, Then
     refused(
-        &zero,
-        "triangle 0 corner 1 on outline edge 0 has normal [0.0, 0.0], which does not move it out across that edge; write its miter offset",
+        &mesh,
+        "triangle 1 corner 2 has kind 0.5, not convex (1), reflex (-1) or inside (0)",
     );
+}
+
+#[test]
+fn an_inside_corner_with_normals_is_refused() {
+    // Given: corner a marked inside but keeping its wedge
+    let mut mesh = square();
+    mesh[0].corners[0].kind = INSIDE;
+
+    // When, Then
     refused(
-        &inward,
-        "triangle 0 corner 1 on outline edge 0 has normal [-1.0, 1.0], which does not move it out across that edge; write its miter offset",
+        &mesh,
+        "triangle 0 corner 0 is inside but has normals [[-1.0, 0.0], [0.0, -1.0]]; an inside corner has none",
     );
+}
+
+#[test]
+fn a_normal_that_is_not_unit_length_is_refused() {
+    // Given
+    let mut mesh = square();
+    mesh[0].corners[1].normals[1] = [0.5, 0.0];
+
+    // When, Then
+    refused(
+        &mesh,
+        "triangle 0 corner 1 has normal [0.5, 0.0], of length 0.5, not a unit normal",
+    );
+}
+
+#[test]
+fn normals_that_meet_head_on_are_refused() {
+    // Given
+    let mut mesh = square();
+    mesh[0].corners[1].normals = [[0.0, -1.0], [0.0, 1.0]];
+
+    // When, Then
+    refused(
+        &mesh,
+        "triangle 0 corner 1 has normals [[0.0, -1.0], [0.0, 1.0]] that meet head-on; its wedge has no inside",
+    );
+}
+
+#[test]
+fn a_triangle_outside_its_corners_convex_wedge_is_refused() {
+    // Given: corner a's wedge turned to face +x, away from the square
+    let mut mesh = square();
+    mesh[0].corners[0].normals = [[0.0, -1.0], [1.0, 0.0]];
+
+    // When, Then
+    refused(
+        &mesh,
+        "triangle 0 corner 0 has a wedge whose normals [[0.0, -1.0], [1.0, 0.0]] put the triangle's corner [1.0, 0.0] outside it",
+    );
+}
+
+#[test]
+fn the_same_wedge_holds_the_triangle_when_reflex() {
+    // Given: the wedge above, which holds the triangle inside either line
+    let mut mesh = square();
+    mesh[0].corners[0].normals = [[0.0, -1.0], [1.0, 0.0]];
+    mesh[0].corners[0].kind = REFLEX;
+
+    // When, Then
+    assert_eq!(check_mesh(&mesh), Ok(()));
+}
+
+#[test]
+fn an_edge_is_on_the_outline_when_both_its_ends_bound_by_it() {
+    // Given: the square's first triangle, and a copy whose corner c no
+    // longer bounds its wedge by the right side (outward +x)
+    let triangle = square()[0];
+    let mut one_end = triangle;
+    one_end.corners[2].normals = [[0.0, 1.0], [0.0, 1.0]];
+
+    // When, Then: edges opposite a, b, c are b-c (right side), the
+    // diagonal c-a, and a-b (top)
+    assert_eq!(
+        [0, 1, 2].map(|edge| triangle.on_outline(edge)),
+        [true, false, true]
+    );
+    assert!(!one_end.on_outline(0));
 }

@@ -3,7 +3,7 @@
 //! is dropped: `a_dropped_sliver_does_not_make_its_neighbours_edge_interior`
 //! in `mesh_edges_tests.rs`.
 
-use crate::mesh_edges::triangles_with_edges;
+use crate::mesh_edges::mesh_triangles;
 
 #[test]
 fn a_sliver_between_triangles_on_both_sides_is_refused_naming_the_vertex() {
@@ -14,7 +14,7 @@ fn a_sliver_between_triangles_on_both_sides_is_refused_naming_the_vertex() {
     let points = [[0.0, 0.0], [2.0, 0.0], [4.0, 0.0], [2.0, 4.0], [2.0, -4.0]];
 
     // When
-    let refused = triangles_with_edges(&points, &[0, 2, 3, 0, 1, 4, 1, 2, 4, 0, 1, 2]);
+    let refused = mesh_triangles(&points, &[0, 2, 3, 0, 1, 4, 1, 2, 4, 0, 1, 2]);
 
     // Then
     assert_eq!(

@@ -115,3 +115,14 @@ tolerance table at the end.
 - The tolerance makes no consistent difference between 0.25 and 0.05
   px. The analytic method's failures come from the corners, not from
   flattening.
+
+## After S3a3 (2026-11-14)
+
+The exact-corner method is now the mesh pipeline, and `aa_methods`
+measures the pipeline in place of the analytic method and the
+prototype (both removed). Its table is the prototype's: 39 of 40 icon
+cells, all 16 closed-form cells, the 0.25 px stroke failing with 9
+strongly-off pixels, and the translucent overlap passing. Taking the
+distance to the corner beyond a convex corner, in place of the farther
+line, gave the same passes and larger maximum differences on Undo and
+Redo (up to 90 against 57), so the pipeline keeps the farther line.
