@@ -1,10 +1,11 @@
 //! From lyon's shared-vertex output to the triangles `mesh.rs` checks:
 //! each with its own three vertices, the edge distances by the rule
 //! there, and the normal (`mesh_normals.rs`) and shifts the half-pixel
-//! extrusion needs. An edge used by one surviving triangle is on the
-//! outline; an edge two share is interior and far. Triangles without
-//! area are dropped first, so a sliver along the outline cannot make
-//! its neighbour's edge count as shared.
+//! extrusion needs. Vertices at one position are welded first. An edge
+//! used by one surviving triangle is on the outline; an edge two share
+//! is interior and far. Triangles without area are dropped first, so a
+//! sliver along the outline cannot make its neighbour's edge count as
+//! shared.
 
 use std::collections::HashMap;
 
@@ -32,6 +33,7 @@ pub fn triangles_with_edges(
         "{} indices is not a whole number of triangles; the producer must emit triples",
         indices.len()
     );
+    let indices = welded(vertices, indices);
     let corners: Vec<[u32; 3]> = indices
         .as_chunks::<3>()
         .0
@@ -50,6 +52,20 @@ pub fn triangles_with_edges(
             triangle(positions(vertices, *corner), normals, outline)
         })
         .collect())
+}
+
+/// `indices` with each vertex replaced by the first at a bit-equal
+/// position: lyon's stroker re-creates a closed subpath's start
+/// vertices, and the edge across the stroke there, under two pairs of
+/// indices, would count as two outline edges and draw a seam. The
+/// tessellator does not read the stroke advancement the copies are for.
+fn welded(vertices: &[[f32; 2]], indices: &[u32]) -> Vec<u32> {
+    let mut first = HashMap::with_capacity(vertices.len());
+    let canonical: Vec<u32> = (0u32..)
+        .zip(vertices)
+        .map(|(i, p)| *first.entry(p.map(|c| (c + 0.0).to_bits())).or_insert(i))
+        .collect();
+    indices.iter().map(|&i| canonical[i as usize]).collect()
 }
 
 fn positions(vertices: &[[f32; 2]], corner: [u32; 3]) -> [[f32; 2]; 3] {

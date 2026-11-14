@@ -17,8 +17,9 @@ pub(crate) const MITER_LIMIT: f32 = 4.0;
 /// for a corner whose vertex the triangles surround.
 ///
 /// # Errors
-/// Two outline edges meeting head-on at a corner (a spike of no
-/// width), where the miter has no direction; names the vertex.
+/// Two outline edges meeting head-on at a corner (the end of a cut of
+/// no width into the shape), where the miter has no direction; names
+/// the vertex.
 pub(crate) fn corner_normals(
     vertices: &[[f32; 2]],
     corners: &[[u32; 3]],
@@ -53,7 +54,7 @@ impl Fans<'_> {
         match sides.map(|other| self.wedge_bound(t, v, other)) {
             [Some(n1), Some(n2)] => miter_offset(n1, n2).ok_or_else(|| {
                 format!(
-                    "outline edges meet head-on at {:?}, a spike of no width with no direction to move out in; remove the spike",
+                    "outline edges meet head-on at {:?}, where a cut of no width into the shape ends, with no direction to move out in; close the cut or give it width",
                     self.vertices[v as usize]
                 )
             }),

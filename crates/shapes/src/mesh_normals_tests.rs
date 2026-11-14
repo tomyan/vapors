@@ -103,6 +103,6 @@ fn outline_edges_meeting_head_on_are_refused_naming_the_vertex() {
     // Then
     assert_eq!(
         refused,
-        Err("outline edges meet head-on at [0.0, 0.0], a spike of no width with no direction to move out in; remove the spike".to_owned())
+        Err("outline edges meet head-on at [0.0, 0.0], where a cut of no width into the shape ends, with no direction to move out in; close the cut or give it width".to_owned())
     );
 }

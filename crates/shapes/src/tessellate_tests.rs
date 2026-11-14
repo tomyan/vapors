@@ -8,7 +8,7 @@ use crate::mesh::{FAR_EDGE, check_mesh};
 const FILL: Paint = Paint::Fill(FillRule::NonZero);
 const TOLERANCE: f32 = 0.05;
 
-fn mesh(data: &str, paint: Paint) -> Mesh {
+pub(super) fn mesh(data: &str, paint: Paint) -> Mesh {
     let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
     let mesh =
         tessellate("a.wisp:3", &path, paint, TOLERANCE).unwrap_or_else(|e| panic!("{data:?}: {e}"));

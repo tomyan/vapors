@@ -117,3 +117,7 @@ fn stroke(path: &Path, width: f32, tolerance: f32, out: &mut Buffers) -> Result<
 #[cfg(test)]
 #[path = "tessellate_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tessellate_closed_tests.rs"]
+mod closed_tests;

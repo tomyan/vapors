@@ -88,3 +88,20 @@ fn a_dropped_sliver_does_not_make_its_neighbours_edge_interior() {
 fn a_remainder_of_indices_is_a_producer_bug() {
     let _ = triangles_with_edges(&SQUARE, &[0, 1, 2, 3]);
 }
+
+#[test]
+fn copies_of_a_vertex_are_one_vertex_so_their_edge_is_shared() {
+    // Given: the square with corner (0, 0) also at index 4, as lyon's
+    // stroker re-creates a closed subpath's start; the second triangle
+    // reaches the diagonal through the copy
+    let mut points = SQUARE.to_vec();
+    points.push([0.0, 0.0]);
+
+    // When
+    let triangles = built(&points, &[0, 1, 2, 4, 2, 3]);
+
+    // Then: the diagonal is far in both triangles
+    assert_eq!(triangles[0][0].edges[1], FAR_EDGE);
+    assert_eq!(triangles[1][0].edges[2], FAR_EDGE);
+    assert_eq!(check_mesh(&triangles), Ok(()));
+}
