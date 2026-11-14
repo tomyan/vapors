@@ -31,8 +31,10 @@ pub(crate) struct Node {
     pub(crate) parent: Option<NodeId>,
     pub(crate) children: Vec<NodeId>,
     pub(crate) world: Mat4,
-    /// How many times `world` has been recomputed.
+    /// Advances when `world` is recomputed or the mesh's colour changes.
     pub(crate) world_version: u64,
+    /// Drawn; set by `Scene::set_appearance`.
+    pub(crate) visible: bool,
     pub(crate) dirty: bool,
 }
 
