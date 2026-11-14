@@ -6,7 +6,7 @@ use crate::placement::{Placement, place, placement_of};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
-use vapors_app::InvalidateError;
+use vapors_app::{InvalidateError, Invalidated};
 use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{NodeId, NodeKind, StoreError, Transform};
 use vapors_signals::{Effect, Owner, Signal, on_cleanup};
@@ -90,14 +90,32 @@ fn remove_on_cleanup(component: &'static str, placement: Placement) {
             Ok(_) | Err(StoreError::Stale(_)) => {}
             Err(error) => panic!("<{component}>: {error}"),
         }
-        // the node is gone either way: when the event loop has ended (a
-        // page dropped after its app) no frame is left to show it, so
-        // that is not a refusal; a renderer missing still is
-        match placement.surface.invalidate() {
-            Ok(_) | Err(InvalidateError::LoopClosed(_)) => {}
-            Err(error) => panic!("<{component}>: {error}"),
+        if let Teardown::Unresolvable(error) = teardown(placement.surface.invalidate()) {
+            panic!("<{component}>: {error}");
         }
     });
+}
+
+/// What a removed node's invalidate came to: the surface asked to draw
+/// again; nothing to draw again, as the surface cannot (the loop has
+/// ended: the app was dropped, or failed and reported it; or its
+/// renderer was unmounted), and the node is gone either way; or an
+/// answer this does not know, which refuses.
+enum Teardown {
+    Invalidated,
+    NothingToRedraw,
+    Unresolvable(InvalidateError),
+}
+
+fn teardown(result: Result<Invalidated, InvalidateError>) -> Teardown {
+    match result {
+        Ok(_) => Teardown::Invalidated,
+        Err(InvalidateError::LoopClosed(_) | InvalidateError::NotMounted(_)) => {
+            Teardown::NothingToRedraw
+        }
+        #[allow(unreachable_patterns)] // InvalidateError may grow variants
+        Err(error) => Teardown::Unresolvable(error),
+    }
 }
 
 impl Placement {

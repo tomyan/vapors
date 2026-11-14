@@ -32,16 +32,34 @@ pub(super) fn accessors() -> String {
     .to_string()
 }
 
-/// Dropping a component mounted with no current owner disposes its
-/// owner: its effects hold the document, so a page dropped without an
-/// unmount would otherwise keep all of it (a 10,000-row page, 979 MB).
+/// `owned_by_parent`, which a parent's generated code calls on the
+/// child it mounts, and the `Drop` that disposes the owner of every
+/// component not so owned: its effects hold the document, so a page
+/// dropped without an unmount would otherwise keep all of it (443.7 MB
+/// live after a 10,000-row page was dropped, measured by
+/// vapors-perf-memory, docs/perf/memory-per-element-2026-11-14.md).
 /// Disposing an owner already disposed (`unmount`) does nothing.
+///
+/// While the thread is panicking it does not dispose: a cleanup that
+/// panicked during unwinding would abort the process and lose the first
+/// panic's message, so a component dropped by unwinding is left as it
+/// was before #353.
 pub(super) fn drop_impl(name: &str) -> String {
     format!(
         "
+impl {name} {{
+    /// Marks this component as its parent's child: its owner is a child
+    /// of the parent's and is disposed with it, so dropping this struct
+    /// disposes nothing. Called by the parent's generated code.
+    pub fn owned_by_parent(mut self) -> Self {{
+        self.disposes_on_drop = false;
+        self
+    }}
+}}
+
 impl Drop for {name} {{
     fn drop(&mut self) {{
-        if self.disposes_on_drop {{
+        if self.disposes_on_drop && !std::thread::panicking() {{
             self.owner.dispose();
         }}
     }}

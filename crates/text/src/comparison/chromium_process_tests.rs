@@ -17,13 +17,17 @@ use crate::comparison::SCALES;
 const RENDER_ALLOWANCE: Duration = Duration::from_secs(10);
 
 /// Every `slow-timeout = { period = "<n>s", terminate-after = <m> }` in
-/// `text`, as the time nextest kills a test; any other shape of a
-/// slow-timeout line, or an override, is refused naming its line.
-/// Comment lines are skipped.
+/// `text`, an override's included, as the time nextest kills a test;
+/// any other shape of a slow-timeout line, or of an override's header,
+/// is refused naming its line. Comment lines and override headers
+/// (`[[profile.<name>.overrides]]`) are skipped: an override's own
+/// slow-timeout is read like any other, so none can be shorter than
+/// the launcher's worst.
 fn kill_times(text: &str, file: &str) -> Vec<Duration> {
     text.lines()
         .enumerate()
         .filter(|(_, line)| !line.trim_start().starts_with('#'))
+        .filter(|(_, line)| !is_override_header(line))
         .filter(|(_, line)| line.contains("slow-timeout") || line.contains("overrides"))
         .map(|(index, line)| {
             kill_time(line).unwrap_or_else(|| {
@@ -34,6 +38,14 @@ fn kill_times(text: &str, file: &str) -> Vec<Duration> {
             })
         })
         .collect()
+}
+
+/// `[[profile.<name>.overrides]]`, alone on its line.
+fn is_override_header(line: &str) -> bool {
+    let line = line.trim();
+    line.strip_prefix("[[profile.")
+        .and_then(|rest| rest.strip_suffix(".overrides]]"))
+        .is_some_and(|name| !name.is_empty() && !name.contains(['[', ']', ' ']))
 }
 
 fn kill_time(line: &str) -> Option<Duration> {

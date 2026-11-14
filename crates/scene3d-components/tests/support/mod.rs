@@ -28,7 +28,8 @@ pub struct Signals {
 }
 
 /// The page is the first field, so it is dropped (and disposed) first,
-/// while the app whose surface its nodes' cleanups invalidate still runs.
+/// while the app runs; a preference since its nodes' removal takes a
+/// closed loop or an unmounted renderer as nothing to draw again.
 pub struct Rig {
     pub page: ScenePage,
     pub doc: Rc<RefCell<Document>>,

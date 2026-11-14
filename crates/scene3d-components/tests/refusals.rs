@@ -184,8 +184,11 @@ fn a_colour_whose_surface_cannot_render_it_is_not_written_and_refuses_the_update
         "the mesh was recoloured for a frame that cannot be drawn"
     );
     drop(scene);
-    // the page's nodes cannot be removed once its surface's renderer is
-    // gone (their cleanup invalidates it, and refuses), so this page,
-    // broken on purpose, is not dropped
-    std::mem::forget(rig);
+
+    // When: the page dropped with its surface's renderer gone
+    let scene = std::rc::Rc::clone(&rig.scene);
+    drop(rig);
+
+    // Then: its nodes are removed, with nothing to draw again
+    assert_eq!(scene.borrow().len(), 1, "the root alone");
 }

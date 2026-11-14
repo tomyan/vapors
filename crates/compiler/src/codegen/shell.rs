@@ -113,12 +113,15 @@ fn component_struct(name: &str, info: &ScriptInfo) -> String {
         );
     }
     format!(
-        "/// `{name}`: its signals, and what `unmount` removes.
+        "/// `{name}`: its signals, and what `unmount` removes. Dropping it
+/// disposes its signals and effects, unless the component that mounted
+/// it as a child owns it (`owned_by_parent`).
+#[must_use = \"dropping a top-level component disposes its effects; keep it or call unmount\"]
 pub struct {name} {{
 {fields}    owner: Owner,
     roots: Vec<Root>,
-    /// Mounted with no current owner: dropping it disposes its owner,
-    /// its signals and effects (a child's owner goes with its parent's).
+    /// False once its parent's generated code took it as its child
+    /// (`owned_by_parent`): its owner then goes with the parent's.
     disposes_on_drop: bool,
 }}
 "
@@ -174,7 +177,7 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
     {{
         let {name}Props {{ {prop_names} }} = props;
 {add_style}        dom.borrow_mut().declare_events(&Self::events());
-        let disposes_on_drop = Owner::current().is_none();
+        let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
