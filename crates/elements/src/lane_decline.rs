@@ -61,9 +61,19 @@ pub enum LaneDecline {
     /// An item's `margin-top` or `margin-bottom` is `auto`: it takes a
     /// share of the free space.
     MainAutoMargin,
-    /// A percentage `row-gap` on a column whose height is not definite:
-    /// Taffy resolves it against the height the items sum to.
-    PercentGap,
+    /// A relative `row-gap` (a percentage, or a `calc()`, which may hold
+    /// one) on a column whose height is not definite: Taffy resolves it
+    /// against the height the items sum to.
+    RelativeGap,
+    /// An item that can shrink has a hypothetical height outside its own
+    /// minimum and maximum (a floor from its aspect ratio or its padding
+    /// and border above its `max-height`). Taffy clamps it whenever the
+    /// column is not exactly sized (`resolve_flexible_lengths`, step d),
+    /// so its height depends on the total.
+    ClampedHeight,
+    /// The column has no items: vapors lays a childless container out as
+    /// a leaf, which the column's answer is not.
+    NoItems,
     /// The items overflow the column's height and one of them can
     /// shrink (its `flex-shrink` is above 0 and its minimum height is
     /// below its hypothetical height), so its height depends on the

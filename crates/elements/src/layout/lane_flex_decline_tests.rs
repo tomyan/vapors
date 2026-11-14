@@ -36,7 +36,7 @@ fn each_column_case_a_lane_does_not_lay_out_is_declined_by_name() {
             "",
             LaneDecline::JustifyContent,
         ),
-        ("row-gap: 10%", "", LaneDecline::PercentGap),
+        ("row-gap: 10%", "", LaneDecline::RelativeGap),
         ("", "flex-grow: 1", LaneDecline::FlexGrow),
         ("", "margin-top: auto", LaneDecline::MainAutoMargin),
         ("", "position: absolute", LaneDecline::OutOfFlowChild),
@@ -102,4 +102,34 @@ fn an_auto_height_column_whose_items_outgrow_their_bases_and_can_shrink_is_decli
             LaneDecline::Shrinks
         ]
     );
+}
+
+#[test]
+fn an_item_that_can_shrink_with_a_floor_above_its_maximum_is_declined() {
+    // Given: a column taller than its items, one of which takes a floor
+    // of 100px from its aspect ratio and width but has `max-height:
+    // 50px`, which Taffy clamps it to (the review's page)
+    let declined = declines(
+        "width: 300px; height: 500px;",
+        "aspect-ratio: 1; width: 100px; min-width: 100px; max-height: 50px; align-self: flex-start;",
+    );
+
+    // Then
+    assert_eq!(declined, [LaneDecline::ClampedHeight]);
+}
+
+#[test]
+fn a_column_with_no_items_is_declined() {
+    // Given: an empty column, which vapors lays out as a leaf
+    let css = "body { margin: 0; } .col { display: flex; flex-direction: column; width: 300px; \
+               height: 100px; padding: 10px; }";
+    let mut doc = page(css, |doc, body| {
+        element(doc, body, "col", None);
+    });
+
+    // When
+    let declined = compare(&mut doc).declined;
+
+    // Then
+    assert_eq!(declined, [LaneDecline::NoItems]);
 }

@@ -4,7 +4,10 @@
 //! `compute_constants` 634-749, `determine_available_space` 896-945),
 //! for a column whose items' sizes and positions do not depend on the
 //! total (10.3); every other column is declined by name and laid out by
-//! Taffy. Each item is `lane_flex_item.rs`, `lane_flex_base.rs` and
+//! Taffy. The right-to-left branches (`column_x`, `aligned`,
+//! `item_bounds`, `relative_inset`) are mirrored but unverified: vapors'
+//! CSS has no `direction` property, so no page reaches them. Each item
+//! is `lane_flex_item.rs`, `lane_flex_base.rs` and
 //! `lane_flex_child.rs`; the column's answer `lane_flex_answer.rs`.
 //! `lane_block.rs` carries Taffy's MIT notice, which covers the
 //! mirrored lines of the `lane_flex*.rs` modules too.

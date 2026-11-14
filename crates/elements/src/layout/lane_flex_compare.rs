@@ -28,10 +28,11 @@ pub(super) fn compare(doc: &mut Document) -> Compared {
     compare_each(doc, is_flex_container, compare_ask)
 }
 
+/// Every flex container, with items or not: one without is asked of
+/// the mirror too, which declines it (`NoItems`).
 fn is_flex_container(layout_box: &LayoutBox) -> bool {
     matches!(layout_box.content, Content::Element(_))
         && layout_box.style.display == taffy::Display::Flex
-        && !layout_box.children.is_empty()
 }
 
 /// Asks the container at `slot` one way and compares; the decline
