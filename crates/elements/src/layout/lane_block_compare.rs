@@ -59,7 +59,7 @@ pub(super) fn compare(doc: &mut Document) -> Compared {
         disowned: 0,
         lanes: &mut placed.lanes,
         lanes_enabled: false,
-        stale: Vec::new(),
+        stale: rustc_hash::FxHashSet::default(),
         lane_counts: crate::layout::lane_layout::LaneCounts::default(),
     };
     let mut compared = Compared::default();

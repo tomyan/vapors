@@ -58,6 +58,48 @@ fn a_resized_row_asks_itself_and_a_constant_whatever_the_rows() {
 }
 
 #[test]
+fn a_list_in_a_definite_height_flex_column_asks_a_constant_whatever_the_rows() {
+    // Given: body a flex column of definite height, the list its item,
+    // asked for its size with its height unknown and laid out with it
+    // known
+    let css = format!("{ROWS} body {{ display: flex; flex-direction: column; height: 300px; }}");
+    let calls = |rows: usize, at: usize| {
+        let list = list(rows, &css);
+        _ = list.insert_at(at);
+        let counts = list.update();
+        assert_matches_full(&list.doc, VIEW(), "after the insert");
+        counts.layout_calls
+    };
+
+    // When / Then
+    assert_eq!(
+        calls(50, 25),
+        calls(500, 250),
+        "layout calls grow with the rows"
+    );
+}
+
+#[test]
+fn rows_with_percentage_heights_in_a_flex_column_are_laid_out_with_the_height_known() {
+    // Given: rows whose height is a percentage of the list's, which the
+    // column's size query leaves unknown and its layout knows
+    let css = format!(
+        "{ROWS} body {{ display: flex; flex-direction: column; height: 300px; }} \
+         .row {{ height: 1%; }}"
+    );
+    let list = list(20, &css);
+
+    // When: a row inserted
+    _ = list.insert_at(10);
+    let counts = list.update();
+
+    // Then: every row was laid out again for the layout, as a full
+    // update lays them out
+    assert_matches_full(&list.doc, VIEW(), "after the insert");
+    assert!(counts.lanes >= 1, "{counts:?}");
+}
+
+#[test]
 fn the_first_update_lays_body_and_the_list_out_by_lane_and_declines_the_flex_rows() {
     // Given / When: the list's rows are flex containers
     let list = list(3, ROWS);
@@ -135,7 +177,7 @@ fn an_empty_child_declines_the_list_as_collapsing_through() {
 }
 
 #[test]
-fn a_text_field_is_declined_as_not_a_block() {
+fn a_restyled_text_field_is_laned_with_its_run() {
     // Given: a text field in a flex row (an input is laid out only as
     // a flex or grid item), laid out once
     let list = list(

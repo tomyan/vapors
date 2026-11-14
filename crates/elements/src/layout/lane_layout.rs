@@ -53,7 +53,8 @@ impl BoxTree<'_> {
             Err(decline) => Settled::Declined(decline),
         };
         let laid = match settled {
-            Settled::Short(output) => Ok(output),
+            // Known without its children: no lane read, none counted
+            Settled::Short(output) => return output,
             Settled::Declined(decline) => Err(decline),
             Settled::Laid(container) => self
                 .lane_run(id, &container)
@@ -114,11 +115,11 @@ impl BoxTree<'_> {
             lane.share = Some(share);
             lane.all = true;
         }
+        let heights_changed = lane.heights.replace(c.heights()) != Some(c.heights());
         if lane.all {
             self.fill_all(slot, c, lane)?;
         } else {
-            self.fill_inserted(c, lane)?;
-            self.fill_stale(c, lane)?;
+            self.fill_changed(c, lane, heights_changed)?;
         }
         let run = lane.tree.total();
         if c.run_mode == RunMode::PerformLayout {
@@ -127,65 +128,12 @@ impl BoxTree<'_> {
         Ok(run)
     }
 
-    /// Every child laid out and put in a fresh tree, in order.
-    fn fill_all(&mut self, slot: usize, c: &Container, lane: &mut Lane) -> Result<(), LaneDecline> {
-        *lane = Lane {
-            share: lane.share.take(),
-            all: false,
-            ..Lane::default()
-        };
-        let mut previous = None;
-        for child in self.boxes[slot].children.clone() {
-            let leaf = self.leaf_of(child, c, lane)?;
-            previous = Some(lane.put(child, previous, leaf));
-        }
-        Ok(())
-    }
-
-    /// The children put in since the last layout, each after its
-    /// previous sibling's leaf.
-    fn fill_inserted(&mut self, c: &Container, lane: &mut Lane) -> Result<(), LaneDecline> {
-        for (child, after) in std::mem::take(&mut lane.inserted) {
-            let leaf = self.leaf_of(child, c, lane)?;
-            let previous = after.map(|after| lane.handle(after));
-            lane.put(child, previous, leaf);
-        }
-        Ok(())
-    }
-
-    /// The children built or cleared this update laid out again, their
-    /// leaves set.
-    fn fill_stale(&mut self, c: &Container, lane: &mut Lane) -> Result<(), LaneDecline> {
-        let stale: Vec<usize> = (self.stale.iter().copied())
-            .filter(|slot| lane.handles.contains_key(slot))
-            .collect();
-        for child in stale {
-            let leaf = self.leaf_of(child, c, lane)?;
-            lane.tree.set(lane.handle(child), leaf);
-            lane.moved.push(child);
-        }
-        Ok(())
-    }
-
-    /// The child in `slot` laid out: its leaf, with its layout held
-    /// for `write_starts`.
-    fn leaf_of(
-        &mut self,
-        slot: usize,
-        c: &Container,
-        lane: &mut Lane,
-    ) -> Result<BlockSummary, LaneDecline> {
-        let laid = self.lane_child(NodeId::from(slot), c)?;
-        lane.pending.insert(slot, laid.layout);
-        BlockSummary::leaf(laid.leaf)
-    }
-
     /// Writes the layout of every child from the first that moved on:
     /// its start from the tree, the container's inset and, when the
     /// container's top margin collapses with its first child's, less
     /// that margin, which Taffy applies outside the container.
     fn write_starts(&mut self, c: &Container, lane: &mut Lane, run: &BlockSummary) {
-        let Some(first) = first_moved(lane) else {
+        let Some(first) = lane.first_moved() else {
             return;
         };
         let escape = if c.own_margins_collapse.start {
@@ -203,15 +151,4 @@ impl BoxTree<'_> {
         lane.moved.clear();
         lane.pending.clear();
     }
-}
-
-/// The moved child nearest the start, whose start and every later one
-/// is written; none when nothing moved.
-fn first_moved(lane: &Lane) -> Option<super::lane_tree::Handle> {
-    lane.moved
-        .iter()
-        .map(|&slot| lane.handle(slot))
-        .map(|handle| (handle, lane.tree.start(handle)))
-        .min_by(|a, b| a.1.total_cmp(&b.1))
-        .map(|(handle, _)| handle)
 }

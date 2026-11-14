@@ -39,11 +39,13 @@ impl Document {
         self.counts.count_layout(work);
         let (slotted, work) = laid_out.map_err(|failed| vec![ElementError::Layout(failed.0)])?;
         // Debug timings include this full build and layout on every
-        // narrowed update; `layout_check.rs` says what would retire it.
-        // A test whose own oracle compares the same layout each step
-        // skips it (`skip_layout_check`).
+        // update; `layout_check.rs` says what would retire it. A full
+        // build is checked too: it lays block containers out by lane,
+        // and the check's fresh layout by Taffy. A test whose own
+        // oracle compares the same layout each step skips it
+        // (`skip_layout_check`).
         #[cfg(debug_assertions)]
-        if !built.every && !self.boxes.skip_layout_check {
+        if !self.boxes.skip_layout_check {
             self.check_layout(&slotted, viewport);
         }
         Ok((slotted, built, work.written))

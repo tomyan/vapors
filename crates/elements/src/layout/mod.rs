@@ -22,9 +22,11 @@ mod lane_block_summary;
 mod lane_bounds;
 // The flex lane's fold (docs/plans/splice-layout.md, PR 2); layout
 // reads it from PR 3f, so until then only the tests do.
+mod lane_fill;
 #[allow(dead_code)]
 mod lane_flex_summary;
 mod lane_layout;
+mod lane_share;
 mod lane_tree;
 mod layout_box;
 #[cfg(debug_assertions)]
@@ -110,7 +112,7 @@ pub(crate) fn lay_out(
         disowned: 0,
         lanes: &mut placed.lanes,
         lanes_enabled: settling.lanes,
-        stale: settling.built,
+        stale: settling.built.into_iter().collect(),
         lane_counts: LaneCounts::default(),
     };
     let changed = settling.changed;

@@ -16,7 +16,7 @@ impl BoxTree<'_> {
             layout_box.hoisted.clear();
             layout_box.asked.clear();
             layout_box.asked_overflowed = false;
-            self.stale.push(slot);
+            self.stale.insert(slot);
         }
     }
 

@@ -65,11 +65,25 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
 /// in CSS px: a lane sums its children's starts and its container's
 /// content height in f64 and Taffy in f32, which is not associative,
 /// so the last bits can differ (`docs/plans/splice-layout.md`, section
-/// 2.1). A relaxed guard; what would retire it: a Taffy that sums in
-/// f64.
+/// 2.1). Every box is compared within it, not only a lane's children:
+/// a lane container's height differs by as much, and Taffy carries
+/// that into its ancestors' sizes and their later children's
+/// locations. A relaxed guard; what would retire it: a Taffy that sums
+/// in f64.
 const TOLERANCE: f32 = 1.0 / 1024.0;
 
 fn walk(fresh: &Placed, placed: &Placed) {
+    match (fresh.boxes.is_empty(), placed.boxes.is_empty()) {
+        (true, true) => return,
+        (false, false) => {}
+        (fresh_empty, _) => panic!(
+            "a fresh layout has {} boxes where the kept one has {}: the root's box is \
+             out of date (`html {{ display: none }}` builds none); \
+             `cargo test -p vapors-elements` reproduces it",
+            if fresh_empty { "no" } else { "some" },
+            if fresh_empty { "some" } else { "none" },
+        ),
+    }
     let mut stack = vec![(0, 0)];
     while let Some((index, slot)) = stack.pop() {
         let (new, kept) = (&fresh.boxes[index].layout, &placed.boxes[slot].layout);

@@ -2,6 +2,7 @@
 //! containing-block traits, and the dispatch from a box's display type
 //! to Taffy's block, flex and leaf algorithms.
 
+use rustc_hash::FxHashSet;
 #[cfg(feature = "grid")]
 use taffy::compute_grid_layout;
 use taffy::{
@@ -39,9 +40,10 @@ pub(crate) struct BoxTree<'f> {
     /// fresh layout, which compares a lane with Taffy.
     pub(crate) lanes: &'f mut Lanes,
     pub(crate) lanes_enabled: bool,
-    /// Slots built this update or whose cache this layout cleared: a
-    /// lane child among them is laid out again (`lane_layout.rs`).
-    pub(crate) stale: Vec<usize>,
+    /// Slots built this update or whose cache this layout cleared, each
+    /// once: a lane child among them is laid out again
+    /// (`lane_layout.rs`).
+    pub(crate) stale: FxHashSet<usize>,
     pub(crate) lane_counts: LaneCounts,
 }
 
