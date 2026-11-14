@@ -9,7 +9,7 @@ fn measured() -> ElementMemory {
         styles_computed: 5,
         total: 900_000,
         owners: [
-            400_000, 100_000, 200_000, 50_000, 1_000, 20_000, 120_000, 9_000,
+            408_000, 100_000, 200_000, 50_000, 1_000, 20_000, 120_000, 1_000,
         ],
     }
 }
@@ -143,11 +143,12 @@ fn a_measurement_within_the_limits_is_kept() {
 
 #[test]
 fn an_owner_at_the_negative_limit_is_kept_and_one_byte_under_it_refused() {
-    // Given: the limit is -1% of 900,000, -9,000 bytes
+    // Given: the limit is -1% of 900,000, -9,000 bytes; layout frees
+    // what the mount left
     let at_limit = |bytes: i64| {
         let mut memory = measured();
-        memory.owners[4] = bytes;
-        memory.owners[7] = 10_000 - bytes;
+        memory.owners[2] = bytes;
+        memory.owners[0] = 608_000 - bytes;
         memory
     };
 
@@ -160,7 +161,7 @@ fn an_owner_at_the_negative_limit_is_kept_and_one_byte_under_it_refused() {
     assert!(
         refused
             .expect_err("one under")
-            .starts_with("update_rest is -9001 bytes")
+            .starts_with("layout is -9001 bytes")
     );
 }
 
@@ -180,4 +181,19 @@ fn a_negative_total_is_refused() {
             .expect_err("negative")
             .starts_with("the total is -900000")
     );
+}
+
+#[test]
+fn bytes_no_named_phase_holds_over_a_percent_of_the_total_are_refused() {
+    // Given: the rest holds 2% of the total, mount making room
+    let mut memory = measured();
+    memory.owners[7] = 18_000;
+    memory.owners[0] -= 17_000;
+
+    // When
+    let refused = memory.checked();
+
+    // Then
+    let error = refused.expect_err("rest over 1%");
+    assert!(error.starts_with("rest holds 18000 bytes"), "{error}");
 }

@@ -24,18 +24,20 @@ fn gpu_a_settled_page_s_live_heap_is_charged_to_its_mount_layout_and_paint() {
     // Given
     let gpu = gpu();
 
-    // When
+    // When: an empty page, then 20 rows, each passing ElementMemory::checked
+    let empty = run_child(&gpu, 0, live).expect("an empty page mounts and settles");
     let measured = run_child(&gpu, 20, live).expect("mounts and settles");
 
     // Then: each row is four elements, under the html and body
-    assert_eq!(measured.elements, 20 * 4 + 2);
-    for owner in ["mount", "layout", "paint"] {
-        let at = OWNERS
-            .iter()
-            .position(|name| *name == owner)
-            .expect("an owner");
-        assert!(measured.owners[at] > 0, "{owner}: {measured:?}");
+    assert_eq!((empty.elements, measured.elements), (2, 20 * 4 + 2));
+    let owner =
+        |name: &str| measured.owners[OWNERS.iter().position(|o| *o == name).expect("an owner")];
+    for name in ["mount", "layout", "paint"] {
+        assert!(owner(name) > 0, "{name}: {measured:?}");
     }
-    assert!(measured.total > 0, "{measured:?}");
-    assert_eq!(measured.owners.iter().sum::<i64>(), measured.total);
+    // the readings at 20 rows: layout 744 KB (the boxes), paint 176 KB,
+    // style 97 KB; a split that swaps any two of them fails here
+    assert!(owner("layout") > owner("paint"), "{measured:?}");
+    assert!(owner("paint") > owner("style"), "{measured:?}");
+    assert!(measured.total > empty.total, "{empty:?} {measured:?}");
 }

@@ -1,13 +1,16 @@
 //! The counting allocator stays in the memory binary and its test: a
-//! `#[global_allocator]` anywhere else in the workspace's crates would
-//! slow every timed run of `vapors-perf` (review of #321, L1).
+//! global allocator set anywhere else in the workspace's crates would
+//! slow every timed run of `vapors-perf` (review of #321, L1). A line of
+//! code naming it in any form counts.
 
 use std::path::{Path, PathBuf};
 
 /// The files allowed to set the global allocator, from `crates/`.
-const ALLOWED: [&str; 2] = [
+/// This file names it too, to look for it.
+const ALLOWED: [&str; 3] = [
     "perf/src/memory_main.rs",
     "perf/tests/gpu_element_memory.rs",
+    "perf/tests/global_allocator_confined.rs",
 ];
 
 fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
@@ -22,6 +25,13 @@ fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
+/// A line of code, not a comment, that names `global_allocator` in any
+/// form: the attribute alone, before its static, or in a `cfg_attr`.
+fn names_the_allocator(line: &str) -> bool {
+    let code = line.trim_start();
+    !code.starts_with("//") && code.contains("global_allocator")
+}
+
 #[test]
 fn only_the_memory_binary_and_its_test_set_the_global_allocator() {
     // Given
@@ -34,9 +44,7 @@ fn only_the_memory_binary_and_its_test_set_the_global_allocator() {
         .iter()
         .filter(|path| {
             let source = std::fs::read_to_string(path).expect("a readable source");
-            source
-                .lines()
-                .any(|line| line.trim() == "#[global_allocator]")
+            source.lines().any(names_the_allocator)
         })
         .map(|path| {
             path.strip_prefix(&crates)

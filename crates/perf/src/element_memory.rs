@@ -38,6 +38,15 @@ pub const OWNERS: [&str; 8] = [
 /// rows (#321), the most of any size.
 pub const NEGATIVE_LIMIT_PERCENT: i64 = 1;
 
+/// The most the owners no named phase holds (the update's rest and the
+/// rest) may hold, as a share of the total: the readings had both
+/// below zero at every size, the update's rest at -0.37% of the total
+/// at 10,000 rows the furthest (#321).
+pub const UNPLACED_LIMIT_PERCENT: i64 = 1;
+
+/// The owners no named phase holds.
+const UNPLACED: [&str; 2] = ["update_rest", "rest"];
+
 /// The fields of a line after its prefix, in order.
 const COUNTS: [&str; 4] = ["rows", "elements", "styles_computed", "total"];
 
@@ -77,41 +86,66 @@ impl ElementMemory {
         ]
     }
 
-    /// This measurement, refused when its owners do not sum to its total,
-    /// or one is below minus [`NEGATIVE_LIMIT_PERCENT`] of the total: a
-    /// phase that freed that much of what another left is a charge the
-    /// split cannot place, so the columns would not say where the heap is.
+    /// This measurement, refused when its total is negative, its owners
+    /// do not sum to it, one is below minus [`NEGATIVE_LIMIT_PERCENT`] of
+    /// it (a phase that freed that much of what another left is a charge
+    /// the split cannot place), or the update's rest or the rest holds
+    /// over [`UNPLACED_LIMIT_PERCENT`] of it (bytes no named phase owns).
     ///
     /// # Errors
-    /// Either, naming the owners and the total.
+    /// The first of these, naming the owners and the total.
     pub fn checked(self) -> Result<Self, String> {
-        if self.total < 0 {
-            return Err(format!(
-                "the total is {} bytes: a page leaves the heap smaller than before its mount, \
-                 so its live count is wrong; fix: read live bytes before and after the page alone",
-                self.total
-            ));
+        self.total_not_negative()?;
+        self.owners_sum_to_total()?;
+        self.owners_within_limits()?;
+        Ok(self)
+    }
+
+    fn total_not_negative(&self) -> Result<(), String> {
+        if self.total >= 0 {
+            return Ok(());
         }
+        Err(format!(
+            "the total is {} bytes: a page leaves the heap smaller than before its mount, so \
+             its live count is wrong; fix: read live bytes before and after the page alone",
+            self.total
+        ))
+    }
+
+    fn owners_sum_to_total(&self) -> Result<(), String> {
         let sum: i64 = self.owners.iter().sum();
-        if sum != self.total {
-            return Err(format!(
-                "the owners {:?} sum to {sum}, not the total {}; fix: ElementMemory::split",
-                self.owners, self.total
-            ));
+        if sum == self.total {
+            return Ok(());
         }
-        let floor = -(self.total * NEGATIVE_LIMIT_PERCENT / 100);
-        let below = OWNERS
-            .iter()
-            .zip(self.owners)
-            .find(|(_, bytes)| *bytes < floor);
-        match below {
-            Some((owner, bytes)) => Err(format!(
-                "{owner} is {bytes} bytes, below {floor} ({NEGATIVE_LIMIT_PERCENT}% of the total \
-                 {}): it freed what another phase left; measure that phase's structure apart",
-                self.total
-            )),
-            None => Ok(self),
+        Err(format!(
+            "the owners {:?} sum to {sum}, not the total {}; fix: ElementMemory::split",
+            self.owners, self.total
+        ))
+    }
+
+    fn owners_within_limits(&self) -> Result<(), String> {
+        let share = |percent: i64| self.total * percent / 100;
+        let (floor, unplaced) = (
+            -share(NEGATIVE_LIMIT_PERCENT),
+            share(UNPLACED_LIMIT_PERCENT),
+        );
+        for (owner, bytes) in OWNERS.iter().zip(self.owners) {
+            if bytes < floor {
+                return Err(format!(
+                    "{owner} is {bytes} bytes, below {floor} ({NEGATIVE_LIMIT_PERCENT}% of the total \
+                     {}): it freed what another phase left; measure that phase's structure apart",
+                    self.total
+                ));
+            }
+            if UNPLACED.contains(owner) && bytes > unplaced {
+                return Err(format!(
+                    "{owner} holds {bytes} bytes, over {unplaced} ({UNPLACED_LIMIT_PERCENT}% of the \
+                     total {}): bytes no named phase owns; meter the work that left them",
+                    self.total
+                ));
+            }
         }
+        Ok(())
     }
 
     /// The line a child prints for this measurement.
