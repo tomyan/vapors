@@ -91,6 +91,34 @@ upload, write and draw goes through `SurfaceFrame::work`, so
 moved node writes its subtree's slots; a recoloured mesh writes its
 own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 
+## Picking
+
+`pick(scene, meshes, PickAt { point, size }, skip)` returns the nearest
+visible mesh under a surface point, or `None`
+(`vapors-scene3d/src/pick.rs`). It casts a ray from the active camera
+through the point, tests it against each mesh's bounds in the mesh's
+own space, then tests the triangles of each mesh whose bounds the ray
+enters. Only hits between the near and far planes count. Hidden meshes and those
+`skip` returns true for are passed over. It refuses a scene with no
+active camera, a projection refused at the surface's aspect, and a mesh
+whose geometry the `Meshes` does not hold.
+
+It runs once per pointer move, not per frame. Cost grows linearly with
+mesh count (`cargo run --release -p vapors-scene3d --example
+pick_cost`, run under `cargo xtask quiet`, i5-10500T, 2026-11-14;
+median of 200 picks; unit cubes of 12 triangles in a column):
+
+| Meshes | Bounds tests only (ray misses all) | Every triangle tested (ray enters all) |
+|---|---|---|
+| 10 | 0.85 µs | 2.0 µs |
+| 100 | 5.9 µs | 17 µs |
+| 1,000 | 55 µs | 173 µs |
+| 10,000 | 562 µs | 1.76 ms |
+
+That is about 56 ns a mesh for the bounds test and about 120 ns more
+for each mesh whose 12 triangles are tested. There is no spatial index,
+so every mesh's bounds are tested on every pick.
+
 ## In a template
 
 ```html
