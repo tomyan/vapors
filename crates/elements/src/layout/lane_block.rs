@@ -120,11 +120,10 @@ impl BoxTree<'_> {
             calc,
         );
         let known = known_dimensions(&inputs, &sizes, (padding + border).sum_axes());
-        if let Some(short) = short_answer(&inputs, known) {
-            return Settled::Short(short);
-        }
-        let Some(outer_width) = known.width else {
-            return Settled::Declined(LaneDecline::WidthUnknown);
+        let outer_width = match (short_answer(&inputs, known), known.width) {
+            (Some(short), _) => return Settled::Short(short),
+            (None, None) => return Settled::Declined(LaneDecline::WidthUnknown),
+            (None, Some(width)) => width,
         };
         let resolution_width = parent_width.unwrap_or(outer_width);
         let edges = Edges::of(style, (padding, border), resolution_width, calc);
