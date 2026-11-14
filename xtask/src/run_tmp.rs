@@ -175,11 +175,22 @@ pub fn around(
     base: &Path,
     body: impl FnOnce(&Path) -> ExitCode,
 ) -> Result<ExitCode, String> {
+    let who = this_run()?;
     let tmp = begin(base)?;
     let code = body(tmp.path());
-    say(&tmp.sweep_inner(&this_run()?)?);
-    tmp.finish(run, std::env::var_os(KEEP_ENV).is_some())?;
+    end(tmp, run, std::env::var_os(KEEP_ENV).is_some(), &who)?;
     Ok(code)
+}
+
+/// The inner sweep, then the leftover check whatever the sweep's result,
+/// so a sweep error does not hide the leftovers or skip the keep switch.
+fn end(tmp: RunTmp, run: &str, keep: bool, who: &sweep::Who<'_>) -> Result<(), String> {
+    let swept = tmp.sweep_inner(who).map(|lines| say(&lines));
+    match (swept, tmp.finish(run, keep)) {
+        (Ok(()), finished) => finished,
+        (Err(why), Ok(())) => Err(why),
+        (Err(why), Err(more)) => Err(format!("{why}; and {more}")),
+    }
 }
 
 /// [`around`] under the temp dir, its refusal printed as a failed run.

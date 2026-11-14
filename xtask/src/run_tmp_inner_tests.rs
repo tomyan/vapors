@@ -68,3 +68,40 @@ fn a_step_s_own_leftover_beside_a_dead_inner_run_is_still_refused() {
     assert!(refusal.contains("left 1 entry"), "{refusal}");
     assert!(refusal.contains("leaked.txt"), "{refusal}");
 }
+
+#[test]
+fn a_dead_runs_directory_holding_a_live_run_is_left_and_said_and_then_refused() {
+    // Given: 77 was killed, 78, started inside it, still runs
+    let (_base, run) = with_inner("run-tmp-inner-live-inside");
+
+    // When
+    let said = run.sweep_inner(&who(&|pid| pid == 78)).expect("swept");
+    let refusal = run.finish("ci", false).expect_err("a live run inside");
+
+    // Then
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0].contains("xtask-run-77 alone: run 78 inside it is still going"),
+        "{said:?}"
+    );
+    assert!(refusal.contains("xtask-run-77/xtask-run-78"), "{refusal}");
+}
+
+#[test]
+fn a_failed_inner_sweep_still_runs_the_leftover_check_and_reports_both() {
+    // Given: four set-aside directories inside the run (the sweep refuses
+    // more than three) and a file a step left
+    let base = scratch::dir("run-tmp-inner-sweep-fails");
+    let run = RunTmp::make(&base, 3).expect("made");
+    for n in 1..=4 {
+        std::fs::create_dir(run.path().join(format!("xtask-run-9-unremovable-{n}"))).expect("dir");
+    }
+    std::fs::write(run.path().join("leaked.txt"), "x").expect("file");
+
+    // When
+    let refusal = end(run, "ci", false, &who(&|_| false)).expect_err("both fail");
+
+    // Then
+    assert!(refusal.contains("more than 3, so runs stop"), "{refusal}");
+    assert!(refusal.contains("leaked.txt"), "{refusal}");
+}
