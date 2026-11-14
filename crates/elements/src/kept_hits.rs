@@ -10,6 +10,7 @@
 //! in its part's scroll frame and put on the page as it is tested
 //! (`frames.rs`).
 
+use rustc_hash::FxHashMap;
 use vapors_dom::NodeId;
 
 use crate::drawn_steps::DrawnSteps;
@@ -21,28 +22,55 @@ use crate::paint_order::Step;
 /// A hit in its scroll frame: the frame, the element and its rect.
 pub(crate) type FramedHit = (usize, (NodeId, BoxRect));
 
-/// Every hit with its box step's place, ordered by place; a part's hits
-/// in the order it painted them.
+/// Every hit with its box step's place, by the frame it is in, each
+/// frame's ordered by place; a part's hits in the order it painted them.
+/// A hit test asks only the frames that can show at its point
+/// (`Frames::meeting`: the scroll frames whose clip meets it, the lane
+/// frames whose row meets it through the lane, section 11.2).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct KeptHits {
-    placed: Vec<(usize, FramedHit)>,
+    by_frame: FxHashMap<usize, Vec<(usize, FramedHit)>>,
+    /// The frame each place's hits are in.
+    frames: FxHashMap<usize, usize>,
 }
 
 impl KeptHits {
     /// The hits of `scene`'s parts, in painting order.
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
-        let placed = scene
-            .placed_parts()
-            .flat_map(|(place, kept)| framed(kept).map(move |hit| (place, hit)));
-        Self {
-            placed: placed.collect(),
+        let mut hits = Self::default();
+        for (place, kept) in scene.placed_parts() {
+            hits.put(place, framed(kept));
+        }
+        hits
+    }
+
+    /// Puts `hits`, of the box step at `place`, in their frame's list.
+    fn put(&mut self, place: usize, hits: impl Iterator<Item = FramedHit>) {
+        for hit in hits {
+            let list = self.by_frame.entry(hit.0).or_default();
+            let at = list.partition_point(|&(placed, _)| placed <= place);
+            list.insert(at, (place, hit));
+            self.frames.insert(place, hit.0);
         }
     }
 
+    /// Takes out the hits of the box step at `place`; them.
+    fn take(&mut self, place: usize) -> Vec<FramedHit> {
+        let Some(frame) = self.frames.remove(&place) else {
+            return Vec::new();
+        };
+        let list = self.by_frame.entry(frame).or_default();
+        let start = list.partition_point(|&(at, _)| at < place);
+        let end = list.partition_point(|&(at, _)| at <= place);
+        let taken = list.drain(start..end).map(|(_, hit)| hit).collect();
+        if list.is_empty() {
+            self.by_frame.remove(&frame);
+        }
+        taken
+    }
+
     /// `self` with the hits of each of `slots`' box steps replaced by
-    /// its part's in `boxes`, at the step's place in `drawn`: one
-    /// splice per place, from the last, so the list stays ordered by
-    /// place as a fresh gather is.
+    /// its part's in `boxes`, at the step's place in `drawn`.
     /// Returns the hits removed and added, in no order, each in its
     /// frame.
     pub(crate) fn patch(
@@ -52,30 +80,47 @@ impl KeptHits {
         boxes: &[Option<KeptBox>],
     ) -> Vec<FramedHit> {
         let mut changed = Vec::new();
-        for (place, slot) in box_places(slots, drawn).into_iter().rev() {
-            let start = self.placed.partition_point(|&(at, _)| at < place);
-            let end = self.placed.partition_point(|&(at, _)| at <= place);
+        for (place, slot) in box_places(slots, drawn) {
+            changed.extend(self.take(place));
             let kept = boxes.get(slot).and_then(Option::as_ref);
             let hits: Vec<FramedHit> = kept.into_iter().flat_map(framed).collect();
             changed.extend_from_slice(&hits);
-            let placed = hits.into_iter().map(|hit| (place, hit));
-            changed.extend(self.placed.splice(start..end, placed).map(|(_, hit)| hit));
+            self.put(place, hits.into_iter());
         }
         changed
     }
 
-    /// Every hit with its frame, in painting order.
-    pub(crate) fn hits(&self) -> impl DoubleEndedIterator<Item = &FramedHit> {
-        self.placed.iter().map(|(_, hit)| hit)
+    /// Every hit with its frame, in painting order: O(hits log hits), for
+    /// the checks.
+    pub(crate) fn hits(&self) -> Vec<FramedHit> {
+        let mut placed: Vec<&(usize, FramedHit)> = self.by_frame.values().flatten().collect();
+        placed.sort_by_key(|&&(place, _)| place);
+        placed.into_iter().map(|&(_, hit)| hit).collect()
     }
 
-    /// The last hit whose rect on the page holds `[x, y]`: its left and
-    /// top edges, not its right and bottom.
+    /// The last hit in painting order whose rect on the page holds
+    /// `[x, y]` (its left and top edges, not its right and bottom),
+    /// among the frames that can show there.
     pub(crate) fn hit(&self, point: [f32; 2], frames: &Frames) -> Option<NodeId> {
-        self.hits()
-            .rev()
-            .find(|(frame, (_, rect))| holds(&frames.hit(*frame, *rect), point))
-            .map(|(_, (node, _))| *node)
+        self.hit_counted(point, frames).0
+    }
+
+    /// `hit`, and how many hits it tested: those of the frames that can
+    /// show at `point`, not every frame's.
+    fn hit_counted(&self, point: [f32; 2], frames: &Frames) -> (Option<NodeId>, usize) {
+        let scale = frames.scale();
+        let [x, y] = point.map(|v| v * scale);
+        let view = vapors_scene::Rect::new(x, y, x + 1.0, y + 1.0);
+        let lists = frames.meeting(view).into_iter();
+        let tested: Vec<&(usize, FramedHit)> = lists
+            .filter_map(|frame| self.by_frame.get(&frame))
+            .flatten()
+            .collect();
+        let holding = tested
+            .iter()
+            .filter(|(_, (frame, (_, rect)))| holds(&frames.hit(*frame, *rect), point));
+        let found = holding.max_by_key(|&&&(place, _)| place);
+        (found.map(|(_, (_, (node, _)))| *node), tested.len())
     }
 }
 
@@ -150,3 +195,7 @@ fn box_place(drawn: &DrawnSteps, slot: usize) -> Option<usize> {
 #[cfg(test)]
 #[path = "kept_hits_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "kept_hits_lane_tests.rs"]
+mod lane_tests;

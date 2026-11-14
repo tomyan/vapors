@@ -52,6 +52,11 @@ impl Default for Frames {
 }
 
 impl Frames {
+    /// Device pixels per CSS pixel.
+    pub(crate) fn scale(&self) -> f32 {
+        self.scale
+    }
+
     /// The page's frame alone, at `scale`.
     pub(crate) fn page(scale: f32) -> Self {
         let page = FrameAt {

@@ -899,11 +899,13 @@ Lane frames are lighter than scroll frames:
 - **Draw** (4b): each lane frame drawn is a batch frame with its shift
   in the uniform table (4-iii): O(rows drawn); batches already break per
   row on the rows page.
-- **Culling** (4d): a lane is one entry in its scroll frame's extents
-  index (`frame_extents.rs`), with its total extent and largest reach
-  (section 10.1); the children that can show come from `between(view)`,
-  and each child's steps are indexed in its own frame. Until 4d, a lane
-  frame's steps are tested by the view moved by its shift.
+- **Culling** (4b, 4d): a framed lane's children are frames of their
+  own, so its scroll frame's extents index (`frame_extents.rs`) holds
+  the container's steps alone, not its rows'; the children that can
+  show come from `between(view)`, widened by the most ink seen past
+  them (`paint_lane_ink.rs`), and each child's steps are indexed in its
+  own frame. What 4d adds is the splice patch below: the per-row frame
+  indexes are not made afresh on an insert.
 - **Splice patch** (4d): an insert or remove of a lane child reshapes
   paint order, and the drawing steps, the extents index and the hits
   were made afresh after a splice (`paint_partial.rs` `drawn_updated`),
@@ -912,9 +914,10 @@ Lane frames are lighter than scroll frames:
   the drawing steps, the extents index and the hits by its edits, the
   new child's steps added and the removed child's taken out, O(that
   child's steps).
-- **Hits** (4d): a hit test inside a lane asks `between(y, y)` first
-  and tests one row's hits (section 5.2); until then the scan over kept
-  hits reads each hit's frame, as it does for scroll frames.
+- **Hits** (4d): the kept hits are by frame; a hit test asks the
+  frames that can show at its point (`Frames::meeting`, which finds a
+  lane's rows through `between`) and tests their hits alone, the last
+  in paint order winning (`kept_hits.rs`).
 - **a11y** (4b): the take is told of the lane children whose start
   changed (a `started` list from the lane, which is O(rows after) but
   only slots), so the mirror's records stay right; section 5.3's

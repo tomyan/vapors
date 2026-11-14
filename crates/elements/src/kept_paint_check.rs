@@ -95,7 +95,7 @@ fn first_differing_hit(
     kept: &crate::kept_hits::KeptHits,
     gathered: &crate::kept_hits::KeptHits,
 ) -> Option<String> {
-    let (mut kept, mut gathered) = (kept.hits(), gathered.hits());
+    let (mut kept, mut gathered) = (kept.hits().into_iter(), gathered.hits().into_iter());
     (0..).find_map(|at| match (kept.next(), gathered.next()) {
         (None, None) => Some(None),
         (k, g) if k != g => Some(Some(format!(
