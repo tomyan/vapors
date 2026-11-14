@@ -99,7 +99,16 @@ own time at this size. If it shows in insert's instructions once the
 splice step makes inserts cheap, chunked storage for the box list (as
 `blocks.rs`, #288) is the follow-up.
 
-## Not measured here
+## A dropped page (#353)
 
-- A page's memory when it is dropped: dhat saw about all of it live at
-  process end (the drop-leak slice).
+Live bytes after a settled 10,000-row page is dropped, three times in
+one process, with #353 (a top-level component disposes its owner when
+dropped) and a measuring mode kept out of the tree:
+
+| | held | left after the 1st drop | 2nd | 3rd |
+|---|---|---|---|---|
+| with #353 | 449.2 MB | 18.1 MB | 0.7 MB | 0.7 MB |
+| without | 449.2 MB | 443.7 MB | 443.6 MB | 460.4 MB |
+
+The 18.1 MB after the first drop is the signal runtime's arenas keeping
+their slots, which the next page takes.
