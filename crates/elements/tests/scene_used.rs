@@ -185,3 +185,36 @@ fn an_element_that_is_no_scene_anchor_has_no_scene_used() {
     // Then
     assert_eq!(doc.scene_used(div), None);
 }
+
+#[test]
+fn an_opacity_computed_outside_zero_to_one_is_refused_naming_the_range() {
+    for value in ["calc(1 + 1)", "calc(0 - 1)"] {
+        // Given
+        let (mut doc, _) = scene(&format!(".body {{ opacity: {value}; }}"));
+
+        // When
+        let refused = refusals(&mut doc).join("\n");
+
+        // Then
+        assert!(
+            refused.contains("app.css:2:")
+                && refused.contains("`opacity: ")
+                && refused.contains("0 to 1"),
+            "{value}: {refused}"
+        );
+    }
+}
+
+#[test]
+fn a_removed_anchor_has_no_scene_used() {
+    // Given
+    let (mut doc, [_, group, mesh]) = scene("");
+    updated(&mut doc);
+
+    // When
+    doc.remove(group);
+    updated(&mut doc);
+
+    // Then
+    assert_eq!(doc.scene_used(mesh), None);
+}

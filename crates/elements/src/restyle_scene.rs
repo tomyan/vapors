@@ -31,6 +31,11 @@ impl Document {
 
     /// Where `node` is, when it is a scene anchor.
     fn scene_context(&self, node: NodeId) -> Option<SceneContext> {
+        debug_assert_eq!(
+            self.sheets.name(USER_AGENT_SHEET),
+            crate::style::USER_AGENT_NAME,
+            "the sheet at USER_AGENT_SHEET is not the user-agent sheet, so an author sheet would escape the scene set check; put the user-agent sheet first in Sheets::new (crates/elements/src/style/mod.rs). Reproduce with `cargo test -p vapors-elements --test scene_used`"
+        );
         let element = self.arena.get(node, "restyle").element()?;
         Some(SceneContext {
             tag: SceneTag::from_tag(&element.tag)?,
@@ -40,8 +45,9 @@ impl Document {
     }
 
     /// The `SceneUsed` the last update kept for `node`; `None` when it
-    /// is no scene anchor (`scene`, `group`, `mesh`, `camera`, `decal`),
-    /// or its style was refused.
+    /// is no scene anchor (`scene`, `group`, `mesh`, `camera`, `decal`)
+    /// or its own style was refused. A value refused at an ancestor and
+    /// inherited here is kept: that update failed, naming the ancestor.
     #[must_use]
     pub fn scene_used(&self, node: NodeId) -> Option<SceneUsed> {
         self.kept.as_ref()?.scene.get(&node).copied()

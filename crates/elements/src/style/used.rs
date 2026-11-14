@@ -2,9 +2,7 @@
 //! or every refusal its computed style earns.
 
 use vapors_css::cascade::ComputedStyle;
-use vapors_css::property::longhands::{
-    BACKGROUND_COLOR, CURSOR, DISPLAY, POINTER_EVENTS, VISIBILITY, Z_INDEX,
-};
+use vapors_css::property::longhands::{BACKGROUND_COLOR, CURSOR, DISPLAY, Z_INDEX};
 use vapors_scene::Color;
 
 use super::box_style;
@@ -13,7 +11,7 @@ use super::decoration::{Decoration, decoration};
 use super::honoured::check_honoured;
 use super::inline;
 use super::text_style::{TextStyle, color, text_style};
-use super::values::{Reader, Refusal, Styles, keyword};
+use super::values::{Reader, Refusal, Styles};
 
 /// What the element's computed style means to layout, text and paint.
 #[derive(Clone, Debug, PartialEq)]
@@ -123,8 +121,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         background: reader.read(BACKGROUND_COLOR, color, Color::default()),
         decoration,
         cursor: reader.read(CURSOR, cursor, Cursor::Default),
-        visible: reader.read(VISIBILITY, |v| keyword(v).map(|k| k == "visible"), true),
-        takes_pointer: reader.read(POINTER_EVENTS, |v| keyword(v).map(|k| k == "auto"), true),
+        visible: super::values::visible(&mut reader),
+        takes_pointer: super::values::takes_pointer(&mut reader),
     };
     let mut refusals = check_honoured(styles, context.initial);
     refusals.extend(reader.refusals);

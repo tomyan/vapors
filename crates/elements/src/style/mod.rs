@@ -78,7 +78,7 @@ impl Sheets {
         Self {
             features: features::Features::default().with(&ua),
             cascade: Cascade::new().user_agent(ua),
-            names: vec!["ua.css".to_owned()],
+            names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
@@ -186,6 +186,10 @@ impl Sheets {
 /// The user-agent sheet's index in the cascade: `Sheets::new` adds it
 /// first.
 pub(crate) const USER_AGENT_SHEET: usize = 0;
+
+/// The user-agent sheet's name, which `restyle_scene` checks is the one
+/// at [`USER_AGENT_SHEET`].
+pub(crate) const USER_AGENT_NAME: &str = "ua.css";
 
 impl Sheets {
     /// The name a sheet was added under, by its cascade order (0 is the

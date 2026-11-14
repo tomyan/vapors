@@ -7,14 +7,15 @@
 //! refuse, and the user-agent sheet's `display: none` is the anchor's.
 
 use vapors_css::property::PropertyId;
-use vapors_css::property::longhands::{CURSOR, OPACITY, POINTER_EVENTS, VISIBILITY};
+use vapors_css::property::longhands::{COLOR, CURSOR, OPACITY};
 use vapors_css::property::scene::{SceneTag, instead};
 use vapors_css::value::Value;
 use vapors_dom::StyleKey;
 use vapors_scene::Color;
 
 use super::cursor::{Cursor, cursor};
-use super::values::{Reader, Refusal, Styles, keyword, shape};
+use super::text_style::color;
+use super::values::{Reader, Refusal, Styles, shape, takes_pointer, visible};
 
 /// What a scene node reads from its anchor's computed style.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -49,14 +50,14 @@ pub(crate) fn scene_used(
     let mut reader = Reader::new(styles);
     let mesh = context.tag == SceneTag::Mesh;
     let used = SceneUsed {
-        colour: styles.own.color(),
+        colour: reader.read(COLOR, color, Color::default()),
         opacity: if mesh {
             reader.read(OPACITY, opacity, 1.0)
         } else {
             1.0
         },
-        visible: reader.read(VISIBILITY, |v| keyword(v).map(|k| k == "visible"), true),
-        takes_pointer: reader.read(POINTER_EVENTS, |v| keyword(v).map(|k| k == "auto"), true),
+        visible: visible(&mut reader),
+        takes_pointer: takes_pointer(&mut reader),
         cursor: if mesh {
             reader.read(CURSOR, cursor, Cursor::Default)
         } else {
@@ -109,12 +110,19 @@ fn is_motion(id: PropertyId) -> bool {
     name.starts_with("transition-") || name.starts_with("animation-")
 }
 
-/// `opacity` as a fraction.
+/// `opacity` as a fraction, refused outside 0 to 1 as a literal is at
+/// parse time: a `calc()` is only range-checked here. Never clamped.
 #[allow(clippy::cast_possible_truncation)] // a fraction from 0 to 1
 fn opacity(value: &Value) -> Result<f32, String> {
-    match value {
-        Value::Number(n) => Ok(*n as f32),
-        Value::Percentage(p) => Ok((*p / 100.0) as f32),
-        _ => Err(shape("a number or a percentage")),
+    let fraction = match value {
+        Value::Number(n) => *n,
+        Value::Percentage(p) => *p / 100.0,
+        _ => return Err(shape("a number or a percentage")),
+    };
+    if !(0.0..=1.0).contains(&fraction) {
+        return Err(format!(
+            "computes to {fraction}, outside 0 to 1 (0% to 100%), the range `opacity` takes; fix the expression"
+        ));
     }
+    Ok(fraction as f32)
 }

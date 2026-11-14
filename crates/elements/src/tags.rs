@@ -46,17 +46,15 @@ const SUPPORTED: &[&str] = &[
     "var",
 ];
 
-/// The anchors of the 3D scene components (vapors-scene3d-components,
-/// docs/plans/css-for-3d.md C1): styled by the cascade, `display: none`
-/// from the user-agent sheet, and drawn by their surface, never laid
-/// out. Not offered in the refusal's list: only the components make
-/// them. `decal` has no component yet: `<Decal>` arrives in
-/// docs/plans/one-scene.md S8.
-const SCENE_ANCHORS: &[&str] = &["scene", "group", "mesh", "camera", "decal"];
-
-/// Whether `tag` is a scene component's anchor.
+/// Whether `tag` is a 3D scene component's anchor
+/// (vapors-scene3d-components, docs/plans/css-for-3d.md C1): one of
+/// vapors-css's `SceneTag`s, the one list of them. Styled by the
+/// cascade, `display: none` from the user-agent sheet, drawn by its
+/// surface and never laid out. Not offered in the refusal's list: only
+/// the components make them. `decal` has no component yet: `<Decal>`
+/// arrives in docs/plans/one-scene.md S8.
 pub(crate) fn is_scene_anchor(tag: &str) -> bool {
-    SCENE_ANCHORS.contains(&tag)
+    vapors_css::property::scene::SceneTag::from_tag(tag).is_some()
 }
 
 /// Where each unimplemented tag arrives.

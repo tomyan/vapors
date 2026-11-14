@@ -581,7 +581,10 @@ and the property table together. A scene anchor keeps a `SceneUsed`
 readers never see it; C1's computed `display` refusal is now the
 set's: an author's `display` of any value is refused, the user-agent
 sheet's is not. A declared `transition-*` or `animation-*` on a mesh,
-in the set, is refused naming C7 until it lands.
+in the set, is refused naming C7 until it lands. `SceneUsed` is derived per
+anchor at each restyle, not yet shared per computed style as 4.3 says;
+C6, which gives scene anchors compiled winners, shares it. `opacity`
+computed outside 0 to 1 (a `calc()`) is refused, as a literal is.
 
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
