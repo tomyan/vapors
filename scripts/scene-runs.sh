@@ -15,7 +15,7 @@
 # `cargo xtask quiet <minutes> -- scripts/scene-runs.sh <dir> <scene>`,
 # which holds xtask's ci, test and gate runs. Before the first run it
 # waits for the 1-minute load to fall under 1.5, at most 15 min (the
-# wait measured 400 s after a gate, 2026-11-14), logging the wait, the
+# wait measured 400 s and 521 s after gates, 2026-11-14), logging the wait, the
 # three load averages and the busiest processes. A run exits 1 when a
 # frame is over budget; that is recorded, not a failure of the script.
 # A run that never reached its first frame (a refusal: the load, the
