@@ -139,10 +139,12 @@ prepare() {
   # The demo bar on hello: its links are the demos before and after in
   # vapors_demos::DEMOS (wrapping to racer), and ] then [ click them; a
   # ] typed into a textarea, an input, a select or an editable element,
-  # a held ]'s repeat, or a ] mid-composition (IME), does not; a second vaporsShowBar changes
+  # a held ]'s repeat, a ] mid-composition (IME) or one a listener
+  # prevented, does not (a click from one is recorded with its case's
+  # name, so a broken guard names itself); a second vaporsShowBar changes
   # nothing. A capturing listener records each click on a bar link and
   # prevents it, so the page stays.
-  page demo-bar "$stepper" "$adapter && (function () { var bar = document.getElementById('demo-bar'); if (bar.hidden) return false; if (!window.vaporsKeyed) { window.vaporsKeyed = true; window.vaporsShowBar(['?demo=x', 'X'], 'T', 'L', ['?demo=y', 'Y']); ['textarea', 'input', 'select'].forEach(function (tag) { var t = document.createElement(tag); document.body.appendChild(t); t.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); t.remove(); }); var editable = document.createElement('div'); editable.contentEditable = 'true'; document.body.appendChild(editable); editable.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); editable.remove(); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true, repeat: true })); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true, isComposing: true })); [']', '['].forEach(function (k) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); } document.body.dataset.bar = Array.prototype.map.call(bar.querySelectorAll('a'), function (a) { return a.getAttribute('href'); }).join(' '); document.body.dataset.stepped = window.vaporsStepped.join(' '); return true; })()"
+  page demo-bar "$stepper" "$adapter && (function () { var bar = document.getElementById('demo-bar'); if (bar.hidden) return false; if (!window.vaporsKeyed) { window.vaporsKeyed = true; window.vaporsShowBar(['?demo=x', 'X'], 'T', 'L', ['?demo=y', 'Y']); var skip = function (source, target, init) { window.vaporsSource = source; document.body.appendChild(target); target.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key: ']', bubbles: true, cancelable: true }, init))); target.remove(); }; ['textarea', 'input', 'select'].forEach(function (tag) { skip(tag, document.createElement(tag), {}); }); var editable = document.createElement('div'); editable.contentEditable = 'true'; skip('editable', editable, {}); skip('repeat', document.createElement('div'), { repeat: true }); skip('composing', document.createElement('div'), { isComposing: true }); var prevented = document.createElement('div'); prevented.addEventListener('keydown', function (e) { e.preventDefault(); }); skip('prevented', prevented, {}); window.vaporsSource = null; [']', '['].forEach(function (k) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); } document.body.dataset.bar = Array.prototype.map.call(bar.querySelectorAll('a'), function (a) { return a.getAttribute('href'); }).join(' '); document.body.dataset.stepped = window.vaporsStepped.join(' '); return true; })()"
   # The rule's own case: the hello demo with elements over its canvas
   # that the rule must list (refused, below) beside one it must accept.
   page overlap-refused "$overlaps<style>#quiet-after::after { content: \"\"; position: absolute; inset: 0; pointer-events: auto; }</style>" "$measure" \
@@ -249,7 +251,7 @@ function vaporsOutside() {
   return found.join(" ") || "none";
 }</script>'
 # Records each click on a demo bar link, and prevents it (demo-bar).
-stepper='<script>window.vaporsStepped = []; document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest("#demo-bar a"); if (a) { e.preventDefault(); window.vaporsStepped.push(a.getAttribute("href")); } }, true);</script>'
+stepper='<script>window.vaporsStepped = []; document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest("#demo-bar a"); if (a) { e.preventDefault(); window.vaporsStepped.push((window.vaporsSource ? window.vaporsSource + ":" : "") + a.getAttribute("href")); } }, true);</script>'
 # What overlap-refused must list: an element with pointer-events none but
 # painted, one unpainted that takes pointer events, a pointer-taking child
 # of an unpainted, untouchable parent (#quiet, accepted), and the
@@ -569,7 +571,7 @@ bar_links=$(printf '%s' "$dom" | grep -o 'data-bar="[^"]*"' | sed 's#data-bar="\
 stepped=$(printf '%s' "$dom" | grep -o 'data-stepped="[^"]*"' | sed 's#data-stepped="\(.*\)"#\1#')
 echo "demo-bar: links [$bar_links], stepped by ] then [ [$stepped]"
 [ "$bar_links" = "?demo=racer ?demo=counter" ] || fail "demo-bar: hello's bar links [$bar_links], wanted [?demo=racer ?demo=counter] (the demos around it in vapors_demos::DEMOS); see crates/web-demo/src/bar.rs and vaporsShowBar in crates/web-demo/index.html"
-[ "$stepped" = "?demo=counter ?demo=racer" ] || fail "demo-bar: ] then [ clicked [$stepped], wanted [?demo=counter ?demo=racer], and nothing for a ] typed into a text input, repeated or mid-composition, nor a second bar; see vaporsShowBar in crates/web-demo/index.html"
+[ "$stepped" = "?demo=counter ?demo=racer" ] || fail "demo-bar: ] then [ clicked [$stepped], wanted [?demo=counter ?demo=racer], and nothing for a ] typed into a text input, repeated, mid-composition or prevented (a click is named by its case), nor a second bar; see vaporsShowBar in crates/web-demo/index.html"
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code, one screenshot per section at that section's window size;
