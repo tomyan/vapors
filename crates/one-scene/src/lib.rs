@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use vapors_app::{ElementsApp, FrameCounts, SurfaceHandle};
 use vapors_elements::Document;
-use vapors_platform::{App, Event, Frame, Instant, Next, Platform};
+use vapors_platform::{App, Event, Frame, Next, Platform};
 use vapors_scene3d::{CameraHandle, Meshes, Projection, Scene};
 use vapors_scene3d_gpu::SceneRenderer;
 use vapors_signals::Signal;
@@ -21,10 +21,14 @@ use vapors_text::FontSystem;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+mod clock;
+pub mod confirm;
 pub mod parts;
 pub mod schedule;
 pub mod script;
 mod shapes;
+
+use clock::Clock;
 
 use one_scene::{OneScene as Page, OneSceneProps};
 
@@ -34,38 +38,31 @@ pub struct OneScene {
     app: ElementsApp,
     document: Rc<RefCell<Document>>,
     scene: Rc<RefCell<Scene>>,
-    time: Signal<Duration>,
-    frames: Signal<u64>,
-    started: Option<Instant>,
+    clock: Clock,
     _page: Page,
 }
 
 impl OneScene {
-    /// The example, mounted; its surface animates from the first frame.
+    /// The example, mounted; its surface animates from the first frame,
+    /// for `limit` frames or for ever.
     ///
     /// # Errors
     /// The renderer cannot be mounted, or the geometry is refused.
-    pub fn new() -> Result<Self, String> {
+    pub fn new(limit: Option<u64>) -> Result<Self, String> {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let mut app = ElementsApp::new(Rc::clone(&document));
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));
-        let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
-        let surface = app
-            .mount("view", Box::new(renderer))
-            .map_err(|e| e.to_string())?;
-        surface.request_animation().map_err(|e| e.to_string())?;
-        let (time, frames) = (Signal::new(Duration::ZERO), Signal::new(0));
-        let props = props(&scene, &meshes, surface, (time, frames))?;
+        let surface = mount_renderer(&mut app, &scene, &meshes)?;
+        let clock = Clock::new(surface.clone(), limit);
+        let props = props(&scene, &meshes, surface, (clock.time, clock.frames))?;
         let body = document.borrow().body();
         let page = Page::mount(&document, body, props);
         Ok(Self {
             app,
             document,
             scene,
-            time,
-            frames,
-            started: None,
+            clock,
             _page: page,
         })
     }
@@ -92,6 +89,20 @@ impl OneScene {
     pub fn elements_app(&mut self) -> &mut ElementsApp {
         &mut self.app
     }
+}
+
+/// A `SceneRenderer` of `scene` on the surface `view`, animating.
+fn mount_renderer(
+    app: &mut ElementsApp,
+    scene: &Rc<RefCell<Scene>>,
+    meshes: &Rc<RefCell<Meshes>>,
+) -> Result<SurfaceHandle, String> {
+    let renderer = SceneRenderer::new(Rc::clone(scene), Rc::clone(meshes));
+    let surface = app
+        .mount("view", Box::new(renderer))
+        .map_err(|e| e.to_string())?;
+    surface.request_animation().map_err(|e| e.to_string())?;
+    Ok(surface)
 }
 
 /// The page's props: the scene, its geometry, a perspective camera.
@@ -121,9 +132,10 @@ impl App for OneScene {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        let started = *self.started.get_or_insert(frame.now);
-        self.time.set(frame.now.duration_since(started));
-        self.frames.update(|n| *n += 1);
+        if let Err(error) = self.clock.tick(frame.now) {
+            vapors_platform::report_error(&error);
+            return Next::Exit;
+        }
         self.app.frame(frame)
     }
 
@@ -132,11 +144,12 @@ impl App for OneScene {
     }
 }
 
-/// Runs the example in a window (natively) or the page (on the web).
+/// Runs the example in a window (natively) or the page (on the web),
+/// for `limit` frames or for ever.
 ///
 /// # Errors
 /// It cannot be made, or the window's loop failed.
-pub fn run() -> Result<(), String> {
+pub fn run(limit: Option<u64>) -> Result<(), String> {
     vapors_platform::app_draws_open();
     vapors_platform::hide_status_line();
     let options = vapors_platform::WindowOptions {
@@ -145,5 +158,5 @@ pub fn run() -> Result<(), String> {
         width: 1100,
         height: 720,
     };
-    vapors_platform::run(options, OneScene::new()?).map_err(|error| error.to_string())
+    vapors_platform::run(options, OneScene::new(limit)?).map_err(|error| error.to_string())
 }

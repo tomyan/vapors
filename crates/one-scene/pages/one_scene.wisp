@@ -32,6 +32,8 @@ let toggle3 = move || lit3.update(|on| *on = !*on);
 .title { font-size: 20px; }
 .frames { margin-top: 4px; font-size: 14px; }
 .lights { margin-top: 8px; display: flex; column-gap: 8px; }
+/* a fixed width: a flex row of buttons in an absolute panel wraps the
+   first one's text (#346); remove once that is fixed */
 button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px solid #526a69; border-radius: 5px; padding: 8px 12px; font-size: 15px; }
 .ground { color: var(--tint); }
 .one { color: #c0392b; }

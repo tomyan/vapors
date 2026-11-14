@@ -40,6 +40,7 @@ fn every_kind_of_change_is_named_in_the_frame_it_is_due() {
     assert_eq!(names(313), "cube 3 hidden");
     assert_eq!(names(625), "click light 2, cube 3 shown");
     assert_eq!(names(938), "cube 3 hidden, night on");
+    assert_eq!(names(1875), "click light 3, cube 3 shown, night off");
     assert_eq!(names(1), "");
 }
 

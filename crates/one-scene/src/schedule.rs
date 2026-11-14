@@ -30,6 +30,20 @@ const NIGHT_SPAN: Duration = Duration::from_secs(15);
 /// How fast the group turns, in radians a second.
 const TURN_RATE: f32 = 0.5;
 
+/// Each cube's `color` in the page's CSS (`.one`, `.two`, `.three`),
+/// as sRGB bytes. The page's sheet and these must agree: `confirm`
+/// compares what is drawn with them, so a disagreement fails it.
+pub const CUBE_COLOURS: [[u8; 3]; CUBES] =
+    [[0xc0, 0x39, 0x2b], [0x27, 0xae, 0x60], [0x29, 0x80, 0xb9]];
+
+/// A lit cube's `color` (`.lit`).
+pub const LIT: [u8; 3] = [0xf1, 0xc4, 0x0f];
+
+/// The ground's `color`, the `--tint` token by day and by night.
+pub const GROUND: [u8; 3] = [0x3b, 0x4a, 0x3f];
+/// See [`GROUND`].
+pub const GROUND_AT_NIGHT: [u8; 3] = [0x1d, 0x23, 0x40];
+
 /// What the scene shows at a frame, once its changes are made.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Expected {
@@ -93,25 +107,44 @@ pub fn expected(frame: usize) -> Expected {
     }
 }
 
+impl Expected {
+    /// The ground's colour.
+    #[must_use]
+    pub fn ground(&self) -> [u8; 3] {
+        if self.night { GROUND_AT_NIGHT } else { GROUND }
+    }
+
+    /// Cube `cube`'s colour and whether it is shown.
+    #[must_use]
+    pub fn cube(&self, cube: usize) -> ([u8; 3], bool) {
+        let colour = if self.lit[cube] {
+            LIT
+        } else {
+            CUBE_COLOURS[cube]
+        };
+        (colour, !(cube == CUBES - 1 && self.gone))
+    }
+}
+
 /// The scripted changes due at `frame`, named for a report: a click,
 /// and each class the time signal flips.
 #[must_use]
 pub fn changes_at(frame: usize) -> Vec<String> {
-    let mut changes: Vec<String> = click_at(frame)
-        .map(|light| format!("click light {}", light + 1))
+    let click = click_at(frame).map(|light| format!("click light {}", light + 1));
+    let Some(before) = frame.checked_sub(1).map(expected) else {
+        return click.into_iter().collect();
+    };
+    let now = expected(frame);
+    let flips = [
+        (before.gone != now.gone)
+            .then(|| format!("cube 3 {}", if now.gone { "hidden" } else { "shown" })),
+        (before.night != now.night)
+            .then(|| format!("night {}", if now.night { "on" } else { "off" })),
+    ];
+    click
         .into_iter()
-        .collect();
-    let (now, before) = (expected(frame), frame.checked_sub(1).map(expected));
-    if before.is_some_and(|before| before.gone != now.gone) {
-        changes.push(format!(
-            "cube 3 {}",
-            if now.gone { "hidden" } else { "shown" }
-        ));
-    }
-    if before.is_some_and(|before| before.night != now.night) {
-        changes.push(format!("night {}", if now.night { "on" } else { "off" }));
-    }
-    changes
+        .chain(flips.into_iter().flatten())
+        .collect()
 }
 
 #[cfg(test)]

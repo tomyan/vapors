@@ -45,7 +45,8 @@ fn start() -> Result<(), String> {
         return vapors_racer::run();
     }
     if name == "one-scene" {
-        return vapors_one_scene::run();
+        let ticks = vapors_demos::frame_limit(query_parameter("ticks").as_deref())?;
+        return vapors_one_scene::run(ticks.map(|frames| frames as u64));
     }
     if name == "image" {
         let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
