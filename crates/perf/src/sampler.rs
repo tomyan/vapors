@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use vapors_gpu_harness::Gpu;
 use vapors_platform::{Frame, Next};
+use vapors_renderer::pipelines::built;
 use vapors_renderer::{WRITE_PHASE, clear};
 use vapors_scene::Color;
 
@@ -94,6 +95,9 @@ impl<'g> Sampler<'g> {
         mut gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Samples, String> {
         let texture = self.texture(workload.size());
+        if !workload.new_app_each_frame() {
+            self.start(workload, texture.format())?;
+        }
         let mut samples = Samples {
             warmup: settings.warmup,
             ..Samples::default()
@@ -102,7 +106,7 @@ impl<'g> Sampler<'g> {
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
             let measured = self.frame(workload, &texture, index, clock)?;
-            if index > timed.start && workload.times_gpu() {
+            if index > timed.start && !workload.new_app_each_frame() {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
@@ -125,7 +129,8 @@ impl<'g> Sampler<'g> {
     }
 
     /// One frame: the change, then the timed frame between timestamps,
-    /// then the untimed wait for the GPU. A frame that writes no buffer
+    /// then the untimed wait for the GPU; refused when the frame built a
+    /// pipeline, which `App::start` builds before frame 0 (one-scene F0). A frame that writes no buffer
     /// (every batch kept, IU4) enters no `write` span; it is recorded as
     /// 0 rather than left out. Every other phase runs in every frame, so
     /// its absence still fails the harness shape test.
@@ -136,6 +141,7 @@ impl<'g> Sampler<'g> {
         index: usize,
         gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Measured, String> {
+        let before = built();
         workload.change(index);
         workload
             .ready()
@@ -145,6 +151,14 @@ impl<'g> Sampler<'g> {
         let _ = self.clock.take_instructions()?;
         let (next, started, took, frame_instructions) =
             self.timed(workload, texture, index, gpu_clock)?;
+        // Relaxed for a new app each frame (the Mount workload): it times
+        // a page's first update in its first frame, which `App::start`
+        // would run before the frame, so it is not started and its frame
+        // builds the pipelines. Retired when Mount times `App::start`
+        // with the mount.
+        if !workload.new_app_each_frame() {
+            judged::nothing_built(index, built().since(before))?;
+        }
         // frame-to-idle ends here, before the harness's own bookkeeping;
         // gpu_judged_frames.rs holds it at or above the frame's GPU time
         wait(&self.gpu.device, FRAME_DEADLINE)?;

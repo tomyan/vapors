@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use vapors_platform::Start;
-use vapors_renderer::pipelines::{Built, built};
+use vapors_renderer::pipelines::Built;
 
 use super::{FRAME_DEADLINE, Measured, Sampler};
 use crate::gpu_reading::frame_gpu_time;
@@ -71,9 +71,8 @@ impl Sampler<'_> {
         let start_up = self.start(workload, texture.format())?;
         let (mut kept, mut waiting) = (Vec::with_capacity(frames), None);
         for index in 0..=frames {
-            let before = built();
+            // `frame` refuses one that built a pipeline
             let measured = self.frame(workload, &texture, index, None)?;
-            nothing_built(index, built().since(before))?;
             if let Some((before, counts)) = waiting.take() {
                 kept.push(judged(
                     before,

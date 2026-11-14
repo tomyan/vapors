@@ -37,11 +37,12 @@ pub trait Workload {
     fn ready(&self) -> Result<(), String> {
         Ok(())
     }
-    /// Whether the app reads each frame's GPU time back in the frame after
-    /// it. A workload that makes a new app for every frame has no such
-    /// frame, and says so here; the sampler then keeps no GPU time.
-    fn times_gpu(&self) -> bool {
-        true
+    /// Whether every frame is a new app's first: the sampler then does
+    /// not start the app (`App::start`), so the frame takes the page's
+    /// first update, may build its pipelines, and keeps no GPU time, as
+    /// no frame after it reads one back.
+    fn new_app_each_frame(&self) -> bool {
+        false
     }
     /// The kinds of frame the change alternates between, in the order
     /// it makes them from frame 0 (warmup counted): the full run

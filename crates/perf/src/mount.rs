@@ -194,9 +194,9 @@ impl Workload for Mount {
         )
     }
 
-    /// Each frame is a new app's first: no later frame reads a time back.
-    fn times_gpu(&self) -> bool {
-        false
+    /// Each frame is a new app's first.
+    fn new_app_each_frame(&self) -> bool {
+        true
     }
 
     fn timing(&self) -> FrameTiming {
