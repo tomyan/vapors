@@ -74,6 +74,10 @@ pub(crate) struct Extents {
     /// over the frames (`IndexCounts`).
     moved: usize,
     blocks: usize,
+    /// The frames holding a step that spans every view (a surface, or
+    /// bounds that are not numbers), each with how many: searched on
+    /// every view, whatever their container's clip (`kept_batches.rs`).
+    spanning: FxHashMap<usize, usize>,
 }
 
 impl Extents {
@@ -94,10 +98,12 @@ impl Extents {
             rebuilds: 0,
             moved: 0,
             blocks: 0,
+            spanning: FxHashMap::default(),
         };
         let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
             extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
+            extents.span_in(frame, &entry);
             let index = extents.frames.entry(frame).or_default();
             index.items += entry.items;
             if entry.tall() {
@@ -141,17 +147,6 @@ impl Extents {
         for &(place, step) in steps {
             self.repatch(place, step, boxes);
         }
-    }
-
-    /// The frames with a drawing step.
-    #[cfg(test)]
-    pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
-        self.frames.keys().copied()
-    }
-
-    /// How many items every drawing step paints.
-    pub(crate) fn items(&self) -> u64 {
-        self.frames.values().map(|index| index.items).sum()
     }
 }
 

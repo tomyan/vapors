@@ -87,3 +87,17 @@ fn taking_out_a_container_under_another_clip_is_refused_naming_it() {
     // When
     index.remove(10, Some(clip(999.0)));
 }
+
+#[test]
+fn a_clip_entered_again_at_negative_zero_is_found_and_moved() {
+    // Given: a container entered with its top at 0.0
+    let mut index = NestedIndex::of(std::iter::once((7, Some(Rect::new(0.0, 0.0, 10.0, 10.0)))));
+
+    // When: taken out under -0.0, then put back lower
+    index.remove(7, Some(Rect::new(0.0, -0.0, 10.0, 10.0)));
+    index.insert(7, Some(Rect::new(0.0, 50.0, 10.0, 60.0)));
+
+    // Then
+    let found: Vec<usize> = index.meeting(Rect::new(0.0, 52.0, 10.0, 55.0)).collect();
+    assert_eq!(found, [7]);
+}

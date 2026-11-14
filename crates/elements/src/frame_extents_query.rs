@@ -6,6 +6,22 @@ use vapors_scene::Rect;
 use super::{Entry, Extents, FrameIndex, missing};
 
 impl Extents {
+    /// The frames with a drawing step.
+    #[cfg(test)]
+    pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
+        self.frames.keys().copied()
+    }
+
+    /// The frames holding a step that spans every view.
+    pub(crate) fn spanning_frames(&self) -> impl Iterator<Item = usize> + '_ {
+        self.spanning.keys().copied()
+    }
+
+    /// How many items every drawing step paints.
+    pub(crate) fn items(&self) -> u64 {
+        self.frames.values().map(|index| index.items).sum()
+    }
+
     /// How many items the step at `place` paints; 0 when it draws
     /// nothing.
     pub(crate) fn items_at(&self, place: usize) -> u64 {

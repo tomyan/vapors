@@ -190,6 +190,9 @@ use nested::NestedIndex;
 
 #[path = "frames_update.rs"]
 mod update;
+
+#[path = "frames_compare.rs"]
+mod compare;
 pub(crate) use update::FrameInputs;
 
 #[cfg(test)]

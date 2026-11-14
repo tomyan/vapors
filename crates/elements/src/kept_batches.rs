@@ -67,6 +67,17 @@ pub(crate) struct KeptBatches {
     unsorted: bool,
 }
 
+/// The frames whose steps can show in `view`: those whose container's
+/// clip meets it (`frames_nested.rs`), and those holding a step that
+/// spans every view, which a culled surface's batch needs; each once.
+fn frames_to_search(view: Rect, sources: Sources<'_>) -> Vec<usize> {
+    let mut frames = sources.frames.meeting(view);
+    frames.extend(sources.extents.spanning_frames());
+    frames.sort_unstable();
+    frames.dedup();
+    frames
+}
+
 impl KeptBatches {
     /// The steps of `sources` that show in `view`: in each frame that
     /// can show in it, the extents index's candidates for the view as it
@@ -78,7 +89,7 @@ impl KeptBatches {
         let boxes = (sources.boxes, sources.frames);
         // Only the frames whose container's clip meets the view are
         // searched (`frames_nested.rs`): O(shown frames · log steps).
-        for frame in sources.frames.meeting(view) {
+        for frame in frames_to_search(view, sources) {
             let in_frame = sources.frames.view_in(frame, view);
             let candidates = sources.extents.candidates(frame, in_frame);
             let showing = candidates.filter(|e| hidden_items(e.step, boxes, view).is_none());

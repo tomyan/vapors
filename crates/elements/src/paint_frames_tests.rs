@@ -89,3 +89,59 @@ fn a_clip_cut_by_a_resized_ancestor_works_out_that_frame_alone() {
     // Then
     assert_eq!(painted.frames_worked, 1);
 }
+
+/// A 40 px scroll container below a 200 px block, holding a surface,
+/// updated once in the 200 x 100 viewport: the container's clip is
+/// outside the view.
+fn surface_below_the_view() -> (Document, NodeId) {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet(
+        "app.css",
+        "body { margin: 0; } .spacer { height: 200px; } \
+         .scroller { overflow: auto; height: 40px; } gpu-surface { display: block; height: 80px; } \
+         .hidden { visibility: hidden; }",
+    )
+    .expect("parses");
+    let body = doc.body();
+    let [spacer, scroller, surface] =
+        ["div", "div", "gpu-surface"].map(|tag| doc.create_element(tag));
+    doc.set_attribute(spacer, "class", "spacer");
+    doc.set_attribute(scroller, "class", "scroller");
+    doc.set_attribute(surface, "name", "track");
+    doc.append(body, spacer);
+    doc.append(body, scroller);
+    doc.append(scroller, surface);
+    doc.update(VIEWPORT).expect("updates");
+    (doc, surface)
+}
+
+#[test]
+fn a_surface_in_a_frame_outside_the_view_keeps_its_culled_batch() {
+    // Given
+    let (doc, _) = surface_below_the_view();
+    let painted = doc.painted.as_ref().expect("painted");
+
+    // When: a debug build compares the kept batches with batching the
+    // whole scene afresh, which keeps the culled surface's batch
+    let view = vapors_scene::Rect::new(0.0, 0.0, 200.0, 100.0);
+    let batches = painted.kept_batches(view);
+
+    // Then
+    let culled = batches.batched.batches.iter().filter(|batch| batch.culled);
+    assert_eq!(culled.count(), 1);
+}
+
+#[test]
+fn a_surface_hidden_in_a_frame_leaves_no_frame_searched_for_it() {
+    // Given
+    let (mut doc, surface) = surface_below_the_view();
+
+    // When: hidden, so its step is patched out of the extents index; a
+    // debug build compares the index, with the frames holding a step
+    // that spans every view, with one made afresh
+    doc.set_attribute(surface, "class", "hidden");
+    let painted = doc.update(VIEWPORT).expect("updates");
+
+    // Then
+    assert_eq!(painted.extents.spanning_frames().count(), 0);
+}

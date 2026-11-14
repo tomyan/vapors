@@ -79,14 +79,16 @@ impl Extents {
             .get_mut(&frame)
             .expect("a frame for every entry");
         let blocks_were = index.entries.block_count();
-        if tall {
-            index.items -= index.tall.remove(index.tall_position(place)).items;
+        let gone = if tall {
+            index.tall.remove(index.tall_position(place))
         } else {
             let (gone, next) = index.entries.remove(index.position(top, place));
-            index.items -= gone.items;
             index.reach_from(next, 0);
-        }
+            gone
+        };
+        index.items -= gone.items;
         let empty = index.entries.is_empty() && index.tall.is_empty();
+        self.span_out(frame, &gone);
         self.noted(frame, blocks_were);
         if empty {
             self.frames.remove(&frame);
@@ -96,6 +98,7 @@ impl Extents {
     /// Puts `entry`, in frame `frame`, where it sorts.
     fn insert(&mut self, (frame, entry): (usize, Entry)) {
         self.at[entry.place] = Some((frame, entry.top, entry.tall()));
+        self.span_in(frame, &entry);
         let index = self.frames.entry(frame).or_default();
         index.items += entry.items;
         if entry.tall() {
@@ -151,10 +154,42 @@ impl FrameIndex {
     }
 }
 
+impl Extents {
+    /// Notes `entry`, put in frame `frame`, when it spans every view.
+    pub(super) fn span_in(&mut self, frame: usize, entry: &Entry) {
+        if entry.spans() {
+            *self.spanning.entry(frame).or_default() += 1;
+        }
+    }
+
+    /// Notes `entry`, taken out of frame `frame`, when it spans every view.
+    fn span_out(&mut self, frame: usize, entry: &Entry) {
+        if !entry.spans() {
+            return;
+        }
+        let count = self
+            .spanning
+            .get_mut(&frame)
+            .unwrap_or_else(|| missing(entry.place));
+        *count -= 1;
+        if *count == 0 {
+            self.spanning.remove(&frame);
+        }
+    }
+}
+
+impl Entry {
+    /// True when the step spans every view: `entry` gives such a step
+    /// no top (a surface, or bounds that are not numbers).
+    fn spans(&self) -> bool {
+        self.top == f32::NEG_INFINITY
+    }
+}
+
 impl PartialEq for Extents {
     /// The same entries in the same frames, whatever the patches did.
     fn eq(&self, other: &Self) -> bool {
-        self.frames == other.frames && self.at == other.at
+        self.frames == other.frames && self.at == other.at && self.spanning == other.spanning
     }
 }
 

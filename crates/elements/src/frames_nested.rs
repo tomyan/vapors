@@ -37,12 +37,8 @@ impl NestedIndex {
     pub(crate) fn of(nested: impl Iterator<Item = (usize, Option<Rect>)>) -> Self {
         let mut index = Self::default();
         for (slot, clip) in nested {
-            match clip.filter(|clip| !is_tall(clip)) {
-                Some(clip) => index.entries.push(Nested {
-                    slot,
-                    clip,
-                    reach: 0.0,
-                }),
+            match short(clip) {
+                Some(clip) => index.entries.push(Nested::new(slot, clip)),
                 None => index.tall.push(slot),
             }
         }
@@ -73,16 +69,12 @@ impl NestedIndex {
 
     /// Puts container `slot` with clip `clip` where it sorts.
     pub(crate) fn insert(&mut self, slot: usize, clip: Option<Rect>) {
-        let Some(clip) = clip.filter(|clip| !is_tall(clip)) else {
+        let Some(clip) = short(clip) else {
             let at = self.tall.partition_point(|&tall| tall < slot);
             self.tall.insert(at, slot);
             return;
         };
-        let entry = Nested {
-            slot,
-            clip,
-            reach: 0.0,
-        };
+        let entry = Nested::new(slot, clip);
         let at = self.entries.partition_point(|e| order(e, &entry).is_lt());
         self.entries.insert(at, entry);
         self.reach_from(at, at + 1);
@@ -91,23 +83,13 @@ impl NestedIndex {
     /// Takes container `slot`, entered with clip `clip`, out; a panic
     /// naming it when it is not there.
     pub(crate) fn remove(&mut self, slot: usize, clip: Option<Rect>) {
-        let Some(clip) = clip.filter(|clip| !is_tall(clip)) else {
-            let at = self
-                .tall
-                .binary_search(&slot)
-                .unwrap_or_else(|_| missing(slot));
-            self.tall.remove(at);
+        let Some(clip) = short(clip) else {
+            self.tall
+                .remove(position(self.tall.binary_search(&slot), slot));
             return;
         };
-        let key = Nested {
-            slot,
-            clip,
-            reach: 0.0,
-        };
-        let at = self
-            .entries
-            .binary_search_by(|e| order(e, &key))
-            .unwrap_or_else(|_| missing(slot));
+        let key = Nested::new(slot, clip);
+        let at = position(self.entries.binary_search_by(|e| order(e, &key)), slot);
         self.entries.remove(at);
         self.reach_from(at, at);
     }
@@ -125,6 +107,34 @@ impl NestedIndex {
             (entry.reach, reach) = (now, now);
         }
     }
+}
+
+impl Nested {
+    fn new(slot: usize, clip: Rect) -> Self {
+        Self {
+            slot,
+            clip,
+            reach: 0.0,
+        }
+    }
+}
+
+/// `clip` as a short entry's, its top -0.0 made 0.0 so that the order
+/// (`total_cmp`) finds it whichever zero it was entered or taken out
+/// with; `None` when it is kept apart.
+fn short(clip: Option<Rect>) -> Option<Rect> {
+    let clip = clip.filter(|clip| !is_tall(clip))?;
+    Some(Rect::new(
+        clip.left,
+        clip.top + 0.0,
+        clip.right,
+        clip.bottom,
+    ))
+}
+
+/// Where a search found `slot`, or a panic naming it.
+fn position(found: Result<usize, usize>, slot: usize) -> usize {
+    found.unwrap_or_else(|_| missing(slot))
 }
 
 /// Whether `clip` is kept apart: taller than [`TALL`], or with an edge

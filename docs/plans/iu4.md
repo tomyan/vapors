@@ -519,7 +519,7 @@ PR 5 as built (2026-11-13):
     over top order (O(log n + shown) for any heights) replaces both the
     list and the reach if that shows.
   - M2: the index is built straight into its map.
-  - M2, still open: every frame is searched on every sort, so a page of
+  - M2, retired (perf/frames-nested, #298): every frame is searched on every sort, so a page of
     thousands of small scrollers (code blocks in a transcript) pays
     O(frames · log steps) per scroll. The fix is to enter each frame's
     clip in its parent frame's index and descend only into frames that

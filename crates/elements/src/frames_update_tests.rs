@@ -146,3 +146,60 @@ fn updating_a_container_the_frames_were_not_made_for_is_refused_naming_it() {
     // When
     updated(&mut frames, &clips, &[500], [0.0; 2]);
 }
+
+/// Frames for slot 1 scrolling on the page, unclipped in effect,
+/// shifted `shift` device pixels, and slot 2 in it clipped to 50 x 11
+/// CSS pixels at `top`, at `scale`.
+fn nested_at(scale: f32, shift: f32, top: f32) -> Frames {
+    let clips = Clips::with(
+        vec![
+            None,
+            Some(BoxRect {
+                x: 0.0,
+                y: -1e5,
+                width: 1e5,
+                height: 2e5,
+            }),
+            Some(BoxRect {
+                x: 0.0,
+                y: top,
+                width: 50.0,
+                height: 11.0,
+            }),
+        ],
+        vec![PAGE, PAGE, 1],
+    );
+    let own = move |slot: usize| if slot == 1 { [0.0, shift] } else { [0.0; 2] };
+    let inputs = FrameInputs {
+        clips: &clips,
+        depth: &depth,
+        shift: &own,
+    };
+    Frames::of(&[1, 2], &inputs, scale)
+}
+
+#[test]
+fn a_nested_frames_clip_lies_inside_its_indexed_clip_at_fractional_scales() {
+    for scale in [1.25, 1.5, 2.625] {
+        for shift in (0..400u16).map(|s| -f32::from(s)) {
+            for top in (0..20u16).map(|k| f32::from(2 * k + 1)) {
+                // Given
+                let frames = nested_at(scale, shift, top);
+
+                // When
+                let clip = frames.at(2).device_clip.expect("clipped");
+                let entered = frames.entered[&2]
+                    .expect("entered")
+                    .offset(frames.at(1).shift);
+
+                // Then
+                let inside = clip.top >= entered.top && clip.bottom <= entered.bottom;
+                let inside = inside && clip.left >= entered.left && clip.right <= entered.right;
+                assert!(
+                    inside,
+                    "scale {scale}, shift {shift}, top {top}: {clip:?} outside {entered:?}"
+                );
+            }
+        }
+    }
+}

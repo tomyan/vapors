@@ -77,7 +77,7 @@ impl Frames {
                  reproduce with `cargo xtask test`"
             )
         });
-        if was != clip {
+        if bits(was) != bits(clip) {
             let index = self.index.entry(inputs.clips.frame(slot)).or_default();
             index.remove(slot, was);
             index.insert(slot, clip);
@@ -85,12 +85,16 @@ impl Frames {
     }
 
     /// Container `slot`'s inner clip, device pixels in the frame it is
-    /// in: what it is indexed by there.
+    /// in, a device pixel wider on each side: what it is indexed by
+    /// there. The frame's own device clip is snapped from the clip moved
+    /// onto the page in CSS pixels, which at a fractional scale can land
+    /// an edge a pixel from this one plus the shift; the margin keeps
+    /// every pixel the frame can show inside the indexed clip. Steps are
+    /// still tested exactly, so the margin costs only candidates.
     fn clip_entered(&self, slot: usize, inputs: &FrameInputs<'_>) -> Option<Rect> {
-        inputs
-            .clips
-            .inner(slot)
-            .map(|clip| snapped(clip, self.scale))
+        let snap = |clip| snapped(clip, self.scale);
+        let widened = |r: Rect| Rect::new(r.left - 1.0, r.top - 1.0, r.right + 1.0, r.bottom + 1.0);
+        inputs.clips.inner(slot).map(snap).map(widened)
     }
 
     /// Works out `start` and, below each frame that came out different,
@@ -138,33 +142,6 @@ impl Frames {
         self.insert(slot, shift, meet(inner, outer.clip))
     }
 
-    /// The first frame that is not the same in `self` and `other`, with
-    /// both, or the scroll containers nested in a frame when those
-    /// differ.
-    pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
-        if self.scale.to_bits() != other.scale.to_bits() {
-            return Some(format!(
-                "the scale: kept {}, fresh {}",
-                self.scale, other.scale
-            ));
-        }
-        let frames = self.by_frame.keys().chain(other.by_frame.keys());
-        let mut slots: Vec<usize> = frames.copied().collect();
-        slots.sort_unstable();
-        let differs = |&slot: &usize| self.by_frame.get(&slot) != other.by_frame.get(&slot);
-        if let Some(slot) = slots.into_iter().find(differs) {
-            let (kept, fresh) = (self.by_frame.get(&slot), other.by_frame.get(&slot));
-            return Some(format!("frame {slot}: kept {kept:?}, fresh {fresh:?}"));
-        }
-        let lists = (&self.nested, &self.index, &self.entered);
-        (lists != (&other.nested, &other.index, &other.entered)).then(|| {
-            format!(
-                "the scroll containers in each frame or their index: kept {:?} {:?}, fresh {:?} {:?}",
-                self.index, self.entered, other.index, other.entered
-            )
-        })
-    }
-
     /// Notes frame `slot` at `shift` under the page clip `clip`; whether
     /// it differs from what was noted.
     fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) -> bool {
@@ -176,6 +153,12 @@ impl Frames {
         };
         self.by_frame.insert(slot, at) != Some(at)
     }
+}
+
+/// `clip`'s edges' bits, for an exact comparison: -0.0 is not 0.0,
+/// and a NaN edge is its own.
+pub(super) fn bits(clip: Option<Rect>) -> Option<[u32; 4]> {
+    clip.map(|r| [r.left, r.top, r.right, r.bottom].map(f32::to_bits))
 }
 
 #[cfg(test)]
