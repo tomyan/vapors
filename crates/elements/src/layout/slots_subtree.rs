@@ -146,9 +146,7 @@ impl Placed {
         // grown by a quarter, not doubled (`slot_list.rs`); a box is about
         // 2.8 KB. Each growth copies every box; chunked storage, as the
         // blocks of #288, is the follow-up if that shows in inserts.
-        crate::slot_list::reserve(&mut self.slots.keys, slot + 1);
         self.slots.keys.push(None);
-        crate::slot_list::reserve(&mut self.boxes, slot + 1);
         self.boxes.push(LayoutBox::vacant());
         slot
     }

@@ -42,6 +42,12 @@ pub(crate) struct KeptBoxes {
 }
 
 impl KeptBoxes {
+    /// The kept boxes' per-slot lists (`Placed::slot_lists`).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        self.placed.slot_lists()
+    }
+
     /// The slot `node`'s element box holds, if it has one.
     pub(crate) fn slot_of(&self, node: NodeId) -> Option<usize> {
         self.placed.slots.of(super::Key::Element(node))

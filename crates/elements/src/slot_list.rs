@@ -11,7 +11,8 @@
 //!
 //! A kept per-slot list is a [`SlotList`], whose only growth goes
 //! through here, so no list can double behind it; and each owner names
-//! its lists in one `slot_lists`, which the growth test reads.
+//! its lists in one `slot_lists`, which the growth test reads
+//! (`slot_list_inventory_tests.rs` fails when a field is left out).
 
 /// The capacity a list of `len` entries needs to grow to for `wanted`:
 /// unchanged when it holds them, else the larger of `wanted` and a
@@ -107,6 +108,13 @@ impl<T> SlotList<T> {
         let wanted = self.0.len() - range.len() + items.len();
         reserve(&mut self.0, wanted);
         self.0.splice(range, items).collect()
+    }
+
+    /// `item` added at the end, grown by a quarter.
+    pub(crate) fn push(&mut self, item: T) {
+        let wanted = self.0.len() + 1;
+        reserve(&mut self.0, wanted);
+        self.0.push(item);
     }
 
     /// The entries from `start` on, taken out; the capacity is kept.

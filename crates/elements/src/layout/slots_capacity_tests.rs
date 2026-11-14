@@ -33,7 +33,7 @@ fn a_vacated_slot_grows_the_placed_boxes_by_a_quarter() {
     let second = first.slots.place(built);
 
     // Then
-    let (len, capacity) = (second.boxes.len(), second.boxes.capacity());
+    let (_, len, capacity) = second.slot_lists()[0];
     assert_eq!(len, 9);
     assert!(capacity <= len + len / 4 + 1, "{len} boxes in {capacity}");
 }

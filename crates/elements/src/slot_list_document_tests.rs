@@ -34,12 +34,12 @@ fn page_with_one_added(count: usize) -> Document {
     doc
 }
 
-/// Every per-slot list the document keeps outside layout (the box list
-/// and its keys: `layout/rebuild_capacity_tests.rs`), as its owners
-/// name them: name, length, capacity.
+/// Every per-slot list the document keeps, as its owners name them:
+/// name, length, capacity.
 fn lists(doc: &Document) -> Vec<(&'static str, usize, usize)> {
     let mut lists = doc.painted.as_ref().expect("painted").slot_lists();
     lists.extend(doc.kept.as_ref().expect("styled").styles.slot_lists());
+    lists.extend(doc.boxes.slot_lists());
     lists
 }
 
