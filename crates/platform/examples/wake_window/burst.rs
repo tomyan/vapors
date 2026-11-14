@@ -1,13 +1,6 @@
-//! `wake_window`'s burst: five wakes from one thread draw fewer frames
-//! than wakes, because wakes before a frame draw it once. How many
-//! frames depends on how far apart the wakes land, which the example
-//! measures rather than assumes: a loaded machine can deschedule the
-//! waking thread between wakes (#366).
-//!
-//! A frame after the first needs a wake that came after the frame
-//! before it started, so with the wakes spread over `gap` and frames
-//! at least `interval` apart, `n` frames need `(n - 2) * interval <
-//! gap`: at most `1 + ceil(gap / interval)` frames.
+//! `wake_window`'s burst in the window: five wakes from one thread draw
+//! fewer frames than wakes, because wakes before a frame draw it once.
+//! This measures the times; `burst_judge.rs` judges them.
 
 use std::fmt;
 use std::thread::sleep;
@@ -15,108 +8,101 @@ use std::time::{Duration, Instant};
 
 use vapors_platform::Waker;
 
-use crate::script::{Shared, frames_over};
+use crate::burst_judge::{self, Attempt, Outcome, Pair, WAKES};
+use crate::shared::{Shared, frames_over};
 
-pub const WAKES: usize = 5;
 /// After the last wake, before counting: as `script::BETWEEN`.
 const AFTER: Duration = Duration::from_millis(300);
-/// Back-to-back pairs measured for the interval; the shortest is kept,
-/// so a pair slowed by load cannot widen the bound.
+/// Back-to-back pairs measured for the frame interval.
 const PAIRS: usize = 3;
 
-/// The burst's frames, the gap from before its first wake to after its
-/// last, and the shortest interval between two frames drawn back to back.
+/// The frame interval, when it was measured, each attempt made, and the
+/// outcome.
 pub struct Burst {
-    frames: u64,
-    gap: Duration,
-    interval: Duration,
+    interval: Option<Duration>,
+    attempts: Vec<Attempt>,
+    pub outcome: Outcome,
+}
+
+pub fn measure(waker: &Waker, shared: &Shared) -> Result<Burst, String> {
+    let pairs = (0..PAIRS)
+        .map(|_| back_to_back(waker, shared))
+        .collect::<Result<Vec<_>, _>>()?;
+    let interval = match burst_judge::interval(&pairs) {
+        Ok(interval) => interval,
+        Err(refused) => return Ok(Burst::not_run(Outcome::Refused(refused))),
+    };
+    let (attempts, outcome) = burst_judge::judge(interval, || attempt(waker, shared))?;
+    Ok(Burst {
+        interval: Some(interval),
+        attempts,
+        outcome,
+    })
 }
 
 impl Burst {
-    /// The most frames the burst may draw, from its gap and interval.
-    pub fn most(&self) -> u64 {
-        // `measure` refuses a zero interval; `max` only keeps the
-        // division defined.
-        let nanos = self.interval.as_nanos().max(1);
-        let spans = self.gap.as_nanos().div_ceil(nanos);
-        1 + u64::try_from(spans).unwrap_or(u64::MAX - 1)
-    }
-
-    /// `Err` names the gap when the wakes were so far apart that the
-    /// bound allows a frame per wake, so the burst shows no coalescing.
-    pub fn held(&self) -> Result<bool, String> {
-        if self.most() >= WAKES as u64 {
-            return Err(format!(
-                "refused: the {WAKES} wakes spanned {:?} against a frame interval of {:?}, so they may draw up to {} frames and the burst cannot show wakes coalescing; the waking thread was held up between wakes (machine load?)",
-                self.gap,
-                self.interval,
-                self.most()
-            ));
+    fn not_run(outcome: Outcome) -> Self {
+        Self {
+            interval: None,
+            attempts: Vec::new(),
+            outcome,
         }
-        Ok((1..=self.most()).contains(&self.frames))
     }
 }
 
 impl fmt::Display for Burst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "a burst of {WAKES} over {:?} (frame interval {:?}): {} frames, at most {}",
-            self.gap,
-            self.interval,
-            self.frames,
-            self.most()
-        )
-    }
-}
-
-pub fn measure(waker: &Waker, shared: &Shared) -> Result<Burst, String> {
-    let interval = (0..PAIRS)
-        .map(|_| back_to_back(waker, shared))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .min()
-        .ok_or("refused: no back-to-back pair was measured, so the frame interval is unknown")?;
-    if interval.is_zero() {
-        return Err(
-            "refused: two frames drawn back to back were 0ns apart, so the frame interval cannot bound the burst; the clock or the frame timestamps are wrong".into(),
-        );
-    }
-    let mut gap = Duration::ZERO;
-    let frames = frames_over(shared, || {
-        gap = wake_all(waker)?;
-        sleep(AFTER);
+        let Some(interval) = self.interval else {
+            return write!(f, "a burst of {WAKES}: not run;");
+        };
+        write!(f, "a burst of {WAKES}:")?;
+        for (n, attempt) in self.attempts.iter().enumerate() {
+            write!(
+                f,
+                " attempt {} over {:?} (frame interval {interval:?}): {} frames, at most {};",
+                n + 1,
+                attempt.gap,
+                attempt.frames,
+                burst_judge::most(attempt.gap, interval)
+            )?;
+        }
         Ok(())
-    })?;
-    Ok(Burst {
-        frames,
-        gap,
-        interval,
-    })
+    }
 }
 
-/// The time between two frames drawn back to back: the woken frame
-/// returns a time already past, which asks for the next frame at once.
-fn back_to_back(waker: &Waker, shared: &Shared) -> Result<Duration, String> {
+/// Two frames drawn back to back: the woken frame returns a time
+/// already past, which asks for the next frame at once.
+fn back_to_back(waker: &Waker, shared: &Shared) -> Result<Pair, String> {
+    let at = shared.count();
     let drawn = frames_over(shared, || {
         shared.wait_until(Instant::now());
         waker.wake().map_err(|closed| closed.to_string())?;
         sleep(AFTER);
         Ok(())
     })?;
-    match (drawn, shared.last_two()) {
-        (2, Some((before, last))) => Ok(last - before),
-        _ => Err(format!(
-            "refused: a frame returning a time already past drew {drawn} frames, not 2, so the frame interval could not be measured"
-        )),
-    }
+    let apart = closest(&shared.drawn_since(at));
+    Ok(Pair { drawn, apart })
 }
 
-/// Wake `WAKES` times; the time from before the first to after the last.
-fn wake_all(waker: &Waker) -> Result<Duration, String> {
+/// One burst: `WAKES` wakes, the gap from before the first to after the
+/// last, then the frames it drew.
+fn attempt(waker: &Waker, shared: &Shared) -> Result<Attempt, String> {
+    let at = shared.count();
     let start = Instant::now();
     for _ in 0..WAKES {
         waker.wake().map_err(|closed| closed.to_string())?;
     }
-    Ok(start.elapsed())
+    let gap = start.elapsed();
+    sleep(AFTER);
+    let drawn = shared.drawn_since(at);
+    Ok(Attempt {
+        frames: drawn.len() as u64,
+        gap,
+        closest: closest(&drawn),
+    })
+}
+
+/// The shortest time between two consecutive frames, if two were drawn.
+fn closest(drawn: &[Instant]) -> Option<Duration> {
+    drawn.windows(2).map(|w| w[1] - w[0]).min()
 }

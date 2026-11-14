@@ -1,17 +1,19 @@
 //! The waker natively: an app that returns `Next::Wait` draws nothing
 //! while idle, exactly one frame per `Waker::wake` from another thread,
 //! fewer than five for a burst of five (at most `1 + ceil(gap /
-//! interval)`, from the burst's measured gap and frame interval;
-//! refused, naming the gap, when that bound reaches five), one frame at
-//! the time a frame asked
-//! for with `Next::WaitUntil`, none if a later frame returned `Wait`, one more
-//! for a time already past,
-//! and once the loop has ended a wake says `LoopClosed`. `xvfb-run -a cargo run -p vapors-platform
-//! --example wake_window` (the CI window job runs it). Exit 1 names
-//! what differed.
+//! interval)` from the burst's measured gap and frame interval; tried
+//! up to three times while that bound reaches five, then refused,
+//! naming each gap: `burst_judge.rs`), one frame at the time a frame
+//! asked for with `Next::WaitUntil`, none if a later frame returned
+//! `Wait`, one more for a time already past, and once the loop has
+//! ended a wake says `LoopClosed`. `xvfb-run -a cargo run -p
+//! vapors-platform --example wake_window` (the CI window job runs it).
+//! Exit 1 lists every count that differed.
 
 mod burst;
+mod burst_judge;
 mod script;
+mod shared;
 #[path = "../support/mod.rs"]
 mod support;
 mod timed;
@@ -22,7 +24,7 @@ use std::sync::{Arc, Mutex};
 use vapors_platform::{App, Event, Frame, Next, Platform, Waker, WindowOptions, run};
 use vapors_scene::Color;
 
-use script::Shared;
+use shared::Shared;
 
 struct Woken {
     shared: Arc<Shared>,

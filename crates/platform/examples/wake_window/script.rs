@@ -2,13 +2,13 @@
 //! wake singly, wake in a burst (`burst.rs`), wait until a time
 //! (`timed.rs`), then end the loop with a last wake.
 
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use vapors_platform::{Next, Waker};
+use vapors_platform::Waker;
 
 use crate::burst::{self, Burst};
+use crate::burst_judge::Outcome;
+use crate::shared::{Shared, frames_over};
 use crate::timed::{self, Timed};
 
 /// After the first frame, before the idle count. The window's own
@@ -22,85 +22,6 @@ const IDLE: Duration = Duration::from_secs(1);
 /// Between wakes: llvmpipe draws this window in well under 50 ms.
 const BETWEEN: Duration = Duration::from_millis(300);
 const SINGLE_WAKES: usize = 3;
-
-/// What the app and the script share.
-#[derive(Default)]
-pub struct Shared {
-    frames: AtomicU64,
-    exit: AtomicBool,
-    outcome: Mutex<Option<Result<String, String>>>,
-    first_at: Mutex<Option<Instant>>,
-    last_at: Mutex<Option<Instant>>,
-    previous_at: Mutex<Option<Instant>>,
-    until: Mutex<Option<Instant>>,
-}
-
-impl Shared {
-    pub fn drew(&self) {
-        self.frames.fetch_add(1, Ordering::SeqCst);
-        let now = Instant::now();
-        self.first_at
-            .lock()
-            .expect("not poisoned")
-            .get_or_insert(now);
-        let previous = self.last_at.lock().expect("not poisoned").replace(now);
-        *self.previous_at.lock().expect("not poisoned") = previous;
-    }
-
-    /// What the app returns from this frame: `WaitUntil` the time the
-    /// script set for this one frame, else `Wait`.
-    pub fn next(&self) -> Next {
-        let until = self.until.lock().expect("not poisoned").take();
-        until.map_or(Next::Wait, Next::WaitUntil)
-    }
-
-    /// Make the next frame return `WaitUntil(at)`.
-    pub fn wait_until(&self, at: Instant) {
-        *self.until.lock().expect("not poisoned") = Some(at);
-    }
-
-    /// When the last frame came.
-    pub fn last_at(&self) -> Option<Instant> {
-        *self.last_at.lock().expect("not poisoned")
-    }
-
-    /// When the frame before the last came, and the last.
-    pub fn last_two(&self) -> Option<(Instant, Instant)> {
-        let previous = *self.previous_at.lock().expect("not poisoned");
-        previous.zip(self.last_at())
-    }
-
-    pub fn exit_asked(&self) -> bool {
-        self.exit.load(Ordering::SeqCst)
-    }
-
-    pub fn count(&self) -> u64 {
-        self.frames.load(Ordering::SeqCst)
-    }
-
-    /// The outcome; the loop has ended, so the script has finished.
-    pub fn outcome(&self) -> Result<String, String> {
-        self.outcome
-            .lock()
-            .expect("not poisoned")
-            .clone()
-            .unwrap_or_else(|| Err("the script did not finish".into()))
-    }
-
-    /// Record `outcome` and ask the app to end the loop at its next
-    /// frame (`run` wakes it).
-    pub fn finish(&self, outcome: Result<String, String>) {
-        *self.outcome.lock().expect("not poisoned") = Some(outcome);
-        self.exit.store(true, Ordering::SeqCst);
-    }
-
-    /// When the last start-up frame came, after the first.
-    fn startup_span(&self) -> Duration {
-        let first = *self.first_at.lock().expect("not poisoned");
-        let last = *self.last_at.lock().expect("not poisoned");
-        first.zip(last).map_or(Duration::ZERO, |(f, l)| l - f)
-    }
-}
 
 /// The whole script, then a wake that ends the loop.
 pub fn run(waker: &Waker, shared: &Shared) {
@@ -125,44 +46,33 @@ fn measure(waker: &Waker, shared: &Shared) -> Result<String, String> {
     let burst = burst::measure(waker, shared)?;
     let timed = timed::measure(waker, shared)?;
     let line = format!(
-        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; {burst}; {timed}",
+        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; {burst} {timed}",
         startup.0, startup.1
     );
-    judge(line, idle, &single, &burst, &timed)
-}
-
-/// `line` when every count held; `Err` with what was expected, or the
-/// burst's refusal.
-fn judge(
-    line: String,
-    idle: u64,
-    single: &[u64],
-    burst: &Burst,
-    timed: &Timed,
-) -> Result<String, String> {
-    let burst_held = burst
-        .held()
-        .map_err(|refused| format!("{line}; {refused}"))?;
-    let held = idle == 0 && single.iter().all(|n| *n == 1) && burst_held;
-    if held && timed.held() {
+    let failures = failures(idle, &single, &burst, &timed);
+    if failures.is_empty() {
         Ok(line)
     } else {
-        Err(format!(
-            "{line}; expected 0 idle, 1 per wake, 1 to {} for the burst, {}",
-            burst.most(),
-            timed::EXPECTED
-        ))
+        Err(format!("{line}\n{}", failures.join("\n")))
     }
 }
 
-/// Frames drawn while `during` runs, or its error.
-pub fn frames_over(
-    shared: &Shared,
-    during: impl FnOnce() -> Result<(), String>,
-) -> Result<u64, String> {
-    let at = shared.count();
-    during()?;
-    Ok(shared.count() - at)
+/// Every count that did not hold, and the burst's refusal if it had one.
+fn failures(idle: u64, single: &[u64], burst: &Burst, timed: &Timed) -> Vec<String> {
+    let mut failures = Vec::new();
+    if idle != 0 {
+        failures.push(format!("expected 0 idle frames, got {idle}"));
+    }
+    if single.iter().any(|n| *n != 1) {
+        failures.push(format!("expected 1 frame per wake, got {single:?}"));
+    }
+    if let Outcome::Count(why) | Outcome::Refused(why) = &burst.outcome {
+        failures.push(why.clone());
+    }
+    if !timed.held() {
+        failures.push(format!("expected {}", timed::EXPECTED));
+    }
+    failures
 }
 
 fn wake_then_wait(waker: &Waker) -> Result<(), String> {
