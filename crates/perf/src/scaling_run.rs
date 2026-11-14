@@ -49,12 +49,16 @@ fn measure(
     settings: Settings,
 ) -> Result<Vec<AtSize>, String> {
     let name = format!("{rows} rows, {change:?}");
+    let reproduce = format!(
+        "vapors-perf {} {} --scaling {change:?}",
+        settings.runs, settings.warmup
+    );
     let workload = &mut Rows::new(rows, change);
     let settings = settings_for(Some(rows), settings);
     enough_frames(change, settings.runs)?;
     let samples = timer
         .sample(workload, settings)
-        .map_err(|e| format!("{name}: {e}"))?;
+        .map_err(|e| format!("{name}: {e}; reproduce: {reproduce}"))?;
     samples_counted(&name, &samples)?;
     by_kind(rows, &samples, change.frame_kinds())
 }

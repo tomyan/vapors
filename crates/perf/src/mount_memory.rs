@@ -78,7 +78,7 @@ pub fn parse_line(line: &str) -> Result<MemoryRow, String> {
 /// A mount or frame that failed, or a resident set that cannot be read.
 pub fn run_child(gpu: &Gpu, rows: usize) -> Result<MemoryRow, String> {
     let mut workload = Mount::new(rows, checked_counter()?);
-    Sampler::new(gpu).sample(&mut workload, Settings { warmup: 0, runs: 1 })?;
+    Sampler::new(gpu).sample_mounts(&mut workload, Settings { warmup: 0, runs: 1 })?;
     let first = workload.mounted[0];
     let framed = workload.after_frame.borrow()[0];
     Ok(MemoryRow {

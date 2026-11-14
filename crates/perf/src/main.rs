@@ -86,9 +86,15 @@ fn run() -> Result<(), String> {
     for (name, (rows, make)) in chosen {
         let mut workload = make();
         let at = settings_for(rows, settings);
-        let samples = timer
-            .sample(workload.as_mut(), at)
-            .map_err(|e| format!("{name}: {e}"))?;
+        let samples = timer.sample(workload.as_mut(), at).map_err(|e| {
+            let set = if set == WorkloadSet::OffPath {
+                " --off-path"
+            } else {
+                ""
+            };
+            let (runs, warmup) = (settings.runs, settings.warmup);
+            format!("{name}: {e}; reproduce: vapors-perf {runs} {warmup}{set} --only \"{name}\"")
+        })?;
         let kinds = workload.frame_kinds();
         for report in sections(&name, &samples, kinds, instructions)? {
             println!("{report}");

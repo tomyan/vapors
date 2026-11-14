@@ -20,7 +20,7 @@ fn gpu_mount_frames_each_draw_a_fresh_page_and_keep_no_gpu_time() {
 
     // When
     let samples = Sampler::new(&gpu)
-        .sample(&mut mount, SETTINGS)
+        .sample_mounts(&mut mount, SETTINGS)
         .expect("the frames ran");
 
     // Then
@@ -42,7 +42,7 @@ fn gpu_a_failed_mount_ends_the_sample_with_its_cause_not_a_panic() {
     let gpu = gpu_with(FEATURES);
 
     // When
-    let result = Sampler::new(&gpu).sample(&mut mount, SETTINGS);
+    let result = Sampler::new(&gpu).sample_mounts(&mut mount, SETTINGS);
 
     // Then
     let error = result.expect_err("the mount failed");

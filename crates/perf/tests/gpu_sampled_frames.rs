@@ -1,6 +1,7 @@
 //! GPU tier: the sampled frames `--scaling` and the baseline count start
 //! after `App::start`, which builds every pipeline (one-scene F0), and a
-//! sampled frame that builds one is refused, naming it.
+//! sampled or idle frame that builds one, in its change or its frame, is
+//! refused, naming it: one check, one window, for every run.
 
 use vapors_app::FrameTiming;
 use vapors_gpu_harness::gpu_with;
@@ -78,6 +79,28 @@ fn gpu_a_sampled_frame_that_builds_a_pipeline_is_refused_naming_it() {
     // Then
     assert!(
         error.starts_with("frame 2 built 1 render pipelines and 1 shader modules"),
+        "{error}"
+    );
+}
+
+#[test]
+fn gpu_an_idle_frame_whose_change_builds_a_pipeline_is_refused_naming_it() {
+    // Given: the rows page left alone, a pipeline built before frame 1
+    let gpu = gpu_with(FEATURES);
+    let mut late = BuildsAPipeline {
+        rows: Rows::new(100, RowChange::Idle),
+        device: gpu.device.clone(),
+        at: 1,
+    };
+
+    // When
+    let error = Sampler::new(&gpu)
+        .idle(&mut late, std::time::Duration::from_secs(1), "the test")
+        .expect_err("frame 1 built a pipeline");
+
+    // Then
+    assert!(
+        error.starts_with("idle frame 1 built 1 render pipelines and 1 shader modules"),
         "{error}"
     );
 }

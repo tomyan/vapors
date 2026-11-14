@@ -37,13 +37,6 @@ pub trait Workload {
     fn ready(&self) -> Result<(), String> {
         Ok(())
     }
-    /// Whether every frame is a new app's first: the sampler then does
-    /// not start the app (`App::start`), so the frame takes the page's
-    /// first update, may build its pipelines, and keeps no GPU time, as
-    /// no frame after it reads one back.
-    fn new_app_each_frame(&self) -> bool {
-        false
-    }
     /// The kinds of frame the change alternates between, in the order
     /// it makes them from frame 0 (warmup counted): the full run
     /// reports each apart (`frame_kinds.rs`). One kind by default.

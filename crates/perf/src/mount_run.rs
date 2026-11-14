@@ -64,7 +64,7 @@ fn print_memory() -> Result<(), String> {
 fn run_size(timer: &mut Sampler, rows: usize, settings: Settings) -> Result<Measured, String> {
     let mut workload = Mount::new(rows, checked_counter()?);
     let samples = timer
-        .sample(&mut workload, settings)
+        .sample_mounts(&mut workload, settings)
         .map_err(|e| format!("{rows} rows, Mount: {e}"))?;
     println!("{}", mount_times(rows, &workload, &samples, settings)?);
     measure(rows, &workload, &samples, settings)

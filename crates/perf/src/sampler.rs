@@ -1,17 +1,16 @@
 //! Runs a workload's frames on a GPU and keeps the timed ones' times.
 
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use vapors_gpu_harness::Gpu;
-use vapors_platform::{Frame, Next};
-use vapors_renderer::pipelines::built;
-use vapors_renderer::{WRITE_PHASE, clear};
+use vapors_renderer::clear;
 use vapors_scene::Color;
 
 use crate::gpu_reading::frame_gpu_time;
-use crate::gpu_time::{GpuClock, wait};
+use crate::gpu_time::GpuClock;
 use crate::instruction_samples::InstructionSamples;
+use crate::mount::Mount;
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
@@ -58,27 +57,53 @@ impl<'g> Sampler<'g> {
         }
     }
 
-    /// `settings.warmup` frames of `workload`, then `settings.runs` timed.
+    /// `workload`'s app started, then `settings.warmup` frames, then
+    /// `settings.runs` timed.
     ///
     /// # Errors
-    /// A frame the workload's check refused, or a GPU wait that failed.
+    /// `App::start` refusing, a frame that built a pipeline or that the
+    /// workload's check refused, or a GPU wait that failed.
     pub fn sample(
         &mut self,
         workload: &mut dyn Workload,
         settings: Settings,
     ) -> Result<Samples, String> {
+        self.sample_apps(workload, settings, Apps::Started)
+    }
+
+    /// The Mount workload's frames, each a new app's first, never
+    /// started ([`Apps::NewEachFrame`]): its frames build the pipelines
+    /// and keep no GPU time.
+    ///
+    /// # Errors
+    /// A frame the workload's check refused, or a GPU wait that failed.
+    pub fn sample_mounts(
+        &mut self,
+        mount: &mut Mount,
+        settings: Settings,
+    ) -> Result<Samples, String> {
+        self.sample_apps(mount, settings, Apps::NewEachFrame)
+    }
+
+    fn sample_apps(
+        &mut self,
+        workload: &mut dyn Workload,
+        settings: Settings,
+        apps: Apps,
+    ) -> Result<Samples, String> {
         let dispatch = tracing::Dispatch::new(self.clock.clone());
-        tracing::dispatcher::with_default(&dispatch, || self.frames(workload, settings))
+        tracing::dispatcher::with_default(&dispatch, || self.frames(workload, settings, apps))
     }
 
     fn frames(
         &mut self,
         workload: &mut dyn Workload,
         settings: Settings,
+        apps: Apps,
     ) -> Result<Samples, String> {
         let frames = u32::try_from(settings.runs).map_err(|_| "too many runs".to_owned())?;
         let mut gpu_clock = GpuClock::new(&self.gpu.device, frames);
-        let mut samples = self.timed_frames(workload, settings, gpu_clock.as_mut())?;
+        let mut samples = self.timed_frames(workload, (settings, apps), gpu_clock.as_mut())?;
         samples.gpu = gpu_clock
             .map(|clock| clock.spans(&self.gpu.device, &self.gpu.queue))
             .transpose()?;
@@ -91,13 +116,11 @@ impl<'g> Sampler<'g> {
     fn timed_frames(
         &mut self,
         workload: &mut dyn Workload,
-        settings: Settings,
+        (settings, apps): (Settings, Apps),
         mut gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Samples, String> {
         let texture = self.texture(workload.size());
-        if !workload.new_app_each_frame() {
-            self.start(workload, texture.format())?;
-        }
+        self.begin(workload, texture.format(), apps)?;
         let mut samples = Samples {
             warmup: settings.warmup,
             ..Samples::default()
@@ -105,8 +128,8 @@ impl<'g> Sampler<'g> {
         let timed = settings.warmup..settings.warmup + settings.runs;
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
-            let measured = self.frame(workload, &texture, index, clock)?;
-            if index > timed.start && !workload.new_app_each_frame() {
+            let measured = self.frame(workload, &texture, (index, apps), clock)?;
+            if index > timed.start && apps == Apps::Started {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
@@ -127,98 +150,17 @@ impl<'g> Sampler<'g> {
         let (device, queue) = (&self.gpu.device, &self.gpu.queue);
         clear(device, queue, width, height, Color::default())
     }
-
-    /// One frame: the change, then the timed frame between timestamps,
-    /// then the untimed wait for the GPU; refused when the frame built a
-    /// pipeline, which `App::start` builds before frame 0 (one-scene F0). A frame that writes no buffer
-    /// (every batch kept, IU4) enters no `write` span; it is recorded as
-    /// 0 rather than left out. Every other phase runs in every frame, so
-    /// its absence still fails the harness shape test.
-    fn frame(
-        &mut self,
-        workload: &mut dyn Workload,
-        texture: &wgpu::Texture,
-        index: usize,
-        gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<Measured, String> {
-        let before = built();
-        workload.change(index);
-        workload
-            .ready()
-            .map_err(|error| format!("frame {index}: {error}"))?;
-        self.now += INTERVAL;
-        let _ = self.clock.take();
-        let _ = self.clock.take_instructions()?;
-        let (next, started, took, frame_instructions) =
-            self.timed(workload, texture, index, gpu_clock)?;
-        // Relaxed for a new app each frame (the Mount workload): it times
-        // a page's first update in its first frame, which `App::start`
-        // would run before the frame, so it is not started and its frame
-        // builds the pipelines. Retired when Mount times `App::start`
-        // with the mount.
-        if !workload.new_app_each_frame() {
-            judged::nothing_built(index, built().since(before))?;
-        }
-        // frame-to-idle ends here, before the harness's own bookkeeping;
-        // gpu_judged_frames.rs holds it at or above the frame's GPU time
-        wait(&self.gpu.device, FRAME_DEADLINE)?;
-        let idle = started.elapsed();
-        let mut phases = self.clock.take();
-        let mut instructions = self.clock.take_instructions()?;
-        phases.entry(WRITE_PHASE.into()).or_default();
-        if let Some(counts) = &mut instructions {
-            counts.entry(WRITE_PHASE.into()).or_default();
-        }
-        workload
-            .check(next)
-            .map_err(|error| format!("frame {index}: {error}"))?;
-        let instructions = frame_instructions.zip(instructions);
-        Ok(Measured {
-            took,
-            idle,
-            phases,
-            instructions,
-        })
-    }
-
-    /// The app's frame, when it started and its wall time, between the
-    /// GPU clock's marks.
-    fn timed(
-        &self,
-        workload: &mut dyn Workload,
-        texture: &wgpu::Texture,
-        index: usize,
-        mut gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<(Next, Instant, Duration, Option<u64>), String> {
-        let (device, queue) = (&self.gpu.device, &self.gpu.queue);
-        if let Some(clock) = gpu_clock.as_deref_mut() {
-            clock.mark(device, queue);
-        }
-        let before = self.clock.instructions_now()?;
-        let started = Instant::now();
-        let next = workload.app().frame(&self.frame_of(texture, index));
-        let took = started.elapsed();
-        let counted = before
-            .zip(self.clock.instructions_now()?)
-            .map(|(a, b)| b - a);
-        if let Some(clock) = gpu_clock {
-            clock.mark(device, queue);
-        }
-        Ok((next, started, took, counted))
-    }
-
-    fn frame_of<'a>(&'a self, texture: &'a wgpu::Texture, index: usize) -> Frame<'a> {
-        Frame {
-            adapter: &self.gpu.adapter,
-            device: &self.gpu.device,
-            queue: &self.gpu.queue,
-            texture,
-            index: index as u64,
-            scale_factor: 1.0,
-            now: self.now,
-        }
-    }
 }
+
+/// A frame's phase times, and its phase counts with a counter.
+type PhaseTakes = (BTreeMap<String, Duration>, Option<BTreeMap<String, u64>>);
+
+#[path = "sampler_start.rs"]
+mod start;
+use start::Apps;
+
+#[path = "sampler_frame.rs"]
+mod frame;
 
 #[path = "sampler_judged.rs"]
 mod judged;

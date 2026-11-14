@@ -58,10 +58,6 @@ impl Workload for Fake {
     fn timing(&self) -> FrameTiming {
         unreachable!("the idle driver reads no frame timing")
     }
-
-    fn times_gpu(&self) -> bool {
-        false
-    }
 }
 
 /// The rows page whose app asks for a frame 100 ms after any it would

@@ -194,11 +194,6 @@ impl Workload for Mount {
         )
     }
 
-    /// Each frame is a new app's first.
-    fn new_app_each_frame(&self) -> bool {
-        true
-    }
-
     fn timing(&self) -> FrameTiming {
         self.page
             .as_ref()
