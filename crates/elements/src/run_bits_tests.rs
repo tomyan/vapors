@@ -1,4 +1,4 @@
-use vapors_scene::{Color, Item, Quad, Rect, Run, Shadow, SurfaceId};
+use vapors_scene::{Color, Item, Quad, Rect, Run, Shadow, Shape, ShapeRef, SurfaceId};
 
 use super::same_bits;
 
@@ -27,12 +27,22 @@ fn surfaces(left: f32) -> Run {
     }])
 }
 
+fn shapes(e: f32) -> Run {
+    Run::Shapes(vec![Shape {
+        shape: ShapeRef(2),
+        transform: [1.0, 0.0, 0.0, 1.0, e, 0.0],
+        colour: Color::from_rgba8(0, 0, 255, 255),
+        bounds: Rect::new(0.0, 0.0, 8.0, 8.0),
+    }])
+}
+
 #[test]
 fn equal_runs_are_the_same_to_the_bit() {
     // When / Then
     assert!(same_bits(&quads(0.0), &quads(0.0)));
     assert!(same_bits(&shadows(2.0), &shadows(2.0)));
     assert!(same_bits(&surfaces(0.0), &surfaces(0.0)));
+    assert!(same_bits(&shapes(0.0), &shapes(0.0)));
 }
 
 #[test]
@@ -42,6 +52,7 @@ fn runs_whose_zeros_differ_in_sign_are_equal_but_not_the_same_to_the_bit() {
         (quads(-0.0), quads(0.0)),
         (shadows(0.0), shadows(-0.0)),
         (surfaces(-0.0), surfaces(0.0)),
+        (shapes(-0.0), shapes(0.0)),
     ];
 
     // When / Then
@@ -56,4 +67,16 @@ fn runs_that_differ_are_not_the_same_to_the_bit() {
     // When / Then
     assert!(!same_bits(&quads(0.0), &quads(1.0)));
     assert!(!same_bits(&quads(0.0), &shadows(0.0)));
+}
+
+#[test]
+fn shape_runs_naming_other_entries_are_not_the_same() {
+    // Given: equal floats, another entry
+    let Run::Shapes(mut other) = shapes(0.0) else {
+        unreachable!("shapes() is a shape run")
+    };
+    other[0].shape = ShapeRef(3);
+
+    // When / Then
+    assert!(!same_bits(&shapes(0.0), &Run::Shapes(other)));
 }

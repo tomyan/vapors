@@ -44,6 +44,7 @@ fn kinds(batched: &Batched) -> Vec<(char, usize)> {
         Run::Images(images) => ('i', images.len()),
         Run::Surfaces(surfaces) => ('g', surfaces.len()),
         Run::Icons(icons) => ('v', icons.len()),
+        Run::Shapes(shapes) => ('h', shapes.len()),
     };
     batched.batches.iter().map(|b| shape(&b.run)).collect()
 }
@@ -184,4 +185,26 @@ fn an_item_whose_bounds_cannot_be_placed_is_drawn() {
 
     // Then
     assert_eq!(kinds(&batched), [('q', 1)]);
+}
+
+#[test]
+fn a_shape_is_culled_by_its_bounds_not_its_transform() {
+    // Given: two shapes translated into the view, one whose bounds lie
+    // below it, between two quads
+    let shape = |bounds_top: f32| {
+        Item::Shape(crate::Shape {
+            shape: crate::ShapeRef(0),
+            transform: [1.0, 0.0, 0.0, 1.0, 10.0, 10.0],
+            colour: Color::from_rgba8(1, 2, 3, 255),
+            bounds: Rect::new(10.0, bounds_top, 20.0, bounds_top + 10.0),
+        })
+    };
+    let scene = scene_of(&[shape(10.0), quad_at(0.0), shape(150.0), quad_at(20.0)]);
+
+    // When
+    let batched = scene.batches(VIEW);
+
+    // Then
+    assert_eq!(kinds(&batched), [('h', 1), ('q', 2)]);
+    assert_eq!(batched.culled, 1);
 }

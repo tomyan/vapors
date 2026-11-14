@@ -19,6 +19,9 @@ mod painter;
 mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
+mod shape_bounds;
+mod shape_error;
+mod shape_store;
 mod surface;
 mod tooltip;
 mod tooltip_box;
@@ -38,6 +41,7 @@ pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,
     SurfaceState, UnsupportedFormat,
 };
+pub use shape_store::{ShapeError, ShapeStore};
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
 pub use tooltip_error::TooltipError;

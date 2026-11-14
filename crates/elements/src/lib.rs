@@ -150,6 +150,8 @@ mod svg_paint;
 mod svg_path_checks;
 mod svg_style_checks;
 mod tags;
+#[cfg(feature = "test-support")]
+pub mod test_items;
 #[cfg(test)]
 mod test_rows;
 mod text_bridge;

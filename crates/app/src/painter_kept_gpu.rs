@@ -8,7 +8,9 @@ use vapors_renderer::{KeptRange, Target};
 use vapors_scene::Run;
 use vapors_text::{GlyphAtlas, TextPipeline};
 
+use super::super::errors::PaintError;
 use super::{Kind, Pipelines, run_bytes};
+use crate::shape_store::ShapeStore;
 
 #[path = "painter_kept_text.rs"]
 mod text;
@@ -53,34 +55,45 @@ impl KeptGpu {
     }
 
     /// The kept bytes of `run`, batch `at` of the frame, keyed `key` on
-    /// `target`, written first when none are kept; `None` when refused.
+    /// `target`, written first when none are kept; `None` when the
+    /// write is refused (on the target's encoder).
+    ///
+    /// # Errors
+    /// A run whose bytes cannot be built ([`run_bytes`]).
     pub(super) fn range(
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
         (run, key, at): (&Run, BatchKey, usize),
-    ) -> Option<&KeptRange> {
+    ) -> Result<Option<&KeptRange>, PaintError> {
         match self.entries.get(&key) {
             Some(gpu) => {
-                gpu.check(run, at);
+                gpu.check(run, at, pipelines.shapes);
                 self.kept += 1;
             }
-            _ => self.write(&mut pipelines, target, (run, key))?,
+            _ => {
+                if self.write(&mut pipelines, target, (run, key))?.is_none() {
+                    return Ok(None);
+                }
+            }
         }
         let gpu = self.entries.get_mut(&key).expect("kept or written above");
         gpu.drawn = self.frame;
-        Some(&gpu.range)
+        Ok(Some(&gpu.range))
     }
 
-    /// Builds and writes `run`'s bytes under `key`; `None` when refused.
+    /// Builds and writes `run`'s bytes under `key`; `None` when the
+    /// write is refused.
     fn write(
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
         (run, key): (&Run, BatchKey),
-    ) -> Option<()> {
-        let (kind, bytes) = (Kind::of(run), run_bytes(run));
-        let range = pipelines.keep(kind, target, &bytes)?;
+    ) -> Result<Option<()>, PaintError> {
+        let (kind, bytes) = (Kind::of(run), run_bytes(run, pipelines.shapes)?);
+        let Some(range) = pipelines.keep(kind, target, &bytes) else {
+            return Ok(None);
+        };
         self.written += 1;
         let gpu = Gpu {
             range,
@@ -91,7 +104,7 @@ impl KeptGpu {
             bytes,
         };
         self.entries.insert(key, gpu);
-        Some(())
+        Ok(Some(()))
     }
 
     pub(super) fn release_undrawn(&mut self, pipelines: &mut Pipelines<'_>) {
@@ -122,10 +135,14 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, run: &Run, at: usize) {
+    fn check(&self, run: &Run, at: usize, shapes: &ShapeStore) {
         #[cfg(debug_assertions)]
-        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run), (run, at));
+        {
+            let fresh = run_bytes(run, shapes)
+                .expect("built when these bytes were kept; the store only grows");
+            super::super::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
+        }
         #[cfg(not(debug_assertions))]
-        let _ = (run, at); // only the debug build's compare uses them
+        let _ = (run, at, shapes); // only the debug build's compare uses them
     }
 }

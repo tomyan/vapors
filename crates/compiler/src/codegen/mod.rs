@@ -33,6 +33,7 @@ mod script_dispatcher;
 mod script_syntax;
 mod script_uses;
 mod shell;
+mod shell_methods;
 mod snippet_list;
 mod snippet_params;
 mod snippets;

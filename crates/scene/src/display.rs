@@ -3,6 +3,7 @@
 //! top-left of the target, y down.
 
 use crate::Color;
+use crate::shape::Shape;
 
 /// An axis-aligned rectangle in device pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -150,6 +151,8 @@ pub enum Item {
         /// Where it is drawn: the element's content box.
         rect: Rect,
     },
+    /// A shape from the shape table (`shape.rs`).
+    Shape(Shape),
     /// A text run, its layout origin at `origin` (device pixels).
     Text {
         /// Which run.

@@ -138,3 +138,33 @@ fn a_stroke_width_that_is_not_above_zero_is_refused_naming_the_shape() {
         );
     }
 }
+
+#[test]
+fn the_paint_is_read_back_from_the_bytes_it_begins() {
+    // Given
+    let path = IconPath::parse("M0 0L1 1").expect("parses");
+    let paints = [
+        Paint::Fill(FillRule::NonZero),
+        Paint::Fill(FillRule::EvenOdd),
+        Paint::Stroke { width: 1.5 },
+    ];
+
+    // When, Then
+    for paint in paints {
+        let canonical = Canonical::of("a.wisp:3", &path, paint).expect("canonical");
+        assert_eq!(paint_of(canonical.bytes()), Ok(paint));
+    }
+}
+
+#[test]
+fn bytes_that_begin_with_no_paint_are_refused_naming_them() {
+    // When, Then
+    assert_eq!(
+        paint_of(b"Q"),
+        Err("the canonical bytes begin [81], not a paint (F, E, or S and a width)".to_owned())
+    );
+    assert_eq!(
+        paint_of(&[b'S', 0, 0, 0, 0]),
+        Err("the canonical bytes stroke at width 0, not a finite number above zero".to_owned())
+    );
+}

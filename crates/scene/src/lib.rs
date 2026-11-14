@@ -8,6 +8,7 @@ mod color;
 mod display;
 mod image;
 mod scissor;
+mod shape;
 mod transform;
 
 pub use batch::{Batch, Batched, Run, batched, culled};
@@ -15,4 +16,5 @@ pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use image::RgbaImage;
 pub use scissor::Scissor;
+pub use shape::{Shape, ShapeRef};
 pub use transform::{Size, Transform};

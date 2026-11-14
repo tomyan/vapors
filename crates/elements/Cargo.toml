@@ -17,6 +17,10 @@ publish = false
 default = ["complex-script-breaks", "grid"]
 complex-script-breaks = ["vapors-text/complex-script-breaks"]
 grid = ["taffy/grid"]
+# `test_items`: items a test has an element paint, for painters' tests
+# of kinds no element paints yet (S3a1's shapes until S4a). Enabled only
+# by dev-dependencies.
+test-support = []
 
 [dependencies]
 vapors-dom.workspace = true

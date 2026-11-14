@@ -91,7 +91,12 @@ impl Shift {
             for item in scene.items_mut() {
                 *item = match *item {
                     Item::Text { text, .. } => text_item(text, rect, slabs, scale),
-                    other => shifted_item(other, self.delta),
+                    moved @ (Item::Shadow(_)
+                    | Item::Quad(_)
+                    | Item::Image { .. }
+                    | Item::Icon { .. }
+                    | Item::Surface { .. }
+                    | Item::Shape(_)) => shifted_item(moved, self.delta),
                 };
             }
             scene.clips_mut().fill(self.clip);

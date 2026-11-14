@@ -5,6 +5,8 @@
 
 mod arena_full;
 mod clear;
+mod closed_form_shape;
+mod closed_forms;
 mod command_encoder;
 mod encoder_budget;
 mod encoder_turn;
@@ -39,6 +41,8 @@ mod work;
 
 pub use arena_full::{ArenaFull, Holding};
 pub use clear::{clear, clear_target, clear_view};
+pub use closed_form_shape::{ClosedFormError, ClosedFormShape};
+pub use closed_forms::ClosedFormPipeline;
 pub use encoder_budget::EncoderBudget;
 pub use frame_arena::{FrameArena, Placed};
 pub use frame_clock::FrameClock;

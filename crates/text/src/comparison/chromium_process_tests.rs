@@ -17,13 +17,17 @@ use crate::comparison::SCALES;
 const RENDER_ALLOWANCE: Duration = Duration::from_secs(10);
 
 /// Every `slow-timeout = { period = "<n>s", terminate-after = <m> }` in
-/// `text`, as the time nextest kills a test; any other shape of a
-/// slow-timeout line, or an override, is refused naming its line.
-/// Comment lines are skipped.
+/// `text`, an override's included, as the time nextest kills a test;
+/// any other shape of a slow-timeout line, or of an override's header,
+/// is refused naming its line. Comment lines and override headers
+/// (`[[profile.<name>.overrides]]`) are skipped: an override's own
+/// slow-timeout is read like any other, so none can be shorter than
+/// the launcher's worst.
 fn kill_times(text: &str, file: &str) -> Vec<Duration> {
     text.lines()
         .enumerate()
         .filter(|(_, line)| !line.trim_start().starts_with('#'))
+        .filter(|(_, line)| !is_override_header(line))
         .filter(|(_, line)| line.contains("slow-timeout") || line.contains("overrides"))
         .map(|(index, line)| {
             kill_time(line).unwrap_or_else(|| {
@@ -34,6 +38,14 @@ fn kill_times(text: &str, file: &str) -> Vec<Duration> {
             })
         })
         .collect()
+}
+
+/// `[[profile.<name>.overrides]]`, alone on its line.
+fn is_override_header(line: &str) -> bool {
+    let line = line.trim();
+    line.strip_prefix("[[profile.")
+        .and_then(|rest| rest.strip_suffix(".overrides]]"))
+        .is_some_and(|name| !name.is_empty() && !name.contains(['[', ']', ' ']))
 }
 
 fn kill_time(line: &str) -> Option<Duration> {
@@ -81,4 +93,39 @@ fn a_slow_timeout_line_of_another_shape_is_refused() {
         .downcast::<String>()
         .expect("a message");
     assert!(message.starts_with("nextest.toml:2: "), "{message}");
+}
+
+#[test]
+fn an_override_header_is_skipped_and_other_bracketed_lines_are_not() {
+    let headers = [
+        "[[profile.default.overrides]]",
+        "  [[profile.ci.overrides]]  ",
+    ];
+    let others = [
+        "[profile.default]",
+        "[[profile..overrides]]",
+        "[[profile.a b.overrides]]",
+    ];
+    assert!(
+        headers.iter().all(|line| is_override_header(line)),
+        "{headers:?}"
+    );
+    assert!(
+        !others.iter().any(|line| is_override_header(line)),
+        "{others:?}"
+    );
+}
+
+#[test]
+fn an_override_s_slow_timeout_is_read_like_any_other() {
+    // Given: an override whose deadline is under the launcher's worst
+    let text = "[profile.default]\nslow-timeout = { period = \"30s\", terminate-after = 2 }\n\
+        [[profile.default.overrides]]\nfilter = 'binary(x)'\n\
+        slow-timeout = { period = \"1s\", terminate-after = 1 }\n";
+
+    // When
+    let kills = kill_times(text, "fixture");
+
+    // Then: its 1 s is read, so the deadline check would fail on it
+    assert_eq!(kills, [Duration::from_secs(60), Duration::from_secs(1)]);
 }

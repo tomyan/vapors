@@ -4,6 +4,7 @@
 use std::borrow::Borrow;
 
 use crate::display::{Item, Quad, Rect, Scene, Shadow};
+use crate::shape::Shape;
 
 /// Consecutive items of one kind under one clip: what a painter draws
 /// with one pipeline before switching to the next.
@@ -33,6 +34,8 @@ pub enum Run {
     Icons(Vec<Item>),
     /// Consecutive GPU surfaces.
     Surfaces(Vec<Item>),
+    /// Consecutive shapes.
+    Shapes(Vec<Shape>),
 }
 
 /// A scene's batches for one target, and how many items were culled.
@@ -115,6 +118,7 @@ impl Run {
             Item::Image { .. } => Run::Images(Vec::new()),
             Item::Icon { .. } => Run::Icons(Vec::new()),
             Item::Surface { .. } => Run::Surfaces(Vec::new()),
+            Item::Shape(_) => Run::Shapes(Vec::new()),
         }
     }
 
@@ -123,6 +127,7 @@ impl Run {
         match (self, item) {
             (Run::Shadows(shadows), Item::Shadow(shadow)) => shadows.push(*shadow),
             (Run::Quads(quads), Item::Quad(quad)) => quads.push(*quad),
+            (Run::Shapes(shapes), Item::Shape(shape)) => shapes.push(*shape),
             (Run::Texts(items), Item::Text { .. })
             | (Run::Images(items), Item::Image { .. })
             | (Run::Icons(items), Item::Icon { .. })
