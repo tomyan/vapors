@@ -137,9 +137,11 @@ impl Gpu {
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
     fn check(&self, run: &Run, at: usize, shapes: &ShapeStore) {
         #[cfg(debug_assertions)]
-        let fresh =
-            run_bytes(run, shapes).expect("built when these bytes were kept; the store only grows");
-        super::super::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
+        {
+            let fresh = run_bytes(run, shapes)
+                .expect("built when these bytes were kept; the store only grows");
+            super::super::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
+        }
         #[cfg(not(debug_assertions))]
         let _ = (run, at, shapes); // only the debug build's compare uses them
     }
