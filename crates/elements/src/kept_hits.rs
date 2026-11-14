@@ -1,5 +1,5 @@
 //! The hits kept across updates (IU3 3c-3g): each box step's part's
-//! hits with the step's place, in painting order. Gathered from the
+//! hits with the step's label, in painting order. Gathered from the
 //! scene view on the first hit test after paint order is walked again;
 //! else patched for the slots an update paints again or frees
 //! (`paint_partial.rs`), as the drawing steps are (`drawn_steps.rs`). A
@@ -17,56 +17,57 @@ use crate::drawn_steps::DrawnSteps;
 use crate::frames::Frames;
 use crate::kept_box::KeptBox;
 use crate::layout::BoxRect;
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 
 /// A hit in its scroll frame: the frame, the element and its rect.
 pub(crate) type FramedHit = (usize, (NodeId, BoxRect));
 
-/// Every hit with its box step's place, by the frame it is in, each
-/// frame's ordered by place; a part's hits in the order it painted them.
+/// Every hit with its box step's label, by the frame it is in, each
+/// frame's ordered by label; a part's hits in the order it painted them.
 /// A hit test asks only the frames that can show at its point
 /// (`Frames::meeting`: the scroll frames whose clip meets it, the lane
 /// frames whose row meets it through the lane, section 11.2).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct KeptHits {
-    by_frame: FxHashMap<usize, Vec<(usize, FramedHit)>>,
-    /// The frame each place's hits are in.
-    frames: FxHashMap<usize, usize>,
+    by_frame: FxHashMap<usize, Vec<(Label, FramedHit)>>,
+    /// The frame each label's hits are in.
+    frames: FxHashMap<Label, usize>,
 }
 
 impl KeptHits {
     /// The hits of `scene`'s parts, in painting order.
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
         let mut hits = Self::default();
-        for (place, kept) in scene.placed_parts() {
-            hits.put(place, framed(kept));
+        for (label, kept) in scene.labelled_parts() {
+            hits.put(label, framed(kept));
         }
         hits
     }
 
-    /// Puts `hits`, of the box step at `place`, in their frame's list.
-    fn put(&mut self, place: usize, hits: impl Iterator<Item = FramedHit>) {
+    /// Puts `hits`, of the box step at `label`, in their frame's list.
+    fn put(&mut self, label: Label, hits: impl Iterator<Item = FramedHit>) {
         for hit in hits {
             let list = self.by_frame.entry(hit.0).or_default();
-            let at = list.partition_point(|&(placed, _)| placed <= place);
-            list.insert(at, (place, hit));
-            self.frames.insert(place, hit.0);
+            let at = list.partition_point(|&(labelled, _)| labelled <= label);
+            list.insert(at, (label, hit));
+            self.frames.insert(label, hit.0);
         }
     }
 
-    /// Takes out the hits of the box step at `place`; them.
-    fn take(&mut self, place: usize) -> Vec<FramedHit> {
-        let Some(frame) = self.frames.remove(&place) else {
+    /// Takes out the hits of the box step at `label`; them.
+    fn take(&mut self, label: Label) -> Vec<FramedHit> {
+        let Some(frame) = self.frames.remove(&label) else {
             return Vec::new();
         };
         let list = self.by_frame.get_mut(&frame).unwrap_or_else(|| {
             panic!(
-                "the hits of place {place} are noted in frame {frame}, which holds none \
+                "the hits of label {label} are noted in frame {frame}, which holds none \
                  (kept_hits.rs `put`); reproduce with `cargo xtask test`"
             )
         });
-        let start = list.partition_point(|&(at, _)| at < place);
-        let end = list.partition_point(|&(at, _)| at <= place);
+        let start = list.partition_point(|&(at, _)| at < label);
+        let end = list.partition_point(|&(at, _)| at <= label);
         let taken = list.drain(start..end).map(|(_, hit)| hit).collect();
         if list.is_empty() {
             self.by_frame.remove(&frame);
@@ -75,7 +76,7 @@ impl KeptHits {
     }
 
     /// `self` with the hits of each of `slots`' box steps replaced by
-    /// its part's in `boxes`, at the step's place in `drawn`.
+    /// its part's in `boxes`, at the step's label in `drawn`.
     /// Returns the hits removed and added, in no order, each in its
     /// frame.
     pub(crate) fn patch(
@@ -85,12 +86,12 @@ impl KeptHits {
         boxes: &[Option<KeptBox>],
     ) -> Vec<FramedHit> {
         let mut changed = Vec::new();
-        for (place, slot) in box_places(slots, drawn) {
-            changed.extend(self.take(place));
+        for (label, slot) in box_labels(slots, drawn) {
+            changed.extend(self.take(label));
             let kept = boxes.get(slot).and_then(Option::as_ref);
             let hits: Vec<FramedHit> = kept.into_iter().flat_map(framed).collect();
             changed.extend_from_slice(&hits);
-            self.put(place, hits.into_iter());
+            self.put(label, hits.into_iter());
         }
         changed
     }
@@ -98,9 +99,9 @@ impl KeptHits {
     /// Every hit with its frame, in painting order: O(hits log hits), for
     /// the checks.
     pub(crate) fn hits(&self) -> Vec<FramedHit> {
-        let mut placed: Vec<&(usize, FramedHit)> = self.by_frame.values().flatten().collect();
-        placed.sort_by_key(|&&(place, _)| place);
-        placed.into_iter().map(|&(_, hit)| hit).collect()
+        let mut labelled: Vec<&(Label, FramedHit)> = self.by_frame.values().flatten().collect();
+        labelled.sort_by_key(|&&(label, _)| label);
+        labelled.into_iter().map(|&(_, hit)| hit).collect()
     }
 }
 
@@ -156,20 +157,20 @@ impl HitsChanged {
 }
 
 /// Each of `slots` whose box step is in `drawn`'s paint order, after
-/// its place, ordered by place, each once.
-fn box_places(slots: impl Iterator<Item = usize>, drawn: &DrawnSteps) -> Vec<(usize, usize)> {
-    let mut places: Vec<(usize, usize)> = slots
-        .filter_map(|slot| box_place(drawn, slot).map(|place| (place, slot)))
+/// its label, ordered by label, each once.
+fn box_labels(slots: impl Iterator<Item = usize>, drawn: &DrawnSteps) -> Vec<(Label, usize)> {
+    let mut labels: Vec<(Label, usize)> = slots
+        .filter_map(|slot| box_label(drawn, slot).map(|label| (label, slot)))
         .collect();
-    places.sort_unstable();
-    places.dedup();
-    places
+    labels.sort_unstable();
+    labels.dedup();
+    labels
 }
 
-/// The place of `slot`'s box step in paint order, if it has one.
-fn box_place(drawn: &DrawnSteps, slot: usize) -> Option<usize> {
-    let mut steps = drawn.places_of(slot);
-    steps.find_map(|(place, step)| matches!(step, Step::Box(_)).then_some(place))
+/// The label of `slot`'s box step in paint order, if it has one.
+fn box_label(drawn: &DrawnSteps, slot: usize) -> Option<Label> {
+    let mut steps = drawn.labels_of(slot);
+    steps.find_map(|(label, step)| matches!(step, Step::Box(_)).then_some(label))
 }
 
 #[path = "kept_hits_query.rs"]

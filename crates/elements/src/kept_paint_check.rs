@@ -112,15 +112,16 @@ fn differing_extents(kept: &Painted) -> Option<&'static str> {
     if let Some(total) = kept.extents.total_differing() {
         return Some(total);
     }
-    let places = kept.order.steps.len();
-    let afresh = crate::frame_extents::Extents::of(&kept.drawn, places, &kept.kept_boxes);
+    let slots = kept.kept_boxes.len();
+    let afresh = crate::frame_extents::Extents::of(&kept.drawn, slots, &kept.kept_boxes);
     (kept.extents != afresh).then_some("extents index")
 }
 
 /// "drawn steps" when the steps `kept` lists as drawing are not those
 /// found afresh from its paint order and kept boxes.
 fn differing_drawn(kept: &Painted) -> Option<&'static str> {
-    let drawn = crate::drawn_steps::DrawnSteps::of(&kept.order.steps, &kept.kept_boxes);
+    let order = (&kept.order.steps[..], &kept.order.labels[..]);
+    let drawn = crate::drawn_steps::DrawnSteps::of(order, &kept.kept_boxes);
     (kept.drawn != drawn).then_some("drawn steps")
 }
 

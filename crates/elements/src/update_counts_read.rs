@@ -41,6 +41,7 @@ impl UpdateCounts {
         self.order_splices = walks.splices;
         self.splices_declined = usize::from(walks.declined.is_some());
         self.splice_decline = walks.declined;
+        (self.paint_relabelled, self.paint_relabel_all) = (walks.relabelled, walks.relabel_all);
     }
 }
 

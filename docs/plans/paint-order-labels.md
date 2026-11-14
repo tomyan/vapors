@@ -46,9 +46,20 @@ after the insert moves.
   the smallest window around the insert whose labels have room is
   relabelled evenly. Those steps' entries are patched in each structure,
   as if painted again. Amortized O(log n) labels per insert.
-- **Spacing.** A walk spaces its `n` labels evenly over `u64`: about
-  2^64 / n apart, about 2^47 at 16k rows of several steps. That spacing,
-  `spacing(n)`, is the one the splice steps by too.
+- **Spacing.** A walk spaces its `n` labels evenly over `u64` with
+  `ROOM` (2^19) spacings free at each end: `spacing(n) = u64::MAX /
+  (n + 2^20)`, about 2^44 at 16k rows of several steps. That spacing is
+  the one the splice steps by too. (Slice 1 found the room needed: a
+  walk spread over all of `u64` left one spacing after the last label,
+  and the outlines that end paint order made every row appended to a
+  list an append there.)
+- **Lean.** Rows put in one after another at one place (appended to a
+  list, whose box steps are interior in paint order) each take a gap
+  whose left end is the run put in before. A run whose left neighbour
+  ends a run the last splice put in takes its labels from the first
+  sixteenth of the gap, and one whose right neighbour starts such a run
+  from the last sixteenth (`Lean`), so about 470 such inserts fit a gap,
+  where halving fits about 44; any other insert takes the midpoint.
 - **Appends and prepends** step from the end label by the spacing,
   rather than taking the midpoint of the gap to `u64::MAX` (or 0), which
   would halve the room on every append and force a relabel after about

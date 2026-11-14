@@ -21,6 +21,7 @@ use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, started};
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
@@ -44,8 +45,8 @@ pub(crate) fn paint_partial(
         _ => (started, None),
     };
     let kept = kept_order.is_some();
-    let place = &|step| painted.drawn.place_of(step);
-    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
+    let label_of = &|step| painted.drawn.label_of(step);
+    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, label_of);
     let scale = input.scale;
     let frames_moved_now =
         crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept))
@@ -114,9 +115,9 @@ fn drawn_updated(
     // After a splice the drawing steps, hits and batches are made afresh
     // as after a walk, until a follow-up shifts them by the splice's edits.
     if order.walks.reshaped() {
-        painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
-        let places = order.steps.len();
-        painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);
+        painted.drawn = DrawnSteps::of((&order.steps, &order.labels), &painted.kept_boxes);
+        let slots = painted.kept_boxes.len();
+        painted.extents = Extents::of(&painted.drawn, slots, &painted.kept_boxes);
         batches_unsorted(painted);
         painted.hits = std::cell::OnceCell::new();
         painted.hits_changed = HitsChanged::Unknown;
@@ -125,7 +126,7 @@ fn drawn_updated(
     painted
         .drawn
         .patch(patched.iter().copied(), &painted.kept_boxes);
-    extents_patched(painted, order, patched);
+    extents_patched(painted, patched);
     painted.hits_changed = match painted.hits.get_mut() {
         Some(hits) => {
             let slots = patched[..with_hits].iter().copied();
@@ -143,10 +144,10 @@ fn drawn_updated(
 }
 
 /// `painted`'s extents index patched for the `patched` slots' steps.
-fn extents_patched(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
-    let places_of = |&slot: &usize| painted.drawn.places_of(slot);
-    let steps: Vec<(usize, Step)> = patched.iter().flat_map(places_of).collect();
-    let drawn = (&painted.drawn, order.steps.len());
+fn extents_patched(painted: &mut Painted, patched: &[usize]) {
+    let labels_of = |&slot: &usize| painted.drawn.labels_of(slot);
+    let steps: Vec<(Label, Step)> = patched.iter().flat_map(labels_of).collect();
+    let drawn = (&painted.drawn, painted.kept_boxes.len());
     painted.extents.patch(&steps, drawn, &painted.kept_boxes);
 }
 
@@ -158,7 +159,7 @@ fn batches_patched(painted: &mut Painted, patched: &[usize]) {
     };
     let steps = patched
         .iter()
-        .flat_map(|&slot| painted.drawn.places_of(slot));
+        .flat_map(|&slot| painted.drawn.labels_of(slot));
     kept.patch(steps, painted.batch_sources());
     *painted.kept_batches.get_mut() = Some(kept);
 }

@@ -8,6 +8,12 @@ fn boxes(slots: &[usize]) -> Vec<Step> {
     slots.iter().map(|&slot| Step::Box(slot)).collect()
 }
 
+/// `steps` with `edits` made, the steps alone.
+fn spliced(steps: &[Step], edits: Vec<Edit>) -> Vec<Step> {
+    let labels = crate::paint_labels::afresh(steps.len());
+    spliced_steps((steps, &labels), edits).0
+}
+
 #[test]
 fn an_insertion_and_a_removal_at_the_same_place_keep_the_inserted_steps() {
     // Given: box 2 removed where 9 goes in, after 1
@@ -26,7 +32,7 @@ fn an_insertion_and_a_removal_at_the_same_place_keep_the_inserted_steps() {
     ];
 
     // When
-    let out = spliced_steps(&steps, edits);
+    let out = spliced(&steps, edits);
 
     // Then
     assert_eq!(out, boxes(&[0, 1, 9, 3]));
@@ -55,7 +61,7 @@ fn edits_are_made_at_their_places_before_any_edit() {
     ];
 
     // When
-    let out = spliced_steps(&steps, edits);
+    let out = spliced(&steps, edits);
 
     // Then
     assert_eq!(out, boxes(&[0, 8, 1, 9, 3]));
@@ -80,5 +86,5 @@ fn overlapping_removals_panic_naming_the_step() {
     ];
 
     // When / Then
-    spliced_steps(&steps, edits);
+    spliced(&steps, edits);
 }

@@ -94,12 +94,13 @@ fn on_page_differs(
 /// or a reach was not kept (`frame_extents.rs`).
 pub(crate) fn assert_candidates(shown: &[Shown], view: vapors_scene::Rect, sources: Sources<'_>) {
     let boxes = (sources.boxes, sources.frames);
-    let in_view =
-        |&(_, step): &(usize, crate::paint_order::Step)| hidden_items(step, boxes, view).is_none();
-    let every: Vec<_> = sources.drawn.placed().filter(in_view).collect();
+    let in_view = |&(_, step): &(crate::paint_labels::Label, crate::paint_order::Step)| {
+        hidden_items(step, boxes, view).is_none()
+    };
+    let every: Vec<_> = sources.drawn.labelled().filter(in_view).collect();
     let found: Vec<_> = shown
         .iter()
-        .map(|&(place, step, _)| (place, step))
+        .map(|&(label, step, _)| (label, step))
         .collect();
     let longest = every.len().max(found.len());
     let Some(at) = (0..longest).find(|&at| every.get(at) != found.get(at)) else {

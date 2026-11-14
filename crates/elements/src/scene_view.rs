@@ -12,12 +12,14 @@ use crate::frames::Frames;
 use crate::frames_draw::BatchFrame;
 use crate::kept_box::KeptBox;
 use crate::kept_hits::FramedHit;
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 
 /// The items of a paint, in painting order, each with its clip.
 #[derive(Clone, Copy)]
 pub struct SceneView<'a> {
     steps: &'a [Step],
+    labels: &'a [Label],
     drawn: &'a DrawnSteps,
     boxes: &'a [Option<KeptBox>],
     frames: &'a Frames,
@@ -25,14 +27,16 @@ pub struct SceneView<'a> {
 
 impl<'a> SceneView<'a> {
     /// The view of `boxes`' parts, in the scroll `frames`, walked
-    /// through `steps`, whose steps that draw are `drawn`.
+    /// through `steps`, labelled `labels`, whose steps that draw are
+    /// `drawn`.
     pub(crate) fn new(
-        steps: &'a [Step],
+        (steps, labels): (&'a [Step], &'a [Label]),
         drawn: &'a DrawnSteps,
         (boxes, frames): (&'a [Option<KeptBox>], &'a Frames),
     ) -> Self {
         Self {
             steps,
+            labels,
             drawn,
             boxes,
             frames,
@@ -88,16 +92,17 @@ impl<'a> SceneView<'a> {
     /// Every hit with its frame, in painting order.
     pub(crate) fn hits(&self) -> impl Iterator<Item = FramedHit> + 'a {
         let framed = |kept: &'a KeptBox| kept.own.hits.iter().map(|&hit| (kept.from.frame, hit));
-        self.placed_parts().flat_map(move |(_, kept)| framed(kept))
+        self.labelled_parts()
+            .flat_map(move |(_, kept)| framed(kept))
     }
 
-    /// Each box step's kept paint with the step's place, in painting
+    /// Each box step's kept paint with the step's label, in painting
     /// order.
-    pub(crate) fn placed_parts(&self) -> impl Iterator<Item = (usize, &'a KeptBox)> + 'a {
+    pub(crate) fn labelled_parts(&self) -> impl Iterator<Item = (Label, &'a KeptBox)> + 'a {
         let boxes = self.boxes;
-        let placed = self.steps.iter().enumerate();
-        placed.filter_map(move |(place, &step)| match step {
-            Step::Box(slot) => Some((place, kept(boxes, slot, step))),
+        let labelled = self.labels.iter().copied().zip(self.steps);
+        labelled.filter_map(move |(label, &step)| match step {
+            Step::Box(slot) => Some((label, kept(boxes, slot, step))),
             Step::Thumb(_) | Step::Outline(_) => None,
         })
     }

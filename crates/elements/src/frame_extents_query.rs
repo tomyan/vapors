@@ -4,6 +4,8 @@
 use vapors_scene::Rect;
 
 use super::{Entry, Extents, FrameIndex, missing};
+use crate::paint_labels::Label;
+use crate::paint_order::Step;
 
 impl Extents {
     /// The frames with a drawing step.
@@ -51,18 +53,18 @@ impl Extents {
         (short != self.short).then_some("extents index short entries total")
     }
 
-    /// How many items the step at `place` paints; 0 when it draws
+    /// How many items the step at `label` paints; 0 when it draws
     /// nothing.
-    pub(crate) fn items_at(&self, place: usize) -> u64 {
-        let Some((frame, top, tall)) = self.at[place] else {
+    pub(crate) fn items_at(&self, label: Label, step: Step) -> u64 {
+        let Some((frame, top, tall)) = self.at_of(step) else {
             return 0;
         };
         let index = &self.frames[&frame];
         if tall {
-            return index.tall[index.tall_position(place)].items;
+            return index.tall[index.tall_position(label)].items;
         }
-        let entry = index.entries.get(index.position(top, place));
-        entry.map_or_else(|| missing(place), |entry| entry.items)
+        let entry = index.entries.get(index.position(top, label));
+        entry.map_or_else(|| missing(label), |entry| entry.items)
     }
 
     /// The entries of frame `frame` whose extent meets `view` (frame

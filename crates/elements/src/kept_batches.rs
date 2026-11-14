@@ -19,6 +19,7 @@ use crate::framed_batches::{framed_batches, hidden_items};
 use crate::frames::Frames;
 use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 
 #[cfg(test)]
@@ -41,15 +42,15 @@ pub(crate) struct Sources<'a> {
     pub(crate) frames: &'a Frames,
 }
 
-/// A shown step: its place, the step, and how many items it paints.
-pub(crate) type Shown = (usize, Step, u64);
+/// A shown step: its label, the step, and how many items it paints.
+pub(crate) type Shown = (Label, Step, u64);
 
 /// The shown steps and batches for one view.
 #[derive(Debug)]
 pub(crate) struct KeptBatches {
     pub(crate) view: Rect,
     /// The drawing steps with an item in `view` or a surface, ordered by
-    /// place.
+    /// label.
     shown: Vec<Shown>,
     /// The items of `shown`'s steps.
     shown_items: u64,
@@ -93,9 +94,9 @@ impl KeptBatches {
             let in_frame = sources.frames.view_in(frame, view);
             let candidates = sources.extents.candidates(frame, in_frame);
             let showing = candidates.filter(|e| hidden_items(e.step, boxes, view).is_none());
-            shown.extend(showing.map(|e| (e.place, e.step, e.items)));
+            shown.extend(showing.map(|e| (e.label, e.step, e.items)));
         }
-        shown.sort_unstable_by_key(|&(place, ..)| place);
+        shown.sort_unstable_by_key(|&(label, ..)| label);
         #[cfg(debug_assertions)]
         crate::kept_batches_check::assert_candidates(&shown, view, sources);
         let shown_items = shown.iter().map(|&(.., items)| items).sum();
@@ -140,12 +141,12 @@ impl KeptBatches {
         self.current().is_some()
     }
 
-    /// The places and steps shown.
+    /// The labels and steps shown.
     #[cfg(test)]
-    pub(crate) fn shown(&self) -> Vec<(usize, Step)> {
+    pub(crate) fn shown(&self) -> Vec<(Label, Step)> {
         self.shown
             .iter()
-            .map(|&(place, step, _)| (place, step))
+            .map(|&(label, step, _)| (label, step))
             .collect()
     }
 

@@ -6,6 +6,7 @@ use vapors_dom::NodeId;
 
 use super::{FramedHit, KeptHits, holds};
 use crate::frames::Frames;
+use crate::paint_labels::Label;
 
 impl KeptHits {
     /// The last hit in painting order whose rect on the page holds
@@ -28,7 +29,7 @@ impl KeptHits {
         let holding =
             every.filter(|(_, (frame, (_, rect)))| holds(&frames.hit(*frame, *rect), point));
         let scanned = holding
-            .max_by_key(|&&(place, _)| place)
+            .max_by_key(|&&(label, _)| label)
             .map(|(_, (_, (node, _)))| *node);
         assert_eq!(
             found, scanned,
@@ -45,14 +46,14 @@ impl KeptHits {
         let [x, y] = point.map(|v| v * scale);
         let view = vapors_scene::Rect::new(x, y, x + 1.0, y + 1.0);
         let lists = frames.meeting(view).into_iter();
-        let tested: Vec<&(usize, FramedHit)> = lists
+        let tested: Vec<&(Label, FramedHit)> = lists
             .filter_map(|frame| self.by_frame.get(&frame))
             .flatten()
             .collect();
         let holding = tested
             .iter()
             .filter(|(_, (frame, (_, rect)))| holds(&frames.hit(*frame, *rect), point));
-        let found = holding.max_by_key(|&&&(place, _)| place);
+        let found = holding.max_by_key(|&&&(label, _)| label);
         (found.map(|(_, (_, (node, _)))| *node), tested.len())
     }
 }

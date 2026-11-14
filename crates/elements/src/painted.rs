@@ -139,7 +139,7 @@ impl Painted {
     #[must_use]
     pub fn scene(&self) -> crate::SceneView<'_> {
         let parts = (&self.kept_boxes[..], &self.frames);
-        crate::SceneView::new(&self.order.steps, &self.drawn, parts)
+        crate::SceneView::new((&self.order.steps, &self.order.labels), &self.drawn, parts)
     }
 
     /// The text run a scene item names.

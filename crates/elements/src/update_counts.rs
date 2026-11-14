@@ -222,6 +222,13 @@ pub struct UpdateCounts {
     /// The condition that declined the splice when `splices_declined`
     /// is 1, else `None`.
     pub splice_decline: Option<SpliceDecline>,
+    /// Paint-order labels the splice relabelled to make room for the
+    /// steps it put in (`paint_labels.rs`), every label when it found no
+    /// range with room: each relabelled step's entries are patched.
+    pub paint_relabelled: usize,
+    /// Times the splice relabelled every label (counted in
+    /// `paint_relabelled` too), so a page that hits it shows.
+    pub paint_relabel_all: usize,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.

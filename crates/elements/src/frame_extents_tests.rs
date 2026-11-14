@@ -49,7 +49,7 @@ pub(super) fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
 /// Each slot's own step, in slot order, and those that draw.
 pub(super) fn drawn(boxes: &[Option<KeptBox>]) -> (Vec<Step>, DrawnSteps) {
     let steps: Vec<Step> = (0..boxes.len()).map(Step::Box).collect();
-    let drawn = DrawnSteps::of(&steps, boxes);
+    let drawn = DrawnSteps::of((&steps, &crate::paint_labels::afresh(steps.len())), boxes);
     (steps, drawn)
 }
 
@@ -59,10 +59,14 @@ pub(super) fn extents(boxes: &[Option<KeptBox>]) -> Extents {
 }
 
 /// The places of `extents`' candidates in `frame` for the band from
-/// `top` to `bottom`, in place order.
+/// `top` to `bottom`, in place order: each slot has its box step alone,
+/// at the slot's place (`drawn`).
 pub(super) fn candidates(extents: &Extents, frame: usize, (top, bottom): (f32, f32)) -> Vec<usize> {
     let view = Rect::new(0.0, top, 100.0, bottom);
-    let mut places: Vec<usize> = extents.candidates(frame, view).map(|e| e.place).collect();
+    let mut places: Vec<usize> = extents
+        .candidates(frame, view)
+        .map(|e| e.step.index())
+        .collect();
     places.sort_unstable();
     places
 }
@@ -75,8 +79,8 @@ pub(super) fn painted_again(
 ) {
     boxes[slot] = now;
     let (steps, drawn) = drawn(boxes);
-    let placed: Vec<(usize, Step)> = drawn.places_of(slot).collect();
-    extents.patch(&placed, (&drawn, steps.len()), boxes);
+    let labelled: Vec<(u64, Step)> = drawn.labels_of(slot).collect();
+    extents.patch(&labelled, (&drawn, steps.len()), boxes);
 }
 
 /// Ten rows of 10 px on the page, the first at 0.
@@ -204,8 +208,8 @@ fn more_steps_patched_than_the_index_patches_one_by_one_make_it_afresh() {
 
     // When
     let (steps, drawn) = drawn(&boxes);
-    let placed: Vec<(usize, Step)> = drawn.placed().collect();
-    patched.patch(&placed, (&drawn, steps.len()), &boxes);
+    let labelled: Vec<(u64, Step)> = drawn.labelled().collect();
+    patched.patch(&labelled, (&drawn, steps.len()), &boxes);
 
     // Then
     assert_eq!(patched, extents(&boxes));
