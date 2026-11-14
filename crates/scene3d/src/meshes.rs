@@ -31,6 +31,7 @@ impl fmt::Display for GeometryId {
 pub struct Geometry {
     positions: Vec<Vec3>,
     indices: Vec<u32>,
+    shades: Vec<f32>,
 }
 
 impl Geometry {
@@ -44,6 +45,13 @@ impl Geometry {
     #[must_use]
     pub fn indices(&self) -> &[u32] {
         &self.indices
+    }
+
+    /// Each position's shade, from 0 to 1: the fraction of the node's
+    /// colour the vertex is drawn in (one-scene D4).
+    #[must_use]
+    pub fn shades(&self) -> &[f32] {
+        &self.shades
     }
 }
 
@@ -84,30 +92,36 @@ impl Meshes {
         }
     }
 
-    /// Validates triangles and holds them for upload. A triangle whose
-    /// indices repeat, or whose corners are collinear, is allowed and
-    /// draws nothing.
+    /// Validates triangles, with a shade for each position, and holds
+    /// them for upload. A triangle whose indices repeat, or whose corners
+    /// are collinear, is allowed and draws nothing.
     ///
     /// # Errors
     ///
     /// [`MeshError`]: no positions, fewer than 3, no indices, an index count
     /// that is not a multiple of 3, an index past the positions, a
-    /// position that is NaN or infinite, or a position or index buffer
-    /// past WebGPU's default `maxBufferSize` (256 MiB), the limit every
-    /// adapter supports.
+    /// position that is NaN or infinite, not one shade per position, a
+    /// shade outside 0 to 1, or a vertex or index buffer past WebGPU's
+    /// default `maxBufferSize` (256 MiB), the limit every adapter supports.
     pub fn geometry(
         &mut self,
         positions: Vec<Vec3>,
         indices: Vec<u32>,
+        shades: Vec<f32>,
     ) -> Result<GeometryHandle, MeshError> {
         crate::mesh_error::check(&positions, &indices)?;
+        crate::mesh_error::check_shades(&shades, positions.len())?;
         let id = GeometryId {
             meshes: self.id,
             index: self.issued,
         };
         self.issued += 1;
         let (handle, claim) = GeometryHandle::claim(id);
-        let geometry = Geometry { positions, indices };
+        let geometry = Geometry {
+            positions,
+            indices,
+            shades,
+        };
         self.held.insert(id.index, Held { geometry, claim });
         Ok(handle)
     }
@@ -165,3 +179,7 @@ mod tests;
 #[cfg(test)]
 #[path = "meshes_release_tests.rs"]
 mod release_tests;
+
+#[cfg(test)]
+#[path = "meshes_shades_tests.rs"]
+mod shades_tests;

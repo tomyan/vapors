@@ -41,7 +41,7 @@ the field; nothing is clamped.
 ```rust
 let scene = Rc::new(RefCell::new(Scene::new()));
 let meshes = Rc::new(RefCell::new(Meshes::new()));
-let square = meshes.borrow_mut().geometry(positions, indices)?; // a GeometryHandle
+let square = meshes.borrow_mut().geometry(positions, indices, shades)?; // a GeometryHandle
 let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
 let surface = app.mount("view", Box::new(renderer))?;
 ```
@@ -52,7 +52,14 @@ let surface = app.mount("view", Box::new(renderer))?;
   node's id is refused (`StoreError::Stale`), never another node's.
 - The root names the active camera by `CameraHandle`; none, two, or an
   unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
-- `Meshes::geometry` validates triangles and returns a
+- `Meshes::geometry(positions, indices, shades)` takes a shade from 0
+  to 1 for each position (one-scene D4, row R1): the vertex is drawn
+  in that fraction of the node's colour (multiplied on the
+  sRGB-encoded channels, as the racer's baked shades were; not linear
+  light), so one CSS colour gives a
+  shaded solid without lights or normals; the shade does not follow
+  the camera. Not one shade per position, or one outside 0 to 1, is
+  refused; there is no default. It validates triangles and returns a
   `GeometryHandle`: a counted claim, cloned to share and not `Copy`
   (lead decision (B), 2026-11-14). A mesh node holds a clone in
   `NodeKind::Mesh`, so a piece is held while the application keeps a
@@ -74,7 +81,8 @@ let surface = app.mount("view", Box::new(renderer))?;
 ## What a frame does
 
 `SceneRenderer::render` runs `Scene::update`, uploads each piece of
-geometry a mesh names that this renderer has not uploaded, writes the
+geometry a mesh names that this renderer has not uploaded (16 bytes a
+vertex: position and shade), writes the
 uniform slot (80 bytes: world matrix and colour) of each mesh whose
 world version changed since this renderer wrote it, writes the camera
 (64 bytes) when it changed, and draws each mesh, depth-tested. Every
