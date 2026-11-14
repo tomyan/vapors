@@ -2,9 +2,18 @@
 //! quiet lock, and `cargo xtask quiet` takes and releases it. Each runs
 //! as a process in a scratch workspace that is also its HOME, so the
 //! locks are its own; `[load] wait = "false"` keeps the load out of it.
+//! A child that gets past its wait finds only a stand-in `cargo` and no
+//! repository (`support`), so it fails its first step at once instead of
+//! running the real tiers, which ran this test again (issue #358).
+
+#[allow(
+    dead_code,
+    reason = "each test binary compiles `support` and uses part of it"
+)]
+mod support;
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const CONFIG: &str = "[web]\npackage = \"none\"\n\n[load]\nwait = \"false\"\n";
@@ -37,21 +46,31 @@ fn held_by_another(home: &Path) -> u128 {
     until
 }
 
+/// The longest a child may take from the holder's deadline to its exit:
+/// it polls every 100 ms (`quiet_lock.rs`, `POLL`), then fails its first
+/// step against the stand-in `cargo`. Measured 2026-11-14 over 10 runs
+/// of this test at 1-minute load 17 to 24 (gates running): ci at most
+/// 862 ms after the deadline, test 436 ms, gate 460 ms. 4 s is about
+/// four and a half times the largest, so a loaded hook run passes, and a
+/// child that starts real work is killed and named here instead of at
+/// nextest's 60 s.
+const AFTER_WAIT: Duration = Duration::from_secs(4);
+
+/// The xtask binary in `dir` with its own TMPDIR, which must be empty
+/// after it; killed and failed past [`HELD`] plus [`AFTER_WAIT`].
 fn xtask(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_xtask"));
-    child.args(args).current_dir(dir).env("HOME", dir);
-    for name in [
-        "GITHUB_ACTIONS",
-        "XTASK_GATE",
-        "XTASK_QUIET_HOLDER",
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-    ] {
-        child.env_remove(name);
-    }
-    child.envs(env.iter().copied());
-    child.output().expect("xtask runs")
+    let tmp = dir.join("tmp");
+    std::fs::create_dir_all(&tmp).expect("tmp");
+    let bin = support::bin(dir, support::NO_WORK);
+    let mut child = support::xtask(dir, &bin, &tmp);
+    child.args(args).envs(env.iter().copied());
+    let output = support::output_within(child, HELD + AFTER_WAIT);
+    assert_eq!(
+        support::entries(&tmp),
+        Vec::<String>::new(),
+        "{args:?} left"
+    );
+    output
 }
 
 fn stdout(output: &Output) -> String {
@@ -81,6 +100,12 @@ fn ci_test_and_gate_wait_for_another_holder_saying_who_and_until_when() {
         assert!(
             ended.as_millis() >= until,
             "{who} went on before the deadline"
+        );
+        let after = ended.as_millis() - until;
+        println!("{who}: ended {after} ms after the deadline");
+        assert!(
+            after <= AFTER_WAIT.as_millis(),
+            "{who} ran {after} ms past the deadline, over {AFTER_WAIT:?}: it did work after its wait; {text}"
         );
     }
 }
