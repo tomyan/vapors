@@ -87,7 +87,8 @@ fn assert_lane_frames_follow_placement(
         let [x, y] = chain_shift(placement, scrolls, from.scale, placement.up[slot]);
         [x, y + lane_offset(placement, lanes, slot) * from.scale]
     };
-    let mut shifts = lane_children.map(|slot| (slot, frames.at(slot).shift, chained(slot)));
+    let mut shifts =
+        lane_children.map(|slot| (slot, frames.resolved_afresh(slot).shift, chained(slot)));
     if let Some((frame, painted, placed)) = shifts.find(|(_, painted, placed)| painted != placed) {
         panic!(
             "lane frame {frame} is shifted {painted:?} by paint (frames_lane.rs, from its \

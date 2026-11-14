@@ -1,10 +1,9 @@
 //! A lane's children are frames of their own (`docs/plans/splice-
 //! layout.md`, section 11): after an insert in a list no later row moves
-//! or is painted, shifted or placed for it; and a lane whose children
-//! cannot be frames (a fractional start, a scroll container in a row) is
-//! counted and keeps the placement from before. Each case also matches a
-//! full update, and the debug checks compare placement, frames and paint
-//! with ones made afresh.
+//! or is painted, shifted or placed for it (`lane_frame_declines.rs`
+//! has the lanes that cannot be framed). Each case also matches a full
+//! update, and the debug checks compare placement, frames and paint with
+//! ones made afresh.
 
 mod support;
 
@@ -12,7 +11,7 @@ use support::mirror_model::Model;
 use support::narrow_list::{List, ROWS, VIEW, list};
 use support::oracle::assert_matches_full;
 use vapors_dom::Dom;
-use vapors_elements::{LaneDecline, UpdateCounts};
+use vapors_elements::UpdateCounts;
 
 /// The counts of the update after `edit` on a list of `rows`, styled
 /// `css` besides the rows, which matches a full update.
@@ -52,48 +51,6 @@ fn a_remove_moves_no_later_row() {
     assert_eq!(
         (counts.boxes_moved, counts.boxes_shifted),
         (2, 0),
-        "{counts:?}"
-    );
-}
-
-#[test]
-fn a_list_with_a_fractional_row_is_counted_and_placed_as_before() {
-    // Given: one row a fraction of a pixel taller, so later starts are
-    // not whole device pixels
-    let css = ".odd { height: 20.5px; }";
-
-    // When
-    let counts = after(100, css, |list| {
-        list.doc
-            .borrow_mut()
-            .set_attribute(list.rows[10], "class", "row odd");
-    });
-
-    // Then: the list is not framed; its later rows move as before
-    assert_eq!(
-        counts.lane_unframed,
-        Some(LaneDecline::LaneFramePixel),
-        "{counts:?}"
-    );
-    assert!(counts.boxes_moved > 0, "{counts:?}");
-}
-
-#[test]
-fn a_list_with_a_scroller_in_a_row_is_counted_and_placed_as_before() {
-    // Given: one row's cell scrolls
-    let css = ".scroll { overflow: auto; }";
-
-    // When
-    let counts = after(100, css, |list| {
-        let mut doc = list.doc.borrow_mut();
-        let cell = doc.children(list.rows[10])[0];
-        doc.set_attribute(cell, "class", "cell scroll");
-    });
-
-    // Then
-    assert_eq!(
-        counts.lane_unframed,
-        Some(LaneDecline::LaneFrameScroller),
         "{counts:?}"
     );
 }

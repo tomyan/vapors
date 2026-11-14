@@ -44,6 +44,7 @@ mod lane_page;
 mod lane_set;
 mod lane_share;
 mod lane_tree;
+mod lane_write;
 #[cfg(debug_assertions)]
 mod lane_written_check;
 mod layout_box;
@@ -73,6 +74,7 @@ pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
+pub(crate) use lane_block_answer::narrow;
 pub(crate) use lane_layout::LaneCounts;
 pub(crate) use lane_set::{Lanes, SharedLanes};
 pub(crate) use rebuilt::Rebuilt;
@@ -137,6 +139,7 @@ pub(crate) fn lay_out(
         lane_counts: LaneCounts::default(),
     };
     let changed = settling.changed;
+    tree.note_scrollers(&changed);
     let available = Size {
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),

@@ -5,7 +5,7 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::layout::{BoxRect, Content};
+use crate::layout::BoxRect;
 use crate::node_map::NodeSet;
 use crate::placement::{LaidOut, Placed, Placement};
 use crate::scroll::Offsets;
@@ -112,16 +112,8 @@ impl<'a, 'b> Walk<'a, 'b> {
         let reframed = self.frame_lane(slot, inner);
         let moved = mark == Mark::Rebuilt || reframed || self.children_moved(slot, inner, before);
         self.visit_placed_in(slot, inner, moved);
-    }
-
-    /// Settles the scroll offset of `slot` again, noting it when the
-    /// offset as applied moved.
-    // Exact: an offset kept is the same bits.
-    #[allow(clippy::float_cmp)]
-    fn settle(&mut self, slot: usize) {
-        let offset = self.settled_offset(slot);
-        if std::mem::replace(&mut self.kept.offsets[slot], offset) != offset {
-            self.placed.offsets_moved.push(slot);
+        if !moved && inner != before {
+            self.visit_hoisted_along(slot, inner);
         }
     }
 
@@ -187,27 +179,6 @@ impl<'a, 'b> Walk<'a, 'b> {
         }
         (self.kept.rects[slot], self.kept.paddings[slot]) = (rect, layout.padding);
     }
-
-    /// The scroll offset of `slot` as applied, settled again: none for
-    /// a box that does not scroll, whose element's offset is dropped.
-    fn settled_offset(&mut self, slot: usize) -> [f32; 2] {
-        let Content::Element(node) = self.boxes.boxes[slot].content else {
-            return [0.0; 2];
-        };
-        if !(self.boxes.scrolls)(slot) {
-            self.scroll.forget(node);
-            return [0.0; 2];
-        }
-        self.settled.insert(node);
-        let scale = self.boxes.scale;
-        let (applied, changed) = self
-            .scroll
-            .settle_box(node, (self.boxes.boxes, slot), scale);
-        if changed {
-            self.placed.states_changed.push(slot);
-        }
-        applied
-    }
 }
 
 /// Where the content of a box at `rect` starts in its scroll frame:
@@ -218,3 +189,5 @@ fn content_origin(rect: BoxRect) -> (f32, f32) {
 
 #[path = "placement_frames.rs"]
 mod frames;
+#[path = "placement_settle.rs"]
+mod settle;

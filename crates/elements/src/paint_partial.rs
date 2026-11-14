@@ -62,12 +62,7 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
-    let inked: Vec<usize> = if order.walks.reshaped() {
-        (0..painted.kept_boxes.len()).collect()
-    } else {
-        patched.clone()
-    };
-    crate::paint_lane_ink::note(&mut painted, input, inked.into_iter());
+    crate::paint_lane_ink::note_painted(&mut painted, input, (order.walks.reshaped(), &patched));
     if frames_moved_now {
         frames_moved(&mut painted);
     }

@@ -101,6 +101,23 @@ impl BoxTree<'_> {
 }
 
 impl BoxTree<'_> {
+    /// Notes, in each lane holding it or an ancestor, every rebuilt
+    /// owner in `changed` holding a scroll container: an owner laid out
+    /// alone that answers as before (`isolated.rs`) leaves its ancestors'
+    /// caches, so no lane lays out the row it is in and learns of it.
+    /// O(each owner's subtree), which building it was too. Noted
+    /// whatever the owner answers: the lane's rows hold one now.
+    pub(super) fn note_scrollers(&mut self, changed: &[super::isolated::Changed]) {
+        for owner in changed {
+            if !self.scroller_at_or_below(owner.slot) {
+                continue;
+            }
+            for &slot in std::iter::once(&owner.slot).chain(&owner.ancestors) {
+                self.lanes.note_scroller(slot);
+            }
+        }
+    }
+
     /// Whether the box in `slot` or one below it scrolls (its content a
     /// scroll frame): O(the subtree), which laying the child out is too.
     fn scroller_at_or_below(&self, slot: usize) -> bool {

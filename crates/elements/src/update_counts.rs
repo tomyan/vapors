@@ -100,6 +100,10 @@ pub struct UpdateCounts {
     /// The condition that declined the first of those, when
     /// `lanes_declined` is above 0, else `None`.
     pub lane_decline: Option<LaneDecline>,
+    /// Lane containers whose children are frames of their own after this
+    /// update (`docs/plans/splice-layout.md`, section 11): those placed
+    /// framed and those kept framed.
+    pub lanes_framed: usize,
     /// Lane containers placed this update whose children could not be
     /// frames of their own (`LaneFramePixel`, `LaneFrameScroller`): their
     /// children keep the placement from before lane frames

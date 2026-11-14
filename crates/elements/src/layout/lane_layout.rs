@@ -9,13 +9,12 @@
 //! algorithm, counted with the reason (`LaneCounts`).
 
 use taffy::{
-    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
-    compute_block_layout, compute_flexbox_layout,
+    BlockContext, LayoutInput, LayoutOutput, NodeId, RunMode, compute_block_layout,
+    compute_flexbox_layout,
 };
 
 use super::lane::Lane;
 use super::lane_block::Settled;
-use super::lane_block_answer::narrow;
 use super::lane_flex::FlexSettled;
 use super::lane_flex_share::FlexLane;
 use super::lane_kind::LaneKind;
@@ -148,16 +147,6 @@ impl BoxTree<'_> {
         K::answer(c, &run?)
     }
 
-    /// Puts `lane` back among the lanes as the lane of the container in
-    /// `slot`, noting its children put since.
-    fn lane_kept<K: LaneKind>(&mut self, slot: usize, mut lane: Lane<K>) {
-        let born = std::mem::take(&mut lane.born);
-        K::lanes(self.lanes).insert(slot, lane);
-        self.lanes
-            .parents
-            .extend(born.into_iter().map(|child| (child, slot)));
-    }
-
     fn fill<K: LaneKind>(
         &mut self,
         slot: usize,
@@ -182,30 +171,5 @@ impl BoxTree<'_> {
             self.write_starts(c, lane, &run);
         }
         Ok(run)
-    }
-
-    /// Writes the layout of every child from the first that moved on:
-    /// its start from the tree, from where the kind measures starts.
-    fn write_starts<K: LaneKind>(
-        &mut self,
-        c: &K::Container,
-        lane: &mut Lane<K>,
-        run: &K::Summary,
-    ) {
-        let Some(first) = lane.first_moved() else {
-            return;
-        };
-        let top = K::top(c, run);
-        for (handle, start) in lane.tree.starts_from(first) {
-            let slot = lane.slots[&handle];
-            let (mut layout, relative) = lane.take_write(slot, self.boxes[slot].layout);
-            layout.location.y = narrow(top + start) + relative;
-            if layout.location.y.to_bits() != self.boxes[slot].layout.location.y.to_bits() {
-                self.written.started.push(slot);
-            }
-            self.set_unrounded_layout(NodeId::from(slot), &layout);
-        }
-        lane.moved.clear();
-        lane.pending.clear();
     }
 }

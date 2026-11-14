@@ -54,10 +54,10 @@ pub(crate) fn updated(
         kept_updated(painted, (order, changed), &inputs, input)
     };
     let bases = lane_bases(input, &order.clips);
-    painted
+    let rebased = painted
         .frames
         .set_lanes(std::rc::Rc::clone(input.lanes), bases);
-    moved
+    moved || rebased
 }
 
 /// Each framed lane's base (`frames_lane.rs`): the frame its
@@ -66,30 +66,33 @@ pub(crate) fn updated(
 /// O(framed lanes): a framed lane is one of many children
 /// (`placement_frames.rs`).
 fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBase> {
-    let placement = input.placement;
-    let framed = placement
+    let framed = input
+        .placement
         .framing
         .iter()
         .filter(|(_, framing)| framing.is_ok());
-    let base = |container: usize| {
-        let scrolls = input.stackings.scrolls(container);
-        LaneBase {
-            parent: if scrolls {
-                container
-            } else {
-                clips.frame(container)
-            },
-            origin: placement.rects[container].y,
-            inner: if scrolls {
-                None
-            } else {
-                clips.inner(container)
-            },
-        }
-    };
     framed
-        .map(|(&container, _)| (container, base(container)))
+        .map(|(&container, _)| (container, lane_base(input, clips, container)))
         .collect()
+}
+
+/// The base of the framed lane container `container`: its content is
+/// in its own scroll frame when it scrolls, clipped there already; else
+/// in the frame its box is in, under the clip it gives its content.
+fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBase {
+    let origin = input.placement.rects[container].y;
+    if input.stackings.scrolls(container) {
+        return LaneBase {
+            parent: container,
+            origin,
+            inner: None,
+        };
+    }
+    LaneBase {
+        parent: clips.frame(container),
+        origin,
+        inner: clips.inner(container),
+    }
 }
 
 /// `painted`'s frames made afresh for the scroll containers `thumbs`;

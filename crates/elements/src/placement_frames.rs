@@ -49,4 +49,19 @@ impl Walk<'_, '_> {
         let framed = matches!(self.kept.framing.get(&up), Some(Ok(())));
         framed && self.boxes.lanes.holds(up, slot)
     }
+
+    /// Visits the boxes `slot` hoists when its content moved along the
+    /// axis of its framed lane only: they are placed in its content, not
+    /// in a lane frame, so they move with it. Those marked were visited.
+    /// None today: a lane declines a child that hoists (`HoistedThrough`,
+    /// `OutOfFlowChild`).
+    pub(crate) fn visit_hoisted_along(&mut self, slot: usize, inner: (f32, f32)) {
+        let marked = self.under.get(&slot).map_or(&[][..], Vec::as_slice);
+        let hoisted = self.boxes.boxes[slot].hoisted.iter().copied();
+        let unmarked: Vec<usize> = hoisted.filter(|child| !marked.contains(child)).collect();
+        for child in unmarked {
+            self.kept.up[child] = slot;
+            self.visit(child, inner, true);
+        }
+    }
 }

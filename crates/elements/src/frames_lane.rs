@@ -63,8 +63,15 @@ impl PartialEq for LaneFrames {
 
 impl Frames {
     /// The lane frames from now on: those of the children of the
-    /// containers in `bases`, from `shared`.
-    pub(crate) fn set_lanes(&mut self, shared: SharedLanes, bases: FxHashMap<usize, LaneBase>) {
+    /// containers in `bases`, from `shared`; whether any base changed
+    /// (a container moved along its axis moves every frame it holds,
+    /// with no row placed or started again).
+    pub(crate) fn set_lanes(
+        &mut self,
+        shared: SharedLanes,
+        bases: FxHashMap<usize, LaneBase>,
+    ) -> bool {
+        let changed = self.lanes.bases != bases;
         let mut by_parent: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         for (&container, base) in &bases {
             by_parent.entry(base.parent).or_default().push(container);
@@ -75,6 +82,7 @@ impl Frames {
             by_parent,
             memo: RefCell::default(),
         };
+        changed
     }
 
     /// The lane frames in frame `frame` that can show in `view`, device
@@ -111,26 +119,43 @@ impl Frames {
         *most = [most[0].max(over[0]), most[1].max(over[1])];
     }
 
-    /// Lane frame `frame`, when `frame` is a framed lane child.
-    #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
+    /// Lane frame `frame`, when `frame` is a framed lane child,
+    /// memoised.
     pub(super) fn lane_at(&self, frame: usize) -> Option<FrameAt> {
         if let Some(&at) = self.lanes.memo.borrow().get(&frame) {
             return Some(at);
         }
+        let at = self.lane_resolved(frame, &|outer| self.at(outer))?;
+        self.lanes.memo.borrow_mut().insert(frame, at);
+        Some(at)
+    }
+
+    /// Frame `frame` worked out from the lanes as they are, reading and
+    /// filling no memo, for the debug checks: a check that filled the
+    /// memo would leave a debug build reading lane frames that a release
+    /// build works out from lanes changed since.
+    pub(crate) fn resolved_afresh(&self, frame: usize) -> FrameAt {
+        let outer = |outer| self.resolved_afresh(outer);
+        self.lane_resolved(frame, &outer)
+            .unwrap_or_else(|| self.at(frame))
+    }
+
+    /// Lane frame `frame` worked out, the frame its container's content
+    /// is in read through `outer`.
+    #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
+    fn lane_resolved(&self, frame: usize, outer: &dyn Fn(usize) -> FrameAt) -> Option<FrameAt> {
         let (base, offset) = self.lane_place(frame)?;
-        let outer = self.at(base.parent);
+        let outer = outer(base.parent);
         let down = (f64::from(base.origin) + offset) * f64::from(self.scale);
         let clip = match base.inner {
             Some(inner) => meet(Some(self.css_rect(outer, inner)), outer.clip),
             None => outer.clip,
         };
-        let at = FrameAt {
+        Some(FrameAt {
             shift: [outer.shift[0], outer.shift[1] + down as f32],
             clip,
             device_clip: clip.map(|clip| snapped(clip, self.scale)),
-        };
-        self.lanes.memo.borrow_mut().insert(frame, at);
-        Some(at)
+        })
     }
 
     /// The base of the framed lane `frame` is a child of and the

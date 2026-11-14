@@ -38,6 +38,12 @@ impl FrameFacts {
         set(&mut self.scrolling, slot, scrolls);
     }
 
+    /// Notes that the child in `slot` holds a scroll container: one put
+    /// in by a rebuilt owner laid out alone, which no lane lays out.
+    pub(super) fn note_scroller(&mut self, slot: usize) {
+        self.scrolling.insert(slot);
+    }
+
     /// Forgets the child taken out of `slot`.
     pub(super) fn forget(&mut self, slot: usize) {
         self.fractional.remove(&slot);

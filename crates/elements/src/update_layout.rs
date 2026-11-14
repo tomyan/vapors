@@ -145,7 +145,9 @@ impl Document {
         let boxes = LaidOut::new(&placed.boxes, &scrolls, &lanes, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
-        changed.started.clone_from(&written.started);
+        // only framed rows: a start change elsewhere moved the slot
+        let framed = |slot: &&usize| placement.framed.get(**slot).copied().unwrap_or(false);
+        changed.started = written.started.iter().filter(framed).copied().collect();
         changed.scroll_states = done.states_changed;
         self.made_from(placement, viewport.scale)
     }
@@ -175,6 +177,7 @@ impl Document {
         self.forget_freed(&changed.freed, slots);
         self.counts.boxes_placed = done.count;
         self.counts.boxes_moved = done.moved.len();
+        self.counts.lanes_framed = placement.framing.values().filter(|f| f.is_ok()).count();
         self.counts.lanes_unframed = done.unframed.len();
         self.counts.lane_unframed = done.unframed.first().map(|&(_, decline)| decline);
         self.counts.slots_chained = done.chained;

@@ -84,6 +84,18 @@ fn composite(ours: &Rgba, theirs: &Rgba) -> Rgba {
     }
 }
 
+/// Panics when a `lane_` fixture has no framed lane, so its comparison
+/// would hold nothing of lane frames (`docs/plans/splice-layout.md`,
+/// section 11).
+fn assert_lanes_framed(name: &str, doc: &Document) {
+    let framed = doc.update_counts().lanes_framed;
+    assert!(
+        !name.starts_with("lane_") || framed > 0,
+        "{name} frames no lane: its rows are not whole device pixels, or too few; \
+         fix the fixture (fixtures/{name}.wisp)"
+    );
+}
+
 fn check(name: &str, scale: u32) {
     let fixture = paint_fixtures()
         .into_iter()
@@ -94,6 +106,7 @@ fn check(name: &str, scale: u32) {
     // Given
     let theirs = exact::with_exact_pixels(name, scale, chromiums("match", name, scale, ""));
     let doc = laid_out(&fixture, scale);
+    assert_lanes_framed(name, &doc.borrow());
 
     // When
     let ours = ours(&doc.borrow(), scale);
@@ -131,6 +144,7 @@ paint_tests![
     clipping,
     icon_curves_paint,
     icons_paint,
+    lane_list_paint,
     outline_paint,
     paint_boxes,
     image_paint,

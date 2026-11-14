@@ -55,7 +55,13 @@ pub(crate) fn lane_offset(kept: &Placement, lanes: &Lanes, slot: usize) -> f32 {
     while at != NO_SLOT {
         let container = kept.up[at];
         if kept.framed[at] {
-            let start = lanes.frame_offset(container, at).unwrap_or(0.0);
+            let start = lanes.frame_offset(container, at).unwrap_or_else(|| {
+                panic!(
+                    "slot {at} is framed but the lane of its container, slot {container}, \
+                     does not hold it (placement_frames.rs `lane_framed`); reproduce with \
+                     `cargo xtask test`"
+                )
+            });
             offset += f64::from(kept.rects[container].y) + start;
         }
         at = container;
