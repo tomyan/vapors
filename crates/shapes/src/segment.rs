@@ -102,6 +102,26 @@ impl Pen {
     }
 }
 
+/// The first value of `segment` that is not a finite number, if any:
+/// a relative command can add two finite coordinates to an infinite
+/// one, and the parser refuses it where it is made.
+#[must_use]
+pub fn non_finite(segment: &Segment) -> Option<f32> {
+    let values: Vec<f32> = match *segment {
+        Segment::Move(p) | Segment::Line(p) => vec![p.x, p.y],
+        Segment::Quad(c, p) => vec![c.x, c.y, p.x, p.y],
+        Segment::Cubic(a, b, p) => vec![a.x, a.y, b.x, b.y, p.x, p.y],
+        Segment::Arc {
+            radii,
+            rotation,
+            to,
+            ..
+        } => vec![radii[0], radii[1], rotation, to.x, to.y],
+        Segment::Close => vec![],
+    };
+    values.into_iter().find(|v| !v.is_finite())
+}
+
 /// What an arc becomes once corrected.
 enum Corrected {
     /// The end point is the current point: the arc is omitted.

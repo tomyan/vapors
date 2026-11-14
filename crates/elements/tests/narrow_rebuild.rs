@@ -5,66 +5,19 @@
 
 mod support;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use support::element;
+use support::narrow_list::{List, ROWS, VIEW, list};
 use support::oracle::assert_matches_full;
-use support::{document, element, text, viewport};
-use vapors_dom::{Dom, NodeId};
-use vapors_elements::{Document, Viewport};
-
-const ROWS: &str = ".row { display: flex; height: 20px; } .cell { width: 40px; }";
-
-const VIEW: fn() -> Viewport = || viewport(400.0, 300.0);
-
-struct List {
-    doc: Rc<RefCell<Document>>,
-    parent: NodeId,
-    rows: Vec<NodeId>,
-}
-
-/// A row: `div.row > div.cell > text`, three boxes (row, cell, run).
-fn row(doc: &mut Document, label: &str) -> NodeId {
-    let row = doc.create_element("div");
-    doc.set_attribute(row, "class", "row");
-    let cell = element(doc, row, "div", "cell");
-    text(doc, cell, label);
-    row
-}
-
-/// `count` rows in a list under body, styled by `css`, updated once.
-fn list(count: usize, css: &str) -> List {
-    let mut doc = document();
-    let body = doc.body();
-    let list = element(&mut doc, body, "div", "list");
-    let rows = (0..count)
-        .map(|index| {
-            let node = row(&mut doc, &format!("row {index}"));
-            doc.append(list, node);
-            node
-        })
-        .collect();
-    doc.add_stylesheet("rows.css", css).expect("parses");
-    doc.update(VIEW()).expect("updates");
-    List {
-        doc: Rc::new(RefCell::new(doc)),
-        parent: list,
-        rows,
-    }
-}
+use vapors_dom::Dom;
 
 /// Updates and returns how many boxes the update built.
 fn built(list: &List) -> usize {
-    let mut doc = list.doc.borrow_mut();
-    doc.update(VIEW()).expect("updates");
-    doc.update_counts().boxes_built
+    list.built()
 }
 
 /// Inserts a new row before row `at`.
 fn insert_at(list: &List, at: usize) {
-    let mut doc = list.doc.borrow_mut();
-    let node = row(&mut doc, "new");
-    doc.insert_before(list.parent, node, Some(list.rows[at]));
+    list.insert_at(at);
 }
 
 #[test]

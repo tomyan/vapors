@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 
 use super::boxes::{Source, build, build_shallow};
 use super::keep::{KeptBoxes, Lender};
-use super::marks::{Owner, Rebuild};
+use super::marks::{Build, Owner, Rebuild};
 use super::rebuilt::Rebuilt;
 use super::slots::{Key, Placed, Taken};
 use crate::text_marks::TextMarks;
@@ -41,11 +41,12 @@ impl KeptBoxes {
         } else {
             marks.rebuild(source.arena, source.used, &self.placed, root)
         };
-        let Rebuild::Owners(owners) = rebuild else {
+        let Rebuild::Owners(owners, unowned) = rebuild else {
             return self.build_every(source, root, scale, may_keep);
         };
         let mut kept = std::mem::take(&mut self.placed);
-        let built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        let mut built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        built.edits.count_unowned(&unowned);
         // Debug timings include this full box build on every narrowed
         // update; the test that would retire it is the one
         // `layout_check.rs` names.
@@ -100,6 +101,7 @@ fn rebuild_owners(
         .collect();
     placed.free_taken(&taken);
     let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
+    rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
@@ -127,9 +129,10 @@ fn lend_owners(
 fn take_owners(placed: &mut Placed, owners: &[Owner], slots: &[usize]) -> Taken {
     let mut taken = Taken::default();
     for (owner, &slot) in owners.iter().zip(slots) {
-        match &owner.kept {
-            Some(kept) => placed.take_shallow(slot, kept, &mut taken),
-            None => placed.take_subtree(slot, &mut taken),
+        match &owner.build {
+            Build::Shallow(kept, _) => placed.take_shallow(slot, kept, &mut taken),
+            Build::Edited(edits) => placed.take_edited(slot, edits, &mut taken),
+            Build::Full => placed.take_subtree(slot, &mut taken),
         }
     }
     taken
@@ -142,12 +145,13 @@ fn put_owner(
     owner: &Owner,
     taken: &mut Taken,
 ) -> Vec<usize> {
-    match &owner.kept {
-        Some(kept) => {
+    match &owner.build {
+        Build::Shallow(kept, _) => {
             let (built, placeholders) = build_shallow(source, owner.node, kept);
             placed.put_subtree(built, &placeholders, taken)
         }
-        None => placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken),
+        Build::Edited(edits) => placed.put_edited(source, (owner.node, edits), taken),
+        Build::Full => placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken),
     }
 }
 

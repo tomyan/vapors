@@ -20,6 +20,7 @@ use std::sync::OnceLock;
 use crate::syntax::{Grammar, parse_grammar};
 use crate::{Error, Position, Result};
 
+pub(crate) use declaration::contains_var;
 pub use declaration::{Longhand, Specified, parse_declaration};
 pub use declaration_check::resolve_pending;
 pub use names::IGNORED_VENDOR_PROPERTIES;
