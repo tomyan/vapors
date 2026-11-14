@@ -13,9 +13,12 @@ use super::{Combinator, Compound, PseudoClass, RelativeSelector, Selector};
 use crate::tree::States;
 
 /// What one pseudo-class reads.
-enum Reads<'s> {
-    /// The selectors inside it, on the same element.
+pub(crate) enum Reads<'s> {
+    /// The selectors inside it, on the same element (`:is()`,
+    /// `:where()`, `:global()`).
     Nested(&'s [Selector]),
+    /// `:not()`: the selectors inside it, none of which may match.
+    Negated(&'s [Selector]),
     /// `:has()`: the selectors after it, on descendants or siblings.
     Relative(&'s [RelativeSelector]),
     /// Siblings or descendants: the positional pseudo-classes, `:empty`.
@@ -26,12 +29,12 @@ enum Reads<'s> {
     Root,
 }
 
-fn reads(pseudo: &PseudoClass) -> Reads<'_> {
+pub(crate) fn reads(pseudo: &PseudoClass) -> Reads<'_> {
     match pseudo {
-        PseudoClass::Not(list)
-        | PseudoClass::Is(list)
-        | PseudoClass::Where(list)
-        | PseudoClass::Global(list) => Reads::Nested(list),
+        PseudoClass::Not(list) => Reads::Negated(list),
+        PseudoClass::Is(list) | PseudoClass::Where(list) | PseudoClass::Global(list) => {
+            Reads::Nested(list)
+        }
         PseudoClass::Has(relatives) => Reads::Relative(relatives),
         PseudoClass::Empty
         | PseudoClass::FirstChild
@@ -62,8 +65,36 @@ fn reads(pseudo: &PseudoClass) -> Reads<'_> {
 pub(crate) fn state_flag(pseudo: &PseudoClass) -> Option<States> {
     match reads(pseudo) {
         Reads::State(flag) => Some(flag),
-        Reads::Nested(_) | Reads::Relative(_) | Reads::Structure | Reads::Root => None,
+        Reads::Nested(_)
+        | Reads::Negated(_)
+        | Reads::Relative(_)
+        | Reads::Structure
+        | Reads::Root => None,
     }
+}
+
+/// Each state pseudo-class with its flag, as [`reads`] maps them: the
+/// one list that names a flag (`state_names`).
+const STATE_PSEUDO_CLASSES: [(&str, States); 9] = [
+    (":hover", States::HOVER),
+    (":focus", States::FOCUS),
+    (":focus-visible", States::FOCUS_VISIBLE),
+    (":focus-within", States::FOCUS_WITHIN),
+    (":active", States::ACTIVE),
+    (":checked", States::CHECKED),
+    (":disabled", States::DISABLED),
+    (":enabled", States::ENABLED),
+    (":invalid", States::INVALID),
+];
+
+/// The pseudo-class names of the flags in `states`, for messages.
+#[must_use]
+pub fn state_names(states: States) -> Vec<&'static str> {
+    STATE_PSEUDO_CLASSES
+        .iter()
+        .filter(|(_, flag)| states.contains(*flag))
+        .map(|(name, _)| *name)
+        .collect()
 }
 
 /// Whether `combinator` steps to a sibling rather than an ancestor.
@@ -90,7 +121,9 @@ fn reads_beyond_chain(compound: &Compound) -> bool {
         .pseudo_classes
         .iter()
         .any(|pseudo| match reads(pseudo) {
-            Reads::Nested(list) => list.iter().any(reads_siblings_or_descendants),
+            Reads::Nested(list) | Reads::Negated(list) => {
+                list.iter().any(reads_siblings_or_descendants)
+            }
             Reads::Relative(_) | Reads::Structure => true,
             Reads::State(_) | Reads::Root => false,
         })
@@ -133,7 +166,7 @@ fn nested(compound: &Compound) -> Vec<&Selector> {
     let mut out = Vec::new();
     for pseudo in &compound.pseudo_classes {
         match reads(pseudo) {
-            Reads::Nested(list) => out.extend(list),
+            Reads::Nested(list) | Reads::Negated(list) => out.extend(list),
             Reads::Relative(relatives) => {
                 out.extend(
                     relatives

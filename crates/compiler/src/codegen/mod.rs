@@ -8,6 +8,7 @@
 //! `{for}` an anchor and a call into `vapors_dom::blocks`.
 
 mod allowances;
+pub(crate) mod attribute_kind;
 mod attribute_refusals;
 mod bind_this_shape;
 mod blocks;
@@ -22,6 +23,7 @@ mod events_decl;
 mod for_block;
 mod format;
 mod handler_capture;
+pub(crate) mod key_parts;
 mod names;
 mod prop_suggestion;
 mod props_index;
@@ -34,7 +36,7 @@ mod shell;
 mod snippet_list;
 mod snippet_params;
 mod snippets;
-mod style_key;
+pub(crate) mod style_key;
 mod syn_map;
 mod tag_path;
 mod tag_props;

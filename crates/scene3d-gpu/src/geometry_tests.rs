@@ -15,6 +15,7 @@ fn mesh_in(meshes: &mut Meshes) -> MeshNode {
         node,
         geometry,
         colour,
+        visible: true,
     }
 }
 
