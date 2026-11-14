@@ -26,6 +26,10 @@ impl Arena {
             return id(index, slot.generation);
         }
         let index = u32::try_from(self.slots.len()).expect("fewer than 2^32 nodes");
+        // grown by doubling and kept so: at most twice the slots in use,
+        // bounded slack, not a cost per element that grows with the page
+        // (property 8; the mount's bytes per element move 1.8 to 2.1 KB
+        // from 1,000 to 10,000 rows, docs/perf/memory-per-element-2026-11-14.md)
         self.slots.push(Slot {
             generation: 0,
             node: Some(node),
