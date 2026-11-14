@@ -5,8 +5,6 @@
 //! that collapses to nothing has no box (the empty anchors `{if}` and
 //! `{for}` leave, and the whitespace between blocks).
 
-use crate::node_map::NodeMap;
-
 use rustc_hash::FxHashMap;
 use taffy::{Display, Style};
 use vapors_dom::NodeId;
@@ -16,13 +14,13 @@ pub(crate) use super::layout_box::{Content, LayoutBox};
 use super::owners::KeptChildren;
 use crate::arena::Arena;
 use crate::node::Kind;
-use crate::style::Used;
+use crate::style::UsedMap;
 
 /// What building reads: the tree, each element's used style, the
 /// images, and the focused number field with its selection.
 pub(crate) struct Source<'a> {
     pub(crate) arena: &'a Arena,
-    pub(crate) used: &'a NodeMap<Used>,
+    pub(crate) used: &'a UsedMap,
     pub(crate) images: &'a crate::images::Images,
     /// The focused text or number field's marks (E6a, 3-E3c).
     pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
@@ -56,6 +54,7 @@ pub(crate) fn build_shallow(
     (boxes, placeholders)
 }
 
+#[allow(clippy::too_many_lines)] // the one box built from every style field layout reads
 fn add_element(
     source: &Source<'_>,
     node: NodeId,

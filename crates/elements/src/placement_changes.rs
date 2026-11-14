@@ -16,11 +16,12 @@ pub(crate) struct Changes<'a> {
 }
 
 /// What placing did: the slots not built again whose rect or padding
-/// changed, the scroll containers whose offset as applied changed, and
-/// how many slots it placed.
+/// changed, the scroll containers whose offset as applied changed, those
+/// whose offset or range changed at all, and how many slots it placed.
 pub(crate) struct Placed {
     pub(crate) moved: Vec<usize>,
     pub(crate) offsets_moved: Vec<usize>,
+    pub(crate) states_changed: Vec<usize>,
     pub(crate) count: usize,
     /// In-flow children chained before the walk (`chain_children`).
     pub(crate) chained: usize,

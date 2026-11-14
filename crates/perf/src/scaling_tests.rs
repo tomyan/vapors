@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use super::{AtSize, Judged, Scaling};
 use crate::rows::RowChange;
 use crate::scaling_judged::{
-    INSERT_A11Y_PER_ROW, RESIZE_A11Y_PER_ROW, SCROLL_A11Y_PER_ROW, SCROLL_SIZE_A11Y_PER_ROW,
+    FLEX_TEXT_FRAME_PERCENT, INSERT_A11Y_PER_ROW, RESIZE_A11Y_PER_ROW, SCROLL_A11Y_PER_ROW,
+    SCROLL_SIZE_A11Y_PER_ROW,
 };
 
 fn size(rows: usize, phases: &[(&str, u64)]) -> AtSize {
@@ -75,7 +76,10 @@ fn a_moving_change_is_judged_on_its_accessibility_phase_alone_against_the_ceilin
     let scaling = moving_change();
 
     // Then: the update's growth is not judged
-    let at = Judged::AccessibilityPerRow { ceiling: 10 };
+    let at = Judged::AccessibilityPerRow {
+        ceiling: 10,
+        flat: &[],
+    };
     assert_eq!(scaling.violations(at), Ok(Vec::new()));
 }
 
@@ -86,7 +90,10 @@ fn accessibility_over_its_ceiling_per_row_is_named_with_the_growth_and_the_ceili
 
     // When
     let violations = scaling
-        .violations(Judged::AccessibilityPerRow { ceiling: 9 })
+        .violations(Judged::AccessibilityPerRow {
+            ceiling: 9,
+            flat: &[],
+        })
         .expect("judged");
 
     // Then: at 3000 rows and at 10,000
@@ -106,7 +113,10 @@ fn judging_the_accessibility_phase_without_its_count_is_refused() {
     let measured = [size(1000, &[("draw", 1)]), size(3000, &[("draw", 1)])];
     let scaling = Scaling::of(&measured).expect("sizes");
     let error = scaling
-        .violations(Judged::AccessibilityPerRow { ceiling: 1 })
+        .violations(Judged::AccessibilityPerRow {
+            ceiling: 1,
+            flat: &[],
+        })
         .expect_err("no accessibility");
     assert!(
         error.contains("no count for phase accessibility"),
@@ -143,26 +153,34 @@ fn each_change_is_judged_as_the_brief_says() {
     for change in [
         RowChange::Idle,
         RowChange::Text,
-        RowChange::FlexText,
         RowChange::Class,
         RowChange::HoveredClass,
     ] {
         assert_eq!(Judged::of(change), Judged::EveryPhase);
     }
+    let flex_text = Judged::EveryPhaseRelaxed {
+        phase: "frame (CPU)",
+        percent: FLEX_TEXT_FRAME_PERCENT,
+    };
+    assert_eq!(Judged::of(RowChange::FlexText), flex_text);
     let insert = Judged::AccessibilityPerRow {
         ceiling: INSERT_A11Y_PER_ROW,
+        flat: &["style"],
     };
     assert_eq!(Judged::of(RowChange::Insert), insert);
     let resize = Judged::AccessibilityPerRow {
         ceiling: RESIZE_A11Y_PER_ROW,
+        flat: &[],
     };
     assert_eq!(Judged::of(RowChange::Resize), resize);
     let scroll = Judged::AccessibilityPerRow {
         ceiling: SCROLL_A11Y_PER_ROW,
+        flat: &[],
     };
     assert_eq!(Judged::of(RowChange::Scroll), scroll);
     let scroll_size = Judged::AccessibilityPerRow {
         ceiling: SCROLL_SIZE_A11Y_PER_ROW,
+        flat: &[],
     };
     assert_eq!(Judged::of(RowChange::ScrollSize), scroll_size);
 }

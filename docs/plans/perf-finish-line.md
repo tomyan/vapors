@@ -39,6 +39,9 @@ for change in Idle Text FlexText Class HoveredClass; do
 done
 ```
 
+`cargo xtask scaling` runs every change (`--scaling all`) on a clean
+tree; it runs nightly on origin/main on the dev machine
+(`scripts/nightly-scaling.sh`), not in the gate (Tom, 2026-11-13).
 It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
@@ -51,10 +54,16 @@ phase's kept sets stopped keeping the mount's capacity (2026-11-12;
 HoveredClass `style` 843k / 847k / 870k instructions at 1,000 / 3,000 /
 10,000 rows before, 840k / 848k / 850k after, docs/plans/iu1.md, PR 2).
 Since #270 (2026-11-13) `--scaling` judges the frames that add the class
-apart from those that remove it, and Class and HoveredClass fail on the
+apart from those that remove it, and Class and HoveredClass failed on the
 add frames: `paint` 13.6 instructions per extra row
 (docs/perf/splice-layout-2026-11-13.md); the one median had been the
-remove frames'.
+remove frames'. The cost was two `Vec` inserts, the drawing steps and
+the extents index taking in the row's step as it started to draw; both
+lists are in blocks since 2026-11-13 and both changes pass on both
+kinds of frame (docs/perf/class-add-paint-2026-11-13.md). The remove
+frames moved the same bytes with `rep movsb`, one retired instruction:
+an instruction judge misses a memmove in that direction, and wall time
+is the check for it.
 The 5k to 9k instructions HoveredClass `style` still rises from 1,000
 rows (once 1 under the judge's 5000 floor, passing on 2%) are glibc's
 malloc costing more per call on a larger heap: with jemalloc preloaded

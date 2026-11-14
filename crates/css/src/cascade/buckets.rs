@@ -55,17 +55,27 @@ impl Buckets {
         out
     }
 
-    /// Candidate rule indices for `element`, in source order.
+    /// Candidate rule indices for `element`, in source order. One
+    /// allocation: the list, with room for a few bucket hits; the tag is
+    /// lowercased only when it has an upper-case byte.
     pub(super) fn candidates<E: Element>(&self, element: &E) -> Vec<usize> {
-        let mut out = self.universal.clone();
+        let mut out = Vec::with_capacity(self.universal.len() + 8);
+        out.extend_from_slice(&self.universal);
         if let Some(id) = element.id() {
             out.extend(self.ids.get(id).into_iter().flatten());
         }
         for class in element.class_names() {
             out.extend(self.classes.get(class).into_iter().flatten());
         }
-        let tag = element.tag_name().to_ascii_lowercase();
-        out.extend(self.tags.get(&tag).into_iter().flatten());
+        let tag = element.tag_name();
+        let lowered;
+        let tag = if tag.bytes().any(|b| b.is_ascii_uppercase()) {
+            lowered = tag.to_ascii_lowercase();
+            lowered.as_str()
+        } else {
+            tag
+        };
+        out.extend(self.tags.get(tag).into_iter().flatten());
         out.sort_unstable();
         out.dedup();
         out

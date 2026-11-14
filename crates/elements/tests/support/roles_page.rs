@@ -16,6 +16,7 @@ pub const STYLE: &str = "body { margin: 0; } .row { display: flex; height: 24px;
     button { width: 80px; }";
 
 /// The page, updated at 640x400.
+#[allow(clippy::too_many_lines)] // the fixture page, one literal per control
 pub fn page() -> Document {
     let mut doc = document();
     let body = doc.body();

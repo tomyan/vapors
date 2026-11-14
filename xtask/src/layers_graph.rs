@@ -1,7 +1,10 @@
 //! The workspace's dependency graph from `cargo metadata`, and the
-//! dependencies a layering rule forbids. Normal and build dependencies
-//! count, followed transitively; dev dependencies do not, since they
-//! build only tests.
+//! dependencies a layering rule forbids. Normal dependencies count,
+//! followed transitively. Dev dependencies do not, since they build only
+//! tests; build dependencies do not, since a build script is not linked
+//! into the crate, so it cannot reach what a rule guards (a build.rs
+//! that runs the compiler links vapors-css into the script, not into
+//! vapors-components; lead decision 2026-11-13).
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -82,15 +85,29 @@ fn name_of(names: &BTreeMap<String, String>, id: &str) -> Result<String, String>
         .ok_or_else(|| format!("cargo metadata: node {id} is not among the packages"))
 }
 
-/// A dependency that ships with the crate: normal or build, not dev.
+/// A dependency linked into the crate: listed as normal (`kind` null
+/// in the metadata) under at least one of its kinds. `dev` and `build`
+/// are not linked; any other kind is refused, naming the dependency,
+/// since cargo emits only these three.
 fn layering(dep: &Value, owner: &str) -> Result<bool, String> {
     let kinds = dep["dep_kinds"]
         .as_array()
         .filter(|kinds| !kinds.is_empty())
         .ok_or_else(|| format!("cargo metadata: a dependency of {owner} has no `dep_kinds`"))?;
-    Ok(kinds
-        .iter()
-        .any(|kind| kind["kind"].as_str() != Some("dev")))
+    let mut linked = false;
+    for kind in kinds {
+        match kind["kind"].as_str() {
+            None if kind["kind"].is_null() => linked = true,
+            Some("dev" | "build") => {}
+            other => {
+                return Err(format!(
+                    "cargo metadata: dependency {} of {owner} has kind {other:?}, which is not null, \"dev\" or \"build\"; fix: teach xtask/src/layers_graph.rs the new kind",
+                    dep["pkg"].as_str().unwrap_or("?")
+                ));
+            }
+        }
+    }
+    Ok(linked)
 }
 
 /// One line per forbidden crate reached, with the path to it.
@@ -157,3 +174,7 @@ fn walk_back(came_from: &BTreeMap<&str, &str>, from: &str, to: &str) -> Vec<Stri
 #[cfg(test)]
 #[path = "layers_graph_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "layers_graph_kinds_tests.rs"]
+mod kinds_tests;

@@ -19,7 +19,7 @@ const METADATA_DEADLINE: Duration = Duration::from_secs(30);
 const REPRODUCE: &str = "cargo metadata --format-version 1 --all-features";
 
 const FIX: &str = "fix: remove the dependency, or move the code to a crate the rule allows; \
-                   reproduce: cargo tree -e normal,build -i <crate> -p <rule's crate>";
+                   reproduce: cargo tree -e normal -i <crate> -p <rule's crate>";
 
 /// Check every rule and report.
 pub fn run() -> ExitCode {

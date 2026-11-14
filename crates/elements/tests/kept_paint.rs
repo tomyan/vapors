@@ -38,7 +38,7 @@ fn at_scale(scale: f32) -> Viewport {
 }
 
 /// Boxes built, boxes laid out, boxes painted.
-fn work(counts: UpdateCounts) -> (usize, usize, usize) {
+fn work(counts: &UpdateCounts) -> (usize, usize, usize) {
     (
         counts.boxes_built,
         counts.boxes_laid_out,
@@ -66,7 +66,7 @@ fn an_update_with_nothing_changed_shows_the_kept_scene() {
         .clone();
 
     // Then
-    assert_eq!(work(doc.update_counts()), (0, 0, 0));
+    assert_eq!(work(&doc.update_counts()), (0, 0, 0));
     assert_eq!(again, first);
 }
 
@@ -84,7 +84,7 @@ fn a_built_box_paints_again() {
     doc.update(viewport(100.0, 100.0)).expect("updates");
 
     // Then: the div and its text
-    assert_eq!(work(doc.update_counts()), (2, 0, 2));
+    assert_eq!(work(&doc.update_counts()), (2, 0, 2));
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn a_scroll_alone_paints_and_shifts_no_row() {
 
     // Then: the rows are kept in the list's scroll frame, which the
     // scroll shifted (IU4, `frames.rs`)
-    assert_eq!(work(list.doc.update_counts()), (0, 0, 0));
+    assert_eq!(work(&list.doc.update_counts()), (0, 0, 0));
     assert_eq!(list.doc.update_counts().boxes_shifted, 0);
 }
 
@@ -113,7 +113,7 @@ fn hiding_the_thumbs_alone_paints_without_them() {
     let hidden = items(&mut list.doc);
 
     // Then: no box painted, and the thumb's item gone
-    assert_eq!(work(list.doc.update_counts()), (0, 0, 0));
+    assert_eq!(work(&list.doc.update_counts()), (0, 0, 0));
     assert!(hidden < shown, "{hidden} items hidden, {shown} shown");
 }
 
@@ -137,7 +137,7 @@ fn a_scale_change_alone_paints_again() {
     let scale = doc.update(at_scale(2.0)).expect("updates").scale();
 
     // Then
-    assert_eq!(work(doc.update_counts()), (4, 4, 4));
+    assert_eq!(work(&doc.update_counts()), (4, 4, 4));
     assert!((scale - 2.0).abs() < f32::EPSILON, "scale {scale}");
 }
 

@@ -4,13 +4,15 @@
 //! again, and it is returned. Which slots: those built again, and those
 //! moved or whose clip was redone whose part was made from other values
 //! (`BoxFrom`) and cannot be shifted to them (`kept_shift.rs`); no
-//! other kept part is read. A dropped part frees its
-//! slab ids and removes its map entries before any part is painted, so
-//! a part painted after takes them. Scroll thumbs are painted on every
-//! update that paints. The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
-//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
+//! other kept part is read. A dropped part frees its slab ids and
+//! removes its map entries before any part is painted, so a part
+//! painted after takes them. The thumbs painted are those of the scroll
+//! containers that can have changed (`thumbs_again.rs`). The scene is
+//! the parts of the steps that draw walked in paint order
+//! (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which
+//! a debug build checks (`kept_paint.rs`).
 
+use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::frame_extents::Extents;
@@ -24,6 +26,7 @@ use crate::paint_order::Step;
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
 use crate::repaint::Repaint;
+use crate::thumbs_again;
 
 /// Paints `boxes` at `rects`, keeping `last`'s parts in place where
 /// they show what painting again would, and patching its maps for the
@@ -51,10 +54,12 @@ pub(crate) fn paint_partial(
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
     crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
-    let (patched, with_hits) = patched_slots((&again, &shifted), changed, &order);
+    let shown_last = kept.then_some(painted.from.thumbs_shown);
+    let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
+    let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
-    repaint.thumbs(input, &mut painted);
+    repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
     if painted.frames != frames_were {
         frames_moved(&mut painted);
@@ -106,18 +111,17 @@ fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offse
 
 /// The slots whose parts this update paints again, shifts or drops:
 /// those painted `again`, the `shifted` and the freed, then the scroll
-/// containers, whose thumbs add no hits; and how many come before the
-/// scroll containers.
+/// containers whose `thumbs` it paints, which add no hits; and how many
+/// come before those.
 fn patched_slots(
-    (again, shifted): (&[(usize, BoxFrom)], &[usize]),
+    (again, shifted, thumbs): (&[(usize, BoxFrom)], &[usize], &[usize]),
     changed: &ChangedSlots,
-    order: &KeptOrder,
 ) -> (Vec<usize>, usize) {
     let again = again.iter().map(|(slot, _)| *slot);
     let freed = changed.freed.iter().map(|(slot, _)| *slot);
     let mut slots: Vec<usize> = again.chain(shifted.iter().copied()).chain(freed).collect();
     let with_hits = slots.len();
-    slots.extend(order.thumbs.iter().copied());
+    slots.extend(thumbs.iter().copied());
     (slots, with_hits)
 }
 
@@ -157,6 +161,8 @@ fn drawn_updated(
         None => HitsChanged::Unknown,
     };
     batches_patched(painted, patched);
+    let drawn = painted.drawn.take_counts();
+    painted.index_counts = drawn.and(painted.extents.take_counts());
 }
 
 /// `painted`'s extents index patched for the `patched` slots' steps.
@@ -187,7 +193,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
-    last.boxes_shifted = 0;
+    (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
     (last, Some(order))
 }
 
