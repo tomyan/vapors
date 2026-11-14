@@ -114,11 +114,12 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_replaced(child);
         if let Some(old) = self.parent(child) {
+            self.boxes.note_removed(&self.arena, old, child);
             self.mark_moved_out(old, child, parent);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
-        self.boxes.marks.mark_children(parent);
+        self.boxes.note_inserted(parent, child);
         self.mark_children_changed(parent, child, true);
     }
 
@@ -133,9 +134,10 @@ impl Dom for Document {
         self.note_change();
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, node, false);
-            self.boxes.marks.mark_children(parent);
+            self.boxes.note_removed(&self.arena, parent, node);
         }
         self.drop_focus_within(node);
+        self.drop_sinks(node);
         self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
@@ -143,6 +145,10 @@ impl Dom for Document {
         self.committed
             .retain(|field, _| self.arena.contains(*field));
         self.editors.retain(|field, _| self.arena.contains(*field));
+    }
+
+    fn watch_appearance(&mut self, anchor: NodeId, sink: vapors_dom::AppearanceSink) {
+        self.watch(anchor, sink);
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {

@@ -52,6 +52,9 @@ pub(crate) struct Kept {
     pub(crate) initial: ComputedStyle,
     pub(crate) styles: Styles,
     pub(crate) used: UsedMap,
+    /// Each scene anchor's used style, in place of a `Used`
+    /// (`restyle_scene`).
+    pub(crate) scene: NodeMap<crate::style::SceneUsed>,
     /// Each element's refusals, kept until it is restyled again.
     pub(crate) refused: NodeMap<Vec<ElementError>>,
     /// Which elements the last update restyled: their computed styles,

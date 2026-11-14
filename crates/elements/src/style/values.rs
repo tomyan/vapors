@@ -9,6 +9,7 @@
 use vapors_css::Position;
 use vapors_css::cascade::ComputedStyle;
 use vapors_css::property::PropertyId;
+use vapors_css::property::longhands::{POINTER_EVENTS, VISIBILITY};
 use vapors_css::value::{LengthUnit, Value};
 
 /// A value the tree does not implement.
@@ -119,6 +120,17 @@ pub(crate) fn amount(value: &Value) -> Result<Amount, String> {
         Value::Calc(calc) => Ok(Amount::Calc(std::ptr::from_ref(calc).cast())),
         _ => Err(shape("a length or percentage")),
     }
+}
+
+/// `visibility: visible`: `hidden` and `collapse` are not, for a box
+/// and a scene node alike.
+pub(crate) fn visible(reader: &mut Reader<'_>) -> bool {
+    reader.read(VISIBILITY, |v| keyword(v).map(|k| k == "visible"), true)
+}
+
+/// `pointer-events: auto`, for a box and a scene node alike.
+pub(crate) fn takes_pointer(reader: &mut Reader<'_>) -> bool {
+    reader.read(POINTER_EVENTS, |v| keyword(v).map(|k| k == "auto"), true)
 }
 
 /// The keyword, or a refusal naming the value.

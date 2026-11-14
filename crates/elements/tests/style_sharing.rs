@@ -17,6 +17,7 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[],
     style: None,
 };
 
@@ -26,6 +27,7 @@ static BUTTON: StyleKey = StyleKey {
     tag: "button",
     classes: &[],
     toggles: &[],
+    attributes: &[],
     style: None,
 };
 

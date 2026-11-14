@@ -1,0 +1,25 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":152,"tag":"html","width":640,"x":0,"y":0},
+{"height":152,"tag":"body","width":640,"x":0,"y":0},
+{"height":44,"tag":"div","width":608,"x":16,"y":16},
+{"height":44,"tag":"button","width":44,"x":16,"y":16},
+{"height":16,"tag":"svg","width":16,"x":30,"y":30},
+{"height":44,"tag":"button","width":44,"x":68,"y":16},
+{"height":16,"tag":"svg","width":16,"x":82,"y":30},
+{"height":44,"tag":"button","width":44,"x":120,"y":16},
+{"height":16,"tag":"svg","width":16,"x":134,"y":30},
+{"height":44,"tag":"button","width":44,"x":172,"y":16},
+{"height":16,"tag":"svg","width":16,"x":186,"y":30},
+{"height":44,"tag":"div","width":608,"x":16,"y":76},
+{"height":44,"tag":"button","width":44,"x":16,"y":76},
+{"height":16,"tag":"svg","width":16,"x":30,"y":90},
+{"height":44,"tag":"button","width":44,"x":68,"y":76},
+{"height":16,"tag":"svg","width":16,"x":82,"y":90},
+{"height":44,"tag":"button","width":44,"x":120,"y":76},
+{"height":16,"tag":"svg","width":16,"x":134,"y":90},
+{"height":44,"tag":"button","width":44,"x":172,"y":76},
+{"height":16,"tag":"svg","width":16,"x":186,"y":90}
+]}
+]}

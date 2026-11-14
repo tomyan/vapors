@@ -81,9 +81,9 @@ impl Scene {
     }
 
     /// A number that grows each time [`Scene::update`] recomputes `id`'s
-    /// world matrix or [`Scene::set_colour`] sets its colour, and does
-    /// not change otherwise: a reader keeps the version it last read
-    /// with the matrix and colour, and reads both again when they
+    /// world matrix or [`Scene::set_appearance`] changes its colour, and
+    /// does not change otherwise: a reader keeps the version it last
+    /// read with the matrix and colour, and reads both again when they
     /// differ, whoever ran the update.
     ///
     /// # Errors

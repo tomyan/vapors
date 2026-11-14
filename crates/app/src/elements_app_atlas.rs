@@ -1,7 +1,6 @@
 //! The glyph atlas the app's painter is made with: sized for the device
 //! unless the app was given a config.
 
-use vapors_platform::Frame;
 use vapors_text::AtlasConfig;
 
 use super::ElementsApp;
@@ -18,12 +17,15 @@ impl ElementsApp {
         self
     }
 
-    /// A painter for `frame`'s device and format, with the atlas given.
-    pub(super) fn make_painter(&self, frame: &Frame<'_>) -> Result<ScenePainter, NewPainterError> {
-        let format = frame.texture.format();
+    /// A painter for `device` drawing into `format`, with the atlas given.
+    pub(super) fn make_painter(
+        &self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Result<ScenePainter, NewPainterError> {
         match self.atlas {
-            Some(atlas) => ScenePainter::with_atlas(frame.device, format, atlas),
-            None => ScenePainter::new(frame.device, format),
+            Some(atlas) => ScenePainter::with_atlas(device, format, atlas),
+            None => ScenePainter::new(device, format),
         }
     }
 }

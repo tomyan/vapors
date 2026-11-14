@@ -11,6 +11,8 @@ the harness shows it, not when the code is believed to do it.
 
 ## The properties
 
+Tom, 2026-11-13: properties 1 to 8 end this iteration; property 9 is the next iteration's target, on the target architecture, judged on a minimal test scene rather than the racer (the racer is a later showcase; `docs/plans/racer-scene.md` keeps its design).
+
 | # | Property | Target | On main at bf8a080 (3000 rows) | Brought by |
 |---|---|---|---|---|
 | 1 | An edit's whole update (style, layout, paint) | under 1 ms, and the same within noise at 1,000, 3,000 and 10,000 rows | Text 3.76 ms, Class 2.74 ms; paint about 0.2 ms | IU3 3b (layout positioning kept), 3c-3e (moved boxes shifted) |
@@ -21,7 +23,7 @@ the harness shows it, not when the code is believed to do it.
 | 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
 | 7 | First frame of a large page | the winning declarations for each template element worked out at build time (computed values still depend on viewport, scale and font size), and constant shapes once the shape table (item 8) lands; time measured and published | not measured | the build-time analysis; shapes by the shape table (Tom, 2026-11-12) |
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
-| 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
+| 9 | HTML, SVG and 3D in one scene | a minimal test scene (a few 3D objects, an SVG decal on one, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
 
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
 
@@ -39,6 +41,9 @@ for change in Idle Text FlexText Class HoveredClass; do
 done
 ```
 
+`cargo xtask scaling` runs every change (`--scaling all`) on a clean
+tree; it runs nightly on origin/main on the dev machine
+(`scripts/nightly-scaling.sh`), not in the gate (Tom, 2026-11-13).
 It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
