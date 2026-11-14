@@ -108,6 +108,7 @@ fn rebuild_owners(
     rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
+    placed.drop_lanes();
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
     rebuilt
 }
@@ -175,10 +176,14 @@ fn lend_subtree(
     may_keep: &dyn Fn(NodeId) -> bool,
 ) -> bool {
     let before = |at: usize| taken.boxes.get(&at).map(|(key, old)| (*key, old));
+    // the lanes are still there: those of the containers built again
+    // are dropped after lending (`Placed::drop_lanes`)
+    let located = |_: usize, layout: &taffy::Layout| layout.location;
     let mut lender = Lender {
         before: &before,
         new: &placed.slots,
         may_keep,
+        located: &located,
         lent: 0,
     };
     lender.lend_from(&mut placed.boxes, slot)

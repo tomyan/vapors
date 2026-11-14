@@ -23,9 +23,10 @@ pub(crate) struct ChangedSlots {
     /// The scroll containers whose offset as applied changed: their
     /// frames' shifts change, and no slot moves (`frames.rs`).
     pub(crate) offsets_moved: Vec<usize>,
-    /// The lane children whose start changed (`layout/written.rs`): a
-    /// framed one's frame shifts, and no slot moves (`frames_lane.rs`).
-    pub(crate) started: Vec<usize>,
+    /// Each lane whose children may start elsewhere, with its first such
+    /// child (`layout/written.rs`): a framed one's frames shift, and no
+    /// slot moves (`frames_lane.rs`).
+    pub(crate) started: Vec<(usize, usize)>,
     /// The scroll containers whose offset or range, unrounded, differs
     /// from when it was last settled (exact): their thumbs move, even
     /// when no slot is built or moved and no offset as applied moved.

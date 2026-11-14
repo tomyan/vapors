@@ -4,8 +4,11 @@
 //! (`docs/plans/splice-layout.md`, section 11).
 
 use rustc_hash::FxHashMap;
+use taffy::{Layout, Point};
 
+use super::LayoutBox;
 use super::lane::Lane;
+use super::lane_block_answer::narrow;
 use super::lane_flex_share::FlexLane;
 use super::lane_share::BlockLane;
 use crate::lane_decline::LaneDecline;
@@ -24,13 +27,29 @@ pub(crate) struct Lanes {
     /// Each child's container, as last put; an entry whose container no
     /// longer has a lane holding the child is stale, and read as none.
     pub(super) parents: FxHashMap<usize, usize>,
+    /// Containers built again since lending, whose lanes are dropped
+    /// once their boxes are lent (`Placed::drop_lanes`).
+    pub(super) rebuilt: Vec<usize>,
+    /// Children's `frame_offset`s worked out in one pass along a lane
+    /// for this update (`offsets_from`), which `taffy_location` reads
+    /// before folding the lane for one child; emptied when layout
+    /// starts (`clear_offsets`), as the lanes change then.
+    pub(super) offsets: std::cell::RefCell<FxHashMap<usize, f64>>,
 }
 
 impl Lanes {
-    /// Drops the lane of the container in `slot`, of either kind.
-    pub(crate) fn remove(&mut self, slot: usize) {
-        self.block.remove(&slot);
-        self.flex.remove(&slot);
+    /// Drops the lane of the container in `slot`, of either kind. A lane
+    /// that wrote its children first puts their starts back in their
+    /// layouts in `boxes`, which then hold Taffy's values with no lane to
+    /// add them: a container built again and lent its cache is not laid
+    /// out again (section 11.2).
+    pub(crate) fn remove(&mut self, slot: usize, boxes: &mut [LayoutBox]) {
+        if let Some(lane) = self.block.remove(&slot) {
+            lane.restore_starts(boxes);
+        }
+        if let Some(lane) = self.flex.remove(&slot) {
+            lane.restore_starts(boxes);
+        }
     }
 
     /// Where the child in `child` starts in the border box of the lane
@@ -101,6 +120,63 @@ impl Lanes {
         if let Some(lane) = self.flex.get_mut(&container) {
             lane.facts.note_scroller(child);
         }
+    }
+
+    /// The children of the lane container in `container` from the one
+    /// in `first` on, by slot, in order; none when it has no lane
+    /// holding `first`.
+    pub(crate) fn children_from(&self, container: usize, first: usize) -> Vec<usize> {
+        let block = self
+            .block
+            .get(&container)
+            .map(|lane| lane.children_from(first));
+        let flex = || {
+            self.flex
+                .get(&container)
+                .map(|lane| lane.children_from(first))
+        };
+        block.or_else(flex).unwrap_or_default()
+    }
+
+    /// The children of the lane container in `container` from the one
+    /// in `first` on, by slot, their offsets noted for `taffy_location`
+    /// this update: O(children from `first`), not a fold each.
+    pub(crate) fn offsets_from(&self, container: usize, first: usize) -> Vec<usize> {
+        let block = self
+            .block
+            .get(&container)
+            .map(|lane| lane.offsets_from(first));
+        let flex = || {
+            self.flex
+                .get(&container)
+                .map(|lane| lane.offsets_from(first))
+        };
+        let offsets = block.or_else(flex).unwrap_or_default();
+        let slots = offsets.iter().map(|&(slot, _)| slot).collect();
+        self.offsets.borrow_mut().extend(offsets);
+        slots
+    }
+
+    /// Forgets the offsets `offsets_from` noted: layout changes the lanes.
+    pub(crate) fn clear_offsets(&mut self) {
+        self.offsets.get_mut().clear();
+    }
+
+    /// Where Taffy puts the child in `slot`, laid out as `layout`: a
+    /// lane child's layout holds its relative offset alone along the
+    /// axis (`docs/plans/splice-layout.md`, section 11.2), so its
+    /// `frame_offset` is added back. The one place that rebuilds
+    /// Taffy's value: placement of a lane not framed, scroll ranges and
+    /// the layout and placement checks read it.
+    pub(crate) fn taffy_location(&self, slot: usize, layout: &Layout) -> Point<f32> {
+        let noted = self.offsets.borrow().get(&slot).copied();
+        let start = noted.or_else(|| {
+            self.container_of(slot)
+                .and_then(|container| self.frame_offset(container, slot))
+        });
+        let mut location = layout.location;
+        location.y += start.map_or(0.0, narrow);
+        location
     }
 
     /// The lane container holding the child in `child`, if any.

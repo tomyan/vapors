@@ -91,7 +91,7 @@ impl Placement {
         let marked = if changes.every {
             Marked::default()
         } else {
-            self.mark(changes)
+            self.mark(changes, boxes.lanes)
         };
         let mut walk = Walk::new(self, boxes, scroll, changes.every, &marked.under);
         walk.place_from_root();

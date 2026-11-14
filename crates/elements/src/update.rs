@@ -77,7 +77,8 @@ impl Document {
         let source = (&from, &slotted.lanes);
         let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), source, &changed);
         drop(paint_span);
-        self.ax.touch_slots(&changed, &slotted.slots);
+        self.ax
+            .touch_slots(&changed, (&slotted.slots, &slotted.lanes.borrow()));
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
         (painted.from, painted.stackings) = (from, stackings);
         Ok(self.shown(painted))

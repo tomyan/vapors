@@ -29,9 +29,9 @@ impl Walk<'_, '_> {
         }
         self.settled.insert(node);
         let scale = self.boxes.scale;
-        let (applied, changed) = self
-            .scroll
-            .settle_box(node, (self.boxes.boxes, slot), scale);
+        let (applied, changed) =
+            self.scroll
+                .settle_box(node, (self.boxes.boxes, self.boxes.lanes, slot), scale);
         if changed {
             self.placed.states_changed.push(slot);
         }

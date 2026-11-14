@@ -54,10 +54,11 @@ impl Fresh {
     /// the offsets by element after.
     fn of(before: &Before, boxes: &LaidOut<'_>, kept: &Placement) -> (Self, Offsets) {
         let mut scroll = before.scroll.clone();
-        let offsets = scroll.settle(boxes.boxes, boxes.scrolls, boxes.scale);
-        let (mut rects, paddings) = placed(boxes.boxes, &vec![[0.0; 2]; offsets.len()]);
+        let laid = (boxes.boxes, boxes.lanes);
+        let offsets = scroll.settle(laid, boxes.scrolls, boxes.scale);
+        let (mut rects, paddings) = placed(laid, &vec![[0.0; 2]; offsets.len()]);
         in_lane_frames(&mut rects, kept, boxes.lanes);
-        let (on_page, _) = placed(boxes.boxes, &offsets);
+        let (on_page, _) = placed(laid, &offsets);
         let fresh = Self {
             rects,
             paddings,

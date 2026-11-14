@@ -69,7 +69,7 @@ fn a_size_query_with_other_height_bases_leaves_the_written_starts() {
         tree.lane_or_flex(NodeId::from(list), query);
 
         // Then: the lane's starts are the ones the rows were laid out at
-        tree.lanes.assert_starts_written(&tree.boxes);
+        tree.lanes.assert_starts_written();
     });
 }
 
@@ -97,7 +97,7 @@ fn a_size_query_the_lane_declines_keeps_the_lane() {
             tree.lanes.block[&list].written.is_some(),
             "the lane was dropped"
         );
-        tree.lanes.assert_starts_written(&tree.boxes);
+        tree.lanes.assert_starts_written();
     });
 }
 
@@ -110,7 +110,7 @@ fn a_lane_a_size_query_made_is_not_framed_until_it_writes() {
     let mut doc = laid_out(css, 50);
 
     asked(&mut doc, 50, |tree, list| {
-        tree.lanes.remove(list);
+        tree.lanes.remove(list, &mut tree.boxes);
 
         // When: a size query makes it again, writing no row
         let query = content_query(&tree.boxes, list);

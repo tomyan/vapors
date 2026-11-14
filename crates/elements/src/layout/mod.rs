@@ -124,6 +124,7 @@ pub(crate) fn lay_out(
     let (fonts, cache) = texts;
     let shared = std::rc::Rc::clone(&placed.lanes);
     let mut lanes = shared.borrow_mut();
+    lanes.clear_offsets();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts,
@@ -186,13 +187,14 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
 /// Each box's border box in document coordinates: its place in its
 /// containing block's content, whose origin is that box's corner less
 /// its scroll offset (`offsets`, by box index, in CSS pixels); and each
-/// box's padding, read in the same pass.
+/// box's padding, read in the same pass. A lane child is where Taffy
+/// puts it, its start from `lanes` added back.
 pub(crate) fn placed(
-    boxes: &[LayoutBox],
+    (boxes, lanes): (&[LayoutBox], &Lanes),
     offsets: &[[f32; 2]],
 ) -> (Vec<BoxRect>, Vec<taffy::Rect<f32>>) {
     let corner = |index: usize, origin: (f32, f32)| {
-        let location = boxes[index].layout.location;
+        let location = lanes.taffy_location(index, &boxes[index].layout);
         (origin.0 + location.x, origin.1 + location.y)
     };
     let origins = crate::chain::by_containing_block(boxes, (0.0, 0.0), &|index, origin| {

@@ -110,7 +110,8 @@ impl<'a, 'b> Walk<'a, 'b> {
         self.put(slot, origin, mark);
         let inner = content_origin(self.kept.rects[slot]);
         let reframed = self.frame_lane(slot, inner);
-        let moved = mark == Mark::Rebuilt || reframed || self.children_moved(slot, inner, before);
+        let rebuilt = mark == Mark::Rebuilt && !self.framed_in_place(slot, inner, before);
+        let moved = rebuilt || reframed || self.children_moved(slot, inner, before);
         self.visit_placed_in(slot, inner, moved);
         if !moved && inner != before {
             self.visit_hoisted_along(slot, inner);
@@ -156,17 +157,19 @@ impl<'a, 'b> Walk<'a, 'b> {
     /// Writes the rect and padding of `slot`, noting it as moved when
     /// either changed, or it went in or out of a lane frame, and it was
     /// not built again. A lane child in a frame of its own has its rect
-    /// in that frame: along the axis, its relative offset alone.
+    /// in that frame: along the axis, its relative offset alone; any
+    /// other box is where Taffy puts it, a lane child's start added back.
     fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark) {
         let layout = &self.boxes.boxes[slot].layout;
         let framed = self.lane_framed(slot);
+        let location = self.boxes.lanes.taffy_location(slot, layout);
         let y = if framed {
             self.boxes.lanes.relative(self.kept.up[slot], slot)
         } else {
-            origin.1 + layout.location.y
+            origin.1 + location.y
         };
         let rect = BoxRect {
-            x: origin.0 + layout.location.x,
+            x: origin.0 + location.x,
             y,
             width: layout.size.width,
             height: layout.size.height,

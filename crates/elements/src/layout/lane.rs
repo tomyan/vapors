@@ -39,22 +39,26 @@ pub(crate) struct Lane<K: LaneKind> {
     /// Children put in since the last layout, each after the child in
     /// the slot given, or first.
     pub(super) inserted: Vec<(usize, Option<usize>)>,
-    /// Children whose start may have changed since positions were last
+    /// Children whose start may have changed since layouts were last
     /// written: put in, laid out again, or after a removed one.
     pub(super) moved: Vec<usize>,
-    /// Layouts of children laid out since positions were last written,
+    /// Layouts of children laid out since layouts were last written,
     /// their `location.y` the relative offset only.
     pub(super) pending: FxHashMap<usize, Layout>,
     /// By child slot, its `position: relative` offset along the axis,
     /// where it has one.
     pub(super) relative: FxHashMap<usize, f32>,
-    /// Whether every child must be laid out again and every start
+    /// Whether every child must be laid out again and its layout
     /// written: a fresh lane, or one whose share changed.
     pub(super) all: bool,
     /// The share and height bases the children's layouts were last
     /// written with; `None` before the first write. The tree holds the
     /// leaves of that write (`lane_aside.rs`).
     pub(super) written: Option<(K::Share, K::Heights)>,
+    /// Each child's start, its lane's top added, as last written: what
+    /// the debug check holds the tree to (`lane_written_check.rs`).
+    #[cfg(debug_assertions)]
+    pub(super) written_starts: FxHashMap<usize, f64>,
     /// What framing the children reads (`lane_frame.rs`).
     pub(crate) facts: FrameFacts,
     /// Children put since the lane was last put back among the lanes,
@@ -79,6 +83,8 @@ impl<K: LaneKind> Lane<K> {
             relative: FxHashMap::default(),
             all: true,
             written: None,
+            #[cfg(debug_assertions)]
+            written_starts: FxHashMap::default(),
             facts: FrameFacts::default(),
             born: Vec::new(),
         }
@@ -106,22 +112,51 @@ impl<K: LaneKind> Lane<K> {
         self.facts.forget(slot);
     }
 
-    /// The child in `slot`'s layout to write, and its relative offset:
-    /// the layout laid out since the last write, whose `location.y` is
-    /// that offset, else the one it holds, with the offset noted then.
-    pub(super) fn take_write(&mut self, slot: usize, held: Layout) -> (Layout, f32) {
-        match self.pending.remove(&slot) {
-            Some(layout) => {
-                let relative = layout.location.y;
-                if relative == 0.0 {
-                    self.relative.remove(&slot);
-                } else {
-                    self.relative.insert(slot, relative);
-                }
-                (layout, relative)
-            }
-            None => (held, self.relative.get(&slot).copied().unwrap_or(0.0)),
+    /// Puts each child's start back in its layout in `boxes`, when this
+    /// lane wrote them, so they hold Taffy's values with the lane gone.
+    /// O(children log children), on a lane dropped.
+    pub(super) fn restore_starts(&self, boxes: &mut [super::LayoutBox]) {
+        if self.written.is_none() {
+            return;
         }
+        for (&slot, &handle) in &self.handles {
+            let start = super::narrow(self.facts.top + self.tree.start(handle));
+            if let Some(layout_box) = boxes.get_mut(slot) {
+                layout_box.layout.location.y += start;
+            }
+        }
+    }
+
+    /// Notes the child in `slot`'s `position: relative` offset along
+    /// the axis, `relative`, as its layout is written.
+    pub(super) fn note_relative(&mut self, slot: usize, relative: f32) {
+        if relative == 0.0 {
+            self.relative.remove(&slot);
+        } else {
+            self.relative.insert(slot, relative);
+        }
+    }
+
+    /// The children from the one in `slot` on, by slot, each with its
+    /// `frame_offset`: one fold to reach it, then one step per child.
+    pub(super) fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)> {
+        let Some(&handle) = self.handles.get(&slot) else {
+            return Vec::new();
+        };
+        let starts = self.tree.starts_from(handle).into_iter();
+        let top = self.facts.top;
+        starts
+            .map(|(handle, start)| (self.slots[&handle], top + start))
+            .collect()
+    }
+
+    /// The children from the one in `slot` on, by slot, in order.
+    pub(super) fn children_from(&self, slot: usize) -> Vec<usize> {
+        let Some(&handle) = self.handles.get(&slot) else {
+            return Vec::new();
+        };
+        let handles = self.tree.handles_from(handle);
+        handles.iter().map(|handle| self.slots[handle]).collect()
     }
 
     /// Puts a leaf for the child in `slot` after `previous`.

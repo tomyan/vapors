@@ -2,9 +2,9 @@
 //! (`docs/plans/splice-layout.md`, section 2 (a) and (d), section 10):
 //! the container's inputs settled (`lane_block.rs`, `lane_flex.rs`),
 //! only the children put in, laid out again or sharing new inputs laid
-//! out and their leaves put in the tree (`lane_fill.rs`), the starts of
-//! the children from the first that moved written into their layouts,
-//! and the container's answer folded (`lane_kind.rs`). A container, or
+//! out and their leaves put in the tree (`lane_fill.rs`), their layouts
+//! written with the relative offset alone along the axis (section 11.2:
+//! the start stays in the lane), and the container's answer folded (`lane_kind.rs`). A container, or
 //! one of its children, the lane does not lay out is handed to Taffy's
 //! algorithm, counted with the reason (`LaneCounts`).
 
@@ -97,7 +97,7 @@ impl BoxTree<'_> {
             Err(decline) => {
                 self.lane_counts.decline(decline);
                 if inputs.run_mode == RunMode::PerformLayout {
-                    self.lanes.remove(usize::from(id));
+                    self.lanes.remove(usize::from(id), &mut self.boxes);
                 }
                 None
             }
@@ -168,7 +168,7 @@ impl BoxTree<'_> {
         if K::writes(c) {
             lane.facts.top = K::top(c, &run);
             lane.written = lane.share.clone().zip(lane.heights);
-            self.write_starts(c, lane, &run);
+            self.write_laid(slot, lane);
         }
         Ok(run)
     }

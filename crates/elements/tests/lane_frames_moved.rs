@@ -44,6 +44,14 @@ fn a_box_positioned_against_a_moved_list_moves_with_it() {
         let cell = doc.children(page.rows[5])[0];
         element(&mut doc, cell, "div", "abs");
         doc.update(VIEW()).expect("updates");
+        // the list's lane declines the row that hoists the box, so it
+        // is not framed: a framed lane hoists nothing
+        assert_eq!(
+            doc.update_counts().lanes_framed,
+            0,
+            "{:?}",
+            doc.update_counts()
+        );
     }
 
     // When: the list moves up
@@ -51,10 +59,9 @@ fn a_box_positioned_against_a_moved_list_moves_with_it() {
         .borrow_mut()
         .set_attribute(page.head, "class", "head short");
 
-    // Then: placed as a full update places it. The list hoists the
-    // box, so its lane declines (`HoistedThrough`) and it is not framed:
-    // a framed lane hoists nothing today, and the walk visits its
-    // hoisted boxes whenever its content moves (`placement_walk.rs`)
+    // Then: placed as a full update places it; were a framed lane to
+    // hoist, the walk visits its hoisted boxes when its content moves
+    // (`placement_frames.rs` `visit_hoisted_along`)
     assert_matches_full(&page.doc, VIEW(), "after the list moved");
 }
 

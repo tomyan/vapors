@@ -20,7 +20,7 @@ use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_owner::Owner;
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
-use crate::layout::{Key, Slots};
+use crate::layout::{Key, Lanes, Slots};
 use crate::node_map::{NodeMap, NodeSet};
 
 /// What a take collects before it reads anything.
@@ -74,7 +74,7 @@ impl Default for AxMirror {
 
 impl AxMirror {
     /// Notes the boxes an update built, moved or freed, by their nodes.
-    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, slots: &Slots) {
+    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, (slots, lanes): (&Slots, &Lanes)) {
         // a box made or unmade a containing block, or a positioned box
         // freed, can change which parent node a node's box is placed in
         // (hoisted or not) without moving it, so nothing touches it:
@@ -89,12 +89,12 @@ impl AxMirror {
         // a framed lane child that started elsewhere has not moved in
         // its frame, but its record's bounds are from its parent node
         // (`docs/plans/splice-layout.md`, 5.3; until PR 5's mirror in flow)
-        let built = changed
-            .rebuilt
+        let started = changed
+            .started
             .iter()
-            .chain(&changed.moved)
-            .chain(&changed.started);
-        for key in built.filter_map(|&slot| slots.key(slot)) {
+            .flat_map(|&(container, first)| lanes.children_from(container, first));
+        let built = changed.rebuilt.iter().chain(&changed.moved).copied();
+        for key in built.chain(started).filter_map(|slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
         }
         for (_, key) in &changed.freed {

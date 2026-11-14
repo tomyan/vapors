@@ -145,8 +145,10 @@ impl Document {
         let boxes = LaidOut::new(&placed.boxes, &scrolls, &lanes, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
-        // only framed rows: a start change elsewhere moved the slot
-        let framed = |slot: &&usize| placement.framed.get(**slot).copied().unwrap_or(false);
+        // only framed lanes: a start change elsewhere moved the slot
+        let framed = |&&(container, _): &&(usize, usize)| {
+            matches!(placement.framing.get(&container), Some(Ok(())))
+        };
         changed.started = written.started.iter().filter(framed).copied().collect();
         changed.scroll_states = done.states_changed;
         self.made_from(placement, viewport.scale)

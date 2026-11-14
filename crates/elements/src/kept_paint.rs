@@ -89,3 +89,7 @@ fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> 
     *input.cache = cache;
     painted
 }
+
+#[cfg(test)]
+#[path = "kept_paint_tests.rs"]
+mod tests;

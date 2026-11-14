@@ -114,12 +114,24 @@ impl Placed {
     /// mapped to slots by `to`.
     fn put_box(&mut self, mut layout_box: LayoutBox, (key, slot): (Key, usize), to: &[usize]) {
         self.hold(key, slot);
-        // a container built again starts its lane afresh
-        self.lanes.borrow_mut().remove(slot);
+        // a container built again starts its lane afresh, after lending
+        self.lanes.borrow_mut().rebuilt.push(slot);
         for child in &mut layout_box.children {
             *child = to[*child];
         }
         self.boxes[slot] = layout_box;
+    }
+
+    /// Drops the lanes of the containers built again (`put_box`), each
+    /// to start afresh, once the boxes are lent their caches: a lane puts
+    /// its children's starts back in the layouts they hold then, which
+    /// a container lent its cache, not laid out again, keeps (section
+    /// 11.2).
+    pub(crate) fn drop_lanes(&mut self) {
+        let mut lanes = self.lanes.borrow_mut();
+        for slot in std::mem::take(&mut lanes.rebuilt) {
+            lanes.remove(slot, &mut self.boxes);
+        }
     }
 
     /// Records that `key` holds `slot`.
@@ -158,7 +170,7 @@ impl Placed {
     /// Frees the taken slots no new box took, once every subtree is put.
     pub(crate) fn free_taken(&mut self, taken: &Taken) {
         for slot in taken.slots.values() {
-            self.lanes.borrow_mut().remove(*slot);
+            self.lanes.borrow_mut().remove(*slot, &mut self.boxes);
         }
         self.slots.free.extend(taken.slots.values().copied());
         self.slots.free.sort_unstable_by(|a, b| b.cmp(a));

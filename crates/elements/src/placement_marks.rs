@@ -7,6 +7,7 @@
 
 use rustc_hash::FxHashMap;
 
+use crate::layout::{Lanes, Written};
 use crate::placement::{Changes, NO_SLOT, Placement};
 use crate::placement_walk::Mark;
 
@@ -46,9 +47,14 @@ impl Marked {
 
 impl Placement {
     /// Marks the slots `changes` names, and those up each one's chain.
-    pub(crate) fn mark(&mut self, changes: &Changes<'_>) -> Marked {
+    pub(crate) fn mark(&mut self, changes: &Changes<'_>, lanes: &Lanes) -> Marked {
         let written = &changes.written;
-        let dirty = written.laid_out.iter().chain(&written.changed);
+        let started = self.started_unframed(written, lanes);
+        let dirty = written
+            .laid_out
+            .iter()
+            .chain(&written.changed)
+            .chain(&started);
         let mut marked = Marked::default();
         for &slot in dirty {
             self.mark_up(slot, Mark::Dirty, &mut marked);
@@ -60,6 +66,21 @@ impl Placement {
             self.mark_up(slot, Mark::Rebuilt, &mut marked);
         }
         marked
+    }
+
+    /// The children whose start may have changed in each lane that was
+    /// not framed: placed again, their starts added back, worked out in
+    /// one pass along each lane (`Lanes::offsets_from`). A framed
+    /// lane's are not; their frames' shifts carry the start, and a lane
+    /// whose framing changes places every child (`placement_frames.rs`).
+    fn started_unframed(&self, written: &Written, lanes: &Lanes) -> Vec<usize> {
+        let unframed = |&&(container, _): &&(usize, usize)| {
+            !matches!(self.framing.get(&container), Some(Ok(())))
+        };
+        let started = written.started.iter().filter(unframed);
+        started
+            .flat_map(|&(container, first)| lanes.offsets_from(container, first))
+            .collect()
     }
 
     /// Marks `slot` with `mark`, and the slots up its chain not yet

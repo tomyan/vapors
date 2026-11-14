@@ -64,4 +64,21 @@ impl Walk<'_, '_> {
             self.visit(child, inner, true);
         }
     }
+
+    /// Whether `slot`, built again, is a lane whose children are frames
+    /// and whose content stayed at `before`: its kept children's rects,
+    /// in their own frames, are as they were, so only the marked ones (a
+    /// child built again is) are placed (section 11.2). A framed lane
+    /// hoists nothing (`visit_hoisted_along`).
+    // Exact, as the content origin is compared otherwise.
+    #[allow(clippy::float_cmp)]
+    pub(crate) fn framed_in_place(
+        &self,
+        slot: usize,
+        inner: (f32, f32),
+        before: (f32, f32),
+    ) -> bool {
+        let framed = matches!(self.kept.framing.get(&slot), Some(Ok(())));
+        framed && inner == before
+    }
 }
