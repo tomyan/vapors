@@ -821,3 +821,86 @@ name the functions and lines they mirror, as `lane_block.rs` does for
   layout to Taffy, counted as a runtime decline. Rows with `overflow:
   visible` and an auto height have a minimum equal to their content,
   so in the usual list nothing can shrink and the lane holds.
+
+## 11. Lane frames: PR 4's design
+
+PR 4 (section 7) makes a lane child's position derived: an insert
+moves no later child's stored position, and nothing below a later
+child is placed, painted, shifted or read for it again. This section is
+how, after reading the paint side as it is (`frames.rs`,
+`kept_clips.rs`, `frames_update.rs`, `kept_batches.rs`,
+`frame_extents.rs`, `placement_walk.rs`, `a11y_mirror_state.rs`).
+
+### 11.1 What a lane frame is
+
+Paint already draws every part in its frame's coordinates and adds the
+frame's shift on read: scene items (`Frames::item`), hits
+(`Frames::hit`), border boxes and origins (`Frames::rect`, `point`),
+batches (`frames_draw.rs`, the shift as a uniform). Today a frame is a
+scroll container's content (IU4). A **lane frame** is a lane child: its
+own box and everything placed below it are in its coordinates, and its
+shift is its scroll frame's shift plus its start along the axis from
+the lane's tree. An insert changes the later children's starts, so
+their frames' shifts, and nothing in them.
+
+Lane frames are lighter than scroll frames:
+- A lane frame clips nothing: its clip is its scroll frame's.
+- It is not in `Frames::of`'s list or the nested-scroller index
+  (`frames_nested.rs`): those are per scroll container and made per
+  paint, O(rows) if rows were in them. A lane frame is resolved on
+  first read and memoised for the paint (section 5.4's `Frames::at`):
+  O(frames read), the rows drawn and hit.
+- Its shift is whole device pixels, as a scroll frame's is (snapped
+  items keep their bits only under a whole shift). A lane child is a
+  frame only when its start times the scale is a whole number; a lane
+  with a fractional start keeps today's placement for its children
+  (correct, O(rows after)), counted as a decline, `LaneFramePixel`.
+- The first slice refuses a scroll container inside a lane child
+  (`LaneFrameScroller`): a scroll frame's shift is worked out from the
+  frame it is in when frames are made, and a lane frame is resolved
+  later. Lifting it means scroll frames composing their shift on read.
+
+### 11.2 What each side does
+
+- **Layout** (4c): a lane child's `Layout.location` along the axis
+  holds its relative offset only; the lane writes a child's layout when
+  the child was laid out, not when its start moved
+  (`lane_layout.rs` `write_starts` goes). The debug layout check adds
+  the start to a lane child's location before comparing with Taffy.
+- **Clips** (4b): `Clips::frame_inside` names a lane child's slot as
+  the frame of its own box and of everything below it; a lane child's
+  own frame is itself (a scroll container's own box is in its parent's
+  frame; a row's moves with it).
+- **Placement** (4b): a lane child's rect is in its own frame, its
+  start left out, so after an insert the later children's rects are
+  unchanged and the walk does not enter them: `boxes_moved` and
+  `boxes_shifted` 0. Until 4c removes the writes, the walk still visits
+  them (their layouts were written) and finds nothing changed.
+- **Frames** (4b): `Frames::at(frame)` resolves a lane frame from the
+  lane's `start(handle)` and its scroll frame's `FrameAt`. The lanes
+  live beside the boxes (`Placed::lanes`), so paint holds them when it
+  reads frames.
+- **Draw** (4b): each lane frame drawn is a batch frame with its shift
+  in the uniform table (4-iii): O(rows drawn); batches already break per
+  row on the rows page.
+- **Culling** (4d): a lane is one entry in its scroll frame's extents
+  index (`frame_extents.rs`), with its total extent and largest reach
+  (section 10.1); the children that can show come from `between(view)`,
+  and each child's steps are indexed in its own frame. Until 4d, a lane
+  frame's steps are tested by the view moved by its shift.
+- **Hits** (4d): a hit test inside a lane asks `between(y, y)` first
+  and tests one row's hits (section 5.2); until then the scan over kept
+  hits reads each hit's frame, as it does for scroll frames.
+- **a11y** (4b): the take is told of the lane children whose start
+  changed (a `started` list from the lane, which is O(rows after) but
+  only slots), so the mirror's records stay right; section 5.3's
+  mirror in flow (PR 5) removes that term.
+
+### 11.3 Slices
+
+| Slice | Content | Accepted when |
+|---|---|---|
+| 4a | This note | reviewed |
+| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` 0, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged; `--scaling Insert` `paint` within 2% across sizes |
+| 4c | Layout leaves starts out of later children's layouts; the layout check derives them | `layout` within 2% across sizes for Insert and FlexInsert |
+| 4d | Culling and hits through `between`; the lane's extents entry | every phase but `accessibility` within 2% across sizes |
