@@ -42,7 +42,7 @@ pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,
     SurfaceState, UnsupportedFormat,
 };
-pub use shape_store::{ShapeError, ShapeStore, kind_of};
+pub use shape_store::{ShapeError, ShapeStore, kind_of, shape_item};
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
 pub use tooltip_error::TooltipError;

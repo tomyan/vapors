@@ -15,6 +15,14 @@ use crate::{KeptRange, Retained, Target, WorkCounter};
 /// buffer, the pipeline's stride and its attribute offsets read.
 pub(crate) const VERTEX_BYTES: u64 = size_of::<MeshVertex>() as u64;
 
+/// The bytes `triangles` take in the entry buffer: three vertices each,
+/// padded to 16, the one answer the store's registration limit, its
+/// upload count and the buffer agree on.
+#[must_use]
+pub fn mesh_entry_bytes(triangles: usize) -> u64 {
+    (triangles as u64 * 3 * VERTEX_BYTES).next_multiple_of(16)
+}
+
 /// One entry's triangles on the GPU.
 #[derive(Debug)]
 pub struct MeshEntry {
@@ -90,7 +98,9 @@ impl MeshEntries {
 /// with zeros to a multiple of 16 bytes for the kept buffer.
 pub(crate) fn vertex_bytes(triangles: &[[MeshVertex; 3]]) -> Vec<u8> {
     let size = size_of::<MeshVertex>();
-    let mut bytes = vec![0; (triangles.len() * 3 * size).next_multiple_of(16)];
+    let len =
+        usize::try_from(mesh_entry_bytes(triangles.len())).expect("a mesh entry fits in memory");
+    let mut bytes = vec![0; len];
     for (at, vertex) in triangles.iter().flatten().enumerate() {
         let start = at * size;
         put(

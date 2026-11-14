@@ -17,11 +17,38 @@ pub use crate::shape_error::ShapeError;
 use vapors_shapes::{Geometry, Paint, ShapeEntry, ShapeTable, paint_of};
 
 /// The registered entries, by [`ShapeRef`].
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ShapeStore {
     entries: Vec<Registered>,
     /// The first entry whose vertices, if a mesh, are not uploaded.
     pub(crate) unuploaded: usize,
+    /// The entry buffer's bytes for every mesh registered.
+    pub(crate) mesh_bytes: u64,
+    /// The most the entry buffer can hold: the device's
+    /// `max_buffer_size`, which registration refuses to pass.
+    pub(crate) buffer_limit: u64,
+}
+
+impl ShapeStore {
+    /// A store whose entry buffer holds at most `limit` bytes (the
+    /// device's `max_buffer_size`).
+    #[must_use]
+    pub fn with_buffer_limit(limit: u64) -> Self {
+        Self {
+            entries: Vec::new(),
+            unuploaded: 0,
+            mesh_bytes: 0,
+            buffer_limit: limit,
+        }
+    }
+}
+
+impl Default for ShapeStore {
+    /// A store with no limit on its entry buffer, for tests without a
+    /// device; the painter's has the device's.
+    fn default() -> Self {
+        Self::with_buffer_limit(u64::MAX)
+    }
 }
 
 #[derive(Debug)]
@@ -40,9 +67,13 @@ impl ShapeStore {
     /// # Errors
     /// [`ShapeError::Table`] when the table's check refuses it (an
     /// undrawable geometry, a rect with elliptical corners, bytes that
-    /// begin with no paint, among others); nothing is registered then.
+    /// begin with no paint, among others), and
+    /// [`ShapeError::MeshBytes`] when its meshes would take the entry
+    /// buffer past the device's `max_buffer_size`; nothing is
+    /// registered then.
     pub fn register(&mut self, table: &ShapeTable) -> Result<Vec<ShapeRef>, ShapeError> {
         table.check().map_err(ShapeError::Table)?;
+        self.mesh_bytes = self.check_mesh_bytes(table)?;
         let first = self.entries.len();
         self.entries.extend(table.entries().iter().map(registered));
         Ok((first..self.entries.len()).map(shape_ref).collect())
@@ -88,20 +119,39 @@ impl ShapeStore {
                 registered: self.entries.len(),
             })?;
         let entry = kind_of(&registered.entry.geometry);
-        if item.kind != entry || run != entry {
+        if item.kind() != entry || run != entry {
             return Err(ShapeError::Kind {
                 shape,
                 site: registered.entry.site,
-                item: item.kind,
+                item: item.kind(),
                 entry,
             });
         }
         Ok(registered)
     }
 
+    /// The entry at `index`, which the store issued.
+    pub(crate) fn at(&self, index: usize) -> &Registered {
+        &self.entries[index]
+    }
+
     pub(crate) fn entries_mut(&mut self) -> &mut [Registered] {
         &mut self.entries
     }
+}
+
+/// An item drawing `entry`, registered as `shape`, with its kind from
+/// the entry's geometry ([`kind_of`]): the way to build a shape item,
+/// so its kind and its entry's cannot disagree.
+#[must_use]
+pub fn shape_item(
+    entry: &ShapeEntry,
+    shape: ShapeRef,
+    transform: [f32; 6],
+    colour: vapors_scene::Color,
+    bounds: vapors_scene::Rect,
+) -> Shape {
+    Shape::new(shape, kind_of(&entry.geometry), transform, colour, bounds)
 }
 
 /// The kind `geometry` is drawn as: the one answer an item's kind is

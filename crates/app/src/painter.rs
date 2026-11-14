@@ -78,7 +78,7 @@ impl ScenePainter {
             closed_forms: ClosedFormPipeline::new(device, format),
             meshes: MeshPipeline::new(device, format),
             mesh_entries: MeshEntries::new(device),
-            shapes: ShapeStore::default(),
+            shapes: ShapeStore::with_buffer_limit(device.limits().max_buffer_size),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
@@ -140,7 +140,9 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
-        self.counts.shape_bytes_uploaded = self.shapes.upload(&mut self.mesh_entries, target);
+        let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
+        self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
+        self.counts.meshes += uploaded;
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
         if runs.is_ok() {

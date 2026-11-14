@@ -20,7 +20,7 @@ use vapors_renderer::{
     ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
     Shift, Target,
 };
-use vapors_scene::{Item, Rect, Run};
+use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
@@ -30,19 +30,9 @@ use crate::shape_store::ShapeStore;
 #[path = "painter_kept_gpu.rs"]
 mod gpu;
 pub(super) use gpu::KeptGpu;
-
-/// Which pipeline's buffer holds a batch's bytes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Kind {
-    Shadows,
-    Quads,
-    /// Closed-form shapes: the closed-form pipeline's.
-    ClosedForms,
-    /// Mesh shapes' instances: the mesh pipeline's.
-    Meshes,
-    /// Image and surface quads: the image pipeline's.
-    Images,
-}
+#[path = "painter_kept_bytes.rs"]
+mod bytes;
+pub(super) use bytes::{Kind, RunBytes, run_bytes};
 
 /// The pipelines whose buffers hold kept bytes, the atlas the text
 /// pipeline's name, and the store shape items name entries in.
@@ -82,15 +72,19 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(range) = self.kept.range(pipelines, target, (run, key, at))? else {
+        let Some(kept) = self.kept.range(pipelines, target, (run, key, at))? else {
             return Ok(());
         };
+        let range = kept.range;
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
             Run::Quads(_) => self.quads.draw_kept(target, range, shift),
             Run::Shapes(_) => self.closed_forms.draw_kept(target, range, shift),
-            Run::Meshes(items) => {
-                let drawn = self.shapes.mesh_entries(items).map_err(PaintError::Shape)?;
+            Run::Meshes(_) => {
+                let drawn = self
+                    .shapes
+                    .uploaded(kept.meshes)
+                    .map_err(PaintError::Shape)?;
                 let entries = (&mut self.mesh_entries, drawn.as_slice());
                 self.meshes.draw_kept(target, range, shift, entries);
             }
@@ -198,59 +192,10 @@ impl Pipelines<'_> {
     }
 }
 
-impl Kind {
-    /// The pipeline that keeps `run`'s bytes; `None` for text and icon
-    /// runs, kept by the text pipeline (`painter_kept_text.rs`).
-    pub(super) fn of_run(run: &Run) -> Option<Self> {
-        match run {
-            Run::Shadows(_) => Some(Self::Shadows),
-            Run::Quads(_) => Some(Self::Quads),
-            Run::Shapes(_) => Some(Self::ClosedForms),
-            Run::Meshes(_) => Some(Self::Meshes),
-            Run::Images(_) | Run::Surfaces(_) => Some(Self::Images),
-            Run::Texts(_) | Run::Icons(_) => None,
-        }
-    }
-
-    fn of(run: &Run) -> Self {
-        Self::of_run(run).expect("only shadow, quad, shape, image and surface runs are kept")
-    }
-}
-
-/// `run`'s instance or vertex bytes, as its pipeline draws them, a
-/// shape run's entries from `shapes`.
-///
-/// # Errors
-/// A shape run naming an entry `shapes` cannot draw.
-pub(super) fn run_bytes(run: &Run, shapes: &ShapeStore) -> Result<Vec<u8>, PaintError> {
-    Ok(match run {
-        Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
-        Run::Quads(quads) => QuadPipeline::bytes(quads),
-        Run::Shapes(items) => {
-            ClosedFormPipeline::bytes(&shapes.closed_forms(items).map_err(PaintError::Shape)?)
-        }
-        Run::Meshes(items) => {
-            MeshPipeline::bytes(&shapes.mesh_instances(items).map_err(PaintError::Shape)?)
-        }
-        Run::Images(items) | Run::Surfaces(items) => {
-            ImagePipeline::rect_bytes(items.iter().map(item_rect))
-        }
-        Run::Texts(_) | Run::Icons(_) => unreachable!("text and icon runs are not kept"),
-    })
-}
-
 /// The blend a text or icon run draws with.
 fn blend(run: &Run) -> BlendParams {
     match run {
         Run::Icons(_) => ICON_BLEND,
         _ => BlendParams::default(),
-    }
-}
-
-/// An image or surface item's rect.
-fn item_rect(item: &Item) -> Rect {
-    match item {
-        Item::Image { rect, .. } | Item::Surface { rect, .. } => *rect,
-        other => unreachable!("an image or surface run holds {other:?}"),
     }
 }

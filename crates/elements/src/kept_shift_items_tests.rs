@@ -8,22 +8,24 @@ use super::shifted_item;
 #[test]
 fn a_shifted_shape_moves_its_translation_and_bounds() {
     // Given
-    let shape = Shape {
-        shape: ShapeRef(4),
-        kind: vapors_scene::ShapeKind::ClosedForm,
-        transform: [2.0, 0.5, -0.5, 2.0, 10.0, 20.0],
-        colour: Color::from_rgba8(1, 2, 3, 255),
-        bounds: Rect::new(8.0, 18.0, 30.0, 44.0),
-    };
+    let shape = Shape::new(
+        ShapeRef(4),
+        vapors_scene::ShapeKind::ClosedForm,
+        [2.0, 0.5, -0.5, 2.0, 10.0, 20.0],
+        Color::from_rgba8(1, 2, 3, 255),
+        Rect::new(8.0, 18.0, 30.0, 44.0),
+    );
 
     // When
     let moved = shifted_item(Item::Shape(shape), [3.0, -4.0]);
 
     // Then
-    let expected = Shape {
-        transform: [2.0, 0.5, -0.5, 2.0, 13.0, 16.0],
-        bounds: Rect::new(11.0, 14.0, 33.0, 40.0),
-        ..shape
-    };
+    let expected = Shape::new(
+        shape.shape,
+        shape.kind(),
+        [2.0, 0.5, -0.5, 2.0, 13.0, 16.0],
+        shape.colour,
+        Rect::new(11.0, 14.0, 33.0, 40.0),
+    );
     assert_eq!(moved, Item::Shape(expected));
 }

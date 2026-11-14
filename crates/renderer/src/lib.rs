@@ -57,7 +57,7 @@ pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
 pub use kept_bind_group::KeptBindGroup;
 pub use kept_range::KeptRange;
-pub use mesh_entries::{MeshEntries, MeshEntry};
+pub use mesh_entries::{MeshEntries, MeshEntry, mesh_entry_bytes};
 pub use mesh_shape::MeshShape;
 pub use meshes::MeshPipeline;
 pub use mips::{upload_rgba8_mipmapped, upload_rgba8_mipmapped_counted};

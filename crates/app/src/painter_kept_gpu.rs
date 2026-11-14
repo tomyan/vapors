@@ -9,7 +9,7 @@ use vapors_scene::Run;
 use vapors_text::{GlyphAtlas, TextPipeline};
 
 use super::super::errors::PaintError;
-use super::{Kind, Pipelines, run_bytes};
+use super::{Kind, Pipelines, RunBytes, run_bytes};
 use crate::shape_store::ShapeStore;
 
 #[path = "painter_kept_text.rs"]
@@ -30,12 +30,22 @@ pub(crate) struct KeptGpu {
     kept: u64,
 }
 
+/// A drawn batch's kept range, and a mesh run's items' entries by the
+/// store's index.
+pub(crate) struct Kept<'a> {
+    pub(crate) range: &'a KeptRange,
+    pub(crate) meshes: &'a [usize],
+}
+
 /// One batch's kept bytes.
 struct Gpu {
     range: KeptRange,
     kind: Kind,
     /// How many bytes `range` holds.
     len: u64,
+    /// A mesh run's items' entries, by the store's index, beside their
+    /// instances in `range`: built once with the bytes.
+    meshes: Vec<usize>,
     drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -65,7 +75,7 @@ impl KeptGpu {
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
         (run, key, at): (&Run, BatchKey, usize),
-    ) -> Result<Option<&KeptRange>, PaintError> {
+    ) -> Result<Option<Kept<'_>>, PaintError> {
         match self.entries.get(&key) {
             Some(gpu) => {
                 gpu.check(run, at, pipelines.shapes);
@@ -79,7 +89,10 @@ impl KeptGpu {
         }
         let gpu = self.entries.get_mut(&key).expect("kept or written above");
         gpu.drawn = self.frame;
-        Ok(Some(&gpu.range))
+        Ok(Some(Kept {
+            range: &gpu.range,
+            meshes: &gpu.meshes,
+        }))
     }
 
     /// Builds and writes `run`'s bytes under `key`; `None` when the
@@ -90,7 +103,8 @@ impl KeptGpu {
         target: &Target<'_>,
         (run, key): (&Run, BatchKey),
     ) -> Result<Option<()>, PaintError> {
-        let (kind, bytes) = (Kind::of(run), run_bytes(run, pipelines.shapes)?);
+        let (kind, built) = (Kind::of(run), run_bytes(run, pipelines.shapes)?);
+        let RunBytes { bytes, meshes } = built;
         let Some(range) = pipelines.keep(kind, target, &bytes) else {
             return Ok(None);
         };
@@ -99,6 +113,7 @@ impl KeptGpu {
             range,
             kind,
             len: bytes.len() as u64,
+            meshes,
             drawn: self.frame,
             #[cfg(debug_assertions)]
             bytes,
@@ -140,7 +155,7 @@ impl Gpu {
         {
             let fresh = run_bytes(run, shapes)
                 .expect("built when these bytes were kept; the store only grows");
-            super::super::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
+            super::super::kept_check::assert_kept(&self.bytes, &fresh.bytes, (run, at));
         }
         #[cfg(not(debug_assertions))]
         let _ = (run, at, shapes); // only the debug build's compare uses them

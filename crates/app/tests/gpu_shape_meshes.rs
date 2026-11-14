@@ -7,8 +7,10 @@
 mod support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
+use vapors_app::shape_item;
 use vapors_elements::test_items::paint_after_background;
-use vapors_scene::{Color, Item, Rect, Shape, ShapeKind, ShapeRef};
+use vapors_renderer::mesh_entry_bytes;
+use vapors_scene::{Color, Item, Rect, ShapeRef};
 use vapors_shapes::{
     FillRule, Geometry, IconPath, MeshVertex, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
     hash_bytes, tessellate,
@@ -57,16 +59,17 @@ fn table() -> ShapeTable {
     )
 }
 
-/// Shape `shape` of `kind` moved to `at` in `colour`, its bounds `size`
-/// from there.
-fn item(shape: u32, kind: ShapeKind, at: [f32; 2], size: [f32; 2], colour: [u8; 4]) -> Item {
-    Item::Shape(Shape {
-        shape: ShapeRef(shape),
-        kind,
-        transform: [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
-        colour: Color::from_rgba8(colour[0], colour[1], colour[2], colour[3]),
-        bounds: Rect::new(at[0], at[1], at[0] + size[0], at[1] + size[1]),
-    })
+/// Entry `shape` of `table()` moved to `at` in `colour`, its bounds
+/// `size` from there, its kind from the entry (`shape_item`).
+fn item(shape: u32, at: [f32; 2], size: [f32; 2], colour: [u8; 4]) -> Item {
+    let table = table();
+    Item::Shape(shape_item(
+        &table.entries()[shape as usize],
+        ShapeRef(shape),
+        [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
+        Color::from_rgba8(colour[0], colour[1], colour[2], colour[3]),
+        Rect::new(at[0], at[1], at[0] + size[0], at[1] + size[1]),
+    ))
 }
 
 /// A red rect at (0, 0), a blue mesh square over its right end at
@@ -78,14 +81,13 @@ fn page() -> vapors_elements::Document {
         &[(None, "div", "a")],
     );
     let a = doc.children(doc.body())[0];
-    let (closed, mesh) = (ShapeKind::ClosedForm, ShapeKind::Mesh);
     paint_after_background(
         a,
         vec![
-            item(0, closed, [0.0, 0.0], [12.0, 8.0], RED),
-            item(1, mesh, [8.0, 0.0], [8.0, 8.0], BLUE),
-            item(0, closed, [14.0, 2.0], [12.0, 8.0], RED),
-            item(2, mesh, [0.0, 23.0], [12.0, 2.0], BLUE),
+            item(0, [0.0, 0.0], [12.0, 8.0], RED),
+            item(1, [8.0, 0.0], [8.0, 8.0], BLUE),
+            item(0, [14.0, 2.0], [12.0, 8.0], RED),
+            item(2, [0.0, 23.0], [12.0, 2.0], BLUE),
         ],
     );
     update(&mut doc, 1.0);
@@ -124,16 +126,40 @@ fn gpu_meshes_are_drawn_in_paint_order_with_closed_forms() {
     assert_eq!((counts.shapes.draw_calls, counts.meshes.draw_calls), (2, 2));
 }
 
+/// The entry buffer's bytes for `table`'s meshes.
+fn mesh_bytes(table: &ShapeTable) -> u64 {
+    table
+        .entries()
+        .iter()
+        .map(|entry| match entry.geometry {
+            Geometry::Mesh { triangles } => mesh_entry_bytes(triangles.len()),
+            _ => 0,
+        })
+        .sum()
+}
+
 #[test]
-fn gpu_mesh_vertices_upload_once_and_an_unchanged_frame_writes_nothing() {
+fn gpu_mesh_vertices_upload_once_each_and_an_unchanged_frame_writes_nothing() {
     // Given
     let doc = page();
     let mut rig = rig();
-    let first = rig.draw(&doc).expect("paints");
-    let uploaded = rig.painter.frame_counts().shape_bytes_uploaded;
-    assert!(uploaded > 0, "the two meshes' vertices");
 
-    // When
+    // When: the first frame
+    let first = rig.draw(&doc).expect("paints");
+
+    // Then: exactly the two meshes' vertices
+    let counts = rig.painter.frame_counts();
+    assert_eq!(counts.shape_bytes_uploaded, mesh_bytes(&table()));
+    assert!(
+        counts.retained_bytes >= mesh_bytes(&table()),
+        "the entry buffer is held"
+    );
+    assert!(
+        counts.meshes.buffer_bytes >= mesh_bytes(&table()),
+        "and its writes counted in the mesh runs' work"
+    );
+
+    // When: drawn again unchanged
     let again = rig.draw(&doc).expect("paints");
 
     // Then
@@ -141,4 +167,39 @@ fn gpu_mesh_vertices_upload_once_and_an_unchanged_frame_writes_nothing() {
     assert_eq!(counts.shape_bytes_uploaded, 0, "{counts:?}");
     assert_eq!(counts.meshes.buffer_bytes + counts.shapes.buffer_bytes, 0);
     assert!(again == first, "the kept shapes draw the same pixels");
+}
+
+#[test]
+fn gpu_a_table_registered_later_uploads_its_own_meshes_once() {
+    // Given: a frame drawn, then a second table with one mesh registered
+    let doc = page();
+    let mut rig = rig();
+    rig.draw(&doc).expect("paints");
+    let triangle = mesh("M0 0L6 0L0 6z", Paint::Fill(FillRule::NonZero));
+    let later = ShapeTable::new(
+        "later",
+        TABLE_FORMAT,
+        Box::leak(Box::new([ShapeEntry {
+            site: "gpu_shape_meshes.rs:9",
+            canonical: b"Ftri",
+            hash: hash_bytes(b"Ftri"),
+            geometry: Geometry::Mesh {
+                triangles: triangle,
+            },
+        }])),
+    );
+    rig.painter
+        .shapes_mut()
+        .register(&later)
+        .expect("registers");
+
+    // When: the next two frames
+    rig.draw(&doc).expect("paints");
+    let second = rig.painter.frame_counts().shape_bytes_uploaded;
+    rig.draw(&doc).expect("paints");
+    let third = rig.painter.frame_counts().shape_bytes_uploaded;
+
+    // Then: only the new table's mesh, then nothing
+    assert_eq!(second, mesh_entry_bytes(triangle.len()));
+    assert_eq!(third, 0);
 }

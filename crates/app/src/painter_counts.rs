@@ -37,7 +37,8 @@ pub struct FrameCounts {
     /// viewport.
     pub shapes: GpuWork,
     /// Mesh shape runs: one draw per item, the run's instances and the
-    /// viewport.
+    /// viewport; and the frame's upload of mesh entries' vertices,
+    /// with the entry buffer's growth and compaction.
     pub meshes: GpuWork,
     /// Bytes of mesh entries' vertices uploaded at the frame's start:
     /// those registered since the last frame; 0 on a frame that
@@ -72,7 +73,8 @@ pub struct FrameCounts {
     /// built or written.
     pub batches_kept: u64,
     /// Bytes held in the pipelines' kept buffers after the frame: the
-    /// batches it drew. Those it did not draw are released.
+    /// batches it drew (those it did not draw are released), and every
+    /// mesh entry's vertices, which the painter keeps for its life.
     pub retained_bytes: u64,
     /// Glyph and icon lookups in the atlas: 0 on a frame whose text and
     /// icon batches are all kept.
@@ -177,7 +179,7 @@ impl ScenePainter {
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
         (self.counts.batches_written, self.counts.batches_kept) = self.kept.drawn();
-        self.counts.retained_bytes = self.retained_bytes();
+        self.counts.retained_bytes = self.retained_bytes() + self.mesh_entries.bytes();
         self.counts.atlas_lookups = self.atlas.lookups() - self.counts.atlas_lookups;
         self.counts.atlas_pin_clears = self.atlas.pin_clears() - self.counts.atlas_pin_clears;
     }

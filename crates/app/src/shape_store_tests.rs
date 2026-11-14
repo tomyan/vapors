@@ -39,22 +39,29 @@ const RECT: Geometry = Geometry::Rect {
 pub(crate) const IDENTITY: [f32; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 /// `entries` as a table that lives for the test binary's life.
-fn table(entries: Vec<ShapeEntry>) -> ShapeTable {
+pub(crate) fn table(entries: Vec<ShapeEntry>) -> ShapeTable {
     ShapeTable::new("demo", TABLE_FORMAT, Box::leak(entries.into_boxed_slice()))
 }
 
 /// The canonical bytes of a stroke of width 2: `S` and the width.
 const STROKE_2: &[u8] = &[b'S', 0, 0, 0, 64, b'M'];
 
-/// An item drawing `shape` under `transform` in blue.
+/// An item drawing closed form `shape` under `transform` in blue.
 pub(crate) fn item(shape: u32, transform: [f32; 6]) -> Shape {
-    Shape {
-        shape: ShapeRef(shape),
-        kind: ShapeKind::ClosedForm,
+    item_of(shape, ShapeKind::ClosedForm, transform)
+}
+
+/// An item saying `kind` for `shape`, under `transform` in blue: built
+/// by hand, so tests can make it disagree with its entry.
+pub(crate) fn item_of(shape: u32, kind: ShapeKind, transform: [f32; 6]) -> Shape {
+    let blue = Color::from_rgba8(0, 0, 255, 255);
+    Shape::new(
+        ShapeRef(shape),
+        kind,
         transform,
-        colour: Color::from_rgba8(0, 0, 255, 255),
-        bounds: Rect::new(0.0, 0.0, 16.0, 16.0),
-    }
+        blue,
+        Rect::new(0.0, 0.0, 16.0, 16.0),
+    )
 }
 
 /// `geometry` as the pipeline draws it under the identity in blue.

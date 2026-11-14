@@ -32,8 +32,18 @@ pub enum ShapeError {
         /// The kind its entry's geometry is.
         entry: ShapeKind,
     },
-    /// A mesh entry whose vertices are not on the GPU: the painter
-    /// uploads every registered entry at the start of each frame.
+    /// A table whose meshes would take the painter's entry buffer past
+    /// the device's `max_buffer_size`.
+    MeshBytes {
+        /// The table's crate.
+        crate_name: &'static str,
+        /// The entry buffer's bytes with the table.
+        needed: u64,
+        /// The device's `max_buffer_size`.
+        limit: u64,
+    },
+    /// A mesh entry whose vertices are not on the GPU: its upload at
+    /// the start of the frame was refused (on the frame's encoder).
     NotUploaded {
         /// The ref.
         shape: ShapeRef,
@@ -101,9 +111,17 @@ impl fmt::Display for ShapeError {
                 "shape {}, the entry at {site}, is a {entry:?} but its item says {item:?}; build the item's kind from its entry's geometry; reproduce with `cargo test -p vapors-app --lib shape_store`",
                 shape.0
             ),
+            Self::MeshBytes {
+                crate_name,
+                needed,
+                limit,
+            } => write!(
+                f,
+                "shape table of crate {crate_name} would put {needed} bytes of mesh vertices in the painter's entry buffer, over the device's max_buffer_size of {limit}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
+            ),
             Self::NotUploaded { shape, site } => write!(
                 f,
-                "shape {}, the mesh at {site}, has no vertices on the GPU; draw through ScenePainter, which uploads every registered entry before a frame; reproduce with `cargo test -p vapors-app --test gpu_shapes`",
+                "shape {}, the mesh at {site}, has no vertices on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
                 shape.0
             ),
         }
