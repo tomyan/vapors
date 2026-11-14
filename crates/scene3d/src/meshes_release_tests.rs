@@ -3,7 +3,11 @@ use crate::{Colour, NodeKind, Scene, Transform};
 
 fn triangle(meshes: &mut Meshes) -> GeometryHandle {
     meshes
-        .geometry(vec![Vec3::ZERO, Vec3::X, Vec3::Y], vec![0, 1, 2])
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![1.0; 3],
+        )
         .unwrap()
 }
 

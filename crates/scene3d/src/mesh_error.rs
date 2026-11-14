@@ -43,20 +43,35 @@ pub enum MeshError {
         /// Where it is in the positions.
         at: usize,
     },
+    /// Not one shade per position.
+    ShadeCount {
+        /// How many shades there are.
+        shades: usize,
+        /// How many positions there are.
+        positions: usize,
+    },
+    /// A shade outside 0 to 1, or not a number.
+    ShadeOutOfRange {
+        /// Where it is in the shades.
+        at: usize,
+        /// Its value.
+        shade: f32,
+    },
 }
 
 /// WebGPU's default `maxBufferSize` (256 MiB), the limit every
 /// adapter supports, so geometry under it uploads on any of them.
 pub(crate) const MAX_BUFFER_BYTES: usize = 256 * 1024 * 1024;
 
-const POSITION_BYTES: usize = std::mem::size_of::<Vec3>();
+/// A vertex as uploaded: its position's three floats, then its shade.
+const VERTEX_BYTES: usize = std::mem::size_of::<Vec3>() + std::mem::size_of::<f32>();
 const INDEX_BYTES: usize = std::mem::size_of::<u32>();
 
 /// Refuses buffers of `positions` and `indices` that exceed
 /// [`MAX_BUFFER_BYTES`].
 pub(crate) fn check_sizes(positions: usize, indices: usize) -> Result<(), MeshError> {
     let sized = [
-        ("position", positions, POSITION_BYTES),
+        ("vertex", positions, VERTEX_BYTES),
         ("index", indices, INDEX_BYTES),
     ];
     for (buffer, count, each) in sized {
@@ -71,6 +86,25 @@ pub(crate) fn check_sizes(positions: usize, indices: usize) -> Result<(), MeshEr
         }
     }
     Ok(())
+}
+
+/// Refuses shades that are not one per position, each from 0 to 1
+/// (docs/plans/one-scene.md D4: the node's colour is multiplied by its
+/// vertices' shades). There is no default: a geometry gives every shade.
+pub(crate) fn check_shades(shades: &[f32], positions: usize) -> Result<(), MeshError> {
+    if shades.len() != positions {
+        return Err(MeshError::ShadeCount {
+            shades: shades.len(),
+            positions,
+        });
+    }
+    match shades.iter().position(|shade| !(0.0..=1.0).contains(shade)) {
+        Some(at) => Err(MeshError::ShadeOutOfRange {
+            at,
+            shade: shades[at],
+        }),
+        None => Ok(()),
+    }
 }
 
 /// Refuses geometry the scene cannot draw.
@@ -138,6 +172,14 @@ impl fmt::Display for MeshError {
             Self::NonFinite { at } => {
                 write!(f, "position {at} is NaN or infinite: give finite positions")
             }
+            Self::ShadeCount { shades, positions } => write!(
+                f,
+                "the geometry has {shades} shades for {positions} positions: give one shade, from 0 to 1, per position"
+            ),
+            Self::ShadeOutOfRange { at, shade } => write!(
+                f,
+                "shade {at} is {shade}, outside 0 to 1: give each vertex's shade as a fraction of the node's colour"
+            ),
         }
     }
 }

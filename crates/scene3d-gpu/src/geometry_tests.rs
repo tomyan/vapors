@@ -1,10 +1,14 @@
 use super::*;
-use vapors_scene3d::{Colour, Meshes, NodeKind, Scene, Transform};
+use vapors_scene3d::{Colour, Meshes, NodeKind, Scene, Transform, Vec3};
 
 /// A mesh node in a fresh scene naming a triangle from `meshes`.
 fn mesh_in(meshes: &mut Meshes) -> MeshNode {
     let geometry = meshes
-        .geometry(vec![Vec3::ZERO, Vec3::X, Vec3::Y], vec![0, 1, 2])
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![1.0; 3],
+        )
         .unwrap();
     let colour = Colour::srgb(1.0, 0.0, 0.0).unwrap();
     let mut scene = Scene::new();

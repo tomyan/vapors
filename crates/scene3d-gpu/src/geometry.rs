@@ -9,7 +9,7 @@ use crate::{RendererLog, Resource};
 use std::collections::HashMap;
 use std::rc::Rc;
 use vapors_app::SurfaceFrame;
-use vapors_scene3d::{Geometry, GeometryId, Vec3};
+use vapors_scene3d::{Geometry, GeometryId};
 
 /// One piece's buffers.
 pub(crate) struct Uploaded {
@@ -95,10 +95,9 @@ impl GpuGeometry {
 }
 
 fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
-    let positions: Vec<u8> = geometry
-        .positions()
-        .iter()
-        .flat_map(Vec3::to_array)
+    // each vertex: its position's three floats, then its shade
+    let positions: Vec<u8> = (geometry.positions().iter().zip(geometry.shades()))
+        .flat_map(|(position, shade)| position.extend(*shade).to_array())
         .flat_map(f32::to_le_bytes)
         .collect();
     let indices: Vec<u8> = geometry

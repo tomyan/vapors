@@ -15,7 +15,11 @@ fn gpu_a_mesh_naming_geometry_from_another_meshes_is_refused_naming_the_node() {
         Vec3::new(0.0, 0.0, 5.0),
     );
     let foreign = Meshes::new()
-        .geometry(vec![Vec3::ZERO, Vec3::X, Vec3::Y], vec![0, 1, 2])
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![1.0; 3],
+        )
         .unwrap();
     let root = fixture.root();
     let colour = Colour::srgb(1.0, 0.0, 0.0).unwrap();

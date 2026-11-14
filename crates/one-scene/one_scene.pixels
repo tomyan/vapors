@@ -11,6 +11,7 @@ pixel 20 20 #182a2f        the HUD panel, inside its top left
 ink 30 30 300 50 #182a2f   the HUD's title and frame counter are drawn
 pixel 320 380 #3b4a3f      the ground, by day (`--tint`)
 pixel 636 396 #3b4a3f      the ground, bottom right
-pixel 200 220 #c0392b      cube 1 (`.one`)
+pixel 200 220 #c0392b      cube 1 (`.one`), its front face at shade 1
+pixel 220 180 #7d251c      cube 1's top face at shade 0.65 of the same colour (R1)
 pixel 320 220 #27ae60      cube 2 (`.two`)
 pixel 440 220 #2980b9      cube 3 (`.three`)

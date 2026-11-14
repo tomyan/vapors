@@ -65,9 +65,10 @@ fn render_pipeline(
     layout: &wgpu::PipelineLayout,
     shader: &wgpu::ShaderModule,
 ) -> wgpu::RenderPipeline {
-    let attributes = wgpu::vertex_attr_array![0 => Float32x3];
+    // a vertex: its position, then its shade (`geometry.rs`, `upload`)
+    let attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32];
     let buffers = [Some(wgpu::VertexBufferLayout {
-        array_stride: 12,
+        array_stride: 16,
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &attributes,
     })];
