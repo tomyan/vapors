@@ -7,8 +7,14 @@ use super::{Entry, Extents, FrameIndex, missing};
 
 impl Extents {
     /// The frames with a drawing step.
+    #[cfg(test)]
     pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
         self.frames.keys().copied()
+    }
+
+    /// The frames holding a step that spans every view.
+    pub(crate) fn spanning_frames(&self) -> impl Iterator<Item = usize> + '_ {
+        self.spanning.keys().copied()
     }
 
     /// How many items every drawing step paints.

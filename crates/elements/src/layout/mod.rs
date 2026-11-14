@@ -22,33 +22,20 @@ mod lane_block_summary;
 mod lane_bounds;
 #[cfg(test)]
 mod lane_compare;
-// The flex lane's fold (docs/plans/splice-layout.md, PR 2); layout
-// reads it from PR 3f, so until then only the tests do.
 mod lane_fill;
-// The flex lane's mirror (docs/plans/splice-layout.md, PR 3f-1); layout
-// routes columns to it in PR 3f-2, so until then only the tests do.
-#[allow(dead_code)]
 mod lane_flex;
-#[allow(dead_code)]
 mod lane_flex_answer;
-#[allow(dead_code)]
 mod lane_flex_base;
-#[allow(dead_code)]
 mod lane_flex_child;
-#[allow(dead_code)]
 mod lane_flex_column;
-#[allow(dead_code)]
 mod lane_flex_contribution;
-#[allow(dead_code)]
 mod lane_flex_item;
-#[allow(dead_code)]
 mod lane_flex_leaf;
-#[allow(dead_code)]
 mod lane_flex_place;
-#[allow(dead_code)]
+mod lane_flex_share;
 mod lane_flex_sizes;
-#[allow(dead_code)]
 mod lane_flex_summary;
+mod lane_kind;
 mod lane_layout;
 #[cfg(test)]
 mod lane_page;

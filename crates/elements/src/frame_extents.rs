@@ -72,6 +72,9 @@ pub(crate) struct Extents {
     /// over the frames (`IndexCounts`).
     moved: usize,
     blocks: usize,
+    /// The frames holding a step that spans every view, each with how
+    /// many (`frame_extents_spans.rs`).
+    spanning: FxHashMap<usize, usize>,
     /// Over every frame, the items and the short entries: running
     /// totals too, so a patch and the culled count sum over no frames.
     items: u64,
@@ -96,6 +99,7 @@ impl Extents {
             rebuilds: 0,
             moved: 0,
             blocks: 0,
+            spanning: FxHashMap::default(),
             items: 0,
             short: 0,
         };
@@ -103,6 +107,7 @@ impl Extents {
         for (frame, entry) in entries {
             extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
             extents.count_in(&entry);
+            extents.span_in(frame, &entry);
             let index = extents.frames.entry(frame).or_default();
             if entry.tall() {
                 index.tall.push(entry);
@@ -196,8 +201,11 @@ fn entry(place: usize, step: Step, boxes: &[Option<KeptBox>]) -> (usize, Entry) 
 
 #[path = "frame_extents_patch.rs"]
 mod patch;
+
 #[path = "frame_extents_query.rs"]
 mod query;
+#[path = "frame_extents_spans.rs"]
+mod spans;
 
 #[cfg(test)]
 #[path = "frame_extents_tests.rs"]

@@ -82,7 +82,7 @@ impl PhaseClock {
 }
 
 /// Reads a span's `phase` field.
-struct PhaseField(String);
+pub(crate) struct PhaseField(pub(crate) String);
 
 impl Visit for PhaseField {
     fn record_str(&mut self, field: &Field, value: &str) {

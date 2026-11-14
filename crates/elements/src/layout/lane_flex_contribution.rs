@@ -15,26 +15,32 @@ use super::lane_flex::Column;
 use super::lane_flex_base::{Base, transferred};
 use super::lane_flex_item::FlexChild;
 use super::tree::BoxTree;
+use crate::lane_decline::LaneDecline;
 
 impl BoxTree<'_> {
     /// The item's two shares of the column's height: under definite
-    /// space and under min- or max-content space. Each is computed only
-    /// when the column's height is not known, since nothing else reads
-    /// them; 0 otherwise.
+    /// space along, and under min- or max-content space. Both are kept
+    /// in the leaf whatever the column was asked, as the leaf serves a
+    /// later ask of either kind (a flex parent's size queries, then its
+    /// layout); the answer picks one (`lane_flex_answer.rs`).
+    ///
+    /// # Errors
+    /// The content share differs under min- and max-content space along
+    /// (`SpaceDependentHeight`).
     pub(super) fn flex_contributions(
         &mut self,
         id: NodeId,
         column: &Column,
         child: &FlexChild,
         base: &Base,
-    ) -> [f32; 2] {
-        if column.node_outer_size.height.is_some() {
-            return [0.0; 2];
+    ) -> Result<[f32; 2], LaneDecline> {
+        let most = self.content_share(id, (column, AvailableSpace::MaxContent), child, base);
+        let least = self.content_share(id, (column, AvailableSpace::MinContent), child, base);
+        // Exactly: the leaf is the same under both kinds, or it is not
+        if most.to_bits() != least.to_bits() {
+            return Err(LaneDecline::SpaceDependentHeight);
         }
-        match column.available_space.height {
-            AvailableSpace::Definite(_) => [basis_length(child, base), 0.0],
-            _ => [0.0, self.content_share(id, column, child, base)],
-        }
+        Ok([basis_length(child, base), most])
     }
 
     /// The flex basis plus the share the content adds above it (1660-
@@ -43,12 +49,12 @@ impl BoxTree<'_> {
     fn content_share(
         &mut self,
         id: NodeId,
-        column: &Column,
+        along: (&Column, AvailableSpace),
         child: &FlexChild,
         base: &Base,
     ) -> f32 {
         let margin_sum = child.margin.vertical_axis_sum();
-        let contribution = self.content_contribution(id, column, child, base);
+        let contribution = self.content_contribution(id, along, child, base);
         let diff = contribution - margin_sum - base.flex_basis;
         let flex_contribution = if diff > 0.0 {
             diff
@@ -71,7 +77,7 @@ impl BoxTree<'_> {
     fn content_contribution(
         &mut self,
         id: NodeId,
-        column: &Column,
+        along: (&Column, AvailableSpace),
         child: &FlexChild,
         base: &Base,
     ) -> f32 {
@@ -90,15 +96,21 @@ impl BoxTree<'_> {
                     .maybe_clamp(style_min, style_max)
             }
             None => {
-                let inner = self.measured_height(id, column, child);
+                let inner = self.measured_height(id, along, child);
                 (inner.max(base.flex_basis) + margin_sum).maybe_clamp(style_min, style_max)
             }
         }
     }
 
     /// The item measured along the column for its contribution (1575-
-    /// 1655), its height from its width by the aspect ratio at least.
-    fn measured_height(&mut self, id: NodeId, column: &Column, child: &FlexChild) -> f32 {
+    /// 1655) with `space` along, its height from its width by the
+    /// aspect ratio at least.
+    fn measured_height(
+        &mut self,
+        id: NodeId,
+        (column, space): (&Column, AvailableSpace),
+        child: &FlexChild,
+    ) -> f32 {
         let cross_space = column
             .available_space
             .width
@@ -117,7 +129,7 @@ impl BoxTree<'_> {
             parent_size: column.node_inner_size,
             available_space: Size {
                 width: cross_space,
-                ..column.available_space
+                height: space,
             },
             sizing_mode: SizingMode::ContentSize,
             axis: RequestedAxis::from(AbsoluteAxis::Vertical),

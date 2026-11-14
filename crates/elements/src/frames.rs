@@ -26,13 +26,16 @@ pub(crate) struct FrameAt {
     pub(crate) device_clip: Option<Rect>,
 }
 
-/// Each frame of a paint, by its scroll container's slot, and the
-/// scroll containers in each frame.
+/// Each frame of a paint, by its scroll container's slot; the scroll
+/// containers in each frame, listed and indexed by their clips
+/// (`frames_nested.rs`); and the clip each container was indexed with.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Frames {
     scale: f32,
     by_frame: FxHashMap<usize, FrameAt>,
     nested: FxHashMap<usize, Vec<usize>>,
+    index: FxHashMap<usize, NestedIndex>,
+    entered: FxHashMap<usize, Option<Rect>>,
 }
 
 impl Default for Frames {
@@ -53,6 +56,8 @@ impl Frames {
             scale,
             by_frame: std::iter::once((PAGE, page)).collect(),
             nested: FxHashMap::default(),
+            index: FxHashMap::default(),
+            entered: FxHashMap::default(),
         }
     }
 
@@ -179,8 +184,15 @@ pub(crate) fn on_page(
     (boxes, &ON_PAGE)
 }
 
+#[path = "frames_nested.rs"]
+mod nested;
+use nested::NestedIndex;
+
 #[path = "frames_update.rs"]
 mod update;
+
+#[path = "frames_compare.rs"]
+mod compare;
 pub(crate) use update::FrameInputs;
 
 #[cfg(test)]

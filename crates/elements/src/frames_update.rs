@@ -7,6 +7,9 @@
 
 use rustc_hash::FxHashSet;
 
+use vapors_scene::Rect;
+
+use super::NestedIndex;
 use super::{FrameAt, Frames, meet};
 use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
@@ -33,6 +36,13 @@ impl Frames {
             let outer = inputs.clips.frame(slot);
             frames.nested.entry(outer).or_default().push(slot);
             frames.work_out(slot, inputs);
+            frames
+                .entered
+                .insert(slot, frames.clip_entered(slot, inputs));
+        }
+        for (&outer, slots) in &frames.nested {
+            let clips = slots.iter().map(|&slot| (slot, frames.entered[&slot]));
+            frames.index.insert(outer, NestedIndex::of(clips));
         }
         frames
     }
@@ -49,9 +59,42 @@ impl Frames {
         let mut done = FxHashSet::default();
         let mut moved = false;
         for start in starts {
+            self.assert_held(start);
+            self.enter_again(start, inputs);
             moved |= self.descend(start, inputs, &mut done);
         }
         (moved, done.len())
+    }
+
+    /// Container `slot` entered again in its frame's index, when its
+    /// clip there changed.
+    fn enter_again(&mut self, slot: usize, inputs: &FrameInputs<'_>) {
+        let clip = self.clip_entered(slot, inputs);
+        let was = self.entered.insert(slot, clip).unwrap_or_else(|| {
+            panic!(
+                "scroll container {slot} is updated but was never entered in its frame's index: \
+                 the frames update only the containers they were made for (paint_frames.rs); \
+                 reproduce with `cargo xtask test`"
+            )
+        });
+        if bits(was) != bits(clip) {
+            let index = self.index.entry(inputs.clips.frame(slot)).or_default();
+            index.remove(slot, was);
+            index.insert(slot, clip);
+        }
+    }
+
+    /// Container `slot`'s inner clip, device pixels in the frame it is
+    /// in, a device pixel wider on each side: what it is indexed by
+    /// there. The frame's own device clip is snapped from the clip moved
+    /// onto the page in CSS pixels, which at a fractional scale can land
+    /// an edge a pixel from this one plus the shift; the margin keeps
+    /// every pixel the frame can show inside the indexed clip. Steps are
+    /// still tested exactly, so the margin costs only candidates.
+    fn clip_entered(&self, slot: usize, inputs: &FrameInputs<'_>) -> Option<Rect> {
+        let snap = |clip| snapped(clip, self.scale);
+        let widened = |r: Rect| Rect::new(r.left - 1.0, r.top - 1.0, r.right + 1.0, r.bottom + 1.0);
+        inputs.clips.inner(slot).map(snap).map(widened)
     }
 
     /// Works out `start` and, below each frame that came out different,
@@ -99,27 +142,6 @@ impl Frames {
         self.insert(slot, shift, meet(inner, outer.clip))
     }
 
-    /// The first frame that is not the same in `self` and `other`, with
-    /// both, or the scroll containers nested in a frame when those
-    /// differ.
-    pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
-        if self.scale.to_bits() != other.scale.to_bits() {
-            return Some(format!(
-                "the scale: kept {}, fresh {}",
-                self.scale, other.scale
-            ));
-        }
-        let frames = self.by_frame.keys().chain(other.by_frame.keys());
-        let mut slots: Vec<usize> = frames.copied().collect();
-        slots.sort_unstable();
-        let differs = |&slot: &usize| self.by_frame.get(&slot) != other.by_frame.get(&slot);
-        if let Some(slot) = slots.into_iter().find(differs) {
-            let (kept, fresh) = (self.by_frame.get(&slot), other.by_frame.get(&slot));
-            return Some(format!("frame {slot}: kept {kept:?}, fresh {fresh:?}"));
-        }
-        (self.nested != other.nested).then(|| "the scroll containers in each frame".to_owned())
-    }
-
     /// Notes frame `slot` at `shift` under the page clip `clip`; whether
     /// it differs from what was noted.
     fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) -> bool {
@@ -131,6 +153,12 @@ impl Frames {
         };
         self.by_frame.insert(slot, at) != Some(at)
     }
+}
+
+/// `clip`'s edges' bits, for an exact comparison: -0.0 is not 0.0,
+/// and a NaN edge is its own.
+pub(super) fn bits(clip: Option<Rect>) -> Option<[u32; 4]> {
+    clip.map(|r| [r.left, r.top, r.right, r.bottom].map(f32::to_bits))
 }
 
 #[cfg(test)]

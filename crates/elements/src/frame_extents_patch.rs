@@ -106,6 +106,7 @@ impl Extents {
         let gone = index.taken(place, (top, tall));
         let empty = index.entries.is_empty() && index.tall.is_empty();
         self.count_out(&gone);
+        self.span_out(frame, &gone);
         self.noted(frame, blocks_were);
         if empty {
             self.frames.remove(&frame);
@@ -116,6 +117,7 @@ impl Extents {
     fn insert(&mut self, (frame, entry): (usize, Entry)) {
         self.at[entry.place] = Some((frame, entry.top, entry.tall()));
         self.count_in(&entry);
+        self.span_in(frame, &entry);
         let index = self.frames.entry(frame).or_default();
         if entry.tall() {
             let at = index.tall.partition_point(|e| e.place < entry.place);
@@ -185,7 +187,10 @@ impl PartialEq for Extents {
     /// them, whatever the patches did.
     fn eq(&self, other: &Self) -> bool {
         let totals = (self.items, self.short) == (other.items, other.short);
-        self.frames == other.frames && self.at == other.at && totals
+        self.frames == other.frames
+            && self.at == other.at
+            && totals
+            && self.spanning == other.spanning
     }
 }
 
