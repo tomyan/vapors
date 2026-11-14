@@ -140,3 +140,44 @@ fn a_measurement_within_the_limits_is_kept() {
     // Then
     assert_eq!(kept, Ok(memory));
 }
+
+#[test]
+fn an_owner_at_the_negative_limit_is_kept_and_one_byte_under_it_refused() {
+    // Given: the limit is -1% of 900,000, -9,000 bytes
+    let at_limit = |bytes: i64| {
+        let mut memory = measured();
+        memory.owners[4] = bytes;
+        memory.owners[7] = 10_000 - bytes;
+        memory
+    };
+
+    // When
+    let kept = at_limit(-9_000).checked();
+    let refused = at_limit(-9_001).checked();
+
+    // Then
+    assert!(kept.is_ok(), "{kept:?}");
+    assert!(
+        refused
+            .expect_err("one under")
+            .starts_with("update_rest is -9001 bytes")
+    );
+}
+
+#[test]
+fn a_negative_total_is_refused() {
+    // Given
+    let mut memory = measured();
+    memory.total = -900_000;
+    memory.owners = [-900_000, 0, 0, 0, 0, 0, 0, 0];
+
+    // When
+    let refused = memory.checked();
+
+    // Then
+    assert!(
+        refused
+            .expect_err("negative")
+            .starts_with("the total is -900000")
+    );
+}

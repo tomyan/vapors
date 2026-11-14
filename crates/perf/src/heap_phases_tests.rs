@@ -10,7 +10,7 @@ thread_local! {
     static LIVE: Cell<i64> = const { Cell::new(0) };
 }
 
-fn live() -> i64 {
+pub(super) fn live() -> i64 {
     LIVE.with(Cell::get)
 }
 
@@ -18,7 +18,7 @@ fn totals(phases: &HeapPhases) -> std::collections::BTreeMap<String, i64> {
     phases.take().expect("every span placed")
 }
 
-fn allocate(bytes: i64) {
+pub(super) fn allocate(bytes: i64) {
     LIVE.with(|live| live.set(live.get() + bytes));
 }
 
@@ -147,38 +147,6 @@ fn sibling_phases_are_each_charged_their_own_bytes() {
         .map(|name| totals[name])
         .to_vec();
     assert_eq!(charged, [7, 900, 3]);
-}
-
-#[test]
-fn a_metered_span_without_a_phase_is_refused() {
-    // Given
-    let phases = HeapPhases::new(live);
-
-    // When
-    tracing::subscriber::with_default(phases.clone(), || {
-        let _span = tracing::trace_span!("update phase").entered();
-        allocate(4);
-    });
-
-    // Then
-    let refused = phases.take().expect_err("no phase field");
-    assert!(refused.contains("no phase field"), "{refused}");
-}
-
-#[test]
-fn one_phase_name_under_both_span_kinds_is_refused_naming_it() {
-    // Given
-    let phases = HeapPhases::new(live);
-
-    // When
-    tracing::subscriber::with_default(phases.clone(), || {
-        drop(tracing::trace_span!("frame phase", phase = "paint").entered());
-        drop(tracing::trace_span!("update phase", phase = "paint").entered());
-    });
-
-    // Then
-    let refused = phases.take().expect_err("paint is both kinds");
-    assert!(refused.contains("\"paint\""), "{refused}");
 }
 
 #[test]

@@ -13,8 +13,9 @@
 //! phase open then.
 //!
 //! What it cannot place it keeps as a failure that `take` returns: a
-//! metered span with no `phase` field, a span exiting that never
-//! entered, and a phase name used by both span kinds.
+//! metered span with no `phase` field, a span entered twice before it
+//! exits, a span exiting that never entered, cloned or closed after its
+//! close, and a phase name used by both span kinds.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -123,7 +124,12 @@ impl Subscriber for HeapPhases {
     fn enter(&self, span: &Id) {
         let mut meter = self.meter();
         let now = (meter.live)();
-        meter.entered.insert(span.into_u64(), now);
+        if meter.entered.insert(span.into_u64(), now).is_some() {
+            let id = span.into_u64();
+            meter.fail(format!(
+                "span {id} entered again before it exited; its first reading is lost"
+            ));
+        }
     }
 
     fn exit(&self, span: &Id) {
@@ -142,8 +148,10 @@ impl Subscriber for HeapPhases {
     }
 
     fn clone_span(&self, span: &Id) -> Id {
-        if let Some(open) = self.meter().spans.get_mut(&span.into_u64()) {
-            open.handles += 1;
+        let mut meter = self.meter();
+        match meter.spans.get_mut(&span.into_u64()) {
+            Some(open) => open.handles += 1,
+            None => meter.fail(format!("span {} cloned after its close", span.into_u64())),
         }
         span.clone()
     }
@@ -152,6 +160,7 @@ impl Subscriber for HeapPhases {
         let mut meter = self.meter();
         let id = span.into_u64();
         let Some(open) = meter.spans.get_mut(&id) else {
+            meter.fail(format!("span {id} closed after its close"));
             return false;
         };
         open.handles -= 1;
@@ -170,3 +179,7 @@ impl Subscriber for HeapPhases {
 #[cfg(test)]
 #[path = "heap_phases_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "heap_phases_refusals_tests.rs"]
+mod refusals_tests;

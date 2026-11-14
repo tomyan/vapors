@@ -85,6 +85,13 @@ impl ElementMemory {
     /// # Errors
     /// Either, naming the owners and the total.
     pub fn checked(self) -> Result<Self, String> {
+        if self.total < 0 {
+            return Err(format!(
+                "the total is {} bytes: a page leaves the heap smaller than before its mount, \
+                 so its live count is wrong; fix: read live bytes before and after the page alone",
+                self.total
+            ));
+        }
         let sum: i64 = self.owners.iter().sum();
         if sum != self.total {
             return Err(format!(
@@ -92,7 +99,7 @@ impl ElementMemory {
                 self.owners, self.total
             ));
         }
-        let floor = -(self.total.abs() * NEGATIVE_LIMIT_PERCENT / 100);
+        let floor = -(self.total * NEGATIVE_LIMIT_PERCENT / 100);
         let below = OWNERS
             .iter()
             .zip(self.owners)
