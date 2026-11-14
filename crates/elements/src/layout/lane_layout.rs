@@ -133,7 +133,11 @@ impl BoxTree<'_> {
             .remove(&slot)
             .unwrap_or_else(|| Lane::new(K::gap(c)));
         let run = self.fill(slot, c, &mut lane)?;
+        let born = std::mem::take(&mut lane.born);
         K::lanes(self.lanes).insert(slot, lane);
+        self.lanes
+            .parents
+            .extend(born.into_iter().map(|child| (child, slot)));
         K::answer(c, &run)
     }
 
@@ -155,6 +159,7 @@ impl BoxTree<'_> {
             self.fill_changed(c, lane, heights_changed)?;
         }
         let run = lane.tree.total();
+        lane.facts.top = K::top(c, &run);
         if K::writes(c) {
             self.write_starts(c, lane, &run);
         }
@@ -177,6 +182,9 @@ impl BoxTree<'_> {
             let slot = lane.slots[&handle];
             let (mut layout, relative) = lane.take_write(slot, self.boxes[slot].layout);
             layout.location.y = narrow(top + start) + relative;
+            if layout.location.y.to_bits() != self.boxes[slot].layout.location.y.to_bits() {
+                self.written.started.push(slot);
+            }
             self.set_unrounded_layout(NodeId::from(slot), &layout);
         }
         lane.moved.clear();

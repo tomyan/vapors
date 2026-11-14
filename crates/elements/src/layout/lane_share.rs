@@ -9,11 +9,12 @@ use taffy::{
     AlignItems, Direction, Layout, LayoutOutput, Line, NodeId, Rect, RunMode, Style, TextAlign,
 };
 
-use super::lane::{Lane, Lanes};
+use super::lane::Lane;
 use super::lane_block::Container;
 use super::lane_block_answer::lane_answer;
 use super::lane_block_summary::BlockSummary;
 use super::lane_kind::LaneKind;
+use super::lane_set::Lanes;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 

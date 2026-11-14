@@ -100,6 +100,14 @@ pub struct UpdateCounts {
     /// The condition that declined the first of those, when
     /// `lanes_declined` is above 0, else `None`.
     pub lane_decline: Option<LaneDecline>,
+    /// Lane containers placed this update whose children could not be
+    /// frames of their own (`LaneFramePixel`, `LaneFrameScroller`): their
+    /// children keep the placement from before lane frames
+    /// (`docs/plans/splice-layout.md`, section 11).
+    pub lanes_unframed: usize,
+    /// The reason for the first of those, when `lanes_unframed` is above
+    /// 0, else `None`.
+    pub lane_unframed: Option<LaneDecline>,
     /// Rebuilt boxes whose subtree changed and that layout laid out in
     /// isolation (`layout/isolated.rs`): asked what their parent asked
     /// the box they replaced, they answered the same, so their

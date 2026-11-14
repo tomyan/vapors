@@ -9,7 +9,8 @@ use std::fmt::Debug;
 use rustc_hash::FxHashMap;
 use taffy::{Layout, LayoutOutput};
 
-use super::lane::{Lane, Lanes};
+use super::lane::Lane;
+use super::lane_set::Lanes;
 use super::lane_tree::Summary;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;

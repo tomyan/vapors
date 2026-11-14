@@ -48,7 +48,8 @@ pub(crate) fn paint_partial(
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
     let frames_moved_now =
-        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
+        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept))
+            || !changed.started.is_empty();
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -61,6 +62,12 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
+    let inked: Vec<usize> = if order.walks.reshaped() {
+        (0..painted.kept_boxes.len()).collect()
+    } else {
+        patched.clone()
+    };
+    crate::paint_lane_ink::note(&mut painted, input, inked.into_iter());
     if frames_moved_now {
         frames_moved(&mut painted);
     }

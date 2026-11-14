@@ -11,7 +11,7 @@
 
 use vapors_scene::Rect;
 
-use crate::layout::BoxRect;
+use crate::layout::{BoxRect, Lanes};
 use crate::paint::snapped;
 use crate::placement::{LaidOut, NO_SLOT, Placement};
 
@@ -30,8 +30,9 @@ pub(crate) fn assert_on_page_same(
 ) {
     let scale = boxes.scale;
     let shown = |slot: usize| {
-        let shift = chain_shift(kept, boxes.scrolls, scale, kept.up[slot]);
-        snapped(kept.rects[slot], scale).offset(shift)
+        let [x, y] = chain_shift(kept, boxes.scrolls, scale, kept.up[slot]);
+        let lane = lane_offset(kept, boxes.lanes, slot) * scale;
+        snapped(kept.rects[slot], scale).offset([x, y + lane])
     };
     let fresh = |slot: usize| fresh_on_page(fresh, scale, slot);
     if let Some(&slot) = held.iter().find(|&&slot| shown(slot) != fresh(slot)) {
@@ -40,6 +41,26 @@ pub(crate) fn assert_on_page_same(
             "slot {slot} shows at {shown:?} on the page, fresh {fresh:?}"
         ));
     }
+}
+
+/// How far down the lane frames at and above slot `slot` put it, CSS
+/// pixels: for each framed lane child on placement's chain, its
+/// container's position in its own frame and its offset in the lane
+/// (`docs/plans/splice-layout.md`, section 11). Each term is whole
+/// device pixels, as framing requires, so the sum is exact.
+#[allow(clippy::cast_possible_truncation)] // CSS px offsets, well within f32
+pub(crate) fn lane_offset(kept: &Placement, lanes: &Lanes, slot: usize) -> f32 {
+    let mut offset = 0.0;
+    let mut at = slot;
+    while at != NO_SLOT {
+        let container = kept.up[at];
+        if kept.framed[at] {
+            let start = lanes.frame_offset(container, at).unwrap_or(0.0);
+            offset += f64::from(kept.rects[container].y) + start;
+        }
+        at = container;
+    }
+    offset as f32
 }
 
 /// Slot `slot`'s fresh rect in its frame, snapped, shifted by the

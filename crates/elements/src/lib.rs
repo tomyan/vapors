@@ -103,6 +103,7 @@ mod order_splice;
 mod paint;
 mod paint_frames;
 mod paint_inline;
+mod paint_lane_ink;
 mod paint_order;
 mod paint_outline;
 mod paint_own;

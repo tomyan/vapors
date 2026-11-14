@@ -53,9 +53,6 @@ impl<S: Summary> LaneTree<S> {
     /// The children whose border box or overflow meets `from..=to`
     /// along the axis, in tree order: O(log n) plus those children and
     /// their nodes' siblings.
-    // Read by PR 4 for culling and hit tests (docs/plans/splice-layout.md,
-    // 5.2); until then only the tests do.
-    #[allow(dead_code)]
     pub(crate) fn between(&self, from: f64, to: f64) -> Vec<Handle> {
         let mut out = Vec::new();
         self.collect(self.root, S::default(), (from, to), &mut out);

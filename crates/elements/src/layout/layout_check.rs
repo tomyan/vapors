@@ -46,7 +46,7 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
     let fresh = Placed {
         boxes: build(source, root),
         slots: Slots::default(),
-        lanes: super::lane::Lanes::default(),
+        lanes: super::lane_set::SharedLanes::default(),
     };
     let viewport = layout.viewport;
     let texts = (layout.fonts, &mut TextCache::default());

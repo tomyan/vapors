@@ -132,7 +132,7 @@ impl Frames {
     /// Works out frame `slot` from the frame it is in; whether it came
     /// out different.
     fn work_out(&mut self, slot: usize, inputs: &FrameInputs<'_>) -> bool {
-        let outer = *self.at(inputs.clips.frame(slot));
+        let outer = self.at(inputs.clips.frame(slot));
         let own = (inputs.shift)(slot);
         let shift = [outer.shift[0] + own[0], outer.shift[1] + own[1]];
         let inner = inputs

@@ -21,6 +21,10 @@ pub(crate) trait ClipInputs {
     fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect>;
     /// Whether box `slot` scrolls, so its content is a frame of its own.
     fn scrolls(&self, slot: usize) -> bool;
+    /// Whether box `slot` is a lane child in a frame of its own: its own
+    /// box and everything below it are in that frame
+    /// (`docs/plans/splice-layout.md`, section 11).
+    fn lane_frame(&self, slot: usize) -> bool;
 }
 
 /// The boxes' clip inputs.
@@ -153,11 +157,17 @@ impl Clips {
     fn redo(&mut self, slot: usize, tree: &ClipTree, inner: Inner<'_>) -> bool {
         let parent = tree.parent(slot);
         // A scroll container's content starts a frame with no clip of
-        // its own: the frame's clip is applied on read (`frames.rs`).
+        // its own, as a lane frame's own box does: the frame's clip is
+        // applied on read (`frames.rs`).
+        let lane_frame = inner.lane_frame(slot);
         let own = parent
-            .filter(|&parent| !inner.scrolls(parent))
+            .filter(|&parent| !inner.scrolls(parent) && !lane_frame)
             .and_then(|parent| self.inner[parent]);
-        let frame = parent.map_or(PAGE, |parent| self.frame_inside(parent, inner));
+        let frame = match parent {
+            _ if lane_frame => slot,
+            Some(parent) => self.frame_inside(parent, inner),
+            None => PAGE,
+        };
         let new = inner.inner(slot, own);
         self.own[slot] = own;
         let was = (self.inner[slot], self.frame[slot]);

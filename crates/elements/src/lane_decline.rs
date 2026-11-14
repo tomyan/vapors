@@ -77,6 +77,17 @@ pub enum LaneDecline {
     /// depend on how the column is asked, which a parent's size queries
     /// change from ask to ask: decided at layout, per item.
     SpaceDependentHeight,
+    /// A lane's children cannot be frames of their own because some
+    /// start, or the container's origin, is not whole device pixels:
+    /// the lane's children keep their placement from before lane frames
+    /// (`docs/plans/splice-layout.md`, section 11.1), O(children after a
+    /// change). Decided by placement, not layout.
+    LaneFramePixel,
+    /// A lane's children cannot be frames of their own because one of
+    /// them holds a scroll container, whose frame is worked out before
+    /// a lane frame is: as `LaneFramePixel`, that lane alone keeps the
+    /// placement from before lane frames.
+    LaneFrameScroller,
     /// The items overflow the column's height and one of them can
     /// shrink (its `flex-shrink` is above 0 and its minimum height is
     /// below its hypothetical height), so its height depends on the

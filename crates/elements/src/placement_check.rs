@@ -14,7 +14,7 @@
 use rustc_hash::FxHashSet;
 
 use crate::changed_slots::ChangedSlots;
-use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
+use crate::layout::{BoxRect, Content, Lanes, LayoutBox, containing_blocks, placed};
 use crate::placement::{LaidOut, NO_SLOT, Placed, Placement};
 use crate::placement_check_page::FreshRects;
 use crate::scroll::Offsets;
@@ -52,10 +52,11 @@ impl Before {
 impl Fresh {
     /// `boxes` settled from `before`'s offsets and placed afresh, and
     /// the offsets by element after.
-    fn of(before: &Before, boxes: &LaidOut<'_>) -> (Self, Offsets) {
+    fn of(before: &Before, boxes: &LaidOut<'_>, kept: &Placement) -> (Self, Offsets) {
         let mut scroll = before.scroll.clone();
         let offsets = scroll.settle(boxes.boxes, boxes.scrolls, boxes.scale);
-        let (rects, paddings) = placed(boxes.boxes, &vec![[0.0; 2]; offsets.len()]);
+        let (mut rects, paddings) = placed(boxes.boxes, &vec![[0.0; 2]; offsets.len()]);
+        in_lane_frames(&mut rects, kept, boxes.lanes);
         let (on_page, _) = placed(boxes.boxes, &offsets);
         let fresh = Self {
             rects,
@@ -72,6 +73,14 @@ impl Fresh {
             in_frame: &self.rects,
             on_page: &self.on_page,
         }
+    }
+}
+
+/// Fresh `rects`, each in its scroll frame, put in the lane frames the
+/// kept placement holds them in, as kept rects are.
+fn in_lane_frames(rects: &mut [BoxRect], kept: &Placement, lanes: &Lanes) {
+    for (slot, rect) in rects.iter_mut().enumerate().take(kept.framed.len()) {
+        rect.y -= crate::placement_check_page::lane_offset(kept, lanes, slot);
     }
 }
 
@@ -92,7 +101,7 @@ pub(crate) fn assert_same(
     (kept, scroll): (&Placement, &Offsets),
     (placed, changed): (&Placed, &ChangedSlots),
 ) {
-    let (fresh, fresh_scroll) = Fresh::of(before, boxes);
+    let (fresh, fresh_scroll) = Fresh::of(before, boxes, kept);
     let held = held(boxes.boxes);
     assert_slots_same(kept, &fresh, &held);
     assert_chain_same(kept, boxes.boxes, &held);

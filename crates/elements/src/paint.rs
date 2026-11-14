@@ -31,6 +31,13 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) scroll: &'a crate::scroll::Offsets,
     /// Whether thumbs are drawn now (on touch, only while scrolling).
     pub(crate) thumbs_shown: bool,
+    /// The placement painted from: whether each slot is a lane child in
+    /// a frame of its own, which clips read, and each framed lane's
+    /// container, which its children's frames are worked out from
+    /// (`placement_frames.rs`, `frames_lane.rs`).
+    pub(crate) placement: &'a crate::placement::Placement,
+    /// The lanes, which lane frames read their shifts from.
+    pub(crate) lanes: &'a crate::layout::SharedLanes,
 }
 
 impl<'a> PaintInput<'a> {
@@ -40,8 +47,8 @@ impl<'a> PaintInput<'a> {
         (used, stackings): (&'a UsedMap, &'a Stackings),
         page: (NodeId, NodeId),
         (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
-        scroll: &'a crate::scroll::Offsets,
-        from: &crate::kept_paint::PaintedFrom,
+        (scroll, lanes): (&'a crate::scroll::Offsets, &'a crate::layout::SharedLanes),
+        from: &'a crate::kept_paint::PaintedFrom,
     ) -> Self {
         Self {
             used,
@@ -55,6 +62,8 @@ impl<'a> PaintInput<'a> {
             clip: None,
             scroll,
             thumbs_shown: from.thumbs_shown,
+            placement: &from.placement,
+            lanes,
         }
     }
 }

@@ -15,4 +15,9 @@ pub(crate) struct Written {
     pub(crate) changed: Vec<usize>,
     /// Slots whose hoisted list was written.
     pub(crate) hoisting: Vec<usize>,
+    /// Lane children whose start along the axis was written to another
+    /// than they held (`lane_layout.rs`): a framed child's rect leaves
+    /// its start out, so paint and the a11y take learn of its new place
+    /// from this list.
+    pub(crate) started: Vec<usize>,
 }

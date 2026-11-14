@@ -74,7 +74,8 @@ impl Document {
         let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);
+        let source = (&from, &slotted.lanes);
+        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), source, &changed);
         drop(paint_span);
         self.ax.touch_slots(&changed, &slotted.slots);
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
