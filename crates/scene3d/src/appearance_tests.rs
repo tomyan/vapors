@@ -156,4 +156,18 @@ fn setting_the_appearance_of_a_group_or_a_removed_mesh_is_refused() {
     // Then
     assert_eq!(group, Err(StoreError::NotMesh(tree.a)));
     assert_eq!(removed, Err(StoreError::Stale(tree.b)));
+    assert_eq!(tree.scene.visible(tree.b), Err(StoreError::Stale(tree.b)));
+}
+
+#[test]
+fn setting_a_mesh_colour_it_already_has_advances_no_version() {
+    // Given
+    let mut tree = tree();
+    let before = tree.scene.world_version(tree.b).unwrap();
+
+    // When
+    tree.scene.set_colour(tree.b, grey()).unwrap();
+
+    // Then
+    assert_eq!(tree.scene.world_version(tree.b).unwrap(), before);
 }

@@ -4,22 +4,17 @@
 use crate::{Colour, NodeId, NodeKind, Scene, StoreError};
 
 impl Scene {
-    /// Sets a mesh's colour. It advances the mesh's
-    /// [`Scene::world_version`], which the renderer compares to decide
-    /// what to write, and recomputes no world matrix.
+    /// Sets a mesh's colour, keeping whether it is drawn: as
+    /// [`Scene::set_appearance`], the one writer of a mesh's colour, so
+    /// the same colour again advances no version.
     ///
     /// # Errors
     ///
     /// [`StoreError::Stale`], or [`StoreError::NotMesh`] for a group or
     /// camera.
     pub fn set_colour(&mut self, id: NodeId, colour: Colour) -> Result<(), StoreError> {
-        let node = self.node_mut(id)?;
-        let NodeKind::Mesh { colour: held, .. } = &mut node.kind else {
-            return Err(StoreError::NotMesh(id));
-        };
-        *held = colour;
-        node.world_version += 1;
-        Ok(())
+        let visible = self.visible(id)?;
+        self.set_appearance(id, colour, visible).map(drop)
     }
 
     /// Sets a mesh's colour and whether it is drawn (its anchor's
