@@ -22,8 +22,15 @@ Tom, 2026-11-13: properties 1 to 8 end this iteration; property 9 is the next it
 | 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
 | 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
 | 7 | First frame of a large page | the winning declarations for each template element worked out at build time (computed values still depend on viewport, scale and font size), and constant shapes once the shape table (item 8) lands; time measured and published | not measured | the build-time analysis; shapes by the shape table (Tom, 2026-11-12) |
-| 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
+| 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | measured (`vapors-perf-memory`, docs/perf/memory-per-element-2026-11-14.md): 4 styles for 65,538 elements; 11.4 KB per element, flat, 1.66 times layout's, with #327 and #333 | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | a minimal test scene (a few 3D objects, an SVG decal on one, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
+
+Property 8's follow-ups (docs/perf/memory-per-element-2026-11-14.md):
+the kept box list grows by a quarter after a structural insert; if the
+growth's copy of every box shows in insert's instructions once inserts
+are cheap (property 3), chunked storage as `blocks.rs` (#288) replaces
+it. A first insert at 16,384 rows also leaves 56 MB in paint, another
+list grown by doubling, not located yet.
 
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
 
