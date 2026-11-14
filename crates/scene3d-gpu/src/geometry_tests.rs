@@ -9,11 +9,12 @@ fn mesh_in(meshes: &mut Meshes) -> MeshNode {
     let colour = Colour::srgb(1.0, 0.0, 0.0).unwrap();
     let mut scene = Scene::new();
     let root = scene.root();
+    let id = geometry.id();
     let kind = NodeKind::Mesh { geometry, colour };
     let node = scene.add(root, kind, Transform::IDENTITY).unwrap();
     MeshNode {
         node,
-        geometry,
+        geometry: id,
         colour,
         visible: true,
     }

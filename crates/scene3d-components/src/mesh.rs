@@ -6,13 +6,13 @@ use crate::node::{Mounted, mount_node, refuse};
 use crate::own_keys;
 use crate::placement::Placement;
 use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
-use vapors_scene3d::{Colour, GeometryId, NodeKind, Transform};
+use vapors_scene3d::{Colour, GeometryHandle, NodeKind, Transform};
 use vapors_signals::{Effect, Signal};
 
 /// What a parent passes to [`Mesh::mount`].
 pub struct MeshProps {
     /// The triangles, from the renderer's `Meshes`; required.
-    pub geometry: Option<GeometryId>,
+    pub geometry: Option<GeometryHandle>,
     /// Drawn unlit; a change writes the mesh's uniform alone.
     pub colour: Signal<Colour>,
     /// Where the mesh sits in its parent; a change writes its uniform

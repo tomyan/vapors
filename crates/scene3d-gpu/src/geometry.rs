@@ -72,6 +72,12 @@ impl GpuGeometry {
         Ok(missing)
     }
 
+    /// Drops the buffers of each piece `held` says its `Meshes` released,
+    /// which the log counts freed.
+    pub(crate) fn forget_released(&mut self, held: impl Fn(GeometryId) -> bool) {
+        self.uploaded.retain(|&id, _| held(id));
+    }
+
     /// `mesh`'s buffers.
     ///
     /// # Errors

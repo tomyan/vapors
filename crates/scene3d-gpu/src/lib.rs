@@ -13,7 +13,10 @@
 //! and draws every mesh node through that one view-projection,
 //! depth-tested. The backing is cleared to transparent first, so the
 //! page shows where no mesh draws. A removed mesh node's uniform slot
-//! is reused by the next one added. Every upload, uniform write and draw
+//! is reused by the next one added. Each render first releases the
+//! pieces no `GeometryHandle` claims (`Meshes::release_unclaimed`) and
+//! drops this renderer's buffers for every piece its `Meshes` no longer
+//! holds. Every upload, uniform write and draw
 //! goes through `SurfaceFrame::work`, so the painter's `FrameCounts`
 //! holds them under `surfaces`.
 

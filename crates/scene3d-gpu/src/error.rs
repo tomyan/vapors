@@ -75,7 +75,7 @@ impl fmt::Display for FrameError {
             ),
             Self::GeometryMissing { node, geometry } => write!(
                 f,
-                "mesh {node} names {geometry}, which its Meshes no longer holds: release geometry only after removing every mesh node that names it"
+                "mesh {node} names {geometry}, which its Meshes has released (a stale id): a mesh node holds a GeometryHandle, which keeps its piece held, so make the node from a handle, not from an id kept after the handles were dropped"
             ),
             Self::ActiveCameraNotCamera(node) => write!(
                 f,

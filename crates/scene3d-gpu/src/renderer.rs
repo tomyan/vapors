@@ -79,6 +79,7 @@ impl SurfaceRenderer for SceneRenderer {
         let (Some(mounted), Some(depth)) = (self.mounted.as_mut(), self.depth.as_ref()) else {
             return Err(FrameError::NotReady.into());
         };
+        release_geometry(&self.meshes, &mut mounted.geometry);
         let meshes = self.meshes.borrow();
         let mut scene = self.scene.borrow_mut();
         scene.update();
@@ -91,6 +92,15 @@ impl SurfaceRenderer for SceneRenderer {
         mounted.write_slots(&frame, &scene, &nodes)?;
         Ok(mounted.draw(&mut frame, depth, &nodes)?)
     }
+}
+
+/// Releases the pieces no handle claims any more, and drops this
+/// renderer's buffers of every piece its `Meshes` no longer holds,
+/// whichever renderer's sweep released it.
+fn release_geometry(meshes: &RefCell<Meshes>, uploaded: &mut GpuGeometry) {
+    meshes.borrow_mut().release_unclaimed();
+    let meshes = meshes.borrow();
+    uploaded.forget_released(|id| meshes.holds(id));
 }
 
 impl Mounted {

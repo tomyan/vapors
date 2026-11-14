@@ -19,7 +19,7 @@ a `gpu-surface` (layer 1, [gpu-surface.md](gpu-surface.md)). Plan:
 | 3 | `SceneRenderer`: geometry upload, uniform slots, counts in `FrameCounts::surfaces` | done |
 | 4 | the components, reactive transforms, one uniform per change | done |
 | 4b | CSS on scene nodes: `css-for-3d.md` C1 to C4 | see that plan's table |
-| 5 | lifecycle: keyed rows, the renderer's drop, geometry release; this doc | this branch, release to follow |
+| 5 | lifecycle: keyed rows, the renderer's drop, geometry release; this doc | 5a in review; 5b, geometry handles, this branch |
 
 ## Conventions
 
@@ -41,7 +41,7 @@ the field; nothing is clamped.
 ```rust
 let scene = Rc::new(RefCell::new(Scene::new()));
 let meshes = Rc::new(RefCell::new(Meshes::new()));
-let square = meshes.borrow_mut().geometry(positions, indices)?;
+let square = meshes.borrow_mut().geometry(positions, indices)?; // a GeometryHandle
 let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
 let surface = app.mount("view", Box::new(renderer))?;
 ```
@@ -52,10 +52,19 @@ let surface = app.mount("view", Box::new(renderer))?;
   node's id is refused (`StoreError::Stale`), never another node's.
 - The root names the active camera by `CameraHandle`; none, two, or an
   unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
-- `Meshes::geometry` validates triangles and issues a `GeometryId`; an
-  id from another `Meshes` is refused at the frame, naming the node.
-  Geometry is held while the `Meshes` lives; release arrives with row
-  5's second part.
+- `Meshes::geometry` validates triangles and returns a
+  `GeometryHandle`: a counted claim, cloned to share and not `Copy`
+  (lead decision (B), 2026-11-14). A mesh node holds a clone in
+  `NodeKind::Mesh`, so a piece is held while the application keeps a
+  handle or any mesh node names it. Once the last handle is dropped,
+  `Meshes::release_unclaimed` releases it; each render runs that sweep
+  and drops the renderer's buffers for every released piece
+  (`RendererLog::made` and `freed` of `Resource::Geometry` count them). A
+  released piece's `GeometryId` (from `GeometryHandle::id`) is stale:
+  `Meshes::get` and `Meshes::holds` find nothing. No node can name a
+  released piece, since each holds a handle; the frame's refusal of a
+  piece its `Meshes` does not hold stays as the guard. A handle from another `Meshes` is refused at the frame,
+  naming the node.
 
 ## What a frame does
 
@@ -100,8 +109,11 @@ own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 ## Lifecycle
 
 - A component's unmount (an `{if}` hiding it, a `{for}` dropping its
-  row, `unmount`) removes its node and the node's subtree and
-  invalidates the surface.
+  row, `unmount`) removes its node and the node's subtree, with the
+  node's geometry handle, and invalidates the surface. The page that
+  passed `geometry={square.clone()}` still holds its own handle, so a
+  mesh hidden and shown again finds its piece; once the page is
+  unmounted and no other handle lives, the next render releases it.
 - In a keyed `{for}`, a row keeps its node across a reorder: no node
   is removed or added. The scene's child order is not changed by a
   reorder (children keep insertion order; an opaque, depth-tested draw

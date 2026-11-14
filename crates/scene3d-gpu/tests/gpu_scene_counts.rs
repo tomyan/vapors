@@ -26,8 +26,8 @@ fn drawn_once(gpu: &Gpu) -> (Fixture, SceneRenderer, NodeId, GpuWork) {
     fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
     let square = fixture.square(0.5);
     let left = Transform::from_translation(Vec3::new(-2.0, 0.0, 0.0)).unwrap();
-    let node = fixture.mesh(fixture.root(), square, RED, left);
-    fixture.mesh(fixture.root(), square, GREEN, Transform::IDENTITY);
+    let node = fixture.mesh(fixture.root(), &square, RED, left);
+    fixture.mesh(fixture.root(), &square, GREEN, Transform::IDENTITY);
     let mut renderer = fixture.renderer(gpu);
     let (_, first) = render_counted(&mut renderer, gpu).expect("renders");
     (fixture, renderer, node, first)
@@ -110,7 +110,7 @@ fn gpu_a_mesh_added_later_uploads_its_geometry_and_writes_its_uniform_alone() {
     let (fixture, mut renderer, _, _) = drawn_once(&gpu);
     let bigger = fixture.square(1.0);
     let up = Transform::from_translation(Vec3::new(0.0, 2.0, 0.0)).unwrap();
-    fixture.mesh(fixture.root(), bigger, RED, up);
+    fixture.mesh(fixture.root(), &bigger, RED, up);
 
     // When
     let (_, added) = render_counted(&mut renderer, &gpu).expect("renders");
@@ -128,7 +128,7 @@ fn gpu_the_node_that_grows_the_slot_buffer_has_every_slot_written_again() {
     let projection = Projection::orthographic(6.0, 0.1, 100.0).unwrap();
     fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
     let square = fixture.square(0.1);
-    let add = || fixture.mesh(fixture.root(), square, RED, Transform::IDENTITY);
+    let add = || fixture.mesh(fixture.root(), &square, RED, Transform::IDENTITY);
     (0..16).for_each(|_| _ = add());
     let mut renderer = fixture.renderer(&gpu);
     render_counted(&mut renderer, &gpu).expect("renders");

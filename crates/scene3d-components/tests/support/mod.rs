@@ -128,7 +128,7 @@ impl Rig {
 }
 
 /// A square 1 unit wide in the XY plane, centred on the origin.
-pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryId {
+pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryHandle {
     let corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
     let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
     meshes

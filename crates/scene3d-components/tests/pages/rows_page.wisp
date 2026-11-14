@@ -3,7 +3,7 @@ use vapors_scene3d_components::{Group, GroupProps, Mesh, MeshProps, Scene, Scene
 
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
-#[prop] let square: Option<vapors_scene3d::GeometryId> = None;
+#[prop] let square: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let rows: Signal<Vec<i32>> = Signal::new(Vec::new());
 
 /// The row's place, following its number: a row reused for another
@@ -25,7 +25,7 @@ fn at(x: i32) -> vapors_scene3d::Transform {
 <Scene scene={scene} surface={surface}>
   <Group>
     {for x in rows.get() key=x}
-      <Mesh geometry={square} transform={following(x)} />
+      <Mesh geometry={square.clone()} transform={following(x)} />
     {/for}
   </Group>
 </Scene>
