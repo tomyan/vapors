@@ -13,8 +13,7 @@ use frame::{BACKGROUND, quad, rgba, square, target};
 use retained::{Frame, RED, kept};
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::{
-    ClosedForm, ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline,
-    Shift, Target,
+    ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target,
 };
 use vapors_scene::{Color, Rect, Shadow};
 
@@ -142,15 +141,14 @@ fn gpu_kept_shadows_drawn_with_a_shift_match_the_shadow_drawn_at_the_moved_place
 
 /// A circle at `x`, `y` drawn under a transform of scale 1.5.
 fn circle(x: f32, y: f32) -> ClosedFormShape {
-    ClosedFormShape {
-        form: ClosedForm::Ellipse {
-            centre: [x / 1.5, y / 1.5],
-            radii: [2.0, 2.0],
-        },
-        stroke: None,
-        transform: [1.5, 0.0, 0.0, 1.5, 0.0, 0.0],
-        colour: Color::from_rgba8(200, 30, 20, 255),
-    }
+    let geometry = vapors_shapes::Geometry::Ellipse {
+        centre: [x / 1.5, y / 1.5],
+        radii: [2.0, 2.0],
+    };
+    let red = Color::from_rgba8(200, 30, 20, 255);
+    ClosedFormShape::new(&geometry, None, [1.5, 0.0, 0.0, 1.5, 0.0, 0.0], red)
+        .expect("drawable")
+        .expect("has area")
 }
 
 #[test]
