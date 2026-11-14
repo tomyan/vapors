@@ -15,8 +15,9 @@ use vapors_scene3d_gpu::SceneRenderer;
 const MESH_BYTES: u64 = 80;
 /// The camera's view-projection, 16 floats.
 const CAMERA_BYTES: u64 = 64;
-/// The test square: 4 positions of 3 floats and 6 `u32` indices.
-const SQUARE_BYTES: u64 = 4 * 12 + 6 * 4;
+/// The test square: 4 vertices of 4 floats (position and shade) and 6
+/// `u32` indices.
+const SQUARE_BYTES: u64 = 4 * 16 + 6 * 4;
 
 /// Two squares sharing one piece of geometry, a camera, and a renderer
 /// that has drawn them once; the first square's node, and that frame's work.

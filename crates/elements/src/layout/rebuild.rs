@@ -64,6 +64,10 @@ impl KeptBoxes {
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> (Placed, Rebuilt) {
         let mut placed = self.place(build(source, root));
+        // the kept list, cut to its length once placed (vacant slots
+        // included): grown by doubling, a box being about 2.8 KB, 40,002
+        // boxes held 65,536 slots (property 8, `vapors-perf-memory`)
+        placed.boxes.shrink_to_fit();
         self.lend(&mut placed, scale, may_keep);
         self.placed = Placed::default();
         let rebuilt = Rebuilt::every(&placed.boxes);
@@ -186,3 +190,7 @@ mod changed;
 #[cfg(test)]
 #[path = "rebuild_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "rebuild_capacity_tests.rs"]
+mod capacity_tests;

@@ -54,7 +54,7 @@ pub use error::SceneError;
 pub use geometry_handle::GeometryHandle;
 pub use glam::{Mat4, Quat, Vec3};
 pub use handle::{CameraHandle, NodeId};
-pub use mesh_error::MeshError;
+pub use mesh_error::{MeshError, VERTEX_BYTES};
 pub use meshes::{Geometry, GeometryId, Meshes};
 pub use node::NodeKind;
 pub use projection::{Projection, project, view_projection};

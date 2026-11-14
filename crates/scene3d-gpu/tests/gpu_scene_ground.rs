@@ -21,7 +21,9 @@ const LIFT: f32 = 0.001;
 fn quad(fixture: &Fixture, corners: [Vec3; 4]) -> GeometryHandle {
     let indices = vec![0, 1, 2, 0, 2, 3];
     let mut meshes = fixture.meshes.borrow_mut();
-    meshes.geometry(corners.to_vec(), indices).unwrap()
+    meshes
+        .geometry(corners.to_vec(), indices, vec![1.0; 4])
+        .unwrap()
 }
 
 /// A square `2 * half` wide in the XZ plane, centred on the origin.

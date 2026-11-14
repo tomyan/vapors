@@ -115,7 +115,7 @@ impl Placed {
     fn put_box(&mut self, mut layout_box: LayoutBox, (key, slot): (Key, usize), to: &[usize]) {
         self.hold(key, slot);
         // a container built again starts its lane afresh
-        self.lanes.remove(&slot);
+        self.lanes.remove(slot);
         for child in &mut layout_box.children {
             *child = to[*child];
         }
@@ -144,6 +144,13 @@ impl Placed {
         }
         let slot = self.boxes.len();
         self.slots.keys.push(None);
+        // grown by a quarter, not doubled: a box is about 2.8 KB and the
+        // list is kept, so its slack stays under 25% (property 8; lead,
+        // 2026-11-14). Each growth copies every box; chunked storage, as
+        // the blocks of #288, is the follow-up if that shows in inserts.
+        if self.boxes.len() == self.boxes.capacity() {
+            self.boxes.reserve_exact((self.boxes.len() / 4).max(1));
+        }
         self.boxes.push(LayoutBox::vacant());
         slot
     }
@@ -151,7 +158,7 @@ impl Placed {
     /// Frees the taken slots no new box took, once every subtree is put.
     pub(crate) fn free_taken(&mut self, taken: &Taken) {
         for slot in taken.slots.values() {
-            self.lanes.remove(slot);
+            self.lanes.remove(*slot);
         }
         self.slots.free.extend(taken.slots.values().copied());
         self.slots.free.sort_unstable_by(|a, b| b.cmp(a));

@@ -56,7 +56,7 @@ fn made_afresh(
 ) -> bool {
     painted.frames_worked = thumbs.len();
     let made = Frames::of(thumbs, inputs, scale);
-    std::mem::replace(&mut painted.frames, made) != painted.frames
+    !std::mem::replace(&mut painted.frames, made).same_frames(&painted.frames)
 }
 
 /// `painted`'s kept frames worked out again for the scroll containers

@@ -8,7 +8,9 @@ fn triangle() -> Vec<Vec3> {
 fn given_geometry_is_held_under_its_id_for_every_reader() {
     // Given
     let mut meshes = Meshes::new();
-    let handle = meshes.geometry(triangle(), vec![0, 1, 2]).unwrap();
+    let handle = meshes
+        .geometry(triangle(), vec![0, 1, 2], vec![1.0; 3])
+        .unwrap();
     let id = handle.id();
 
     // When: two renderers read it
@@ -27,7 +29,7 @@ fn geometry_from_another_meshes_is_not_found_in_this_one() {
     // Given
     let ours = Meshes::new();
     let foreign = Meshes::new()
-        .geometry(triangle(), vec![0, 1, 2])
+        .geometry(triangle(), vec![0, 1, 2], vec![1.0; 3])
         .unwrap()
         .id();
 
@@ -40,8 +42,14 @@ fn an_id_from_another_meshes_is_not_issued_by_this_one() {
     // Given
     let mut ours = Meshes::new();
     let mut theirs = Meshes::new();
-    let mine = ours.geometry(triangle(), vec![0, 1, 2]).unwrap().id();
-    let foreign = theirs.geometry(triangle(), vec![0, 1, 2]).unwrap().id();
+    let mine = ours
+        .geometry(triangle(), vec![0, 1, 2], vec![1.0; 3])
+        .unwrap()
+        .id();
+    let foreign = theirs
+        .geometry(triangle(), vec![0, 1, 2], vec![1.0; 3])
+        .unwrap()
+        .id();
 
     // Then
     assert!(ours.issued(mine));
@@ -79,7 +87,8 @@ fn geometry_the_scene_cannot_draw_is_refused_and_not_held() {
         let mut meshes = Meshes::new();
 
         // When
-        let result = meshes.geometry(positions, indices);
+        let shades = vec![1.0; positions.len()];
+        let result = meshes.geometry(positions, indices, shades);
 
         // Then
         assert_eq!(result, Err(refusal));
@@ -93,7 +102,7 @@ fn a_degenerate_triangle_is_accepted() {
     let mut meshes = Meshes::new();
 
     // When
-    let result = meshes.geometry(triangle(), vec![0, 0, 0]);
+    let result = meshes.geometry(triangle(), vec![0, 0, 0], vec![1.0; 3]);
 
     // Then
     assert!(result.is_ok());
@@ -120,9 +129,9 @@ fn geometry_past_the_portable_buffer_limit_is_refused_naming_limit_and_size() {
 }
 
 #[test]
-fn a_position_buffer_past_the_portable_limit_is_refused() {
+fn a_vertex_buffer_past_the_portable_limit_is_refused() {
     // Given
-    let over = crate::mesh_error::MAX_BUFFER_BYTES / 12 + 1;
+    let over = crate::mesh_error::MAX_BUFFER_BYTES / 16 + 1;
 
     // When
     let refused = crate::mesh_error::check_sizes(over, 3);
@@ -131,8 +140,8 @@ fn a_position_buffer_past_the_portable_limit_is_refused() {
     assert_eq!(
         refused,
         Err(MeshError::BufferTooLarge {
-            buffer: "position",
-            bytes: over * 12,
+            buffer: "vertex",
+            bytes: over * 16,
             limit: crate::mesh_error::MAX_BUFFER_BYTES,
         })
     );
@@ -141,7 +150,7 @@ fn a_position_buffer_past_the_portable_limit_is_refused() {
 #[test]
 fn buffers_exactly_at_the_limit_pass_the_size_check() {
     // When
-    let result = crate::mesh_error::check_sizes(crate::mesh_error::MAX_BUFFER_BYTES / 12, 3);
+    let result = crate::mesh_error::check_sizes(crate::mesh_error::MAX_BUFFER_BYTES / 16, 3);
 
     // Then
     assert_eq!(result, Ok(()));

@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_app::{ElementsApp, FrameCounts, SurfaceHandle};
+use vapors_app::{ElementsApp, FrameCounts, FrameTiming, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, Start};
 use vapors_scene3d::{CameraHandle, Meshes, Projection, Scene};
@@ -31,6 +31,10 @@ mod shapes;
 use clock::Clock;
 
 use one_scene::{OneScene as Page, OneSceneProps};
+
+/// The example's size in device pixels at scale 1: its window's, and the
+/// judged run's target.
+pub const SIZE: (u32, u32) = (1100, 720);
 
 /// The example as an app: the page in an `ElementsApp`, its scene drawn
 /// by a `SceneRenderer` on the surface named `view`.
@@ -85,9 +89,21 @@ impl OneScene {
         self.app.frame_counts()
     }
 
-    /// The app it runs in, for its timings.
-    pub fn elements_app(&mut self) -> &mut ElementsApp {
-        &mut self.app
+    /// Render passes its last frame began.
+    #[must_use]
+    pub fn render_passes(&self) -> u64 {
+        self.app.render_passes()
+    }
+
+    /// Its frames' times, the GPU's read back by the frame after.
+    #[must_use]
+    pub fn frame_timing(&self) -> FrameTiming {
+        self.app.frame_timing()
+    }
+
+    /// Turns timing its frames on the GPU on or off; off by default.
+    pub fn time_frames(&mut self, on: bool) {
+        self.app.time_frames(on);
     }
 }
 
@@ -159,8 +175,8 @@ pub fn run(limit: Option<u64>) -> Result<(), String> {
     let options = vapors_platform::WindowOptions {
         app_name: "vapors one scene".into(),
         title: "Vapors / One scene".into(),
-        width: 1100,
-        height: 720,
+        width: SIZE.0,
+        height: SIZE.1,
     };
     vapors_platform::run(options, OneScene::new(limit)?).map_err(|error| error.to_string())
 }

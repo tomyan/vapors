@@ -3,6 +3,7 @@
 //! 2611-2677) and `compute/common/alignment.rs` (12-18);
 //! `lane_block.rs` carries Taffy's MIT notice.
 
+use taffy::util::MaybeMath;
 use taffy::{Layout, LayoutOutput, Overflow, Point, Rect, Size};
 
 use super::lane_flex::Column;
@@ -69,4 +70,20 @@ pub(super) fn item_layout(
         border: child.border,
         margin,
     }
+}
+
+/// Whether Taffy may move an item that can shrink off its hypothetical
+/// height in a column that is not exactly sized: step d of
+/// `resolve_flexible_lengths` (1898-1915) clamps an unfrozen item's
+/// target to its resolved minimum and its maximum, a narrower range than
+/// the hypothetical height's, whose floor also holds the transferred
+/// minimum and the padding and border, and wins over the maximum. Said
+/// whether or not the item would be frozen there: an over-refusal, which
+/// Taffy lays out exactly.
+pub(super) fn clamped_by_taffy(child: &FlexChild, base: &Base) -> bool {
+    let clamped = base
+        .hypothetical_inner
+        .maybe_clamp(Some(base.resolved_minimum_main_size), child.max_size.height)
+        .max(0.0);
+    child.flex_shrink > 0.0 && clamped.to_bits() != base.hypothetical_inner.to_bits()
 }

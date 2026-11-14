@@ -20,13 +20,13 @@ use vapors_scene::Color;
 /// A mesh node's uniform: its world matrix and colour.
 const MESH_BYTES: u64 = 80;
 
-/// The cube (8 positions of 12 bytes, 36 indices of 4) and the ground
-/// (4 positions, 6 indices).
-const GEOMETRY_BYTES: u64 = 8 * 12 + 36 * 4 + 4 * 12 + 6 * 4;
+/// The cube (24 vertices of 16 bytes, position and shade; 36 indices of
+/// 4) and the ground (4 vertices, 6 indices).
+const GEOMETRY_BYTES: u64 = 24 * 16 + 36 * 4 + 4 * 16 + 6 * 4;
 
 /// Frame 0's surface work: the geometry, four mesh uniforms, the
 /// camera's 64 bytes, and 112 more outside the scene renderer (measured
-/// 2026-11-14: 808 in all; not derived).
+/// 2026-11-14; not derived): 1112 in all.
 const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 64 + 112;
 
 /// The surface's own draw in the composition, beside the meshes'.

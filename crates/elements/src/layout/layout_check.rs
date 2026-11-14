@@ -70,7 +70,23 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
 /// that into its ancestors' sizes and their later children's
 /// locations. A relaxed guard; what would retire it: a Taffy that sums
 /// in f64.
+///
+/// That fixed part covers a short sum. Taffy's positions and sizes are
+/// running f32 sums, each addition off by at most half an ulp of its
+/// partial sum, and no coordinate takes more additions than the tree
+/// has boxes, n: so for sums of non-negative terms (lists of rows) it
+/// is off by at most n * EPSILON / 2 * |value|. `tolerance` adds that
+/// bound: 4.9 px for a body of 2000 rows of 10.21 px (about 4000 boxes),
+/// where Taffy is 0.31 px off the exact 20420. Loose, but a stale row moves a
+/// box by a row's height, which is still over it on that page (#348).
 const TOLERANCE: f32 = 1.0 / 1024.0;
+
+/// How far `a` and `b` may differ when one was summed in f32 over
+/// `terms` terms (above).
+#[allow(clippy::cast_precision_loss)] // child counts, far below 2^24
+fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
+    TOLERANCE + terms as f32 * f32::EPSILON / 2.0 * a.abs().max(b.abs())
+}
 
 fn walk(fresh: &Placed, placed: &Placed) {
     match (fresh.boxes.is_empty(), placed.boxes.is_empty()) {
@@ -84,10 +100,11 @@ fn walk(fresh: &Placed, placed: &Placed) {
             if fresh_empty { "some" } else { "none" },
         ),
     }
+    let terms = fresh.boxes.len();
+    let apart = |a: f32, b: f32| (a - b).abs() > tolerance(a, b, terms);
     let mut stack = vec![(0, 0)];
     while let Some((index, slot)) = stack.pop() {
         let (new, kept) = (&fresh.boxes[index].layout, &placed.boxes[slot].layout);
-        let apart = |a: f32, b: f32| (a - b).abs() > TOLERANCE;
         if apart(new.size.width, kept.size.width)
             || apart(new.size.height, kept.size.height)
             || apart(new.location.x, kept.location.x)

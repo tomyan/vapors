@@ -23,13 +23,14 @@ impl Document {
         viewport: Viewport,
     ) -> Result<(Placed, Rebuilt, Written), Vec<ElementError>> {
         let (boxes, mut built) = self.rebuilt(viewport.scale);
+        let lanes = self.lanes_on();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
         let settling = Settling {
             changed: std::mem::take(&mut built.changed),
             built: built.slots.clone(),
-            lanes: true,
+            lanes,
         };
         let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, settling);
         let work = match &laid_out {
@@ -49,6 +50,22 @@ impl Document {
             self.check_layout(&slotted, viewport);
         }
         Ok((slotted, built, work.written))
+    }
+
+    /// Whether this update lays containers out by lane: always, but
+    /// for the in-crate lane tests' pages (`KeptBoxes::lanes_off`).
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            reason = "only the test build reads `lanes_off`; outside tests every update uses lanes"
+        )
+    )]
+    fn lanes_on(&self) -> bool {
+        #[cfg(test)]
+        return !self.boxes.lanes_off;
+        #[cfg(not(test))]
+        true
     }
 
     /// Debug builds skip the layout check (`layout/layout_check.rs`)

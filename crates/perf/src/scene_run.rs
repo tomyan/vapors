@@ -1,45 +1,61 @@
-//! The 60 s run of the racer, from its refusals before the first frame
-//! to its verdict (docs/plans/one-scene.md, 3.2): every frame judged,
-//! no warmup (D7 (a)), by its frame-to-idle time (D6 (a)).
+//! The judged 60 s run of a scene (`SceneKind`: the racer or the
+//! one-scene example), from its refusals before the first frame to its
+//! verdict (docs/plans/one-scene.md, 3.2): every frame judged, no
+//! warmup (D7 (a)), by its frame-to-idle time (D6 (a)).
 
 use vapors_gpu_harness::Gpu;
 
 use crate::driver::RUN_FRAMES;
-use crate::racer_driven::DrivenRacer;
 use crate::sampler::{JudgedFrame, Sampler};
-use crate::scene_judge::{BUDGET, REPRODUCE, load_average, over_budget, quiet, require_timestamps};
+use crate::scene_judge::{
+    BUDGET, load_average, over_budget, quiet, require_hardware, require_timestamps,
+};
+use crate::scene_kind::SceneKind;
 use crate::scene_report::{over_budget_lines, report};
 use crate::shader_cache::shader_cache;
 
 /// The revision the harness was built from (`build.rs`).
 pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
 
-/// Runs the driven racer for [`RUN_FRAMES`] frames on the GPU `open`
-/// makes, after the shader cache is read, and prints the report.
+/// Runs `kind` driven for [`RUN_FRAMES`] frames on the GPU `open` makes,
+/// after the shader cache is read, and prints the report.
 ///
 /// # Errors
-/// Mesa's shader cache not chosen, a device without timestamps or a
-/// busy machine, before the first frame; a frame refused or without a
-/// GPU reading, naming it; then every frame over budget and a busy
-/// machine at the end.
-pub fn run(open: impl FnOnce() -> Gpu) -> Result<(), String> {
-    let cache = shader_cache(|name| std::env::var(name).ok())?;
+/// Mesa's shader cache not chosen, a software adapter, a device without
+/// timestamps or a busy machine, before the first frame; a frame refused
+/// or without a GPU reading, naming it; then every frame over budget and
+/// a busy machine at the end.
+pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
+    let reproduce = reproducing(kind);
+    let cache = shader_cache(|name| std::env::var(name).ok()).map_err(&reproduce)?;
     let gpu = open();
-    require_timestamps(gpu.device.features(), &gpu.adapter.get_info().name)?;
-    let start = quiet("start", load_average())?;
-    println!("Revision: {REVISION}");
-    println!("Shader cache: {}", cache.describe());
+    let start =
+        before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
+    println!("Revision: {REVISION}\nShader cache: {}", cache.describe());
     println!(
         "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
     );
+    let mut workload = kind.workload().map_err(&reproduce)?;
     let run = Sampler::new(&gpu)
-        .judged(&mut DrivenRacer::new(), RUN_FRAMES)
-        .map_err(|error| format!("{error}\nreproduce: {REPRODUCE}"))?;
+        .judged(&mut *workload, RUN_FRAMES)
+        .map_err(&reproduce)?;
     println!("{}", start_up_line(run.start_up));
-    let frames = run.frames;
     let end = load_average();
-    println!("{}", report(&frames, start, end.clone().ok()));
-    verdict(&frames, end)
+    println!("{}", report(&run.frames, start, end.clone().ok(), kind));
+    verdict(&run.frames, end, kind)
+}
+
+/// A refusal of `kind`'s run, with the command that reproduces it.
+fn reproducing(kind: SceneKind) -> impl Fn(String) -> String {
+    move |error| format!("{error}\nreproduce: {}", kind.reproduce())
+}
+
+/// The refusals on the GPU `info` names, with `features`, and on the
+/// machine's load: the load at the start when the run may go on.
+fn before_frame_zero(info: &wgpu::AdapterInfo, features: wgpu::Features) -> Result<f64, String> {
+    require_hardware(info.device_type, &info.name, &info.driver)?;
+    require_timestamps(features, &info.name)?;
+    quiet("start", load_average())
 }
 
 /// The start-up's line: `App::start`'s time, before frame 0 and not
@@ -53,14 +69,18 @@ fn start_up_line(start_up: std::time::Duration) -> String {
 
 /// The run's failures together: the frames over budget, then the load
 /// at the end.
-fn verdict(frames: &[JudgedFrame], end: Result<f64, String>) -> Result<(), String> {
+fn verdict(
+    frames: &[JudgedFrame],
+    end: Result<f64, String>,
+    kind: SceneKind,
+) -> Result<(), String> {
     let over = over_budget(frames);
     let mut failures = Vec::new();
     if !over.is_empty() {
         failures.push(format!(
             "{} frames over {BUDGET:?} from the start of App::frame to the GPU idle:\n{}",
             over.len(),
-            over_budget_lines(&over)
+            over_budget_lines(&over, kind)
         ));
     }
     if let Err(busy) = quiet("end", end) {
@@ -69,7 +89,11 @@ fn verdict(frames: &[JudgedFrame], end: Result<f64, String>) -> Result<(), Strin
     if failures.is_empty() {
         return Ok(());
     }
-    Err(format!("{}\nreproduce: {REPRODUCE}", failures.join("\n")))
+    Err(format!(
+        "{}\nreproduce: {}",
+        failures.join("\n"),
+        kind.reproduce()
+    ))
 }
 
 #[cfg(test)]

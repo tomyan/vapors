@@ -33,7 +33,7 @@ check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected 
 
 reset
 check "changes listed" "$(expected_changes "$fixture" | xargs)" \
-  "Class FlexText HoveredClass Idle Insert Resize Scroll ScrollSize Text"
+  "Class FlexInsert FlexText HoveredClass Idle Insert Resize Scroll ScrollSize Text"
 check "changes failed" "$(changes_that "$fixture" fail | xargs)" "Class HoveredClass Text"
 check "a block is its change's alone" "$(change_block "$fixture" Class | grep -c '74854')" 0
 printf '%s\n' "scaling-error-begin: Text" mine "scaling-error-end: Text" \
@@ -58,7 +58,7 @@ check "changed parts retitle the issue" "$(calls 'issue edit 12')$(calls 'Retitl
 reset; head -n "$(grep -n 'scaling-result: Class fail' "$fixture" | cut -d: -f1)" "$fixture" >"$work/cut.log"
 report_results "$work/cut.log" abc 1
 check "a judge stopped partway names what it did not judge" \
-  "$(calls 'no result for HoveredClass Insert Resize Scroll ScrollSize')" 1
+  "$(calls 'no result for FlexInsert HoveredClass Insert Resize Scroll ScrollSize')" 1
 
 reset; report_results "$fixture" abc 1
 check "a complete run with failures files no runner issue" "$(calls "title $runner_title")" 0
