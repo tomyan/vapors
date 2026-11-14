@@ -20,8 +20,9 @@ use super::compute_resolve::resolve;
 use super::compute_source::{source, value_of};
 use crate::{Error, Position, Result};
 
-/// The initial value of every longhand, parsed once.
-pub(super) fn initial(id: PropertyId) -> &'static Value {
+/// The initial value of every longhand, parsed once: the one table the
+/// build-time analysis judges `initial`, `unset` and undeclared by.
+pub(crate) fn initial(id: PropertyId) -> &'static Value {
     static INITIALS: OnceLock<Vec<Value>> = OnceLock::new();
     &INITIALS.get_or_init(|| {
         PROPERTIES

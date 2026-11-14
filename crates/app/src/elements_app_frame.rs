@@ -75,9 +75,22 @@ impl ElementsApp {
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
-        let size = size_of(frame);
+        let max_side = frame.device.limits().max_texture_dimension_2d;
+        self.check_start_target(size_of(frame), scale);
+        self.update_document_at(max_side, size_of(frame), scale)
+    }
+
+    /// `Document::update` for a target of `size` device pixels at
+    /// `scale`, images capped at `max_side`, then the tooltip's style
+    /// checked.
+    pub(super) fn update_document_at(
+        &mut self,
+        max_side: u32,
+        size: Size,
+        scale: f32,
+    ) -> Result<(), String> {
         let mut document = self.document.borrow_mut();
-        document.set_max_image_side(frame.device.limits().max_texture_dimension_2d);
+        document.set_max_image_side(max_side);
         document
             .update(viewport(size, scale))
             .map_err(|errors| refused(&errors))?;
@@ -117,11 +130,10 @@ impl ElementsApp {
             viewport: size_of(frame),
             scissor: None,
         };
+        self.check_format(frame.texture.format())?;
         if self.painter.is_none() {
-            let made = self
-                .make_painter(frame)
-                .map_err(|refused| refused.to_string())?;
-            self.painter = Some(made);
+            self.painter = Some(self.unstarted_painter(frame)?);
+            self.start.state = super::StartState::MadeInFirstFrame;
         }
         let scene_painter = self.painter.as_mut().expect("made above");
         self.surfaces

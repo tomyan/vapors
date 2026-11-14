@@ -9,10 +9,11 @@
 //! refused at each such attribute; another crate's component without
 //! the field fails in rustc at the props struct, naming `anchor`.
 
+use super::attribute_kind::carried_by_key;
 use super::element_class::is_class_directive;
 use super::emit::Emitter;
 use super::props_index::Declared;
-use super::style_key::{Keyed, carried_by_key};
+use super::style_key::Keyed;
 use crate::CompileError;
 use crate::ast::{Attribute, ComponentTag};
 

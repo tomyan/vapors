@@ -52,29 +52,51 @@ fn run(loads: &[f64], github: bool) -> (Result<Outcome, String>, Vec<String>, Du
 }
 
 #[test]
-fn a_load_over_the_threshold_is_waited_out_saying_so_every_30_s() {
-    // When
-    let (outcome, said, slept) = run(&[20.0, 15.5, 11.0], false);
+fn runnable_tasks_over_the_threshold_are_waited_out_saying_the_mean_every_30_s() {
+    // Given: 20 at 0, 5, ... 30 s, then 11
+    let loads = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 11.0];
 
-    // Then
+    // When
+    let (outcome, said, slept) = run(&loads, false);
+
+    // Then: the mean of the last six is 11 once all six are, at 60 s
     assert_eq!(outcome, Ok(Outcome::Clear));
     assert_eq!(slept, Duration::from_secs(60));
     assert_eq!(said.len(), 2, "{said:?}");
     assert!(
-        said[1].starts_with("load: 15.50 is over 12 ([load] threshold); waiting, 30 s so far"),
+        said[0].starts_with("load: 20.0 runnable tasks on average over the last 1 reading, "),
+        "{said:?}"
+    );
+    assert!(
+        said[1].starts_with(
+            "load: 20.0 runnable tasks on average over the last 6 readings, over 12 ([load] threshold); waiting, 30 s so far"
+        ),
         "{said:?}"
     );
 }
 
 #[test]
-fn a_load_at_the_threshold_starts_at_once_saying_nothing() {
+fn single_low_readings_between_compile_bursts_do_not_end_the_wait() {
+    // Given: lows at 5, 20 and 30 s among 30s, then lows from 35 s
+    let loads = [30.0, 2.0, 30.0, 30.0, 2.0, 30.0, 2.0, 2.0, 2.0];
+
+    // When
+    let (outcome, _, slept) = run(&loads, false);
+
+    // Then: the six readings to 40 s average 11.3, the first window under 12
+    assert_eq!(outcome, Ok(Outcome::Clear));
+    assert_eq!(slept, 8 * READ_EVERY);
+}
+
+#[test]
+fn an_idle_machine_starts_once_the_window_is_full_saying_nothing() {
     // When
     let (outcome, said, slept) = run(&[12.0], false);
 
     // Then
     assert_eq!(
         (outcome, said.len(), slept),
-        (Ok(Outcome::Clear), 0, Duration::ZERO)
+        (Ok(Outcome::Clear), 0, (WINDOW - 1) * READ_EVERY)
     );
 }
 
@@ -87,7 +109,10 @@ fn at_the_deadline_it_goes_on_saying_the_load_and_the_wait() {
     assert_eq!(outcome, Ok(Outcome::PastDeadline));
     assert_eq!(slept, SETTINGS.deadline);
     let last = said.last().expect("a line at the deadline");
-    assert!(last.contains("STILL 30.00"), "{last}");
+    assert!(
+        last.contains("STILL 30.0 runnable tasks on average"),
+        "{last}"
+    );
     assert!(
         last.contains("after waiting 600 s; going on anyway"),
         "{last}"

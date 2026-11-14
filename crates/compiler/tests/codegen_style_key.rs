@@ -21,17 +21,36 @@ fn an_element_is_created_from_its_key_with_site_scope_tag_classes_and_style() {
     // Then: the <div> is at line 4, column 1 of counter.wisp
     assert_has(
         &code,
-        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\") };",
+        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\"), attributes: &[(\"title\", \"t\")] };",
     );
     assert_has(
         &code,
         "let div0 = dom.borrow_mut().create_keyed_element(&KEY_DIV0);",
     );
-    assert_has(&code, "set_attribute(div0, \"title\", \"t\");");
     assert_lacks(&code, "create_element(");
-    for fixed in ["\"class\"", "\"style\"", "SCOPE_ATTRIBUTE, SCOPE"] {
+    for fixed in [
+        "\"class\"",
+        "\"style\"",
+        "\"title\"",
+        "SCOPE_ATTRIBUTE, SCOPE",
+    ] {
         assert_lacks(&code, &format!("set_attribute(div0, {fixed}"));
     }
+}
+
+#[test]
+fn only_literal_attributes_go_in_the_key_the_rest_are_set_as_before() {
+    // Given: a literal, an expression, a listener and a binding
+    let code = generated_with(
+        "let x: Signal<String> = Signal::new(String::new());\nlet f = || {};",
+        "<input type=\"text\" id={x} onclick={f} bind:value={x} />",
+    );
+
+    // Then
+    assert_has(&code, "attributes: &[(\"type\", \"text\")]");
+    assert_lacks(&code, "set_attribute(input0, \"type\"");
+    assert_has(&code, "set_attribute_if_changed(input0, \"id\", &value);");
+    assert_has(&code, "listen(input0, \"click\"");
 }
 
 #[test]
@@ -91,10 +110,20 @@ fn every_element_gets_its_own_key_named_after_its_node() {
 }
 
 #[test]
-fn a_literal_id_stays_an_ordinary_attribute() {
+fn a_literal_id_is_fixed_by_the_key_and_an_expression_id_is_not() {
     // When
-    let code = generated("<div id=\"main\"></div>");
+    let literal = generated("<div id=\"main\"></div>");
+    let expression = generated_with(
+        "let x: Signal<String> = Signal::new(String::new());",
+        "<div id={x}></div>",
+    );
 
     // Then
-    assert_has(&code, "set_attribute(div0, \"id\", \"main\");");
+    assert_has(&literal, "attributes: &[(\"id\", \"main\")]");
+    assert_lacks(&literal, "set_attribute(");
+    assert_has(&expression, "attributes: &[]");
+    assert_has(
+        &expression,
+        "set_attribute_if_changed(div0, \"id\", &value);",
+    );
 }
