@@ -24,7 +24,6 @@ use crate::lane_decline::LaneDecline;
 /// A scroll container with a child wholly before its origin, which
 /// Taffy leaves out of the overflow (`BeforeScrollOrigin`).
 pub(crate) fn lane_answer(c: &Container, run: &BlockSummary) -> Result<LayoutOutput, LaneDecline> {
-    let a = &c.answer;
     let first_offset = if c.own_margins_collapse.start {
         0.0
     } else {
@@ -36,9 +35,28 @@ pub(crate) fn lane_answer(c: &Container, run: &BlockSummary) -> Result<LayoutOut
         width: c.outer_width,
         height: outer_height,
     };
-    let (top_margin, bottom_margin) = margin_sets(c, run, outer_height);
+    let mut output = size_answer(c, run, size, first_child_top);
+    if c.run_mode == RunMode::ComputeSize {
+        return Ok(output);
+    }
+    output.oof_positioning_area = Some(positioning_area(c, size));
+    output.scrollable_overflow_rect = overflow_rect(c, run, first_child_top)?;
+    Ok(output)
+}
+
+/// The answer as a size query reads it: size, baseline, margin sets
+/// and whether margins collapse through the container (`compute_inner`
+/// 754-775).
+fn size_answer(
+    c: &Container,
+    run: &BlockSummary,
+    size: Size<f32>,
+    first_child_top: f64,
+) -> LayoutOutput {
+    let a = &c.answer;
+    let (top_margin, bottom_margin) = margin_sets(c, run, size.height);
     let baseline = run.bounds().baseline.map(|b| narrow(first_child_top + b));
-    let mut output = LayoutOutput {
+    LayoutOutput {
         size,
         scrollable_overflow_rect: Rect::ZERO,
         baselines: if a.suppresses_baseline {
@@ -53,17 +71,11 @@ pub(crate) fn lane_answer(c: &Container, run: &BlockSummary) -> Result<LayoutOut
         // too (`lane_block_item.rs`), so only an empty run can; PR 3b
         // lifts the first decline and changes this line with it.
         margins_can_collapse_through: !a.prevents_collapse_through
-            && outer_height == 0.0
+            && size.height == 0.0
             && run.is_empty(),
         oof_candidates: OofCandidates::NONE,
         oof_positioning_area: None,
-    };
-    if c.run_mode == RunMode::ComputeSize {
-        return Ok(output);
     }
-    output.oof_positioning_area = Some(positioning_area(c, size));
-    output.scrollable_overflow_rect = overflow_rect(c, run, first_child_top)?;
-    Ok(output)
 }
 
 /// The known height, else the content clamped, floored at the padding
