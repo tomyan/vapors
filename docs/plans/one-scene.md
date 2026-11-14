@@ -251,7 +251,15 @@ and the fix, as the compiler refuses other attributes today
 `Item::Shape` in the 2D display list:
 
 - `shape`: a `ShapeRef`, either a registered `ShapeId` or a run-time
-  entry (1.5);
+  entry (1.5). A run-time entry is an index into its document's
+  `ShapeCache` (`vapors-shapes`, per document, lead 2026-11-14) with
+  `ShapeRef::RUNTIME` set. The cache parses, classifies and
+  tessellates each distinct shape once for the largest scale asked,
+  counted as `shapes_tessellated`; on a hash hit it compares bytes,
+  and other bytes are a new entry. The painter's store takes the
+  shapes the document's `Painted` holds past those it has before each
+  frame, uploads their meshes as a table's, and refuses another
+  document's cache (S4a PR 2);
 - `kind`: closed form or mesh, so batching splits the two into runs
   for their pipelines (S3a2, lead's option (a)); it is set once, at
   construction, and `vapors_app::shape_item` builds an item from its

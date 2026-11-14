@@ -21,7 +21,7 @@ pub fn white(geometry: &Geometry, stroke: Option<f32>, transform: [f32; 6]) -> C
 }
 
 /// A rect at `origin` of `size` with corners of `radius`.
-pub const fn rect(origin: [f32; 2], size: [f32; 2], radius: f32) -> Geometry {
+pub const fn rect(origin: [f32; 2], size: [f32; 2], radius: f32) -> Geometry<'static> {
     Geometry::Rect {
         origin,
         size,
@@ -30,7 +30,7 @@ pub const fn rect(origin: [f32; 2], size: [f32; 2], radius: f32) -> Geometry {
 }
 
 /// A circle about `centre` of `radius`.
-pub const fn circle(centre: [f32; 2], radius: f32) -> Geometry {
+pub const fn circle(centre: [f32; 2], radius: f32) -> Geometry<'static> {
     Geometry::Ellipse {
         centre,
         radii: [radius, radius],

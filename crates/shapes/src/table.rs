@@ -43,7 +43,7 @@ pub struct ShapeEntry {
     /// recomputes it.
     pub hash: u64,
     /// What is drawn.
-    pub geometry: Geometry,
+    pub geometry: Geometry<'static>,
 }
 
 impl ShapeTable {

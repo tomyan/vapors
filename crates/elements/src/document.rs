@@ -65,6 +65,10 @@ pub struct Document {
     pub(crate) ax: crate::a11y_mirror_state::AxMirror,
     /// Each watched mesh anchor's appearance sink (`scene_sinks`).
     pub(crate) sinks: crate::node_map::NodeMap<vapors_dom::AppearanceSink>,
+    /// The run-time shapes its items name (one-scene S4a), per
+    /// document: S5b's process registry issues table `ShapeId`s, and
+    /// this run-time range stays apart from them.
+    pub(crate) shapes: vapors_shapes::ShapeCache,
 }
 
 impl Document {
@@ -105,6 +109,7 @@ impl Document {
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
             sinks: crate::node_map::NodeMap::default(),
+            shapes: vapors_shapes::ShapeCache::default(),
         }
     }
 

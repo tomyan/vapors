@@ -15,7 +15,7 @@ use super::{ShapeError, ShapeStore};
 pub(crate) fn entry(
     site: &'static str,
     canonical: &'static [u8],
-    geometry: Geometry,
+    geometry: Geometry<'static>,
 ) -> ShapeEntry {
     ShapeEntry {
         site,
@@ -25,12 +25,12 @@ pub(crate) fn entry(
     }
 }
 
-pub(crate) const CIRCLE: Geometry = Geometry::Ellipse {
+pub(crate) const CIRCLE: Geometry<'static> = Geometry::Ellipse {
     centre: [8.0, 8.0],
     radii: [4.0, 4.0],
 };
 
-const RECT: Geometry = Geometry::Rect {
+const RECT: Geometry<'static> = Geometry::Rect {
     origin: [1.0, 2.0],
     size: [10.0, 6.0],
     radius: [1.0, 1.0],
@@ -65,7 +65,7 @@ pub(crate) fn item_of(shape: u32, kind: ShapeKind, transform: [f32; 6]) -> Shape
 }
 
 /// `geometry` as the pipeline draws it under the identity in blue.
-fn drawn(geometry: &Geometry, stroke: Option<f32>) -> ClosedFormShape {
+fn drawn(geometry: &Geometry<'_>, stroke: Option<f32>) -> ClosedFormShape {
     let blue = Color::from_rgba8(0, 0, 255, 255);
     ClosedFormShape::new(geometry, stroke, IDENTITY, blue)
         .expect("drawable")
@@ -148,7 +148,7 @@ fn a_ref_past_the_registered_entries_is_refused_naming_it() {
     // Then
     assert_eq!(
         refused.to_string(),
-        "shape 7 is not registered in this painter's store, which holds 1; register its crate's table (ShapeStore::register) before drawing it"
+        "shape 7 is not registered in this painter's store, which holds 1; register its crate's table (ShapeStore::register) before drawing it, or draw a document's run-time shapes with the painter that draws its frames"
     );
 }
 

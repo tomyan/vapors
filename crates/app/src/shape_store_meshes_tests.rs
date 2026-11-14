@@ -76,7 +76,7 @@ fn a_table_whose_meshes_pass_the_entry_buffers_limit_is_refused_naming_its_crate
     assert_eq!(
         refused.to_string(),
         format!(
-            "shape table of crate demo would put {bytes} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
+            "shape table of crate demo would put {bytes} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {}; draw fewer or smaller meshes, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
             bytes - 1
         )
     );

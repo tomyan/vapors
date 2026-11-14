@@ -79,7 +79,16 @@ impl Document {
         self.ax.touch_slots(&changed, &slotted.slots);
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
         (painted.from, painted.stackings) = (from, stackings);
+        self.keep_runtime_shapes(&mut painted);
         Ok(self.shown(painted))
+    }
+
+    /// Hands `painted` the run-time shapes the cache made since it last
+    /// had them, and counts the paths tessellated this update.
+    fn keep_runtime_shapes(&mut self, painted: &mut Painted) {
+        self.counts.shapes_tessellated = self.shapes.take_tessellated();
+        let made = &self.shapes.shapes()[painted.runtime_shapes.len()..];
+        painted.runtime_shapes.extend(made.iter().cloned());
     }
 
     /// Keeps `painted` as the last update's result, and moves the hover

@@ -140,7 +140,7 @@ fn gpu_a_shape_the_store_has_no_entry_for_is_refused_naming_it() {
     assert!(matches!(refused, PaintError::Shape(_)), "{refused:?}");
     assert_eq!(
         refused.to_string(),
-        "shape 5 is not registered in this painter's store, which holds 2; register its crate's table (ShapeStore::register) before drawing it"
+        "shape 5 is not registered in this painter's store, which holds 2; register its crate's table (ShapeStore::register) before drawing it, or draw a document's run-time shapes with the painter that draws its frames"
     );
 }
 

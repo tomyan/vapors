@@ -26,7 +26,7 @@ pub enum ShapeError {
         /// The ref.
         shape: ShapeRef,
         /// Where it was written.
-        site: &'static str,
+        site: String,
         /// The kind the item says.
         item: ShapeKind,
         /// The kind its entry's geometry is.
@@ -35,8 +35,9 @@ pub enum ShapeError {
     /// A table whose meshes would take the painter's entry buffer past
     /// the device's `max_buffer_size`.
     MeshBytes {
-        /// The table's crate.
-        crate_name: &'static str,
+        /// What would add them: a crate's table, or a document's
+        /// run-time shapes.
+        owner: String,
         /// The entry buffer's bytes with the table.
         needed: u64,
         /// The device's `max_buffer_size`.
@@ -48,7 +49,7 @@ pub enum ShapeError {
         /// The ref.
         shape: ShapeRef,
         /// Where it was written.
-        site: &'static str,
+        site: String,
     },
     /// The item's bounds, which culling reads, do not hold what it
     /// draws (`shape_bounds.rs`).
@@ -56,18 +57,33 @@ pub enum ShapeError {
         /// The ref.
         shape: ShapeRef,
         /// Where it was written.
-        site: &'static str,
+        site: String,
         /// What it draws, device pixels, with the ramp.
         drawn: Rect,
         /// The item's bounds.
         bounds: Rect,
+    },
+    /// A document's cache given to a store that holds another
+    /// document's run-time shapes.
+    OtherDocument {
+        /// How many run-time shapes the store holds.
+        held: usize,
+        /// How many the given cache holds.
+        given: usize,
+    },
+    /// A run-time shape the store cannot draw: its geometry or paint.
+    Runtime {
+        /// Where it was written.
+        site: String,
+        /// Why.
+        reason: String,
     },
     /// The closed-form pipeline refused the item: its transform.
     Undrawable {
         /// The ref.
         shape: ShapeRef,
         /// Where it was written.
-        site: &'static str,
+        site: String,
         /// Why.
         reason: ClosedFormError,
     },
@@ -79,18 +95,13 @@ impl fmt::Display for ShapeError {
             Self::Table(error) => error.fmt(f),
             Self::Unregistered { shape, registered } => write!(
                 f,
-                "shape {} is not registered in this painter's store, which holds {registered}; register its crate's table (ShapeStore::register) before drawing it",
-                shape.0
+                "{shape} is not registered in this painter's store, which holds {registered}; register its crate's table (ShapeStore::register) before drawing it, or draw a document's run-time shapes with the painter that draws its frames"
             ),
             Self::Undrawable {
                 shape,
                 site,
                 reason,
-            } => write!(
-                f,
-                "shape {}, the entry at {site}, cannot be drawn: {reason}",
-                shape.0
-            ),
+            } => write!(f, "{shape}, the entry at {site}, cannot be drawn: {reason}"),
             Self::OutsideBounds {
                 shape,
                 site,
@@ -98,8 +109,7 @@ impl fmt::Display for ShapeError {
                 bounds,
             } => write!(
                 f,
-                "shape {}, the entry at {site}, draws over {drawn:?} but its item's bounds are {bounds:?}, so culling would drop pixels it draws; give the item bounds that hold its transformed entry",
-                shape.0
+                "{shape}, the entry at {site}, draws over {drawn:?} but its item's bounds are {bounds:?}, so culling would drop pixels it draws; give the item bounds that hold its transformed entry"
             ),
             Self::Kind {
                 shape,
@@ -108,21 +118,27 @@ impl fmt::Display for ShapeError {
                 entry,
             } => write!(
                 f,
-                "shape {}, the entry at {site}, is a {entry:?} but its item says {item:?}; build the item's kind from its entry's geometry; reproduce with `cargo test -p vapors-app --lib shape_store`",
-                shape.0
+                "{shape}, the entry at {site}, is a {entry:?} but its item says {item:?}; build the item's kind from its entry's geometry; reproduce with `cargo test -p vapors-app --lib shape_store`"
             ),
             Self::MeshBytes {
-                crate_name,
+                owner,
                 needed,
                 limit,
             } => write!(
                 f,
-                "shape table of crate {crate_name} would put {needed} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {limit}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
+                "{owner} would put {needed} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {limit}; draw fewer or smaller meshes, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
+            ),
+            Self::OtherDocument { held, given } => write!(
+                f,
+                "this painter holds {held} run-time shapes of another document, and was given a document's cache of {given}; draw each document with a ScenePainter of its own; reproduce with `cargo test -p vapors-app --lib shape_store_runtime`"
+            ),
+            Self::Runtime { site, reason } => write!(
+                f,
+                "the run-time shape at {site} cannot be drawn: {reason}; this is a fault in the document's shape cache, so report it with the page; reproduce with `cargo test -p vapors-app --lib shape_store_runtime`"
             ),
             Self::NotUploaded { shape, site } => write!(
                 f,
-                "shape {}, the mesh at {site}, has no triangles on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
-                shape.0
+                "{shape}, the mesh at {site}, has no triangles on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
             ),
         }
     }

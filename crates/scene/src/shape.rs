@@ -7,9 +7,48 @@
 use crate::{Color, Rect};
 
 /// Which shape an item draws: an index the painter resolves to an
-/// entry it has registered (`vapors-app`'s `ShapeStore`).
+/// entry it has registered (`vapors-app`'s `ShapeStore`). Two ranges:
+/// a table entry's, which the store issues on registration (and S5b's
+/// process registry will, as `ShapeId`s), and a run-time entry's, an
+/// index into its document's shape cache with [`ShapeRef::RUNTIME`]
+/// set, which the store takes from the document's frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ShapeRef(pub u32);
+
+impl ShapeRef {
+    /// The bit that marks a run-time entry's ref.
+    pub const RUNTIME: u32 = 1 << 31;
+
+    /// The ref of the run-time entry at `index` in its document's
+    /// cache.
+    ///
+    /// # Panics
+    /// When `index` reaches [`ShapeRef::RUNTIME`]: no document caches
+    /// 2^31 shapes.
+    #[must_use]
+    pub fn runtime(index: u32) -> Self {
+        assert!(
+            index < Self::RUNTIME,
+            "run-time shape {index} is past the run-time range"
+        );
+        Self(index | Self::RUNTIME)
+    }
+
+    /// The index in its document's cache, for a run-time entry's ref.
+    #[must_use]
+    pub fn runtime_index(self) -> Option<u32> {
+        (self.0 & Self::RUNTIME != 0).then_some(self.0 & !Self::RUNTIME)
+    }
+}
+
+impl std::fmt::Display for ShapeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.runtime_index() {
+            Some(index) => write!(f, "run-time shape {index}"),
+            None => write!(f, "shape {}", self.0),
+        }
+    }
+}
 
 /// Which pipeline draws an entry: its kind, as `vapors_app::kind_of`
 /// gives it from the entry's geometry. Batching splits on it; the
@@ -71,3 +110,7 @@ impl Shape {
         self.kind
     }
 }
+
+#[cfg(test)]
+#[path = "shape_tests.rs"]
+mod tests;

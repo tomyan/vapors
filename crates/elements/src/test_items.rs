@@ -33,3 +33,37 @@ pub(crate) fn paint(node: NodeId, out: &mut Painting) {
         }
     });
 }
+
+/// A shape item drawing `path` painted by `paint` from `doc`'s run-time
+/// shape cache, as a `<path>` makes one (S4a): flattened for
+/// `transform`'s scale, its kind from the cached geometry, in `colour`
+/// within `bounds`. The painter's store takes the shape from the next
+/// update's `Painted`.
+///
+/// # Panics
+/// When the cache refuses the shape.
+pub fn runtime_item(
+    doc: &mut crate::Document,
+    (path, paint): (&vapors_shapes::IconPath, vapors_shapes::Paint),
+    transform: [f32; 6],
+    colour: vapors_scene::Color,
+    bounds: vapors_scene::Rect,
+) -> Item {
+    let [a, b, ..] = transform;
+    let index = doc
+        .shapes
+        .entry("test_items", path, paint, a.hypot(b))
+        .unwrap_or_else(|e| panic!("{e}"));
+    let closed = doc.shapes.shapes()[index as usize]
+        .geometry()
+        .is_closed_form();
+    let kind = if closed {
+        vapors_scene::ShapeKind::ClosedForm
+    } else {
+        vapors_scene::ShapeKind::Mesh
+    };
+    let shape = vapors_scene::ShapeRef::runtime(index);
+    Item::Shape(vapors_scene::Shape::new(
+        shape, kind, transform, colour, bounds,
+    ))
+}

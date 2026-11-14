@@ -16,7 +16,7 @@ pub struct Icon {
 /// Chromium and the mesh methods.
 pub struct ClosedCase {
     pub shape: Icon,
-    pub geometry: vapors_shapes::Geometry,
+    pub geometry: vapors_shapes::Geometry<'static>,
 }
 
 pub fn closed_cases() -> [ClosedCase; 4] {

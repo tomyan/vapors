@@ -14,6 +14,10 @@ use crate::style::Cursor;
 /// The canvas colour, the scene, the text runs it names, each element's
 /// border box, and the elements a pointer can hit.
 pub struct Painted {
+    /// The document's run-time shapes, by the index a
+    /// `ShapeRef::runtime` carries, for the painter's store to take:
+    /// those the cache made since are added after each update.
+    pub(crate) runtime_shapes: Vec<std::sync::Arc<vapors_shapes::RuntimeShape>>,
     pub(crate) canvas: Color,
     /// The element whose background became the canvas's, if one did.
     pub(crate) canvas_from: Option<CanvasFrom>,
@@ -126,6 +130,7 @@ impl Painted {
             maps_patched: 0,
             index_counts: crate::blocks::IndexCounts::default(),
             stackings: crate::paint_order::Stackings::default(),
+            runtime_shapes: Vec::new(),
         }
     }
 
@@ -175,6 +180,14 @@ impl Painted {
 
     /// The icon a scene item names.
     ///
+    /// The document's run-time shapes, by the index a
+    /// `ShapeRef::runtime` carries; a painter's store takes those past
+    /// the ones it holds before each frame.
+    #[must_use]
+    pub fn runtime_shapes(&self) -> &[std::sync::Arc<vapors_shapes::RuntimeShape>] {
+        &self.runtime_shapes
+    }
+
     /// # Panics
     /// When `id` is not one this update's scene names.
     #[must_use]
