@@ -145,7 +145,7 @@ fn arrange(mut built: Vec<LayoutBox>, to: &[usize], len: usize) -> Vec<LayoutBox
     }
     let mut destination = to.to_vec();
     destination.extend((0..len).filter(|&slot| !taken[slot]));
-    built.resize_with(len, LayoutBox::vacant);
+    crate::slot_list::resize_with(&mut built, len, LayoutBox::vacant);
     permute(&mut built, destination);
     built
 }
