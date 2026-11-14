@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use crate::canonical::hash_bytes;
 use crate::geometry::{Geometry, check_geometry};
 pub use crate::shape_id::{ShapeId, ShapeIndex};
 use crate::table_error::EMITTER;
@@ -37,9 +38,9 @@ pub struct ShapeEntry {
     /// viewBox units, the fill rule and the stroke parameters that
     /// change the mesh. Two entries with equal bytes are one shape.
     pub canonical: &'static [u8],
-    /// The hash of `canonical`; equal hashes are compared by bytes at
-    /// the registry's merge. Unverified until S2 brings the hash
-    /// function, when [`ShapeTable::check`] recomputes it.
+    /// [`hash_bytes`] of `canonical`; equal hashes are compared by
+    /// bytes at the registry's merge, and [`ShapeTable::check`]
+    /// recomputes it.
     pub hash: u64,
     /// What is drawn.
     pub geometry: Geometry,
@@ -99,7 +100,8 @@ impl ShapeTable {
     ///
     /// # Errors
     /// [`TableError`] for another [`TABLE_FORMAT`], an empty crate
-    /// name, site or canonical bytes, a geometry that cannot be drawn
+    /// name, site or canonical bytes, a hash that is not the bytes'
+    /// hash, a geometry that cannot be drawn
     /// ([`check_geometry`]), or two entries with one hash: the same
     /// bytes (the compiler deduplicates, so a repeat is its bug) or
     /// different bytes (a collision the registry would also refuse).
@@ -179,6 +181,13 @@ fn check_entry(entry: &ShapeEntry) -> Result<(), String> {
         return Err(
             "the canonical bytes are empty; an entry carries its shape's canonical form".to_owned(),
         );
+    }
+    let hash = hash_bytes(entry.canonical);
+    if entry.hash != hash {
+        return Err(format!(
+            "carries hash {:#x} but its canonical bytes hash to {hash:#x}",
+            entry.hash
+        ));
     }
     check_geometry(&entry.geometry)
 }
