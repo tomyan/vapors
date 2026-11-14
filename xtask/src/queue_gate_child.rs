@@ -59,8 +59,8 @@ fn wait(child: &mut Child, deadline: Duration) -> Result<Option<ExitStatus>, Str
 /// How often the child is polled; a gate takes minutes.
 const POLL: Duration = Duration::from_millis(200);
 
-/// Kill the child's process group and the group of each of its
-/// descendants: the gate puts each step in a group of its own
+/// End the child's process group and the group of each of its
+/// descendants, SIGTERM first so the steps' traps run, then SIGKILL: the gate puts each step in a group of its own
 /// (`command.rs`) and enforced the step's deadline itself, so the steps
 /// must go too. What was killed and what could not be, for the log.
 /// Declared limit: a process started between the scan and the kill is
@@ -72,6 +72,7 @@ fn kill_tree(child: &mut Child, deadline: Duration) -> String {
             groups.push(group);
         }
     }
+    crate::command::ask_groups_to_end(&groups);
     let failed: Vec<String> = groups
         .iter()
         .filter_map(|group| crate::command::kill_group_id(*group).err())
