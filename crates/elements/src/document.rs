@@ -31,8 +31,8 @@ pub struct Document {
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
-    /// The `href` a followed link asks to go to (`link.rs`).
-    pub(crate) navigation: Option<String>,
+    /// The link a followed click asks to open (`link.rs`).
+    pub(crate) navigation: Option<crate::link::Navigation>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
     /// Each number field's last committed number and value (`number_committed`).

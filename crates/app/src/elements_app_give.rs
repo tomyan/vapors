@@ -8,7 +8,8 @@
 
 use std::fmt;
 
-use vapors_platform::{Event, Instant, Platform, report_error};
+use vapors_elements::{Navigation, Opened};
+use vapors_platform::{Event, Instant, NewContext, Platform, report_error};
 
 use super::ElementsApp;
 use super::text::Text;
@@ -113,14 +114,15 @@ impl ElementsApp {
         })
     }
 
-    /// Hands the address of a link the event followed, if any, to the
-    /// platform; one it cannot go to is reported and the app goes on.
+    /// Hands a link the event followed, if any, to the platform, where
+    /// its modifiers say (`vapors_elements::Opened`); one the platform
+    /// cannot open is reported and the app goes on.
     fn follow_link(&self, platform: &Platform) {
-        let Some(href) = self.document.borrow_mut().take_navigation() else {
+        let Some(link) = self.document.borrow_mut().take_navigation() else {
             return;
         };
-        if let Err(refused) = platform.navigate(&href) {
-            report_error(&refused.to_string());
+        if let Err(refused) = open_link(platform, &link) {
+            report_error(&refused);
         }
     }
 
@@ -159,3 +161,20 @@ impl ElementsApp {
 #[cfg(test)]
 #[path = "elements_app_give_tooltip_tests.rs"]
 mod tooltip_tests;
+
+/// `link` opened where it asks: in place, a new tab or a new window;
+/// a download (Alt) is refused, naming the address.
+fn open_link(platform: &Platform, link: &Navigation) -> Result<(), String> {
+    let href = &link.href;
+    let opened = match link.opened {
+        Opened::Here => platform.navigate(href),
+        Opened::NewTab => platform.open_new(href, NewContext::Tab),
+        Opened::NewWindow => platform.open_new(href, NewContext::Window),
+        Opened::Download => {
+            return Err(format!(
+                "Alt on <a href=\"{href}\"> downloads it in Chromium; vapors does not download, so the link was not followed"
+            ));
+        }
+    };
+    opened.map_err(|refused| refused.to_string())
+}

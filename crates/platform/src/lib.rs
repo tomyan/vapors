@@ -107,6 +107,7 @@ pub use error::PlatformError;
 pub use event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 pub use file_kind::FileKind;
 pub use gestures::{Gestures, TAP_SLOP};
+pub use navigate::{Followed, NewContext};
 pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_startup, report_status};

@@ -141,7 +141,7 @@ impl Document {
             ("input", Some("range")) => "slider",
             ("input", Some("number")) => "spinbutton",
             ("button", _) => "button",
-            ("a", _) if self.attribute(node, "href").is_some() => "link",
+            ("a", _) if self.is_link(node) => "link",
             ("section", _) if !self.ax_name(node, "region", ids).is_empty() => "region",
             _ => return None,
         };

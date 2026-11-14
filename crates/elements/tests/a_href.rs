@@ -6,64 +6,8 @@
 
 mod support;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use support::{document, viewport};
-use vapors_dom::{Dom, Event, NodeId};
-use vapors_elements::{Document, Modifiers};
-
-const SHEET: &str = "body { margin: 0; } a { display: block; height: 20px; }";
-
-struct Page {
-    doc: Rc<RefCell<Document>>,
-    /// y 0..20, `href="?demo=counter"`, holding a span.
-    link: NodeId,
-    /// y 20..40, no `href`.
-    plain: NodeId,
-}
-
-fn page() -> Page {
-    let mut doc = document();
-    let body = doc.body();
-    let link = anchor(&mut doc, body, Some("?demo=counter"), "Counter");
-    let plain = anchor(&mut doc, body, None, "Nowhere");
-    doc.add_stylesheet("app.css", SHEET).expect("parses");
-    doc.update(viewport(200.0, 100.0)).expect("updates");
-    Page {
-        doc: Rc::new(RefCell::new(doc)),
-        link,
-        plain,
-    }
-}
-
-fn anchor(doc: &mut Document, parent: NodeId, href: Option<&str>, label: &str) -> NodeId {
-    let a = doc.create_element("a");
-    if let Some(href) = href {
-        doc.set_attribute(a, "href", href);
-    }
-    let span = doc.create_element("span");
-    let text = doc.create_text(label);
-    doc.append(span, text);
-    doc.append(a, span);
-    doc.append(parent, a);
-    a
-}
-
-fn click(page: &Page, point: [f32; 2]) {
-    Document::pointer_pressed(&page.doc, point);
-    Document::pointer_released(&page.doc, point);
-}
-
-fn key(page: &Page, key: &str) {
-    let none = Modifiers::default();
-    Document::key_pressed(&page.doc, key, none);
-    Document::key_released(&page.doc, key, none);
-}
-
-fn taken(page: &Page) -> Option<String> {
-    page.doc.borrow_mut().take_navigation()
-}
+use support::link_page::{click, key, page, taken};
+use vapors_dom::{Dom, Event};
 
 #[test]
 fn a_click_on_what_a_link_holds_asks_to_go_to_its_href_once() {

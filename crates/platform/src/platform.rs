@@ -33,8 +33,8 @@ pub struct Platform {
     text_field: RefCell<Option<Option<TextField>>>,
     /// The a11y updates the app set, in order, until the loop takes them.
     ax_updates: RefCell<Vec<AxUpdate>>,
-    /// The addresses a detached platform was asked to go to.
-    navigations: RefCell<Vec<String>>,
+    /// The links a detached platform was asked to follow (`navigate.rs`).
+    pub(crate) followed: RefCell<Vec<crate::navigate::Followed>>,
 }
 
 impl Platform {
@@ -57,7 +57,7 @@ impl Platform {
             cursor: Cell::new(None),
             text_field: RefCell::new(None),
             ax_updates: RefCell::new(Vec::new()),
-            navigations: RefCell::new(Vec::new()),
+            followed: RefCell::new(Vec::new()),
         }
     }
 
@@ -132,29 +132,6 @@ impl Platform {
         std::mem::take(&mut *self.ax_updates.borrow_mut())
     }
 
-    /// Go to `href`, a followed link's address: on the web the page's
-    /// address is set to it (relative to the page's). A detached
-    /// platform records it for [`take_navigations`](Self::take_navigations).
-    ///
-    /// # Errors
-    /// [`PlatformError::Navigation`], naming `href`: natively, where
-    /// vapors has no way to hand an address to the system browser; on
-    /// the web, when the browser refuses it.
-    pub fn navigate(&self, href: &str) -> Result<(), PlatformError> {
-        if self.proxy.is_none() {
-            self.navigations.borrow_mut().push(href.to_owned());
-            return Ok(());
-        }
-        crate::navigate::go(href).map_err(PlatformError::Navigation)
-    }
-
-    /// The addresses a detached platform was asked to go to since the
-    /// last take, in order.
-    #[must_use]
-    pub fn take_navigations(&self) -> Vec<String> {
-        std::mem::take(&mut *self.navigations.borrow_mut())
-    }
-
     /// The states the window's device is watched into.
     pub(crate) fn gpu_watch(&self) -> GpuWatch {
         self.gpu_watch.clone()
@@ -170,6 +147,11 @@ impl Platform {
     #[must_use]
     pub fn device_lost(&self) -> Option<Lost> {
         self.gpu_watch.lost.get()
+    }
+
+    /// Whether this platform has no event loop (`detached`).
+    pub(crate) fn is_detached(&self) -> bool {
+        self.proxy.is_none()
     }
 
     /// The loop's proxy.
