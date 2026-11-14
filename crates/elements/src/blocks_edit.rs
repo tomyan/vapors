@@ -30,7 +30,8 @@ impl<T> Blocks<T> {
     /// Splits the full block at `pos` in two halves; `pos` in the half
     /// it falls in.
     fn split(&mut self, pos: Pos) -> Pos {
-        let upper = self.chunks[pos.block].split_off(CAP / 2);
+        let mut upper = Vec::with_capacity(CAP);
+        upper.extend(self.chunks[pos.block].drain(CAP / 2..));
         self.moved += upper.len() + (self.chunks.len() - pos.block - 1);
         self.chunks.insert(pos.block + 1, upper);
         if pos.at <= CAP / 2 {
@@ -58,14 +59,18 @@ impl<T> Blocks<T> {
     }
 
     /// Takes the item at `pos` out, dropping a block it empties (which
-    /// moves the block pointers after it); the item and the position
-    /// of the one after it.
+    /// moves the block pointers after it) and halving one left under a
+    /// quarter full, so its slots stay within four an item; the item and
+    /// the position of the one after it.
     ///
     /// # Panics
     /// When `pos` holds no item.
     pub(crate) fn remove(&mut self, pos: Pos) -> (T, Pos) {
         let block = &mut self.chunks[pos.block];
         let item = block.remove(pos.at);
+        if block.len() * 4 < block.capacity() {
+            block.shrink_to(block.len() * 2);
+        }
         let (tail, emptied) = (block.len() - pos.at, block.is_empty());
         self.len -= 1;
         self.moved += tail;
