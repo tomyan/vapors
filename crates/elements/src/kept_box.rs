@@ -90,6 +90,11 @@ impl KeptBox {
     }
 
     /// Its outline's items.
+    #[allow(
+        clippy::inline_always,
+        reason = "left to LLVM, a Scroll frame's paint took 52 instructions more than main's (`--scaling Scroll`, review of #367)"
+    )]
+    #[inline(always)]
     pub(crate) fn outline(&self) -> &Scene {
         self.marks
             .as_ref()
@@ -97,18 +102,22 @@ impl KeptBox {
     }
 
     /// Its scroll thumbs' items.
+    #[allow(
+        clippy::inline_always,
+        reason = "left to LLVM, a Scroll frame's paint took 52 instructions more than main's (`--scaling Scroll`, review of #367)"
+    )]
+    #[inline(always)]
     pub(crate) fn thumb(&self) -> &Scene {
         self.marks.as_ref().map_or(&NO_ITEMS, |marks| &marks.thumb)
     }
 
-    /// Its thumbs' items now `thumb`.
+    /// Its thumbs' items now `thumb`. The marks box, once made, stays
+    /// while the thumbs are hidden and shown again; a repaint of the box
+    /// (`new`) makes it afresh.
     pub(crate) fn set_thumb(&mut self, thumb: Scene) {
-        let Some(marks) = self.marks.as_mut() else {
-            return self.set_marks(Scene::new(), thumb);
-        };
-        marks.thumb = thumb;
-        if marks.outline.items().is_empty() && marks.thumb.items().is_empty() {
-            self.marks = None;
+        match self.marks.as_mut() {
+            Some(marks) => marks.thumb = thumb,
+            None => self.set_marks(Scene::new(), thumb),
         }
     }
 
@@ -126,6 +135,11 @@ impl KeptBox {
 
     /// The items `step`, one of this box's steps, paints: its own
     /// part's, its outline or its thumbs.
+    #[allow(
+        clippy::inline_always,
+        reason = "left to LLVM, a Scroll frame's paint took 52 instructions more than main's (`--scaling Scroll`, review of #367)"
+    )]
+    #[inline(always)]
     pub(crate) fn scene_of(&self, step: crate::paint_order::Step) -> &Scene {
         match step {
             crate::paint_order::Step::Box(_) => &self.own.scene,

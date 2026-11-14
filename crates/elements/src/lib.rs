@@ -72,6 +72,8 @@ mod kept_batches_check;
 mod kept_batches_keys;
 mod kept_box;
 #[cfg(test)]
+mod kept_box_marks_tests;
+#[cfg(test)]
 mod kept_box_size_tests;
 mod kept_checks;
 mod kept_clips;

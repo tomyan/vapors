@@ -9,7 +9,7 @@ use crate::document::Document;
 use crate::kept_box::KeptBox;
 use crate::update::Viewport;
 
-const VIEWPORT: Viewport = Viewport {
+pub(crate) const VIEWPORT: Viewport = Viewport {
     width: 200.0,
     height: 400.0,
     scale: 1.0,
@@ -22,7 +22,7 @@ const CSS: &str = "div { height: 10px; background-color: red; } \
 
 /// An element of `tag` with `class` under the body, updated once, and
 /// its kept box.
-fn kept_box(tag: &str, class: &str) -> (Document, NodeId) {
+pub(crate) fn kept_box(tag: &str, class: &str) -> (Document, NodeId) {
     let mut doc = Document::new(FontSystem::bundle_only());
     doc.add_stylesheet("t.css", CSS).expect("parses");
     let body = doc.body();
@@ -38,7 +38,7 @@ fn kept_box(tag: &str, class: &str) -> (Document, NodeId) {
     (doc, element)
 }
 
-fn of(doc: &Document, element: NodeId) -> &KeptBox {
+pub(crate) fn of(doc: &Document, element: NodeId) -> &KeptBox {
     let painted = doc.painted.as_ref().expect("painted");
     painted
         .kept_boxes
