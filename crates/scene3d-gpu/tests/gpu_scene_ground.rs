@@ -7,7 +7,7 @@ mod support;
 
 use support::{Fixture, GREEN, RED, SIZE, centroid, render, to_pixel};
 use vapors_scene3d::{
-    GeometryId, NodeId, Projection, Transform, Vec3, View, project, view_projection,
+    GeometryHandle, NodeId, Projection, Transform, Vec3, View, project, view_projection,
 };
 
 const BLUE: [u8; 4] = [0, 0, 255, 255];
@@ -18,20 +18,20 @@ const P: Vec3 = Vec3::new(0.6, 0.0, -0.4);
 const LIFT: f32 = 0.001;
 
 /// A quad through `corners`, two triangles.
-fn quad(fixture: &Fixture, corners: [Vec3; 4]) -> GeometryId {
+fn quad(fixture: &Fixture, corners: [Vec3; 4]) -> GeometryHandle {
     let indices = vec![0, 1, 2, 0, 2, 3];
     let mut meshes = fixture.meshes.borrow_mut();
     meshes.geometry(corners.to_vec(), indices).unwrap()
 }
 
 /// A square `2 * half` wide in the XZ plane, centred on the origin.
-fn flat(fixture: &Fixture, half: f32) -> GeometryId {
+fn flat(fixture: &Fixture, half: f32) -> GeometryHandle {
     let corners = [(-half, -half), (half, -half), (half, half), (-half, half)];
     quad(fixture, corners.map(|(x, z)| Vec3::new(x, 0.0, z)))
 }
 
 /// A post 0.1 wide and 1 high in the XY plane, its base centred on the origin.
-fn post(fixture: &Fixture) -> GeometryId {
+fn post(fixture: &Fixture) -> GeometryHandle {
     let corners = [(-0.05, 0.0), (0.05, 0.0), (0.05, 1.0), (-0.05, 1.0)];
     quad(fixture, corners.map(|(x, y)| Vec3::new(x, y, 0.0)))
 }
@@ -71,13 +71,13 @@ const MOVED: Vec3 = Vec3::new(-1.5, 2.5, 5.0);
 
 /// The ground under the root, carrying its marker at P.
 fn add_ground(fixture: &Fixture) {
-    let ground = fixture.mesh(fixture.root(), flat(fixture, 4.0), GREEN, at(Vec3::ZERO));
+    let ground = fixture.mesh(fixture.root(), &flat(fixture, 4.0), GREEN, at(Vec3::ZERO));
     let square = flat(fixture, 0.3);
-    fixture.mesh(ground, square, RED, at(P + Vec3::new(0.0, LIFT, 0.0)));
+    fixture.mesh(ground, &square, RED, at(P + Vec3::new(0.0, LIFT, 0.0)));
 }
 
 fn add_object(fixture: &Fixture) {
-    fixture.mesh(fixture.root(), post(fixture), BLUE, at(P));
+    fixture.mesh(fixture.root(), &post(fixture), BLUE, at(P));
 }
 
 /// Moves the camera `node` to look from [`MOVED`]; that view.

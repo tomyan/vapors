@@ -8,7 +8,8 @@ fn triangle() -> Vec<Vec3> {
 fn given_geometry_is_held_under_its_id_for_every_reader() {
     // Given
     let mut meshes = Meshes::new();
-    let id = meshes.geometry(triangle(), vec![0, 1, 2]).unwrap();
+    let handle = meshes.geometry(triangle(), vec![0, 1, 2]).unwrap();
+    let id = handle.id();
 
     // When: two renderers read it
     let first = meshes.get(id).cloned();
@@ -25,7 +26,10 @@ fn given_geometry_is_held_under_its_id_for_every_reader() {
 fn geometry_from_another_meshes_is_not_found_in_this_one() {
     // Given
     let ours = Meshes::new();
-    let foreign = Meshes::new().geometry(triangle(), vec![0, 1, 2]).unwrap();
+    let foreign = Meshes::new()
+        .geometry(triangle(), vec![0, 1, 2])
+        .unwrap()
+        .id();
 
     // Then
     assert_eq!(ours.get(foreign), None);
@@ -36,8 +40,8 @@ fn an_id_from_another_meshes_is_not_issued_by_this_one() {
     // Given
     let mut ours = Meshes::new();
     let mut theirs = Meshes::new();
-    let mine = ours.geometry(triangle(), vec![0, 1, 2]).unwrap();
-    let foreign = theirs.geometry(triangle(), vec![0, 1, 2]).unwrap();
+    let mine = ours.geometry(triangle(), vec![0, 1, 2]).unwrap().id();
+    let foreign = theirs.geometry(triangle(), vec![0, 1, 2]).unwrap().id();
 
     // Then
     assert!(ours.issued(mine));

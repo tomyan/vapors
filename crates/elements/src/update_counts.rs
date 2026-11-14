@@ -3,6 +3,7 @@
 //! of each phase.
 
 use crate::edit_decline::EditDecline;
+use crate::lane_decline::LaneDecline;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
@@ -87,6 +88,18 @@ pub struct UpdateCounts {
     pub layout_calls: usize,
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
+    /// Times a block container was laid out by its lane
+    /// (`layout/lane_layout.rs`, `docs/plans/splice-layout.md`): its
+    /// children put in or changed since laid out and their starts
+    /// summed in the lane's tree, the rest neither asked nor placed by
+    /// the lane.
+    pub lanes: usize,
+    /// Times a block or flex container was laid out by Taffy because
+    /// its style, place or a child kept it out of a lane.
+    pub lanes_declined: usize,
+    /// The condition that declined the first of those, when
+    /// `lanes_declined` is above 0, else `None`.
+    pub lane_decline: Option<LaneDecline>,
     /// Rebuilt boxes whose subtree changed and that layout laid out in
     /// isolation (`layout/isolated.rs`): asked what their parent asked
     /// the box they replaced, they answered the same, so their

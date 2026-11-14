@@ -6,46 +6,52 @@
 //! (`perform_final_layout_on_in_flow_children`). A child whose margins
 //! collapse through it is declined until PR 3b.
 
+use taffy::CollapsibleMarginSet;
+
 use super::lane_bounds::Bounds;
 use super::lane_tree::Summary;
+pub(crate) use crate::lane_decline::LaneDecline;
 
-/// Collapsible margins: the largest positive and the most negative.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct Margins {
-    pub(crate) positive: f64,
-    pub(crate) negative: f64,
+/// Collapsible margins: Taffy's own set (the largest positive and the
+/// most negative, f32), so a child's set from its answer is kept as it
+/// is; only the heights are summed in f64.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Margins(CollapsibleMarginSet);
+
+impl Default for Margins {
+    fn default() -> Self {
+        Self(CollapsibleMarginSet::ZERO)
+    }
 }
 
 impl Margins {
     /// One margin's set.
+    #[cfg(test)]
+    #[allow(clippy::cast_possible_truncation)] // a margin in CSS px, well within f32
     pub(crate) fn of(margin: f64) -> Self {
-        Self {
-            positive: margin.max(0.0),
-            negative: margin.min(0.0),
-        }
+        Self(CollapsibleMarginSet::from_margin(margin as f32))
+    }
+
+    /// A set as Taffy made it.
+    pub(crate) fn set(set: CollapsibleMarginSet) -> Self {
+        Self(set)
     }
 
     /// The two sets collapsed into one (Taffy's
     /// `CollapsibleMarginSet::collapse_with_set`).
     pub(crate) fn collapse(self, other: Self) -> Self {
-        Self {
-            positive: self.positive.max(other.positive),
-            negative: self.negative.min(other.negative),
-        }
+        Self(self.0.collapse_with_set(other.0))
     }
 
     /// The collapsed margin's size.
     pub(crate) fn resolve(self) -> f64 {
-        self.positive + self.negative
+        f64::from(self.0.resolve())
     }
-}
 
-/// Why a child cannot be a lane's leaf.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum LaneDecline {
-    /// Its margins collapse through it (empty, no padding or border):
-    /// the join is PR 3b's.
-    CollapsesThrough,
+    /// The set, for a container's answer.
+    pub(crate) fn as_set(self) -> CollapsibleMarginSet {
+        self.0
+    }
 }
 
 /// One child as block layout laid it out: its collapsible margin sets
@@ -92,10 +98,22 @@ impl BlockSummary {
     }
 
     /// The run's height with its first top and last bottom margins.
+    #[cfg(test)]
     pub(crate) fn outer(&self) -> f64 {
         self.0.map_or(0.0, |run| {
             run.top.resolve() + run.inner + run.bottom.resolve()
         })
+    }
+
+    /// The run's height from its first child's border-box top to its
+    /// last child's border-box bottom; 0 with no children.
+    pub(crate) fn inner(&self) -> f64 {
+        self.0.map_or(0.0, |run| run.inner)
+    }
+
+    /// Whether the run has no children.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_none()
     }
 
     /// The first child's top set: the container's own collapsible top

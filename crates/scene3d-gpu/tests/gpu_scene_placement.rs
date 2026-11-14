@@ -23,7 +23,7 @@ fn placed(projection: Projection) -> ([f32; 2], [f32; 2]) {
     let square = fixture.square(0.2);
     fixture.mesh(
         group,
-        square,
+        &square,
         RED,
         Transform::from_translation(Vec3::X).unwrap(),
     );

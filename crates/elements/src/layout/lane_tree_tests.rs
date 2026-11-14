@@ -12,10 +12,7 @@ fn item(size: f64) -> FlexSummary {
         size,
         basis: size,
         content: size,
-        bounds: Bounds {
-            reach: size,
-            ..Bounds::EMPTY
-        },
+        bounds: Bounds::span(0.0, size),
     })
 }
 
@@ -114,6 +111,23 @@ fn between_gives_the_children_an_interval_meets_in_order() {
 
     // Then: 96..106, 108..118, 120..130
     assert_eq!(shown, handles[8..11]);
+}
+
+#[test]
+fn starts_from_gives_each_later_child_with_its_start() {
+    // Given: more children than one leaf holds
+    let (tree, handles) = appended(60);
+
+    // When
+    let from = tree.starts_from(handles[37]);
+
+    // Then: handle 37 on, each at the start `start` gives
+    let expected: Vec<(Handle, f64)> = handles[37..]
+        .iter()
+        .map(|&handle| (handle, tree.start(handle)))
+        .collect();
+    assert_eq!(from, expected);
+    assert_eq!(tree.starts_from(handles[59]).len(), 1);
 }
 
 #[test]

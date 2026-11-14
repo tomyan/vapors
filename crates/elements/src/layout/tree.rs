@@ -2,19 +2,23 @@
 //! containing-block traits, and the dispatch from a box's display type
 //! to Taffy's block, flex and leaf algorithms.
 
+use rustc_hash::FxHashSet;
 #[cfg(feature = "grid")]
 use taffy::compute_grid_layout;
 use taffy::{
     BlockContext, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
-    Style, TraversePartialTree, TraverseTree, compute_block_layout, compute_cached_layout,
-    compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
+    Style, TraversePartialTree, TraverseTree, compute_cached_layout, compute_flexbox_layout,
+    compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
 use super::asked::Asked;
 use super::boxes::{Content, LayoutBox};
 use super::calcs::Calcs;
+use super::lane::Lanes;
+use super::lane_layout::LaneCounts;
 use super::measure::measure_text;
+use crate::lane_decline::LaneDecline;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
 pub(crate) struct BoxTree<'f> {
@@ -31,6 +35,16 @@ pub(crate) struct BoxTree<'f> {
     /// Recorded size answers disowned: a box answered a size query
     /// otherwise than it recorded (`tree_cache.rs`).
     pub(crate) disowned: usize,
+    /// The lanes beside the boxes (`lane.rs`), and whether a block
+    /// container may be laid out by one: not in the debug check's
+    /// fresh layout, which compares a lane with Taffy.
+    pub(crate) lanes: &'f mut Lanes,
+    pub(crate) lanes_enabled: bool,
+    /// Slots built this update or whose cache this layout cleared, each
+    /// once: a lane child among them is laid out again
+    /// (`lane_layout.rs`).
+    pub(crate) stale: FxHashSet<usize>,
+    pub(crate) lane_counts: LaneCounts,
 }
 
 impl BoxTree<'_> {
@@ -75,10 +89,16 @@ impl BoxTree<'_> {
         let has_children = !self.node(id).children.is_empty();
         match (self.node(id).style.display, has_children) {
             (Display::None, _) => compute_hidden_layout(self, id),
-            (Display::Block, true) => compute_block_layout(self, id, inputs, block),
-            (Display::Flex, true) => compute_flexbox_layout(self, id, inputs),
+            (Display::Block, true) => self.lane_or_block(id, inputs, block),
+            (Display::Flex, true) => {
+                self.lane_counts.decline(LaneDecline::FlexLaneNotBuilt);
+                compute_flexbox_layout(self, id, inputs)
+            }
             #[cfg(feature = "grid")]
-            (Display::Grid, true) => compute_grid_layout(self, id, inputs),
+            (Display::Grid, true) => {
+                self.lane_counts.decline(LaneDecline::Grid);
+                compute_grid_layout(self, id, inputs)
+            }
             (_, false) => self.leaf(id, inputs),
             (display, true) => unreachable!("{display:?} is refused when styles are read"),
         }
