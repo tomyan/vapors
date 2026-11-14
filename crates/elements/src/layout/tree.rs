@@ -18,7 +18,6 @@ use super::calcs::Calcs;
 use super::lane::Lanes;
 use super::lane_layout::LaneCounts;
 use super::measure::measure_text;
-use crate::lane_decline::LaneDecline;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
 pub(crate) struct BoxTree<'f> {
@@ -93,7 +92,8 @@ impl BoxTree<'_> {
             (Display::Flex, true) => self.lane_or_flex(id, inputs),
             #[cfg(feature = "grid")]
             (Display::Grid, true) => {
-                self.lane_counts.decline(LaneDecline::Grid);
+                self.lane_counts
+                    .decline(crate::lane_decline::LaneDecline::Grid);
                 compute_grid_layout(self, id, inputs)
             }
             (_, false) => self.leaf(id, inputs),
