@@ -11,13 +11,7 @@ use crate::{PlatformError, Start};
 
 impl Handler {
     pub(super) fn gpu_ready(&mut self, event_loop: &ActiveEventLoop, gpu: Gpu) {
-        let limits = gpu.limits();
-        crate::report::report_startup(&format!(
-            "adapter: {}; max texture {} px, max buffer {} MiB",
-            gpu.adapter_summary(),
-            limits.max_texture_dimension_2d,
-            limits.max_buffer_size >> 20
-        ));
+        crate::report::report_startup(&adapter_line(&gpu));
         self.gpu = Some(gpu);
         self.start_gate.gpu_ready(crate::Instant::now());
         if let Some(window) = &self.window {
@@ -79,10 +73,10 @@ impl Handler {
         let began = crate::Instant::now();
         let waited = self.start_gate.since_ready(began);
         match self.app.start(&start) {
-            Ok(()) => crate::report::report_startup(&format!(
-                "start (before the first frame): {:.1} ms, {:.1} ms after the GPU was ready",
-                began.elapsed().as_secs_f64() * 1e3,
-                waited.as_secs_f64() * 1e3
+            Ok(()) => crate::report::report_startup(&started_line(
+                &adapter_line(gpu),
+                began.elapsed(),
+                waited,
             )),
             Err(message) => self.fail(event_loop, PlatformError::Start(message)),
         }
@@ -114,3 +108,33 @@ impl Handler {
         true
     }
 }
+
+/// The start-up line once the app has started: the adapter line first,
+/// so a page's #status (or #adapter) still starts `adapter: `, which
+/// the page contract waits for, then the start's time and its wait.
+pub(super) fn started_line(
+    adapter: &str,
+    took: std::time::Duration,
+    waited: std::time::Duration,
+) -> String {
+    format!(
+        "{adapter}; start before the first frame {:.1} ms, {:.1} ms after the GPU was ready",
+        took.as_secs_f64() * 1e3,
+        waited.as_secs_f64() * 1e3
+    )
+}
+
+/// The GPU's start-up line: the adapter and its limits.
+fn adapter_line(gpu: &Gpu) -> String {
+    let limits = gpu.limits();
+    format!(
+        "adapter: {}; max texture {} px, max buffer {} MiB",
+        gpu.adapter_summary(),
+        limits.max_texture_dimension_2d,
+        limits.max_buffer_size >> 20
+    )
+}
+
+#[cfg(test)]
+#[path = "handler_gpu_tests.rs"]
+mod tests;
