@@ -1,0 +1,31 @@
+[package]
+name = "vapors-one-scene"
+description = "The one-scene example (finish-line property 9): HTML over a 3D scene whose meshes CSS styles, scripted over 60 s; a web demo (?demo=one-scene) and vapors-perf's judged workload."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-app.workspace = true
+vapors-dom.workspace = true
+vapors-elements = { workspace = true, features = ["complex-script-breaks"] }
+vapors-platform.workspace = true
+vapors-scene3d.workspace = true
+vapors-scene3d-components.workspace = true
+vapors-scene3d-gpu.workspace = true
+vapors-signals.workspace = true
+vapors-text = { workspace = true, features = ["complex-script-breaks"] }
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
+vapors-renderer.workspace = true
+vapors-scene.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[lints]
+workspace = true
