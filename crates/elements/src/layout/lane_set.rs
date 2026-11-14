@@ -64,16 +64,23 @@ impl Lanes {
         block.or_else(flex).unwrap_or_default()
     }
 
+    /// Whether the lane container in `container` has a lane holding the
+    /// child in `child`: a lookup, where `frame_offset` folds the lane.
+    pub(crate) fn holds(&self, container: usize, child: usize) -> bool {
+        let block = self.block.get(&container).map(|lane| lane.holds(child));
+        let flex = || self.flex.get(&container).map(|lane| lane.holds(child));
+        block.or_else(flex).unwrap_or(false)
+    }
+
     /// The lane container holding the child in `child`, if any.
     pub(crate) fn container_of(&self, child: usize) -> Option<usize> {
         let container = *self.parents.get(&child)?;
-        self.frame_offset(container, child).map(|_| container)
+        self.holds(container, child).then_some(container)
     }
 
     /// Whether the children of the lane container in `container` can be
     /// frames of their own, its content origin along the axis `origin`
     /// at `scale` (`lane_frame.rs`); `None` when it has no lane, or too
-    /// few children to frame (`Lane::framing`). or too
     /// few children to frame (`Lane::framing`).
     pub(crate) fn framing(
         &self,

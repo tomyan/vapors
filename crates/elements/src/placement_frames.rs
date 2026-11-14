@@ -47,6 +47,6 @@ impl Walk<'_, '_> {
     pub(crate) fn lane_framed(&self, slot: usize) -> bool {
         let up = self.kept.up[slot];
         let framed = matches!(self.kept.framing.get(&up), Some(Ok(())));
-        framed && self.boxes.lanes.frame_offset(up, slot).is_some()
+        framed && self.boxes.lanes.holds(up, slot)
     }
 }

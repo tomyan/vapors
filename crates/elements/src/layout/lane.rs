@@ -156,6 +156,11 @@ impl<K: LaneKind> Lane<K> {
             .collect()
     }
 
+    /// Whether the lane holds the child in `slot`.
+    pub(super) fn holds(&self, slot: usize) -> bool {
+        self.handles.contains_key(&slot)
+    }
+
     /// The child in `slot`'s start from the lane's top, plus that top.
     pub(super) fn frame_offset(&self, slot: usize) -> Option<f64> {
         let handle = *self.handles.get(&slot)?;
