@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use vapors_app::{ElementsApp, FrameCounts, SurfaceHandle};
 use vapors_elements::Document;
-use vapors_platform::{App, Event, Frame, Next, Platform};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start};
 use vapors_scene3d::{CameraHandle, Meshes, Projection, Scene};
 use vapors_scene3d_gpu::SceneRenderer;
 use vapors_signals::Signal;
@@ -137,6 +137,10 @@ impl App for OneScene {
             return Next::Exit;
         }
         self.app.frame(frame)
+    }
+
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.app.start(start)
     }
 
     fn drawn(&mut self, platform: &Platform) {
