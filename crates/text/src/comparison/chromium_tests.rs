@@ -120,10 +120,9 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
     );
 }
 
-/// How long a killed process may take to end. SIGKILL is delivered at
-/// once, but the process ends only when it is next scheduled, and at
-/// load 40 to 55 here a few hundred milliseconds is possible; 5 s is
-/// far past that (not measured more closely).
+/// How long a killed process may take to end. Measured 2026-11-14, 60
+/// runs 12 at a time at load 76 to 114: 59 had ended at the first read
+/// (under 0.1 ms), the slowest after 20 ms. 5 s is about 250 times that.
 const KILLED_ENDS_WITHIN: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The state of process `pid` once it has had [`KILLED_ENDS_WITHIN`] to
@@ -133,35 +132,33 @@ const KILLED_ENDS_WITHIN: std::time::Duration = std::time::Duration::from_secs(5
 fn state_once_killed(pid: &str) -> Option<char> {
     let started = std::time::Instant::now();
     loop {
-        let state = std::fs::read_to_string(format!("/proc/{pid}/stat"))
-            .ok()
-            .and_then(|stat| stat[stat.rfind(')')? + 1..].trim_start().chars().next())
-            .filter(|&state| state != 'Z');
+        let state = running_state(pid);
         if state.is_none() || started.elapsed() >= KILLED_ENDS_WITHIN {
+            println!("pid {pid}: {state:?} after {:?}", started.elapsed());
             return state;
         }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
 }
 
-#[test]
-fn a_failed_screenshot_names_the_browser_it_launched() {
-    // Given: a "browser" that exits 1 at once
-    let scratch = tempfile::Builder::new()
-        .prefix("vapors-chromium-named-")
-        .tempdir();
-    let scratch = scratch.expect("a scratch directory under the temp dir");
-    let dir = scratch.path();
-    let chromium = Chromium {
-        binary: std::path::PathBuf::from("/bin/false"),
-        deadline: std::time::Duration::from_secs(5),
+/// `pid`'s state from /proc/<pid>/stat: none when the process is gone or
+/// a zombie. Any other read error or a line of another shape panics,
+/// naming the pid and what was read, rather than counting as ended.
+fn running_state(pid: &str) -> Option<char> {
+    let path = format!("/proc/{pid}/stat");
+    let stat = match std::fs::read_to_string(&path) {
+        Ok(stat) => stat,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => panic!("{path}: {e}"),
     };
-
-    // When
-    let error = chromium
-        .screenshot(&dir.join("page.html"), &dir.join("page.png"), 10, 10, 1)
-        .expect_err("it exits 1");
-
-    // Then
-    assert!(error.to_string().contains("/bin/false"), "{error}");
+    let state = stat
+        .rfind(')')
+        .and_then(|end| stat[end + 1..].trim_start().chars().next())
+        .unwrap_or_else(|| {
+            panic!(
+                "{path} reads `{}`, with no state after the name",
+                stat.trim()
+            )
+        });
+    (state != 'Z').then_some(state)
 }

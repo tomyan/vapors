@@ -12,6 +12,7 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct Held {
     file: File,
+    path: std::path::PathBuf,
 }
 
 impl Drop for Held {
@@ -19,7 +20,12 @@ impl Drop for Held {
     /// held has a copy of the descriptor until it execs, and the lock,
     /// which belongs to the open file, would outlive this close until then.
     fn drop(&mut self) {
-        let _ = self.file.unlock();
+        if let Err(e) = self.file.unlock() {
+            eprintln!(
+                "queue: could not unlock {}: {e}; it is freed when the last copy of its descriptor closes",
+                self.path.display()
+            );
+        }
     }
 }
 
@@ -40,7 +46,10 @@ pub fn take(path: &Path) -> Result<Held, String> {
     file.set_len(0)
         .map_err(|e| format!("{}: {e}", path.display()))?;
     writeln!(file, "pid {}", std::process::id()).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(Held { file })
+    Ok(Held {
+        file,
+        path: path.to_path_buf(),
+    })
 }
 
 /// Lock `file` without waiting; refused naming the holder's pid when
@@ -76,5 +85,22 @@ mod tests {
         );
         drop(first);
         assert!(take(&path).is_ok(), "freed when dropped");
+    }
+
+    #[test]
+    fn dropping_the_lock_frees_it_while_a_copy_of_its_descriptor_lives() {
+        // Given: a copy of the descriptor, as a child spawned by another
+        // thread holds one between its fork and its exec
+        let scratch = crate::scratch::dir("queue-lock-copy");
+        let path = scratch.join("queue.lock");
+        let first = take(&path).expect("first");
+        let copy = first.file.try_clone().expect("a copy");
+
+        // When
+        drop(first);
+
+        // Then
+        assert!(take(&path).is_ok(), "the copy kept the lock");
+        drop(copy);
     }
 }
