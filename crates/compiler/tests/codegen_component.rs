@@ -70,7 +70,7 @@ fn child_component_is_mounted_with_props() {
     assert_has(&code, "let greeting3_props = GreetingProps {");
     assert_has(
         &code,
-        "Greeting::mount_before(dom, div0, None, greeting3_props);",
+        "Greeting::mount_before(dom, div0, None, greeting3_props).owned_by_parent();",
     );
     assert_has(&code, "name: \"Sumi\".into(),");
     assert_has(&code, "..Default::default()");
@@ -84,7 +84,7 @@ fn top_level_child_component_contributes_its_roots() {
     // Then
     assert_has(
         &code,
-        "Greeting::mount_before(dom, parent, before, greeting0_props);",
+        "Greeting::mount_before(dom, parent, before, greeting0_props).owned_by_parent();",
     );
     assert_has(
         &code,
@@ -185,7 +185,7 @@ fn top_level_elements_become_roots() {
     assert_has(&code, "insert_before(parent, div0, before);");
     assert_has(&code, "roots.push(Root::Node(div0));");
     assert_has(&code, "roots.push(Root::Node(span1));");
-    assert_has(&code, "Counter { owner, roots }");
+    assert_has(&code, "Counter { owner, roots, disposes_on_drop }");
 }
 
 #[test]

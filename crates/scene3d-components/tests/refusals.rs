@@ -183,4 +183,12 @@ fn a_colour_whose_surface_cannot_render_it_is_not_written_and_refuses_the_update
         !matches!(scene.kind(mesh).unwrap(), vapors_scene3d::NodeKind::Mesh { colour, .. } if *colour == blue),
         "the mesh was recoloured for a frame that cannot be drawn"
     );
+    drop(scene);
+
+    // When: the page dropped with its surface's renderer gone
+    let scene = std::rc::Rc::clone(&rig.scene);
+    drop(rig);
+
+    // Then: its nodes are removed, with nothing to draw again
+    assert_eq!(scene.borrow().len(), 1, "the root alone");
 }

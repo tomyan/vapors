@@ -38,7 +38,8 @@ pub(crate) fn assemble(
         &super::events_decl::child_types(component),
         &uses,
     ));
-    file.push_str(&accessors());
+    file.push_str(&super::shell_methods::accessors());
+    file.push_str(&super::shell_methods::drop_impl(name));
     file
 }
 
@@ -112,10 +113,16 @@ fn component_struct(name: &str, info: &ScriptInfo) -> String {
         );
     }
     format!(
-        "/// `{name}`: its signals, and what `unmount` removes.
+        "/// `{name}`: its signals, and what `unmount` removes. Dropping it
+/// disposes its signals and effects, unless the component that mounted
+/// it as a child owns it (`owned_by_parent`).
+#[must_use = \"dropping a top-level component disposes its effects; keep it or call unmount\"]
 pub struct {name} {{
 {fields}    owner: Owner,
     roots: Vec<Root>,
+    /// False once its parent's generated code took it as its child
+    /// (`owned_by_parent`): its owner then goes with the parent's.
+    disposes_on_drop: bool,
 }}
 "
     )
@@ -170,43 +177,14 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
     {{
         let {name}Props {{ {prop_names} }} = props;
 {add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
 {body}            {returned}
         }});
-        {name} {{ {built} }}
+        {name} {{ {built}, disposes_on_drop }}
     }}
 "
     )
-}
-
-fn accessors() -> String {
-    "
-    /// The top-level nodes now, in order, including those of a block
-    /// or child component at the top level.
-    #[must_use]
-    pub fn roots(&self) -> Vec<NodeId> {
-        vapors_dom::current_nodes(&self.roots)
-    }
-
-    /// The top-level entries, for a parent that mounts this component
-    /// at its own top level.
-    #[must_use]
-    pub fn root_entries(&self) -> &[Root] {
-        &self.roots
-    }
-
-    /// Reads the top-level nodes, disposes the signals and effects, and
-    /// removes the nodes.
-    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
-        let nodes = self.roots();
-        self.owner.dispose();
-        for node in nodes {
-            dom.borrow_mut().remove(node);
-        }
-    }
-}
-"
-    .to_string()
 }
