@@ -47,3 +47,20 @@ fn a_transform_with_no_area_draws_nothing_and_one_not_finite_is_refused() {
         "{refused}"
     );
 }
+
+#[test]
+fn a_transform_whose_extrusion_overflows_is_refused_naming_it() {
+    // Given: finite values and a finite determinant, but the squares of
+    // the singular values past f32 (the review's 2e19), and a shrink so
+    // far that half a pixel is past f32
+    let red = Color::from_rgba8(255, 0, 0, 255);
+
+    // When, Then: the first is drawn (worked in f64); the second refused
+    let wide = MeshShape::new([2e19, 0.0, 0.0, 1.0, 0.0, 0.0], red).expect("drawable");
+    assert!(wide.is_some_and(|shape| shape.instance()[6].is_finite()));
+    let refused = MeshShape::new([1.0, 0.0, 0.0, 1e-39, 0.0, 0.0], red).expect_err("refused");
+    assert_eq!(
+        refused.0,
+        "transform [1.0, 0.0, 0.0, 1e-39, 0.0, 0.0] shrinks some direction so far that half a pixel in its units is past f32's range; give the element a transform whose scale is within f32's range; reproduce with `cargo test -p vapors-renderer --lib mesh_shape`"
+    );
+}

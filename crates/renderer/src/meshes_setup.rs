@@ -2,16 +2,51 @@
 //! vertices and the items' instances, and no face culling (the
 //! tessellator's winding is not checked).
 
-/// Per vertex: position, normal (two floats each), three edge
-/// distances, three shifts.
-const VERTEX: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
-    0 => Float32x2, 1 => Float32x2, 2 => Float32x3, 3 => Float32x3
+use std::mem::offset_of;
+
+use vapors_shapes::MeshVertex;
+
+/// Per vertex, at `MeshVertex`'s own field offsets: position, normal
+/// (two floats each), three edge distances, three shifts.
+const VERTEX: [wgpu::VertexAttribute; 4] = [
+    attribute(
+        0,
+        offset_of!(MeshVertex, position),
+        wgpu::VertexFormat::Float32x2,
+    ),
+    attribute(
+        1,
+        offset_of!(MeshVertex, normal),
+        wgpu::VertexFormat::Float32x2,
+    ),
+    attribute(
+        2,
+        offset_of!(MeshVertex, edges),
+        wgpu::VertexFormat::Float32x3,
+    ),
+    attribute(
+        3,
+        offset_of!(MeshVertex, shift),
+        wgpu::VertexFormat::Float32x3,
+    ),
 ];
 
 /// Per instance: the linear part; translation and extrusion; colour.
 const INSTANCE: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     4 => Float32x4, 5 => Float32x4, 6 => Float32x4
 ];
+
+const fn attribute(
+    location: u32,
+    offset: usize,
+    format: wgpu::VertexFormat,
+) -> wgpu::VertexAttribute {
+    wgpu::VertexAttribute {
+        format,
+        offset: offset as u64,
+        shader_location: location,
+    }
+}
 
 pub(crate) fn render_pipeline(
     device: &wgpu::Device,
@@ -70,7 +105,7 @@ fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
             attributes: &VERTEX,
         }),
         Some(wgpu::VertexBufferLayout {
-            array_stride: 48,
+            array_stride: crate::meshes::INSTANCE_BYTES,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &INSTANCE,
         }),

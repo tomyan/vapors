@@ -116,7 +116,7 @@ fn gpu_a_rotated_mesh_covers_its_area_and_a_later_one_draws_over() {
 }
 
 #[test]
-fn gpu_an_entrys_vertices_are_written_once_and_counted() {
+fn gpu_an_entrys_vertices_are_counted_when_written() {
     // Given
     let gpu = vapors_gpu_harness::gpu();
     let triangles = mesh("M0 0h4v4h-4z", None);

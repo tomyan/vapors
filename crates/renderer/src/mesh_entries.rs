@@ -5,12 +5,15 @@
 //! counted, `shape_bytes_uploaded`, so a frame that registers nothing
 //! writes none.
 
+use std::mem::offset_of;
+
 use vapors_shapes::MeshVertex;
 
 use crate::{KeptRange, Retained, Target, WorkCounter};
 
-/// Bytes per vertex: position, normal, three distances, three shifts.
-pub(crate) const VERTEX_BYTES: u64 = 40;
+/// Bytes per vertex: `MeshVertex`'s own size, the one answer the
+/// buffer, the pipeline's stride and its attribute offsets read.
+pub(crate) const VERTEX_BYTES: u64 = size_of::<MeshVertex>() as u64;
 
 /// One entry's triangles on the GPU.
 #[derive(Debug)]
@@ -81,24 +84,45 @@ impl MeshEntries {
     }
 }
 
-/// `triangles`' vertices as the mesh pipeline reads them, padded with
-/// zeros to a multiple of 16 bytes for the kept buffer.
-fn vertex_bytes(triangles: &[[MeshVertex; 3]]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = triangles
-        .iter()
-        .flatten()
-        .flat_map(|v| {
-            let floats = [v.position.as_slice(), &v.normal, &v.edges, &v.shift].concat();
-            floats
-                .into_iter()
-                .flat_map(f32::to_le_bytes)
-                .collect::<Vec<u8>>()
-        })
-        .collect();
-    debug_assert_eq!(
-        bytes.len() as u64,
-        triangles.len() as u64 * 3 * VERTEX_BYTES
-    );
-    bytes.resize(bytes.len().next_multiple_of(16), 0);
+/// `triangles`' vertices as the mesh pipeline reads them: each field's
+/// floats at its `offset_of!` in a vertex of `size_of::<MeshVertex>()`,
+/// the layout `meshes_setup.rs` declares from the same offsets; padded
+/// with zeros to a multiple of 16 bytes for the kept buffer.
+pub(crate) fn vertex_bytes(triangles: &[[MeshVertex; 3]]) -> Vec<u8> {
+    let size = size_of::<MeshVertex>();
+    let mut bytes = vec![0; (triangles.len() * 3 * size).next_multiple_of(16)];
+    for (at, vertex) in triangles.iter().flatten().enumerate() {
+        let start = at * size;
+        put(
+            &mut bytes,
+            start + offset_of!(MeshVertex, position),
+            &vertex.position,
+        );
+        put(
+            &mut bytes,
+            start + offset_of!(MeshVertex, normal),
+            &vertex.normal,
+        );
+        put(
+            &mut bytes,
+            start + offset_of!(MeshVertex, edges),
+            &vertex.edges,
+        );
+        put(
+            &mut bytes,
+            start + offset_of!(MeshVertex, shift),
+            &vertex.shift,
+        );
+    }
     bytes
 }
+
+fn put(bytes: &mut [u8], at: usize, floats: &[f32]) {
+    for (k, float) in floats.iter().enumerate() {
+        bytes[at + k * 4..at + k * 4 + 4].copy_from_slice(&float.to_le_bytes());
+    }
+}
+
+#[cfg(test)]
+#[path = "mesh_entries_tests.rs"]
+mod tests;

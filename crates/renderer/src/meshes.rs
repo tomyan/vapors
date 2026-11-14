@@ -13,8 +13,9 @@ use crate::mesh_entries::{MeshEntries, MeshEntry};
 use crate::uniform_slots::UniformSlots;
 use crate::{GpuWork, KeptRange, MeshShape, Retained, Shift, Target, WorkCounter};
 
-/// Bytes per instance: three four-float attributes.
-const INSTANCE_BYTES: u64 = 48;
+/// Bytes per instance: [`MeshShape::instance`]'s floats, the stride
+/// `meshes_setup.rs` declares.
+pub(crate) const INSTANCE_BYTES: u64 = (crate::mesh_shape::INSTANCE_FLOATS * 4) as u64;
 
 /// A pipeline that draws mesh items. Create once per target format.
 pub struct MeshPipeline {
@@ -108,18 +109,14 @@ impl MeshPipeline {
         let bind_group = bind_group.of(viewports.generation(), || {
             made_bind_group(target, layout, work, viewports)
         });
-        let instances = instances_buffer.slice(target.encoder, kept);
-        let vertices = entries.slices(target, drawn);
-        let (pipeline, work) = (&*pipeline, &*work);
-        target.draw_pass(|pass| {
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, bind_group, &[viewport]);
-            pass.set_vertex_buffer(1, instances);
-            for (at, (slice, entry)) in (0u32..).zip(vertices.into_iter().zip(drawn)) {
-                pass.set_vertex_buffer(0, slice);
-                work.draw(pass, 0..entry.vertices, at..at + 1);
-            }
-        });
+        let run = Draws {
+            pipeline,
+            bind_group,
+            viewport,
+            instances: instances_buffer.slice(target.encoder, kept),
+            vertices: entries.slices(target, drawn),
+        };
+        run.record(target, work, drawn);
     }
 
     /// Gives `kept`'s bytes back.
@@ -168,4 +165,30 @@ fn made_bind_group(
             }],
         },
     )
+}
+
+/// One run's draws: the pipeline, its bind group at `viewport`, the
+/// run's instances and each item's entry's vertices.
+struct Draws<'a> {
+    pipeline: &'a wgpu::RenderPipeline,
+    bind_group: &'a wgpu::BindGroup,
+    viewport: u32,
+    instances: wgpu::BufferSlice<'a>,
+    vertices: Vec<wgpu::BufferSlice<'a>>,
+}
+
+impl Draws<'_> {
+    /// Records one draw per item into `target`'s pass, the `i`th of
+    /// instance `i` over `drawn[i]`'s vertices.
+    fn record(self, target: &Target<'_>, work: &WorkCounter, drawn: &[&MeshEntry]) {
+        target.draw_pass(|pass| {
+            pass.set_pipeline(self.pipeline);
+            pass.set_bind_group(0, self.bind_group, &[self.viewport]);
+            pass.set_vertex_buffer(1, self.instances);
+            for (at, (slice, entry)) in (0u32..).zip(self.vertices.into_iter().zip(drawn)) {
+                pass.set_vertex_buffer(0, slice);
+                work.draw(pass, 0..entry.vertices, at..at + 1);
+            }
+        });
+    }
 }
