@@ -10,7 +10,7 @@ fn item(margins: [f64; 2], size: f64) -> FlexSummary {
         size,
         basis: size + 1.0,
         content: size + 2.0,
-        bounds: Bounds::EMPTY,
+        bounds: Bounds::span(0.0, size),
     })
 }
 

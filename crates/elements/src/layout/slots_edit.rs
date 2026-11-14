@@ -38,14 +38,22 @@ impl Placed {
         let slot = self.slot_for(key, taken);
         let mut children = old_children(taken, slot);
         for &removed in &edits.removed {
-            children.remove(position(&children, removed));
+            let at = position(&children, removed);
+            children.remove(at);
+            if let Some(lane) = self.lanes.get_mut(&slot) {
+                lane.child_removed(removed, children.get(at).copied());
+            }
         }
         let mut put = vec![slot];
         let mut pending = edits.inserted.clone();
         while let Some(child) = next_in_order(source, &mut pending) {
             let at = self.after_previous(source, (child, &children), taken);
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
+            let after = at.checked_sub(1).map(|before| children[before]);
             children.insert(at, built[0]);
+            if let Some(lane) = self.lanes.get_mut(&slot) {
+                lane.child_inserted(built[0], after);
+            }
             put.extend(built);
         }
         let (mut own, field_text) = element_box(source, owner);

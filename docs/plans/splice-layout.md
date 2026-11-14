@@ -505,6 +505,17 @@ the splice lane's; 4 waits for IU4 4-ii's frame coordinates; 5 waits
 for 4 on the elements side; 3f after 3 and before 4 (section 10.6); 6 after 4; 7 last. The estimates in
 section 6 assume PR 1 lands before PR 4's acceptance run.
 
+As built, PR 3 (3a-1 #315, 3a-2 #323): the lane is not lent with its
+container's cache. `put_box` drops it with the container's box, so any
+rebuild of the container's own box (a class toggle or hover style on the
+list itself, or a declined child edit) makes the next layout lay every
+child out again: O(rows) `lane_child` calls, each a cache hit, no worse
+than Taffy. The leaves' inputs are split in two (`lane_share.rs`): the
+height bases change between a flex parent's size query and its layout,
+and only the children whose styles read them (a percentage height,
+min-height or max-height, or a relative `top` or `bottom` percentage)
+are laid out again when they do.
+
 ## 8. Decisions for Tom
 
 Decided by Tom, 2026-11-13: 1 build the lane (Taffy stays for every other

@@ -140,7 +140,7 @@ impl<S: Summary> LaneTree<S> {
     }
 
     /// The children before `handle`'s, folded.
-    fn before(&self, handle: Handle) -> S {
+    pub(super) fn before(&self, handle: Handle) -> S {
         let (mut node, at) = self.locate(handle);
         let mut left = self.fold(&self.nodes[node].sums[..at]);
         while let Some(parent) = self.nodes[node].parent {

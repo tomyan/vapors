@@ -15,7 +15,7 @@ fn sets(top: Margins, bottom: Margins, height: f64) -> BlockSummary {
         bottom,
         height,
         collapses_through: false,
-        bounds: Bounds::EMPTY,
+        bounds: Bounds::span(0.0, height),
     })
     .expect("does not collapse through")
 }
@@ -81,7 +81,7 @@ fn a_child_that_collapses_through_is_declined() {
         bottom: Margins::of(4.0),
         height: 0.0,
         collapses_through: true,
-        bounds: Bounds::EMPTY,
+        bounds: Bounds::span(0.0, 0.0),
     });
     assert_eq!(leaf, Err(LaneDecline::CollapsesThrough));
 }
