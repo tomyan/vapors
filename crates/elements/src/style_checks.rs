@@ -154,6 +154,7 @@ impl Document {
             if let Some(kept) = self.kept.as_mut() {
                 kept.styles.remove(node);
                 kept.used.remove(&node);
+                kept.scene.remove(&node);
                 kept.refused.remove(&node);
                 kept.calcs.forget(node);
             }

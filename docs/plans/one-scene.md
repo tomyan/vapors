@@ -103,13 +103,47 @@ markings seen up close in 3D, is to be measured in S3b.
 Antialiasing differs by kind. A closed-form shape has a distance to its
 edge in the fragment shader, so analytic coverage from `fwidth` works
 as it does for boxes. A tessellated mesh has interior triangle edges
-with no edge distance; analytic coverage for it needs each vertex to
-carry its distance to the outline (edge flags or distances per
-triangle, evaluated with `fwidth`), built at tessellation time but
-evaluated after the transform. A CPU fringe of fixed width is early
-antialiasing and is not a candidate (the brief, "Antialiasing after
-every transform"). S3b compares, for each kind, MSAA against that
-kind's analytic method.
+with no edge distance; analytic coverage for it needs distances per
+triangle, evaluated with `fwidth`, built at tessellation time but
+evaluated after the transform. S2 builds them by edge
+(`crates/shapes/src/mesh.rs`, the check; `mesh_edges.rs` in S2's last
+PR, the builder): each triangle has its own three vertices, and for
+an outline edge the two corners on it carry distance 0 and the third
+its altitude, so the interpolated value is a fragment's signed
+distance to that edge's line; for an edge two triangles share (found
+by counting each edge's uses in lyon's output) all three corners
+carry a far value, so it never wins the `min`. Fragments exist only
+inside the mesh, which would leave the outer half of the coverage
+ramp missing (every edge a hard edge on its outer side), so the
+outline is extruded by half a device pixel in the vertex shader (Tom,
+2026-11-13, option 2): each vertex carries the miter offset of its
+outline edges as a normal and, per edge, the shift that move takes
+off its distance; distances go negative outside the true outline and
+the ramp straddles it, where Chromium's edge sits. Rejected: one
+distance per shared vertex (every vertex of a convex fill, and every
+vertex lyon's stroker emits, lies on the outline at zero, and a
+corner triangle has two outline edges); an index buffer with
+per-vertex edge flags (edge membership is per triangle); per-triangle
+flags through `@interpolate(flat)` with an index buffer (WebGPU takes
+the first vertex, so every triangle needs its own first vertex, extra
+work for no bytes saved); barycentrics (not in WebGPU); curves
+evaluated in the fragment shader, Loop-Blinn style (svg-support D1);
+an inset-only ramp (the shape draws half a pixel small) and an AA
+ring of inset fill plus a one-pixel band (an inset of a stroke under a
+pixel wide folds its fill). Cost against the indexed layout it
+replaces: a fill of n outline vertices is about 24n bytes indexed
+(12-byte vertices, u32 indices) and 120n bytes here (40-byte vertices,
+three per triangle, no index buffer), 5 times; a 24 px icon of 200
+vertices about 24 KB against 5 KB; the vertex shader runs three times
+per triangle. Small in absolute terms for icons; S5a measures. A known
+limit for S3b: a pixel inside the shape within half a pixel of the
+outline but inside a triangle with no outline edge (the wedge at an
+outline vertex) gets coverage 1 where Chromium gives between 0.5 and
+1, at most one slightly dark pixel per outline vertex, expected along
+flattened curves. A CPU fringe of fixed width is early antialiasing
+and is not a candidate (the brief, "Antialiasing after every
+transform"). S3b compares, for each kind, MSAA against that kind's
+analytic method.
 
 A literal outside the subset is refused at build time naming file, line
 and the fix, as the compiler refuses other attributes today
@@ -120,9 +154,15 @@ and the fix, as the compiler refuses other attributes today
 - Two shapes are the same entry when their canonical form is equal:
   absolute commands in viewBox units after parsing, plus the fill rule
   and stroke parameters that change the mesh (width, join, cap,
-  miter limit). Paint is not part of the key; it is per item.
+  miter limit). Paint is not part of the key; it is per item. Equality
+  is per build target: an arc whose radii the parser scaled up for its
+  chord passes through `sin_cos`, whose last bit differs between the
+  host's libm and wasm32's, so S4a's run-time parse must not rely on
+  cross-target bit equality: on a hash hit it compares bytes, and a
+  miss is a cache miss (one more tessellation, counted), never a
+  defect (S2, `crates/shapes/src/canonical.rs`).
 - Each crate's build emits one `static SHAPES: ShapeTable` beside its
-  `wisp.rs`: vertex and index buffers for every mesh entry, parameters
+  `wisp.rs`: triangle buffers for every mesh entry, parameters
   for every closed-form entry, and each entry's canonical bytes and
   their hash. Each shape element's emitted code names its index in that
   table.
@@ -368,6 +408,27 @@ pipelines must join the registry. Start-up time is moved out of the
 judged frames, not reduced. A vapors-owned on-disk pipeline cache
 (faster later launches; wgpu supports it on Vulkan only) is deferred to
 after the finish line (Tom, 2026-11-13).
+
+F0 as built (2026-11-13, #272, #281 and PR 3): `vapors_renderer::pipelines`
+is the counted door, and clippy bans wgpu's constructors elsewhere.
+`App::start` runs once the GPU is ready and the window has a size, before
+the first frame. In it, `ElementsApp` builds the painter's pipelines,
+mounts and sizes the surfaces, uploads the atlas page, makes the frame
+timer, runs the document's first update, and clears each surface's
+backing at the start's size (a frame 0 at another size or scale remakes
+the backings in frame 0, says so on the status line, and records
+`StartState::StartedAtOtherSize`). The judged run refuses any frame that builds a pipeline.
+Measured on a loaded box: frame 0's first surface submit cost 13 to 20 ms.
+`perf` showed i915 allocating and zeroing the pages of a new memory block
+(`clear_page_erms` under execbuffer); wgpu's default block is 128 MiB.
+The submit fell to 0.2 to 0.4 ms only with both the timer made at start
+and the backings cleared at start, in that order. `MemoryHints` is
+unchanged (lead, 2026-11-13).
+Open: the acceptance runs (P0's three cold and warm pairs, load under
+1.5) have not been made. Every window so far stayed loaded. They come in
+the first real quiet window, which xtask's quiet lock is to make
+possible: slice 3 of `docs/plans/factory-throughput.md` (branch
+`factory/throughput-0`, not yet on main; pending Tom).
 
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next

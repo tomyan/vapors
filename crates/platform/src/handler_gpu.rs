@@ -1,23 +1,19 @@
 //! The handler's part in the GPU's life: the device's arrival after the
 //! window opened, and the loop stopped on its loss.
 
-use winit::event_loop::ActiveEventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 
 use super::Handler;
-use crate::PlatformError;
 use crate::event::Event;
+use crate::start_gate::Step;
 use crate::surface::Gpu;
+use crate::{PlatformError, Start};
 
 impl Handler {
-    pub(super) fn gpu_ready(&mut self, gpu: Gpu) {
-        let limits = gpu.limits();
-        crate::report::report_startup(&format!(
-            "adapter: {}; max texture {} px, max buffer {} MiB",
-            gpu.adapter_summary(),
-            limits.max_texture_dimension_2d,
-            limits.max_buffer_size >> 20
-        ));
+    pub(super) fn gpu_ready(&mut self, event_loop: &ActiveEventLoop, gpu: Gpu) {
+        crate::report::report_startup(&adapter_line(&gpu));
         self.gpu = Some(gpu);
+        self.start_gate.gpu_ready(crate::Instant::now());
         if let Some(window) = &self.window {
             let size = window.inner_size();
             self.app.event(
@@ -28,6 +24,61 @@ impl Handler {
                 &self.platform,
             );
             window.request_redraw();
+        }
+        // RELAXED: no windowless test; a real window is the only caller.
+        // Caught today, though not by name: without this call no app
+        // starts and no frame is drawn, so the gate's demo screenshot
+        // steps fail ("`demo` did not finish within 120s; it never wrote
+        // its screenshot", shown with the call removed). Retired by a
+        // handler test with a fake window, which winit does not offer.
+        self.start_when_sized(event_loop);
+    }
+
+    /// The app's start, once, as the start gate says: when the GPU is
+    /// ready and the window has a size, before the first frame; a
+    /// window without one is waited for to a deadline, then refused.
+    pub(super) fn start_when_sized(&mut self, event_loop: &ActiveEventLoop) {
+        let size = self.window.as_ref().map_or((0, 0), |window| {
+            let size = window.inner_size();
+            (size.width, size.height)
+        });
+        match self.start_gate.step(size, crate::Instant::now()) {
+            Step::Start => self.start_app(event_loop),
+            Step::WaitUntil(at) => event_loop.set_control_flow(ControlFlow::WaitUntil(at)),
+            // RELAXED: the refusal itself is pinned (start_gate_tests.rs);
+            // that it stops the loop is not, as `fail` needs a real event
+            // loop, and no gate step has a window without a size. Retired
+            // by a handler test with a fake event loop.
+            Step::Refuse(message) => self.fail(event_loop, PlatformError::Start(message)),
+            Step::Wait | Step::Started => {}
+        }
+    }
+
+    /// `App::start` on the window's GPU, timed on the start-up line; a
+    /// refused start stops the loop.
+    fn start_app(&mut self, event_loop: &ActiveEventLoop) {
+        let (Some(window), Some(gpu)) = (&self.window, &self.gpu) else {
+            return;
+        };
+        let size = window.inner_size();
+        let start = Start {
+            adapter: &gpu.adapter,
+            device: &gpu.device,
+            queue: &gpu.queue,
+            format: gpu.config.format,
+            width: size.width,
+            height: size.height,
+            scale_factor: window.scale_factor(),
+        };
+        let began = crate::Instant::now();
+        let waited = self.start_gate.since_ready(began);
+        match self.app.start(&start) {
+            Ok(()) => crate::report::report_startup(&started_line(
+                &adapter_line(gpu),
+                began.elapsed(),
+                waited,
+            )),
+            Err(message) => self.fail(event_loop, PlatformError::Start(message)),
         }
     }
 
@@ -57,3 +108,33 @@ impl Handler {
         true
     }
 }
+
+/// The start-up line once the app has started: the adapter line first,
+/// so a page's #status (or #adapter) still starts `adapter: `, which
+/// the page contract waits for, then the start's time and its wait.
+pub(super) fn started_line(
+    adapter: &str,
+    took: std::time::Duration,
+    waited: std::time::Duration,
+) -> String {
+    format!(
+        "{adapter}; start before the first frame {:.1} ms, {:.1} ms after the GPU was ready",
+        took.as_secs_f64() * 1e3,
+        waited.as_secs_f64() * 1e3
+    )
+}
+
+/// The GPU's start-up line: the adapter and its limits.
+fn adapter_line(gpu: &Gpu) -> String {
+    let limits = gpu.limits();
+    format!(
+        "adapter: {}; max texture {} px, max buffer {} MiB",
+        gpu.adapter_summary(),
+        limits.max_texture_dimension_2d,
+        limits.max_buffer_size >> 20
+    )
+}
+
+#[cfg(test)]
+#[path = "handler_gpu_tests.rs"]
+mod tests;

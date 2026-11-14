@@ -1,13 +1,14 @@
 //! The table's lookup and its check: a bad entry refused naming the
-//! crate and the site, each shape held once, one format.
+//! crate and the site, each shape held once, one format, each hash
+//! its bytes' hash.
 
 use super::*;
 
-const fn entry(site: &'static str, canonical: &'static [u8], hash: u64) -> ShapeEntry {
+fn entry(site: &'static str, canonical: &'static [u8]) -> ShapeEntry {
     ShapeEntry {
         site,
         canonical,
-        hash,
+        hash: hash_bytes(canonical),
         geometry: Geometry::Ellipse {
             centre: [8.0, 8.0],
             radii: [4.0, 4.0],
@@ -15,21 +16,20 @@ const fn entry(site: &'static str, canonical: &'static [u8], hash: u64) -> Shape
     }
 }
 
-const fn undrawable(site: &'static str, hash: u64) -> ShapeEntry {
+fn undrawable(site: &'static str) -> ShapeEntry {
     ShapeEntry {
-        site,
-        canonical: b"rect",
-        hash,
         geometry: Geometry::Rect {
             origin: [0.0; 2],
             size: [0.0, 1.0],
             radius: [0.0; 2],
         },
+        ..entry(site, b"rect")
     }
 }
 
-fn table(entries: &'static [ShapeEntry]) -> ShapeTable {
-    ShapeTable::new("demo", TABLE_FORMAT, entries)
+/// A table of `entries`, which live for the test binary's life.
+fn table(entries: Vec<ShapeEntry>) -> ShapeTable {
+    ShapeTable::new("demo", TABLE_FORMAT, Box::leak(entries.into_boxed_slice()))
 }
 
 fn refused(table: &ShapeTable) -> TableError {
@@ -39,28 +39,24 @@ fn refused(table: &ShapeTable) -> TableError {
 #[test]
 fn an_entry_is_found_by_the_index_its_element_names() {
     // Given
-    static ENTRIES: [ShapeEntry; 2] = [
-        entry("a.wisp:3", b"M0 0L1 1", 1),
-        entry("a.wisp:9", b"M0 0L2 2", 2),
-    ];
-    let table = table(&ENTRIES);
+    let table = table(vec![
+        entry("a.wisp:3", b"M0 0L1 1"),
+        entry("a.wisp:9", b"M0 0L2 2"),
+    ]);
 
     // When
     let found = table.entry(ShapeIndex::new(1));
 
     // Then
-    assert_eq!(found, Ok(&ENTRIES[1]));
+    assert_eq!(found, Ok(&table.entries()[1]));
+    assert_eq!(found.map(|e| e.site), Ok("a.wisp:9"));
     assert_eq!(table.crate_name(), "demo");
-    assert_eq!(table.entries().len(), 2);
 }
 
 #[test]
 fn an_index_past_the_end_is_refused_naming_the_crate() {
-    // Given
-    static ENTRIES: [ShapeEntry; 1] = [entry("a.wisp:3", b"M0 0L1 1", 1)];
-
     // When
-    let error = table(&ENTRIES)
+    let error = table(vec![entry("a.wisp:3", b"M0 0L1 1")])
         .entry(ShapeIndex::new(1))
         .expect_err("past the end");
 
@@ -73,26 +69,27 @@ fn an_index_past_the_end_is_refused_naming_the_crate() {
 
 #[test]
 fn a_table_of_distinct_drawable_entries_passes_the_check() {
-    // Given
-    static ENTRIES: [ShapeEntry; 2] = [
-        entry("a.wisp:3", b"M0 0L1 1", 1),
-        entry("b.wisp:4", b"M0 0L2 2", 2),
-    ];
-
     // When, Then
-    assert_eq!(table(&ENTRIES).check(), Ok(()));
-    assert_eq!(table(&[]).check(), Ok(()));
+    assert_eq!(
+        table(vec![
+            entry("a.wisp:3", b"M0 0L1 1"),
+            entry("b.wisp:4", b"M0 0L2 2"),
+        ])
+        .check(),
+        Ok(())
+    );
+    assert_eq!(table(vec![]).check(), Ok(()));
 }
 
 #[test]
 fn an_entry_that_cannot_be_drawn_is_refused_naming_crate_and_site() {
     // Given
-    static FIRST: [ShapeEntry; 2] = [undrawable("b.wisp:7", 1), entry("a.wisp:3", b"M0 0L1 1", 2)];
-    static LAST: [ShapeEntry; 2] = [entry("a.wisp:3", b"M0 0L1 1", 1), undrawable("b.wisp:7", 2)];
+    let first = table(vec![undrawable("b.wisp:7"), entry("a.wisp:3", b"M0 0L1 1")]);
+    let last = table(vec![entry("a.wisp:3", b"M0 0L1 1"), undrawable("b.wisp:7")]);
 
     // When, Then
-    for entries in [&FIRST, &LAST] {
-        let error = refused(&table(entries));
+    for table in [first, last] {
+        let error = refused(&table);
         assert_eq!(error.crate_name, "demo");
         assert_eq!(error.site, Some("b.wisp:7"));
         assert_eq!(error.reason, "size [0.0, 1.0] is not above zero");
@@ -102,31 +99,49 @@ fn an_entry_that_cannot_be_drawn_is_refused_naming_crate_and_site() {
 
 #[test]
 fn an_entry_with_no_site_or_no_bytes_is_refused() {
-    // Given
-    static NO_SITE: [ShapeEntry; 1] = [entry("", b"M0 0L1 1", 1)];
-    static NO_BYTES: [ShapeEntry; 1] = [entry("a.wisp:3", b"", 1)];
-
     // When, Then
     assert_eq!(
-        refused(&table(&NO_SITE)).reason,
+        refused(&table(vec![entry("", b"M0 0L1 1")])).reason,
         "the site is empty; an entry names where its shape was written"
     );
     assert_eq!(
-        refused(&table(&NO_BYTES)).reason,
+        refused(&table(vec![entry("a.wisp:3", b"")])).reason,
         "the canonical bytes are empty; an entry carries its shape's canonical form"
+    );
+}
+
+#[test]
+fn a_hash_that_is_not_its_bytes_hash_is_refused_naming_both() {
+    // Given
+    let wrong = ShapeEntry {
+        hash: 0xabc,
+        ..entry("a.wisp:3", b"M0 0L1 1")
+    };
+
+    // When
+    let error = refused(&table(vec![wrong]));
+
+    // Then
+    assert_eq!(error.site, Some("a.wisp:3"));
+    assert_eq!(
+        error.reason,
+        format!(
+            "carries hash 0xabc but its canonical bytes hash to {:#x}",
+            hash_bytes(b"M0 0L1 1")
+        )
     );
 }
 
 #[test]
 fn another_format_or_an_empty_crate_name_is_refused_before_the_entries() {
     // Given
-    static ENTRIES: [ShapeEntry; 1] = [undrawable("b.wisp:7", 1)];
+    let entries: &'static [ShapeEntry] = Box::leak(vec![undrawable("b.wisp:7")].into_boxed_slice());
 
     // When
-    let format = ShapeTable::new("demo", TABLE_FORMAT + 1, &ENTRIES)
+    let format = ShapeTable::new("demo", TABLE_FORMAT + 1, entries)
         .check()
         .expect_err("refused");
-    let name = ShapeTable::new("", TABLE_FORMAT, &ENTRIES)
+    let name = ShapeTable::new("", TABLE_FORMAT, entries)
         .check()
         .expect_err("refused");
 
@@ -144,15 +159,12 @@ fn another_format_or_an_empty_crate_name_is_refused_before_the_entries() {
 
 #[test]
 fn the_same_shape_twice_is_refused_as_the_emitters_bug() {
-    // Given
-    static ENTRIES: [ShapeEntry; 3] = [
-        entry("a.wisp:3", b"M0 0L1 1", 1),
-        entry("b.wisp:4", b"M0 0L2 2", 2),
-        entry("c.wisp:5", b"M0 0L1 1", 1),
-    ];
-
     // When
-    let error = refused(&table(&ENTRIES));
+    let error = refused(&table(vec![
+        entry("a.wisp:3", b"M0 0L1 1"),
+        entry("b.wisp:4", b"M0 0L2 2"),
+        entry("c.wisp:5", b"M0 0L1 1"),
+    ]));
 
     // Then
     assert_eq!(error.site, Some("c.wisp:5"));
@@ -165,19 +177,25 @@ fn the_same_shape_twice_is_refused_as_the_emitters_bug() {
 
 #[test]
 fn one_hash_for_two_shapes_is_refused_naming_both_sites() {
-    // Given
-    static ENTRIES: [ShapeEntry; 2] = [
-        entry("a.wisp:3", b"M0 0L1 1", 0xabc),
-        entry("c.wisp:5", b"M0 0L2 2", 0xabc),
-    ];
+    // Given: a collision, which the hash check in front of this path
+    // keeps out of `check` unless it is genuine, so the refusal is
+    // tested on its own
+    let earlier = entry("a.wisp:3", b"M0 0L1 1");
+    let entry = ShapeEntry {
+        hash: earlier.hash,
+        ..entry("c.wisp:5", b"M0 0L2 2")
+    };
 
     // When
-    let error = refused(&table(&ENTRIES));
+    let error = table(vec![]).hash_shared(&earlier, &entry);
 
     // Then
     assert_eq!(
         error.to_string(),
-        "shape table of crate demo, entry at c.wisp:5: has the hash 0xabc of the entry at a.wisp:3 with different canonical bytes; a hash names one shape; change one shape's canonical bytes (another stroke width, or a point added to the path), or widen the hash"
+        format!(
+            "shape table of crate demo, entry at c.wisp:5: has the hash {:#x} of the entry at a.wisp:3 with different canonical bytes; a hash names one shape; change one shape's canonical bytes (another stroke width, or a point added to the path), or widen the hash",
+            earlier.hash
+        )
     );
 }
 
