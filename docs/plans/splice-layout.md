@@ -851,10 +851,18 @@ Lane frames are lighter than scroll frames:
   first read and memoised for the paint (section 5.4's `Frames::at`):
   O(frames read), the rows drawn and hit.
 - Its shift is whole device pixels, as a scroll frame's is (snapped
-  items keep their bits only under a whole shift). A lane child is a
-  frame only when its start times the scale is a whole number; a lane
-  with a fractional start keeps today's placement for its children
-  (correct, O(rows after)), counted as a decline, `LaneFramePixel`.
+  items keep their bits only under a whole shift). The shift past its
+  scroll frame's is the container's content origin in that frame, the
+  lane's top (the inset, less an escaping margin) and the child's
+  start, so a lane's children are frames only when the origin and every
+  start are whole at the scale. That is decided per lane, by the
+  placement walk when it places the container: the lane keeps the
+  children whose margin box or margins are fractional and those with a
+  scroll container below (sets, updated as leaves are put), and the
+  origin is the container's placed rect. A lane that is not framed
+  keeps today's placement for its children (correct, O(rows after)),
+  counted as a decline, `LaneFramePixel`; a lane whose framing flips
+  has its children placed and their clips redone, O(children), rare.
 - The first slice refuses a scroll container inside a lane child
   (`LaneFrameScroller`): a scroll frame's shift is worked out from the
   frame it is in when frames are made, and a lane frame is resolved
@@ -876,10 +884,14 @@ Lane frames are lighter than scroll frames:
   unchanged and the walk does not enter them: `boxes_moved` and
   `boxes_shifted` 0. Until 4c removes the writes, the walk still visits
   them (their layouts were written) and finds nothing changed.
-- **Frames** (4b): `Frames::at(frame)` resolves a lane frame from the
-  lane's `start(handle)` and its scroll frame's `FrameAt`. The lanes
-  live beside the boxes (`Placed::lanes`), so paint holds them when it
-  reads frames.
+- **Frames** (4b): a lane frame is resolved from the lane's
+  `start(handle)`, the container's placed origin and its scroll frame's
+  `FrameAt`, when it is read. Frames are read at draw too, after the
+  update (scene items, batches), so resolving lazily needs the lanes
+  then: each read of a frame takes a resolver holding the frames, the
+  lanes (`Placed::lanes`) and the placement, memoising per draw. Making
+  every lane frame when frames are made instead would be O(rows after)
+  again, since an insert changes every later row's shift.
 - **Draw** (4b): each lane frame drawn is a batch frame with its shift
   in the uniform table (4-iii): O(rows drawn); batches already break per
   row on the rows page.
