@@ -2,6 +2,7 @@
 //! tests hold (restyled, laid out, text built) and the structural work
 //! of each phase.
 
+use crate::edit_decline::EditDecline;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
@@ -66,6 +67,20 @@ pub struct UpdateCounts {
     /// subtree and inline elements, whose text is part of a run, have
     /// none.
     pub boxes_built: usize,
+    /// Elements whose box children an insert or remove edited in place
+    /// (`layout/child_edits.rs`): the inserted children built and put
+    /// in after their previous sibling's box, the removed taken out,
+    /// no other child built or walked in the DOM. The edit still copies
+    /// and searches the box's child list, O(children).
+    pub children_edited: usize,
+    /// Elements whose inserts and removes were not made as an edit:
+    /// built shallow instead, or, making no box of their own, built by
+    /// an ancestor (`EditDecline::OwnerHasNoBox`).
+    pub children_edits_declined: usize,
+    /// The condition that declined the first of those (the owners by
+    /// slot, then the elements with no box), when
+    /// `children_edits_declined` is above 0, else `None`.
+    pub children_edit_decline: Option<EditDecline>,
     /// Times Taffy asked a box for its layout, a cache hit included. A
     /// box can be asked more than once in an update (measured, then
     /// laid out), and a box under a cache hit is not asked at all.

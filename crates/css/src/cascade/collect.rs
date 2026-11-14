@@ -42,7 +42,7 @@ impl<V> Candidate<V> {
 
 /// Cascade Level 4 section 6.1: user agent normal, author normal, author
 /// important, user agent important.
-fn rank(origin: Origin, important: bool) -> u8 {
+pub(crate) fn rank(origin: Origin, important: bool) -> u8 {
     match (origin, important) {
         (Origin::UserAgent, false) => 0,
         (Origin::Author, false) => 1,

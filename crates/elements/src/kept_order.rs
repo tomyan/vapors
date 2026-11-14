@@ -26,8 +26,7 @@ pub(crate) struct KeptOrder {
     pub(crate) tree: ClipTree,
     pub(crate) clips: Clips,
     pub(crate) chains: Chains,
-    /// The scroll containers, whose thumbs are painted on every update
-    /// that paints.
+    /// The scroll containers, each with a thumb step.
     pub(crate) thumbs: Vec<usize>,
     /// The slots whose clips the update that made this redid.
     pub(crate) redone: Vec<usize>,

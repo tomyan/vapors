@@ -13,6 +13,7 @@ mod naming;
 mod sections;
 mod source;
 mod style_check;
+pub mod styles;
 mod template;
 
 use std::path::Path;
