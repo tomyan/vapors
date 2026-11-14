@@ -118,7 +118,7 @@ fn check_stroke(stroke: Option<f32>) -> Result<(), ClosedFormError> {
 
 /// `transform`'s determinant, when it and every value are finite; zero
 /// for a transform with no area.
-fn check_transform(transform: [f32; 6]) -> Result<f32, ClosedFormError> {
+pub(crate) fn check_transform(transform: [f32; 6]) -> Result<f32, ClosedFormError> {
     let fix = "give the element a transform whose values and scale are finite";
     if !transform.iter().all(|v| v.is_finite()) {
         return Err(refused(
