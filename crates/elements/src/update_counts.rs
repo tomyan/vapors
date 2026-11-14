@@ -221,4 +221,14 @@ pub struct UpdateCounts {
     /// hover stands, as it does while an element holds the mouse
     /// capture (M11).
     pub hovers_tested: usize,
+    /// Paths the document's shape cache tessellated: each distinct
+    /// path a `<path>` paints, once for the scale it is drawn at (one
+    /// -scene S4a); 0 on an update that paints no new path.
+    pub shapes_tessellated: usize,
+    /// The run-time shapes live after the update (one or more elements
+    /// paint each), and the slots the cache holds: live ones and free
+    /// ones for reuse. Both stay flat while elements come and go.
+    pub shapes_live: usize,
+    /// See [`UpdateCounts::shapes_live`].
+    pub shape_slots: usize,
 }

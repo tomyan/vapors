@@ -59,6 +59,10 @@ impl Document {
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let mut last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
+        // tessellations made between updates (an acquire outside one) are
+        // not this update's; style and layout refuse before paint, and
+        // paint cannot refuse, so no refused update has tessellated
+        self.shapes.borrow_mut().cache.take_tessellated();
         self.texts.begin(
             last.as_ref()
                 .map_or(0, |painted| painted.slabs.texts.live()),
@@ -79,7 +83,18 @@ impl Document {
         self.ax.touch_slots(&changed, &slotted.slots);
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
         (painted.from, painted.stackings) = (from, stackings);
+        self.keep_runtime_shapes(&mut painted);
         Ok(self.shown(painted))
+    }
+
+    /// Shares the document's shapes with `painted`, and counts the
+    /// paths tessellated this update.
+    fn keep_runtime_shapes(&mut self, painted: &mut Painted) {
+        let mut shapes = self.shapes.borrow_mut();
+        self.counts.shapes_tessellated = shapes.cache.take_tessellated();
+        (self.counts.shapes_live, self.counts.shape_slots) = shapes.cache.counts();
+        drop(shapes);
+        painted.shapes = Some(std::rc::Rc::clone(&self.shapes));
     }
 
     /// Keeps `painted` as the last update's result, and moves the hover

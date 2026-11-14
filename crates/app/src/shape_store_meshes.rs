@@ -4,7 +4,7 @@
 //! pipeline.
 
 use vapors_renderer::{GpuWork, MeshEntries, MeshEntry, MeshShape, Target, mesh_entry_bytes};
-use vapors_scene::{Shape, ShapeKind, ShapeRef};
+use vapors_scene::{Shape, ShapeKind};
 use vapors_shapes::{Geometry, ShapeTable};
 
 use crate::shape_store::{Registered, ShapeError, ShapeStore, check_bounds, undrawable};
@@ -19,15 +19,27 @@ impl ShapeStore {
         let added: u64 = table
             .entries()
             .iter()
-            .map(|entry| match entry.geometry {
-                Geometry::Mesh { triangles } => mesh_entry_bytes(triangles.len()),
-                _ => 0,
-            })
+            .map(|entry| geometry_bytes(&entry.geometry))
             .sum();
+        self.mesh_bytes_with(added, || {
+            format!("shape table of crate {}", table.crate_name())
+        })
+    }
+
+    /// The entry buffer's bytes with `added` more.
+    ///
+    /// # Errors
+    /// [`ShapeError::MeshBytes`] past the buffer's limit, naming what
+    /// `owner` says would add them.
+    pub(crate) fn mesh_bytes_with(
+        &self,
+        added: u64,
+        owner: impl FnOnce() -> String,
+    ) -> Result<u64, ShapeError> {
         let needed = self.mesh_bytes.saturating_add(added);
         if needed > self.buffer_limit {
             return Err(ShapeError::MeshBytes {
-                crate_name: table.crate_name(),
+                owner: owner(),
                 needed,
                 limit: self.buffer_limit,
             });
@@ -46,16 +58,29 @@ impl ShapeStore {
         let first = self.unuploaded;
         let mut done = 0;
         for registered in &mut self.entries_mut()[first..] {
-            if let Geometry::Mesh { triangles } = registered.entry.geometry {
-                let Some(written) = entries.write(target, triangles) else {
-                    break;
-                };
-                registered.uploaded = Some(written);
+            if !upload_one(registered, entries, target) {
+                break;
             }
             done += 1;
         }
         self.unuploaded += done;
+        self.upload_runtime(entries, target);
         entries.take_work()
+    }
+
+    /// Uploads each run-time slot taken since the last upload, stopping
+    /// at a refused write as [`ShapeStore::upload`] does.
+    fn upload_runtime(&mut self, entries: &mut MeshEntries, target: &Target<'_>) {
+        let pending = std::mem::take(&mut self.runtime_unuploaded);
+        for (at, &index) in pending.iter().enumerate() {
+            let Some(registered) = self.runtime[index as usize].as_mut() else {
+                continue;
+            };
+            if registered.uploaded.is_none() && !upload_one(registered, entries, target) {
+                self.runtime_unuploaded = pending[at..].to_vec();
+                return;
+            }
+        }
     }
 
     /// `shapes`' instances for the mesh pipeline, and beside each the
@@ -73,11 +98,11 @@ impl ShapeStore {
         for item in shapes {
             let registered = self.of_kind(item, ShapeKind::Mesh)?;
             let mesh = MeshShape::new(item.transform, item.colour)
-                .map_err(|reason| undrawable(item, registered.entry, reason))?;
+                .map_err(|reason| undrawable(item, registered, reason))?;
             if let Some(mesh) = mesh {
-                check_bounds(registered.entry, None, item)?;
+                check_bounds(registered, None, item)?;
                 instances.push(mesh);
-                entries.push(item.shape.0 as usize);
+                entries.push(crate::shape_store::store_index(item.shape));
             }
         }
         Ok((instances, entries))
@@ -92,16 +117,41 @@ impl ShapeStore {
     pub(crate) fn uploaded(&self, indices: &[usize]) -> Result<Vec<&MeshEntry>, ShapeError> {
         indices
             .iter()
-            .map(|&index| uploaded(index, self.at(index)))
+            .map(|&index| uploaded(self.at(index)))
             .collect()
     }
 }
 
-fn uploaded(index: usize, registered: &Registered) -> Result<&MeshEntry, ShapeError> {
-    registered.uploaded.as_ref().ok_or(ShapeError::NotUploaded {
-        shape: ShapeRef(u32::try_from(index).expect("an index the store issued")),
-        site: registered.entry.site,
-    })
+fn uploaded(registered: &Registered) -> Result<&MeshEntry, ShapeError> {
+    registered
+        .uploaded
+        .as_ref()
+        .ok_or_else(|| ShapeError::NotUploaded {
+            shape: registered.shape,
+            site: registered.source.site().to_owned(),
+        })
+}
+
+/// Writes `registered`'s triangles, when it is a mesh; whether the
+/// buffer took them (a closed form needs none).
+fn upload_one(registered: &mut Registered, entries: &mut MeshEntries, target: &Target<'_>) -> bool {
+    let Geometry::Mesh { triangles } = registered.source.geometry() else {
+        return true;
+    };
+    let Some(written) = entries.write(target, triangles) else {
+        return false;
+    };
+    registered.uploaded = Some(written);
+    true
+}
+
+/// The entry buffer's bytes `geometry` takes: a mesh's, 0 for a
+/// closed form.
+pub(crate) fn geometry_bytes(geometry: &Geometry<'_>) -> u64 {
+    match geometry {
+        Geometry::Mesh { triangles } => mesh_entry_bytes(triangles.len()),
+        _ => 0,
+    }
 }
 
 #[cfg(test)]

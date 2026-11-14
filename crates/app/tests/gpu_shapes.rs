@@ -52,7 +52,7 @@ const CSS: &str = "div { position: absolute; top: 0; left: 0; width: 32px; heigh
 /// `shape` moved to `at` in red, its bounds `size` from there.
 fn red(shape: u32, at: [f32; 2], size: [f32; 2]) -> Item {
     Item::Shape(Shape::new(
-        ShapeRef(shape),
+        ShapeRef::Table(shape),
         vapors_scene::ShapeKind::ClosedForm,
         [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
         Color::from_rgba8(255, 0, 0, 255),
@@ -86,7 +86,7 @@ fn rig() -> Rig {
         .shapes_mut()
         .register(&table())
         .expect("registers");
-    assert_eq!(refs, [ShapeRef(0), ShapeRef(1)]);
+    assert_eq!(refs, [ShapeRef::Table(0), ShapeRef::Table(1)]);
     rig
 }
 
@@ -140,7 +140,7 @@ fn gpu_a_shape_the_store_has_no_entry_for_is_refused_naming_it() {
     assert!(matches!(refused, PaintError::Shape(_)), "{refused:?}");
     assert_eq!(
         refused.to_string(),
-        "shape 5 is not registered in this painter's store, which holds 2; register its crate's table (ShapeStore::register) before drawing it"
+        "shape 5 is not registered in this painter's store, which holds 2; register its crate's table (ShapeStore::register) before drawing it, or draw a document's run-time shapes with the painter that draws its frames"
     );
 }
 

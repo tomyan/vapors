@@ -194,7 +194,7 @@ fn a_shape_is_culled_by_its_bounds_not_its_transform() {
     // below it, between two quads
     let shape = |bounds_top: f32| {
         Item::Shape(crate::Shape {
-            shape: crate::ShapeRef(0),
+            shape: crate::ShapeRef::Table(0),
             kind: crate::ShapeKind::ClosedForm,
             transform: [1.0, 0.0, 0.0, 1.0, 10.0, 10.0],
             colour: Color::from_rgba8(1, 2, 3, 255),

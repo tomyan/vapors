@@ -3,7 +3,7 @@
 
 use super::*;
 
-fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry {
+fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry<'static> {
     Geometry::Rect {
         origin: [1.0, 1.0],
         size,
@@ -11,7 +11,7 @@ fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry {
     }
 }
 
-fn ellipse(centre: [f32; 2], radii: [f32; 2]) -> Geometry {
+fn ellipse(centre: [f32; 2], radii: [f32; 2]) -> Geometry<'static> {
     Geometry::Ellipse { centre, radii }
 }
 

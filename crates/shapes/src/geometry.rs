@@ -8,8 +8,8 @@ use crate::mesh_check::check_mesh;
 
 /// A shape's geometry, in viewBox units: the cheapest exact primitive
 /// the compiler classified it to (one-scene.md 1.2).
-#[derive(Debug, PartialEq)]
-pub enum Geometry {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Geometry<'a> {
     /// An axis-aligned rectangle, rounded when `radius` is not zero,
     /// drawn by the closed-form pipeline's distance
     /// (`crates/renderer/src/closed_forms.wgsl`).
@@ -38,8 +38,18 @@ pub enum Geometry {
     /// faces.
     Mesh {
         /// The triangles.
-        triangles: &'static [MeshTriangle],
+        triangles: &'a [MeshTriangle],
     },
+}
+
+impl Geometry<'_> {
+    /// Whether it is a closed form (a rect or an ellipse), drawn by its
+    /// distance, rather than a mesh: the one answer a shape item's kind
+    /// is built from.
+    #[must_use]
+    pub fn is_closed_form(&self) -> bool {
+        matches!(self, Self::Rect { .. } | Self::Ellipse { .. })
+    }
 }
 
 /// Why `geometry` cannot be drawn, if it cannot: a value that is not a
@@ -49,7 +59,7 @@ pub enum Geometry {
 ///
 /// # Errors
 /// The reason, without the crate and site [`ShapeTable::check`] adds.
-pub fn check_geometry(geometry: &Geometry) -> Result<(), String> {
+pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
     match geometry {
         Geometry::Rect {
             origin,

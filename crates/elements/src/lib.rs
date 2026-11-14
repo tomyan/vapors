@@ -46,6 +46,7 @@ mod corners;
 mod css_element;
 mod document;
 mod document_images;
+mod document_shapes;
 mod dom_impl;
 mod dom_keyed;
 mod drawn_steps;

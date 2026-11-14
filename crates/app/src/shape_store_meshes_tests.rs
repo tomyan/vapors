@@ -76,12 +76,15 @@ fn a_table_whose_meshes_pass_the_entry_buffers_limit_is_refused_naming_its_crate
     assert_eq!(
         refused.to_string(),
         format!(
-            "shape table of crate demo would put {bytes} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
+            "shape table of crate demo would put {bytes} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {}; draw fewer or smaller meshes, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
             bytes - 1
         )
     );
     let circle = crate::shape_store::tests::table(vec![entry("b.wisp:1", b"FC", CIRCLE)]);
-    assert_eq!(store.register(&circle), Ok(vec![vapors_scene::ShapeRef(0)]));
+    assert_eq!(
+        store.register(&circle),
+        Ok(vec![vapors_scene::ShapeRef::Table(0)])
+    );
 }
 
 #[test]
@@ -124,7 +127,14 @@ fn an_item_built_from_its_entry_takes_the_entrys_kind() {
     let at = |entry| {
         let bounds = vapors_scene::Rect::new(0.0, 0.0, 16.0, 16.0);
         let colour = vapors_scene::Color::from_rgba8(0, 0, 0, 255);
-        crate::shape_item(entry, vapors_scene::ShapeRef(0), IDENTITY, colour, bounds).kind()
+        crate::shape_item(
+            entry,
+            vapors_scene::ShapeRef::Table(0),
+            IDENTITY,
+            colour,
+            bounds,
+        )
+        .kind()
     };
 
     // When, Then

@@ -20,9 +20,11 @@ mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
 mod shape_bounds;
+mod shape_entry;
 mod shape_error;
 mod shape_store;
 mod shape_store_meshes;
+mod shape_store_runtime;
 mod surface;
 mod tooltip;
 mod tooltip_box;

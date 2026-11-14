@@ -29,7 +29,7 @@ fn surfaces(left: f32) -> Run {
 
 fn shapes(e: f32) -> Run {
     Run::Shapes(vec![Shape::new(
-        ShapeRef(2),
+        ShapeRef::Table(2),
         vapors_scene::ShapeKind::ClosedForm,
         [1.0, 0.0, 0.0, 1.0, e, 0.0],
         Color::from_rgba8(0, 0, 255, 255),
@@ -76,7 +76,7 @@ fn shape_runs_naming_other_entries_are_not_the_same() {
     let Run::Shapes(mut other) = shapes(0.0) else {
         unreachable!("shapes() is a shape run")
     };
-    other[0].shape = ShapeRef(3);
+    other[0].shape = ShapeRef::Table(3);
 
     // When / Then
     assert!(!same_bits(&shapes(0.0), &Run::Shapes(other)));

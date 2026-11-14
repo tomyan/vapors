@@ -6,10 +6,44 @@
 
 use crate::{Color, Rect};
 
-/// Which shape an item draws: an index the painter resolves to an
-/// entry it has registered (`vapors-app`'s `ShapeStore`).
+/// Which shape an item draws, which the painter resolves to an entry
+/// it holds (`vapors-app`'s `ShapeStore`): a table entry, by the index
+/// the store issued on registration (S5b's process registry will issue
+/// `ShapeId`s), or a run-time entry of a document's shape cache (S4a).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShapeRef(pub u32);
+pub enum ShapeRef {
+    /// A table entry.
+    Table(u32),
+    /// A run-time entry.
+    Runtime(RuntimeRef),
+}
+
+/// A run-time entry: its document, its slot in that document's cache,
+/// and the slot's generation, which goes up each time the slot is
+/// freed and reused, so a ref to an entry since freed is refused, never
+/// resolved to the shape that took its slot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RuntimeRef {
+    /// The document whose cache made it.
+    pub document: u32,
+    /// Its slot in the cache.
+    pub index: u32,
+    /// The slot's generation when it was made.
+    pub generation: u32,
+}
+
+impl std::fmt::Display for ShapeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Table(index) => write!(f, "shape {index}"),
+            Self::Runtime(at) => write!(
+                f,
+                "run-time shape {} (generation {}) of document {}",
+                at.index, at.generation, at.document
+            ),
+        }
+    }
+}
 
 /// Which pipeline draws an entry: its kind, as `vapors_app::kind_of`
 /// gives it from the entry's geometry. Batching splits on it; the
@@ -71,3 +105,7 @@ impl Shape {
         self.kind
     }
 }
+
+#[cfg(test)]
+#[path = "shape_tests.rs"]
+mod tests;

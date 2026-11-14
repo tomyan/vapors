@@ -1,7 +1,7 @@
 //! The GPU copies of a painter's mesh entries (docs/plans/one-scene.md
 //! 1.4): each entry's triangles written once into a kept buffer and
-//! drawn from there for as long as the painter lives; nothing is
-//! released, as the shape store only grows. The bytes written are
+//! drawn from there until the store releases it (a run-time shape no
+//! element paints any more). The bytes written are
 //! counted, `shape_bytes_uploaded`, so a frame that registers nothing
 //! writes none.
 
@@ -67,6 +67,12 @@ impl MeshEntries {
             range,
             triangles: count,
         })
+    }
+
+    /// Gives `entry`'s range back: its shape is no longer drawn (a
+    /// run-time shape freed, one-scene S4a); its bytes are reused.
+    pub fn release(&mut self, entry: MeshEntry) {
+        self.triangles.release(entry.range);
     }
 
     /// The bytes the buffer holds.

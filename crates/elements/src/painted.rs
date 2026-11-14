@@ -14,6 +14,10 @@ use crate::style::Cursor;
 /// The canvas colour, the scene, the text runs it names, each element's
 /// border box, and the elements a pointer can hit.
 pub struct Painted {
+    /// The document's run-time shapes, shared, for the painter's store
+    /// to take the slots that changed; set by each update.
+    pub(crate) shapes:
+        Option<std::rc::Rc<std::cell::RefCell<crate::document_shapes::DocumentShapes>>>,
     pub(crate) canvas: Color,
     /// The element whose background became the canvas's, if one did.
     pub(crate) canvas_from: Option<CanvasFrom>,
@@ -126,6 +130,7 @@ impl Painted {
             maps_patched: 0,
             index_counts: crate::blocks::IndexCounts::default(),
             stackings: crate::paint_order::Stackings::default(),
+            shapes: None,
         }
     }
 
@@ -171,6 +176,34 @@ impl Painted {
     #[must_use]
     pub fn image(&self, id: vapors_scene::ImageId) -> &std::rc::Rc<vapors_scene::RgbaImage> {
         resolved(self.slabs.images.get(id.0), "image", id.0)
+    }
+
+    /// The document's number and each run-time shape slot changed
+    /// since the store last took them, with its entry now (`None` when
+    /// freed). They stay until [`Painted::shape_changes_taken`], so a
+    /// take the store refuses loses none. A painter draws one document,
+    /// so one store takes each change.
+    ///
+    /// # Panics
+    /// On a `Painted` no update finished, which a document never hands
+    /// out.
+    #[must_use]
+    pub fn shape_changes(&self) -> (u32, Vec<vapors_shapes::SlotChange>) {
+        let shapes = self
+            .shapes
+            .as_ref()
+            .expect("an update shares its shapes")
+            .borrow();
+        (shapes.cache.document(), shapes.cache.changes())
+    }
+
+    /// The store took [`Painted::shape_changes`]: they are forgotten.
+    ///
+    /// # Panics
+    /// As [`Painted::shape_changes`].
+    pub fn shape_changes_taken(&self) {
+        let shapes = self.shapes.as_ref().expect("an update shares its shapes");
+        shapes.borrow_mut().cache.clear_changes();
     }
 
     /// The icon a scene item names.
