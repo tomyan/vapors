@@ -119,7 +119,19 @@ outline is extruded by half a device pixel in the vertex shader (Tom,
 2026-11-13, option 2): each vertex carries the miter offset of its
 outline edges as a normal and, per edge, the shift that move takes
 off its distance; distances go negative outside the true outline and
-the ramp straddles it, where Chromium's edge sits. Rejected: one
+the ramp straddles it, where Chromium's edge sits. The miter is taken
+per triangle corner from the two outline edges bounding its wedge, so
+where an outline touches itself at a vertex (a bowtie, an even-odd
+star's points) each wedge moves out of its own side; two outline edges
+meeting head-on (the end of a cut of no width into the shape) have no
+miter and are refused, naming the vertex. Vertices lyon emits twice at
+one position (a closed stroke's start) are welded first, so the edge
+across the stroke there is shared, not a seam. Two shapes the builder
+cannot draw are refused naming the shape and a vertex, until a path
+that produces one is in hand as a fixture: an edge used by three or
+more triangles, and a dropped sliver with triangles on both sides (a
+T-junction inside the fill, whose edges would draw as outline).
+Rejected: one
 distance per shared vertex (every vertex of a convex fill, and every
 vertex lyon's stroker emits, lies on the outline at zero, and a
 corner triangle has two outline edges); an index buffer with

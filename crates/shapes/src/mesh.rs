@@ -182,7 +182,7 @@ fn check_near(
 }
 
 /// The unit normal of edge `edge` pointing away from corner `edge`.
-fn outward_normal(points: [[f32; 2]; 3], edge: usize) -> [f32; 2] {
+pub(crate) fn outward_normal(points: [[f32; 2]; 3], edge: usize) -> [f32; 2] {
     let (a, b, c) = (points[edge], points[(edge + 1) % 3], points[(edge + 2) % 3]);
     let (dx, dy) = (c[0] - b[0], c[1] - b[1]);
     let len = (dx * dx + dy * dy).sqrt();
