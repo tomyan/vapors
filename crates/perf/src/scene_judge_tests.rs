@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use super::{load_from, over_budget, quiet, require_timestamps};
+use super::{load_from, over_budget, quiet, require_hardware, require_timestamps};
 use crate::sampler::JudgedFrame;
 
 fn frame(index: usize, idle_micros: u64) -> JudgedFrame {
@@ -69,4 +69,26 @@ fn a_load_of_1_5_or_more_is_refused_printing_it_and_less_is_accepted() {
     assert!(error.contains("1.50 at the start"), "{error}");
     assert_eq!(quiet("end", Ok(1.49)), Ok(1.49));
     assert!(quiet("end", Err("unread".into())).is_err());
+}
+
+#[test]
+fn a_software_adapter_is_refused_naming_it_and_a_gpu_is_not() {
+    // When
+    let llvmpipe = "llvmpipe (LLVM 19.1.7, 256 bits)";
+    let refused =
+        require_hardware(wgpu::DeviceType::Cpu, llvmpipe, "llvmpipe").expect_err("software");
+
+    // Then
+    assert!(
+        refused.starts_with("llvmpipe (LLVM 19.1.7, 256 bits) (llvmpipe) is a software adapter"),
+        "{refused}"
+    );
+    assert!(refused.contains("--scene-run"), "{refused}");
+    let uhd = "Intel(R) UHD Graphics 630 (CML GT2)";
+    let gpu = require_hardware(
+        wgpu::DeviceType::IntegratedGpu,
+        uhd,
+        "Intel open-source Mesa driver",
+    );
+    assert_eq!(gpu, Ok(()));
 }

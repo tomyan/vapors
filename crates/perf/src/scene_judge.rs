@@ -22,8 +22,9 @@ pub const BUDGET: Duration = Duration::from_micros(16_700);
 /// stays below it.
 const MAX_LOAD: f64 = 1.5;
 
-/// How to run it again.
-pub const REPRODUCE: &str = "cargo run --release -p vapors-perf -- --scene-run";
+/// How to run it again, for a refusal before the run picks its scene's
+/// own command (`SceneKind::reproduce`).
+pub const REPRODUCE: &str = "cargo run --release -p vapors-perf -- --scene-run [racer|one-scene]";
 
 /// The frames whose frame-to-idle time is over [`BUDGET`].
 #[must_use]
@@ -79,6 +80,27 @@ pub fn quiet(when: &str, load: Result<f64, String>) -> Result<f64, String> {
     Err(format!(
         "the 1-minute load average is {load:.2} at the {when}; the run needs under \
          {MAX_LOAD}: wait until `uptime` shows it, then {REPRODUCE}"
+    ))
+}
+
+/// Whether an adapter of `device_type`, named `name` with `driver`,
+/// rasterises on the GPU: a software adapter (wgpu's `DeviceType::Cpu`:
+/// lavapipe, llvmpipe, `SwiftShader`) times the CPU drawing the frame,
+/// which says nothing about the budget on a display.
+///
+/// # Errors
+/// It is a software adapter, naming it and its driver.
+pub fn require_hardware(
+    device_type: wgpu::DeviceType,
+    name: &str,
+    driver: &str,
+) -> Result<(), String> {
+    if device_type != wgpu::DeviceType::Cpu {
+        return Ok(());
+    }
+    Err(format!(
+        "{name} ({driver}) is a software adapter, so the run would time the CPU drawing each \
+         frame; run on a GPU (the dev machine's Intel UHD 630 on Vulkan): {REPRODUCE}"
     ))
 }
 

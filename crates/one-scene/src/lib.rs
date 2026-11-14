@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_app::{ElementsApp, FrameCounts, SurfaceHandle};
+use vapors_app::{ElementsApp, FrameCounts, FrameTiming, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, Start};
 use vapors_scene3d::{CameraHandle, Meshes, Projection, Scene};
@@ -85,9 +85,21 @@ impl OneScene {
         self.app.frame_counts()
     }
 
-    /// The app it runs in, for its timings.
-    pub fn elements_app(&mut self) -> &mut ElementsApp {
-        &mut self.app
+    /// Render passes its last frame began.
+    #[must_use]
+    pub fn render_passes(&self) -> u64 {
+        self.app.render_passes()
+    }
+
+    /// Its frames' times, the GPU's read back by the frame after.
+    #[must_use]
+    pub fn frame_timing(&self) -> FrameTiming {
+        self.app.frame_timing()
+    }
+
+    /// Turns timing its frames on the GPU on or off; off by default.
+    pub fn time_frames(&mut self, on: bool) {
+        self.app.time_frames(on);
     }
 }
 
