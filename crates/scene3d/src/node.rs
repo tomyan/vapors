@@ -33,6 +33,8 @@ pub(crate) struct Node {
     pub(crate) world: Mat4,
     /// How many times `world` has been recomputed.
     pub(crate) world_version: u64,
+    /// Drawn; set by `Scene::set_appearance`.
+    pub(crate) visible: bool,
     pub(crate) dirty: bool,
 }
 
