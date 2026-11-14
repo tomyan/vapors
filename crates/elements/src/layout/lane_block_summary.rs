@@ -131,6 +131,18 @@ impl BlockSummary {
 }
 
 impl Summary for BlockSummary {
+    /// The children before, folded: a start reads their collapsed
+    /// margins.
+    type Walk = Self;
+
+    fn walk_from(left: &Self) -> Self {
+        *left
+    }
+
+    fn walk_step(walk: Self, leaf: &Self, gap: f64) -> (f64, Self) {
+        (Self::start_of(&walk, leaf, gap), walk.combine(leaf, gap))
+    }
+
     fn combine(&self, right: &Self, _gap: f64) -> Self {
         let (Some(left), Some(right)) = (self.0, right.0) else {
             return Self(self.0.or(right.0));

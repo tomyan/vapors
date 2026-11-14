@@ -59,7 +59,12 @@ impl KeptHits {
         let Some(frame) = self.frames.remove(&place) else {
             return Vec::new();
         };
-        let list = self.by_frame.entry(frame).or_default();
+        let list = self.by_frame.get_mut(&frame).unwrap_or_else(|| {
+            panic!(
+                "the hits of place {place} are noted in frame {frame}, which holds none \
+                 (kept_hits.rs `put`); reproduce with `cargo xtask test`"
+            )
+        });
         let start = list.partition_point(|&(at, _)| at < place);
         let end = list.partition_point(|&(at, _)| at <= place);
         let taken = list.drain(start..end).map(|(_, hit)| hit).collect();
@@ -96,31 +101,6 @@ impl KeptHits {
         let mut placed: Vec<&(usize, FramedHit)> = self.by_frame.values().flatten().collect();
         placed.sort_by_key(|&&(place, _)| place);
         placed.into_iter().map(|&(_, hit)| hit).collect()
-    }
-
-    /// The last hit in painting order whose rect on the page holds
-    /// `[x, y]` (its left and top edges, not its right and bottom),
-    /// among the frames that can show there.
-    pub(crate) fn hit(&self, point: [f32; 2], frames: &Frames) -> Option<NodeId> {
-        self.hit_counted(point, frames).0
-    }
-
-    /// `hit`, and how many hits it tested: those of the frames that can
-    /// show at `point`, not every frame's.
-    fn hit_counted(&self, point: [f32; 2], frames: &Frames) -> (Option<NodeId>, usize) {
-        let scale = frames.scale();
-        let [x, y] = point.map(|v| v * scale);
-        let view = vapors_scene::Rect::new(x, y, x + 1.0, y + 1.0);
-        let lists = frames.meeting(view).into_iter();
-        let tested: Vec<&(usize, FramedHit)> = lists
-            .filter_map(|frame| self.by_frame.get(&frame))
-            .flatten()
-            .collect();
-        let holding = tested
-            .iter()
-            .filter(|(_, (frame, (_, rect)))| holds(&frames.hit(*frame, *rect), point));
-        let found = holding.max_by_key(|&&&(place, _)| place);
-        (found.map(|(_, (_, (node, _)))| *node), tested.len())
     }
 }
 
@@ -191,6 +171,9 @@ fn box_place(drawn: &DrawnSteps, slot: usize) -> Option<usize> {
     let mut steps = drawn.places_of(slot);
     steps.find_map(|(place, step)| matches!(step, Step::Box(_)).then_some(place))
 }
+
+#[path = "kept_hits_query.rs"]
+mod query;
 
 #[cfg(test)]
 #[path = "kept_hits_tests.rs"]

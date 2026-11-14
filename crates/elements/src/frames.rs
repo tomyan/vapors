@@ -77,9 +77,8 @@ impl Frames {
 
     /// Frame `frame`, a scroll frame or a lane frame, if it is one.
     pub(crate) fn get(&self, frame: usize) -> Option<FrameAt> {
-        self.by_frame
-            .get(&frame)
-            .copied()
+        self.primed_at(frame)
+            .or_else(|| self.by_frame.get(&frame).copied())
             .or_else(|| self.lane_at(frame))
     }
 

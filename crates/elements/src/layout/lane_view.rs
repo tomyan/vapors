@@ -22,9 +22,10 @@ pub(super) trait LaneView {
     fn children_between(&self, from: f64, to: f64) -> Vec<usize>;
     /// The children from the one in `slot` on, in order.
     fn children_from(&self, slot: usize) -> Vec<usize>;
-    /// The children from the one in `slot` on, in order, each with its
-    /// `frame_offset`: one fold to reach it, then one step a child.
-    fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)>;
+    /// Calls `each` with the children from the one in `slot` on, in
+    /// order, each with its `frame_offset`: one fold to reach it, then
+    /// one step a child, allocating nothing.
+    fn each_offset_from(&self, slot: usize, each: &mut dyn FnMut(usize, f64));
     /// Whether its children can be frames (`Lane::framing`).
     fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>>;
     /// The child in `slot`'s `position: relative` offset along the axis.
@@ -64,15 +65,17 @@ impl<K: LaneKind> LaneView for Lane<K> {
         Lane::children_from(self, slot)
     }
 
-    fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)> {
-        let Some(&handle) = self.handles.get(&slot) else {
-            return Vec::new();
-        };
+    fn each_offset_from(&self, slot: usize, each: &mut dyn FnMut(usize, f64)) {
+        let handle = *self.handles.get(&slot).unwrap_or_else(|| {
+            panic!(
+                "a started entry names slot {slot}, which its framed lane does not hold \
+                 (layout/lane_write.rs `write_laid`); reproduce with `cargo xtask test`"
+            )
+        });
         let top = self.facts.top;
-        let starts = self.tree.starts_from(handle).into_iter();
-        starts
-            .map(|(handle, start)| (self.slots[&handle], top + start))
-            .collect()
+        self.tree.each_start_from(handle, &mut |index, start| {
+            each(self.slots.at_index(index), top + start);
+        });
     }
 
     fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {

@@ -131,12 +131,23 @@ impl Lanes {
         Some(lane.children_from(first))
     }
 
-    /// The children of the lane container in `container` from the one
-    /// in `first` on, each with its `frame_offset`, in one pass along the
-    /// lane; none when it has no lane.
-    pub(crate) fn offsets_from(&self, container: usize, first: usize) -> Vec<(usize, f64)> {
-        let lane = self.lane(container);
-        lane.map_or_else(Vec::new, |lane| lane.offsets_from(first))
+    /// Calls `each` with the children of the framed lane container in
+    /// `container` from the one in `first` on, each with its
+    /// `frame_offset`, in one pass along the lane; a panic naming it when
+    /// it has no lane, as the frames hold its base only while placement
+    /// framed it.
+    pub(crate) fn each_offset_from(
+        &self,
+        (container, first): (usize, usize),
+        each: &mut dyn FnMut(usize, f64),
+    ) {
+        let lane = self.lane(container).unwrap_or_else(|| {
+            panic!(
+                "the frames hold a lane base for slot {container}, which has no lane \
+                 (paint_frames.rs `lane_bases`); reproduce with `cargo xtask test`"
+            )
+        });
+        lane.each_offset_from(first, each);
     }
 
     /// Whether the children of the lane container in `container` can be

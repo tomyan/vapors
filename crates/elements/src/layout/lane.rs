@@ -12,7 +12,7 @@ use taffy::Layout;
 
 use super::lane_frame::FrameFacts;
 use super::lane_kind::LaneKind;
-use super::lane_tree::{Handle, LaneTree};
+use super::lane_tree::{Handle, HandleSlots, LaneTree};
 use crate::lane_decline::LaneDecline;
 
 /// The fewest children a lane frames (`Lane::framing`): enough that
@@ -26,7 +26,7 @@ pub(crate) struct Lane<K: LaneKind> {
     pub(super) tree: LaneTree<K::Summary>,
     /// By child slot, its handle; and back.
     pub(super) handles: FxHashMap<usize, Handle>,
-    pub(super) slots: FxHashMap<Handle, usize>,
+    pub(super) slots: HandleSlots,
     /// What the leaves were made with; every leaf is made again when
     /// it changes.
     pub(super) share: Option<K::Share>,
@@ -73,7 +73,7 @@ impl<K: LaneKind> Lane<K> {
         Self {
             tree: LaneTree::new(gap),
             handles: FxHashMap::default(),
-            slots: FxHashMap::default(),
+            slots: HandleSlots::default(),
             share: None,
             heights: None,
             height_readers: FxHashSet::default(),
@@ -100,7 +100,7 @@ impl<K: LaneKind> Lane<K> {
     /// place, starts elsewhere.
     pub(crate) fn child_removed(&mut self, slot: usize, next: Option<usize>) {
         if let Some(handle) = self.handles.remove(&slot) {
-            self.slots.remove(&handle);
+            self.slots.remove(handle);
             self.tree.remove(handle);
         }
         self.moved.retain(|&moved| moved != slot);

@@ -10,11 +10,11 @@ use std::cell::RefCell;
 
 use rustc_hash::FxHashMap;
 
-use super::{FrameAt, Frames, meet};
+use super::{FrameAt, Frames};
+use prime::Primed;
 use vapors_scene::Rect;
 
 use crate::layout::{BoxRect, SharedLanes};
-use crate::paint::snapped;
 
 /// What a framed lane's children's frames are worked out from.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,6 +40,14 @@ pub(crate) struct LaneFrames {
     /// The lanes whose children from the one named on started elsewhere
     /// this update (`ChangedSlots::started`), for `prime_started`.
     started: Vec<(usize, usize)>,
+    /// The frames `prime_started` worked out (`Primed`), set once an
+    /// update: a read of a started row costs an index, not a hash or a
+    /// borrow (section 11.2, 4d); the table, sized to the largest primed
+    /// slot in an update that started rows, is 16 bytes a slot.
+    primed: std::cell::OnceCell<Primed>,
+    /// Lane frames worked out by a fold of their lane since the lanes
+    /// were set, for the tests that the priming holds (`lane_folds`).
+    folds: std::cell::Cell<usize>,
 }
 
 /// How far each framed lane's children's ink reaches past their boxes,
@@ -85,6 +93,8 @@ impl Frames {
             by_parent,
             memo: RefCell::default(),
             started: started.to_vec(),
+            primed: std::cell::OnceCell::new(),
+            folds: std::cell::Cell::new(0),
         };
         changed
     }
@@ -123,6 +133,13 @@ impl Frames {
         *most = [most[0].max(over[0]), most[1].max(over[1])];
     }
 
+    /// How many lane frames a fold of their lane worked out since the
+    /// lanes were set: those read and neither primed nor read before.
+    #[cfg(test)]
+    pub(crate) fn lane_folds(&self) -> usize {
+        self.lanes.folds.get()
+    }
+
     /// Lane frame `frame`, when `frame` is a framed lane child,
     /// memoised.
     pub(super) fn lane_at(&self, frame: usize) -> Option<FrameAt> {
@@ -130,6 +147,7 @@ impl Frames {
             return Some(at);
         }
         let at = self.lane_resolved(frame, &|outer| self.at(outer))?;
+        self.lanes.folds.set(self.lanes.folds.get() + 1);
         self.lanes.memo.borrow_mut().insert(frame, at);
         Some(at)
     }
@@ -155,16 +173,7 @@ impl Frames {
     /// container's content in the frame at `outer`.
     #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
     pub(super) fn lane_frame_at(&self, base: LaneBase, offset: f64, outer: FrameAt) -> FrameAt {
-        let down = (f64::from(base.origin) + offset) * f64::from(self.scale);
-        let clip = match base.inner {
-            Some(inner) => meet(Some(self.css_rect(outer, inner)), outer.clip),
-            None => outer.clip,
-        };
-        FrameAt {
-            shift: [outer.shift[0], outer.shift[1] + down as f32],
-            clip,
-            device_clip: clip.map(|clip| snapped(clip, self.scale)),
-        }
+        self.lane_child_at(self.lane_template(base, outer), base, offset)
     }
 
     /// The base of the framed lane `frame` is a child of and the
