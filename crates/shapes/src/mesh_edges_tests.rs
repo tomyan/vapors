@@ -105,3 +105,16 @@ fn copies_of_a_vertex_are_one_vertex_so_their_edge_is_shared() {
     assert_eq!(triangles[1][0].edges[2], FAR_EDGE);
     assert_eq!(check_mesh(&triangles), Ok(()));
 }
+
+#[test]
+fn an_edge_three_triangles_use_is_refused_naming_it() {
+    // Given: the square with its first triangle drawn twice, so the
+    // diagonal 0-2 has three triangles
+    let indices = [0, 1, 2, 0, 2, 3, 0, 2, 1];
+
+    // When, Then
+    assert_eq!(
+        triangles_with_edges(&SQUARE, &indices),
+        Err("the edge from [0.0, 0.0] to [1.0, 1.0] is used by 3 triangles, so the tessellation overlaps itself there; the tessellator does not draw that, so report the path as a fixture".to_owned())
+    );
+}

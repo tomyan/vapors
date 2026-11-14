@@ -11,15 +11,18 @@ use std::collections::HashMap;
 
 use crate::mesh::{FAR_EDGE, MeshVertex, length, outward_normal, twice_area};
 use crate::mesh_normals::corner_normals;
+use crate::mesh_slivers::check_slivers;
 
-/// The triangles using each undirected edge, by index; two at most for
-/// a mesh this code understands.
+/// The triangles using each undirected edge, by index; two at most,
+/// as `edge_triangles` checks.
 pub(crate) type EdgeTriangles = HashMap<(u32, u32), Vec<usize>>;
 
 /// The triangles of `indices` over `vertices`, three indices each.
 ///
 /// # Errors
-/// Outline edges meeting head-on at a vertex (`mesh_normals.rs`).
+/// An edge used by three or more triangles; a dropped sliver that is a
+/// T-junction inside the shape (`mesh_slivers.rs`); outline edges
+/// meeting head-on at a vertex (`mesh_normals.rs`).
 ///
 /// # Panics
 /// When `indices` is not a whole number of triangles: lyon emits
@@ -34,14 +37,14 @@ pub fn triangles_with_edges(
         indices.len()
     );
     let indices = welded(vertices, indices);
-    let corners: Vec<[u32; 3]> = indices
+    let (corners, slivers): (Vec<[u32; 3]>, Vec<[u32; 3]>) = indices
         .as_chunks::<3>()
         .0
         .iter()
         .copied()
-        .filter(|corner| twice_area(positions(vertices, *corner)) != 0.0)
-        .collect();
-    let edges = edge_triangles(&corners);
+        .partition(|corner| twice_area(positions(vertices, *corner)) != 0.0);
+    let edges = edge_triangles(vertices, &corners)?;
+    check_slivers(vertices, &slivers, &edges)?;
     let normals = corner_normals(vertices, &corners, &edges)?;
     Ok(corners
         .iter()
@@ -72,21 +75,28 @@ fn positions(vertices: &[[f32; 2]], corner: [u32; 3]) -> [[f32; 2]; 3] {
     corner.map(|i| vertices[i as usize])
 }
 
-fn edge_triangles(corners: &[[u32; 3]]) -> EdgeTriangles {
+/// Each edge's triangles.
+///
+/// # Errors
+/// An edge with three or more: the tessellation overlaps itself, which
+/// the normals' walk round a vertex cannot follow.
+fn edge_triangles(vertices: &[[f32; 2]], corners: &[[u32; 3]]) -> Result<EdgeTriangles, String> {
     let mut edges = EdgeTriangles::with_capacity(corners.len() * 3);
     for (t, corner) in corners.iter().enumerate() {
         for (a, b) in [(0, 1), (1, 2), (2, 0)] {
             let users = edges.entry(edge_key(corner[a], corner[b])).or_default();
             users.push(t);
-            debug_assert!(
-                users.len() <= 2,
-                "edge {:?} is used by {} triangles; the producer overlaps itself",
-                edge_key(corner[a], corner[b]),
-                users.len()
-            );
+            if users.len() > 2 {
+                return Err(format!(
+                    "the edge from {:?} to {:?} is used by {} triangles, so the tessellation overlaps itself there; the tessellator does not draw that, so report the path as a fixture",
+                    vertices[corner[a] as usize],
+                    vertices[corner[b] as usize],
+                    users.len()
+                ));
+            }
         }
     }
-    edges
+    Ok(edges)
 }
 
 pub(crate) fn edge_key(a: u32, b: u32) -> (u32, u32) {

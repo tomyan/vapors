@@ -12,6 +12,7 @@ mod geometry;
 mod mesh;
 mod mesh_edges;
 mod mesh_normals;
+mod mesh_slivers;
 mod path;
 mod path_lex;
 mod path_verb;
