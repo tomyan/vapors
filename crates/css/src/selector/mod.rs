@@ -4,7 +4,7 @@
 mod attribute;
 mod element;
 mod items;
-mod matching;
+pub(crate) mod matching;
 mod nth;
 mod parse;
 mod pseudo;
@@ -15,8 +15,8 @@ mod structural;
 pub use element::Element;
 pub use matching::matches;
 pub use nth::Nth;
-pub(crate) use share::reads_siblings_or_descendants;
-pub use share::{attribute_names, state_flags};
+pub(crate) use share::{Reads, reads, reads_siblings_or_descendants};
+pub use share::{attribute_names, state_flags, state_names};
 pub use specificity::Specificity;
 
 use crate::ast::ComponentValue;

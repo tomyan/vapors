@@ -129,6 +129,10 @@ impl Dom for RecordingDom {
         ));
     }
 
+    fn watch_appearance(&mut self, anchor: NodeId, _sink: crate::AppearanceSink) {
+        self.calls.push(Call::WatchAppearance { node: anchor });
+    }
+
     fn add_style(&mut self, scope: &str, css: &str) {
         self.calls.push(Call::AddStyle {
             scope: scope.into(),

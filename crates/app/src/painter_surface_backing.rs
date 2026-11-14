@@ -7,8 +7,8 @@ use vapors_renderer::{ImagePipeline, Target, TextureBinding, WorkCounter};
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
 use super::scope::{Scopes, Turn};
-use super::texture::{Backing, fits};
-use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+use super::texture::{Backing, fits, render_into};
+use crate::surface::{SurfaceRenderer, SurfaceSize};
 
 /// A renderer and its state on the painter.
 // four independent flags: each is set and cleared at its own time
@@ -133,12 +133,40 @@ impl Mounted {
         fits(device, size)
     }
 
-    fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
+    /// Calls the renderer's `mount` unless it was called already.
+    pub(super) fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
         if !self.started {
             let renderer = &mut self.renderer;
             self.scopes.run(device, turn, || renderer.mount(device))?;
             self.started = true;
         }
+        Ok(())
+    }
+
+    /// At `App::start`: mounted, and a backing at `size` made, the
+    /// renderer resized, and the backing cleared on `queue`, so the
+    /// memory both live in is the GPU's before the first frame: on
+    /// i915 the first submit using a new memory block zeroes all of it
+    /// (one-scene F0).
+    pub(super) fn start_at(
+        &mut self,
+        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        pipeline: &ImagePipeline,
+        size: SurfaceSize,
+        turn: Turn<'_>,
+    ) -> Result<(), Refusal> {
+        fits(device, size)?;
+        self.start(device, turn)?;
+        self.allocate(device, pipeline, size, turn)?;
+        let backing = self.backing.as_ref().expect("allocated above");
+        // RELAXED: no test pins this clear. Its pixels are the zeros wgpu
+        // fills a new texture with, and wgpu offers no count of submits,
+        // so only frame 0's time shows it. Measured in diagnostic builds
+        // on a loaded box (1-minute load 20 to 60), not acceptance runs:
+        // without it frame 0's surface submit took 13 to 20 ms, with it
+        // and the timer made before it 0.2 to 0.4 ms (one-scene.md, F0).
+        // Retired by the acceptance runs, or a GPU-time test of frame 0.
+        backing.clear(device, queue);
         Ok(())
     }
 
@@ -177,37 +205,6 @@ impl Mounted {
         self.stale = false;
         Ok(())
     }
-}
-
-const ENCODER: wgpu::CommandEncoderDescriptor<'static> = wgpu::CommandEncoderDescriptor {
-    label: Some("gpu-surface"),
-};
-
-/// `renderer`'s render into `backing`, submitted on `target`'s queue.
-fn render_into(
-    renderer: &mut Box<dyn SurfaceRenderer>,
-    target: &Target<'_>,
-    backing: &Backing,
-    work: &WorkCounter,
-) -> Result<(), SurfaceError> {
-    let mut encoder = target.device.create_command_encoder(&ENCODER);
-    // a timed frame's pair around the renderer's passes (GpuTimer)
-    target
-        .encoder
-        .time_section(&mut encoder, &backing.view, |encoder| {
-            renderer.render(SurfaceFrame {
-                device: target.device,
-                queue: target.queue,
-                encoder,
-                view: &backing.view,
-                size: backing.size,
-                work,
-            })
-        })?;
-    let commands = encoder.finish();
-    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
-    target.encoder.submit_section(target.queue, commands);
-    Ok(())
 }
 
 #[cfg(test)]

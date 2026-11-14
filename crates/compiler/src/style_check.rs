@@ -3,6 +3,8 @@
 //! parse; a `:global()` the scoping cannot honour) fails the build
 //! instead, positioned in the `.wisp` file.
 
+use vapors_css::ast::Stylesheet;
+
 use crate::CompileError;
 use crate::ast::Section;
 use crate::build::Styles;
@@ -16,6 +18,15 @@ pub(crate) fn check(
     section: &Section,
     styles: Styles,
 ) -> Result<(), CompileError> {
+    checked(source, section, styles).map(drop)
+}
+
+/// [`check`], giving the parsed sheet (unscoped) to the analysis.
+pub(crate) fn checked(
+    source: &Source,
+    section: &Section,
+    styles: Styles,
+) -> Result<Stylesheet, CompileError> {
     refuse_other_line_breaks(source, section)?;
     let in_file = |error| positioned(source, section, error);
     let sheet = vapors_css::parse(&section.text).map_err(in_file)?;
@@ -23,7 +34,8 @@ pub(crate) fn check(
         Styles::Scoped => vapors_css::scope::refuse_nested_global(&sheet),
         Styles::Global => vapors_css::scope::refuse_global(&sheet),
     }
-    .map_err(in_file)
+    .map_err(in_file)?;
+    Ok(sheet)
 }
 
 /// vapors-css counts a lone carriage return and a form feed as line
@@ -51,7 +63,11 @@ fn refuse_other_line_breaks(source: &Source, section: &Section) -> Result<(), Co
 /// A refusal positioned in the section's text, moved to the file: the
 /// section's first line starts after its open tag, every later line is
 /// a file line of its own.
-fn positioned(source: &Source, section: &Section, error: vapors_css::Error) -> CompileError {
+pub(crate) fn positioned(
+    source: &Source,
+    section: &Section,
+    error: vapors_css::Error,
+) -> CompileError {
     let (line, col) = source.position(section.offset);
     let (css_line, css_col) = (error.position.line as usize, error.position.column as usize);
     let (line, col) = if css_line == 1 {

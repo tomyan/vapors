@@ -20,6 +20,7 @@ static PARENT: StyleKey = StyleKey {
     tag: "div",
     classes: &["p"],
     toggles: &["on"],
+    attributes: &[],
     style: None,
 };
 
@@ -29,6 +30,7 @@ static CHILD: StyleKey = StyleKey {
     tag: "span",
     classes: &["c"],
     toggles: &[],
+    attributes: &[],
     style: None,
 };
 
@@ -38,6 +40,7 @@ static BUTTON: StyleKey = StyleKey {
     tag: "button",
     classes: &["b"],
     toggles: &[],
+    attributes: &[],
     style: None,
 };
 

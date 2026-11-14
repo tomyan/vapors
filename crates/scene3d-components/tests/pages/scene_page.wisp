@@ -8,23 +8,29 @@ use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, Me
 #[prop] let lens: Option<vapors_scene3d::Projection> = None;
 #[prop] let back: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let left: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
-#[prop] let left_colour: Signal<vapors_scene3d::Colour> = Signal::new(vapors_scene3d::Colour::BLACK);
+#[prop] let blue: Signal<bool> = Signal::new(false);
+#[prop] let gone: Signal<bool> = Signal::new(false);
 #[prop] let right: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
-#[prop] let right_colour: Signal<vapors_scene3d::Colour> = Signal::new(vapors_scene3d::Colour::BLACK);
 #[prop] let shown: Signal<bool> = Signal::new(false);
 </script>
 
 <style>
+:global(html) { --tint: #ff0000; }
+:global(html.night) { --tint: #ffff00; }
+:global(body) { color: var(--tint); }
 .view { display: block; width: 64px; height: 64px; }
+.left { color: var(--tint); }
+.blue { color: #0000ff; }
+.gone { visibility: hidden; }
 </style>
 
 <gpu-surface name="view" class="view"></gpu-surface>
 <Scene scene={scene} surface={surface} camera={eye}>
   <Camera handle={eye} projection={lens} transform={back} />
   <Group>
-    <Mesh geometry={square} colour={left_colour} transform={left} />
+    <Mesh geometry={square} class="left" class:blue={blue.get()} class:gone={gone.get()} transform={left} />
     {if shown.get()}
-      <Mesh geometry={square} colour={right_colour} transform={right} />
+      <Mesh geometry={square} transform={right} />
     {/if}
   </Group>
 </Scene>

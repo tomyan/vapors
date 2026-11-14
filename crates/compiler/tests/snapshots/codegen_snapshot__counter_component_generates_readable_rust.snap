@@ -1,5 +1,6 @@
 ---
 source: crates/compiler/tests/codegen_snapshot.rs
+assertion_line: 16
 expression: code
 ---
 // Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
@@ -23,6 +24,7 @@ static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
     classes: &[],
     toggles: &[],
     style: None,
+    attributes: &[],
 };
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]

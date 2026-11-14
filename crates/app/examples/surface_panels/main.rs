@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
 use vapors_app::{ElementsApp, InvalidateError, SurfaceHandle};
-use vapors_platform::{App, Event, Frame, Instant, Next, Platform, WindowOptions, run};
+use vapors_platform::{App, Event, Frame, Instant, Next, Platform, Start, WindowOptions, run};
 
 use flip::{Flip, Flipper};
 use gradient::Gradient;
@@ -86,6 +86,14 @@ impl Alternating {
 }
 
 impl App for Alternating {
+    // RELAXED: nothing pins this forward. No CI or gate step runs this
+    // example, so removing it would only show as the status line's "App::start
+    // was not called" when it is run by hand. Retired when a gate step runs
+    // surface_panels and checks ElementsApp::start_state(), as Checked does.
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.inner.start(start)
+    }
+
     fn event(&mut self, event: Event, platform: &Platform) {
         self.inner.event(event, platform);
     }

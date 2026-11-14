@@ -24,13 +24,11 @@ mod restyle;
 mod share;
 mod supports;
 
-pub use computed::ComputedStyle;
-pub use environment::Environment;
-pub use inline::INLINE_SHEET;
-pub use restyle::RestyleScope;
-pub use share::{Unshareable, unshareable};
-
-pub(crate) use compute::resolve_for;
+pub use share::{Unshareable, rule_indices_for_key, unshareable};
+pub(crate) use {collect::rank, compute::initial, compute::resolve_for};
+pub use {computed::ComputedStyle, environment::Environment};
+pub(crate) use {font_weight::is_parent_relative, inline::INLINE_SPECIFICITY};
+pub use {inline::INLINE_SHEET, restyle::RestyleScope};
 
 use crate::Result;
 use crate::ast::{Keyframes, Rule, Stylesheet};
