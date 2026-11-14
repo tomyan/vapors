@@ -18,7 +18,7 @@
 //! rects, a range track or a text field's origin, which paint derives
 //! from more than the rect. Never shifted on a guess.
 
-use vapors_scene::{Item, Rect};
+use vapors_scene::{Item, Rect, Scene};
 
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_shift_items::{shifted_item, text_item, whole_item};
@@ -86,25 +86,31 @@ impl Shift {
     /// Moves `kept`'s items and own hit, sets its clip, and notes what
     /// it now shows.
     pub(crate) fn apply_to(self, kept: &mut KeptBox, slabs: &Slabs, scale: f32) {
-        let rect = self.from.rect;
-        for scene in [&mut kept.own.scene, &mut kept.outline] {
-            for item in scene.items_mut() {
-                *item = match *item {
-                    Item::Text { text, .. } => text_item(text, rect, slabs, scale),
-                    moved @ (Item::Shadow(_)
-                    | Item::Quad(_)
-                    | Item::Image { .. }
-                    | Item::Icon { .. }
-                    | Item::Surface { .. }
-                    | Item::Shape(_)) => shifted_item(moved, self.delta),
-                };
-            }
-            scene.clips_mut().fill(self.clip);
+        self.shift_scene(&mut kept.own.scene, slabs, scale);
+        if let Some(outline) = kept.outline_mut() {
+            self.shift_scene(outline, slabs, scale);
         }
         if let Some((_, hit)) = kept.own.hits.first_mut() {
-            *hit = crate::clip::within(self.from.clip, rect);
+            *hit = crate::clip::within(self.from.clip, self.from.rect);
         }
         kept.from = self.from;
+    }
+
+    /// Moves `scene`'s items and sets their clip.
+    fn shift_scene(&self, scene: &mut Scene, slabs: &Slabs, scale: f32) {
+        let rect = self.from.rect;
+        for item in scene.items_mut() {
+            *item = match *item {
+                Item::Text { text, .. } => text_item(text, rect, slabs, scale),
+                moved @ (Item::Shadow(_)
+                | Item::Quad(_)
+                | Item::Image { .. }
+                | Item::Icon { .. }
+                | Item::Surface { .. }
+                | Item::Shape(_)) => shifted_item(moved, self.delta),
+            };
+        }
+        scene.clips_mut().fill(self.clip);
     }
 }
 
@@ -180,18 +186,19 @@ fn hits_shiftable(part: &KeptBox, content: &Content) -> bool {
 /// only in a text run's part, whose origin paint takes from its rect;
 /// any other item on whole device pixels.
 fn items_shiftable(part: &KeptBox, content: &Content) -> bool {
-    let mut items = part.own.scene.items().iter().chain(part.outline.items());
-    items.all(|item| match item {
+    let shiftable = |item: &Item| match item {
         Item::Text { .. } => matches!(content, Content::Text(_)),
         other => whole_item(other),
-    })
+    };
+    let own = part.own.scene.items().iter().all(shiftable);
+    own && part.outline().items().iter().all(shiftable)
 }
 
 /// Whether every item of `part` is under `clip`, the part's own, so
 /// setting the new clip on every item is what paint does.
 fn under_one_clip(part: &KeptBox, clip: Option<Rect>) -> bool {
-    let mut clips = part.own.scene.clips().iter().chain(part.outline.clips());
-    clips.all(|each| *each == clip)
+    let own = part.own.scene.clips().iter().all(|each| *each == clip);
+    own && part.outline().clips().iter().all(|each| *each == clip)
 }
 
 #[cfg(test)]

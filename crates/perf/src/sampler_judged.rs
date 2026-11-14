@@ -94,7 +94,7 @@ impl Sampler<'_> {
 
     /// The app's start on this GPU for textures of `format`, timed to
     /// the GPU's idle after it.
-    fn start(
+    pub(super) fn start(
         &self,
         workload: &mut dyn Workload,
         format: wgpu::TextureFormat,
@@ -120,7 +120,7 @@ impl Sampler<'_> {
 
 /// Refuses frame `index` when it built a pipeline or shader module:
 /// every one is built in `App::start`, before frame 0 (one-scene F0).
-fn nothing_built(index: usize, built: Built) -> Result<(), String> {
+pub(super) fn nothing_built(index: usize, built: Built) -> Result<(), String> {
     if built.is_none() {
         return Ok(());
     }
