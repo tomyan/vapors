@@ -1,18 +1,20 @@
 //! GPU tier: the page's scene drawn by its `SceneRenderer` in an
 //! `ElementsApp`. Its draws are counted in `FrameCounts::surfaces`
-//! (`docs/plans/3d-2.md` decision 4), and a transform or colour signal
-//! change renders the surface again, writing one mesh's uniform and no
-//! geometry.
+//! (`docs/plans/3d-2.md` decision 4). A transform signal change, or a
+//! class or token change to a mesh's computed `color`
+//! (`docs/plans/css-for-3d.md` C3), renders the surface again, writing
+//! one uniform per mesh it reaches and no geometry.
 
 mod support;
 
 use support::{Rig, at};
 use vapors_app::{ElementsApp, GpuWork};
+use vapors_dom::Dom;
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_platform::{App, Frame, Instant, Next};
 use vapors_renderer::clear;
 use vapors_scene::Color;
-use vapors_scene3d::{Colour, Transform, Vec3};
+use vapors_scene3d::{Transform, Vec3};
 
 /// The target's side in device pixels: the page's surface fills it.
 const SIZE: u32 = 64;
@@ -20,9 +22,10 @@ const SIZE: u32 = 64;
 const MESH_BYTES: u64 = 80;
 /// The camera's view-projection, 16 floats.
 const CAMERA_BYTES: u64 = 64;
-/// The `{if}` mesh's default colour, at 1 unit right of centre.
-const BLACK: [u8; 4] = [0, 0, 0, 255];
+/// The `--tint` token's colour, which both meshes take.
 const RED: [u8; 4] = [255, 0, 0, 255];
+/// The token's colour under `html.night`.
+const YELLOW: [u8; 4] = [255, 255, 0, 255];
 const BLUE: [u8; 4] = [0, 0, 255, 255];
 
 /// One app frame into a fresh target: what it asked for next, the
@@ -92,20 +95,70 @@ fn gpu_a_transform_signal_change_writes_one_uniform_and_uploads_no_geometry() {
 }
 
 #[test]
-fn gpu_a_colour_signal_change_writes_one_uniform_and_recolours_the_mesh() {
+fn gpu_an_idle_frame_writes_nothing() {
+    // Given
+    let gpu = vapors_gpu_harness::gpu();
+
+    // When
+    let (_, idle) = settled(&gpu);
+
+    // Then
+    assert_eq!(idle.buffer_bytes, 0);
+}
+
+#[test]
+fn gpu_a_class_toggle_recolours_one_mesh_writing_one_uniform_and_no_geometry() {
+    // Given: the {if} mesh shown too, 1 unit right of centre
+    let gpu = vapors_gpu_harness::gpu();
+    let (mut rig, idle) = settled(&gpu);
+    rig.signals.shown.set(true);
+    frame(&mut rig.app, &gpu);
+
+    // When
+    rig.signals.blue.set(true);
+    let (_, recoloured, pixels) = frame(&mut rig.app, &gpu);
+
+    // Then
+    assert_eq!(recoloured.buffer_bytes, idle.buffer_bytes + MESH_BYTES);
+    assert_eq!(recoloured.texture_bytes, 0);
+    assert_eq!(pixel(&pixels, 32, 32), BLUE);
+    assert_eq!(pixel(&pixels, 48, 32), RED);
+}
+
+#[test]
+fn gpu_a_token_change_recolours_every_mesh_that_reads_it_one_uniform_each() {
+    // Given: `.left` reads `--tint`, the {if} mesh inherits the body's
+    // `color`, which reads it too
+    let gpu = vapors_gpu_harness::gpu();
+    let (mut rig, idle) = settled(&gpu);
+    rig.signals.shown.set(true);
+    frame(&mut rig.app, &gpu);
+    let root = rig.doc.borrow().root();
+
+    // When
+    rig.doc.borrow_mut().set_attribute(root, "class", "night");
+    let (_, recoloured, pixels) = frame(&mut rig.app, &gpu);
+
+    // Then
+    assert_eq!(recoloured.buffer_bytes, idle.buffer_bytes + 2 * MESH_BYTES);
+    assert_eq!(pixel(&pixels, 32, 32), YELLOW);
+    assert_eq!(pixel(&pixels, 48, 32), YELLOW);
+}
+
+#[test]
+fn gpu_visibility_hidden_drops_one_draw_and_writes_nothing() {
     // Given
     let gpu = vapors_gpu_harness::gpu();
     let (mut rig, idle) = settled(&gpu);
 
     // When
-    rig.signals
-        .left_colour
-        .set(Colour::srgb(0.0, 0.0, 1.0).unwrap());
-    let (_, recoloured, pixels) = frame(&mut rig.app, &gpu);
+    rig.signals.gone.set(true);
+    let (_, hidden, pixels) = frame(&mut rig.app, &gpu);
 
-    // Then
-    assert_eq!(recoloured.buffer_bytes, idle.buffer_bytes + MESH_BYTES);
-    assert_eq!(pixel(&pixels, 32, 32), BLUE);
+    // Then: the composition's draw alone
+    assert_eq!(hidden.buffer_bytes, idle.buffer_bytes);
+    assert_eq!(hidden.draw_calls, idle.draw_calls);
+    assert_ne!(pixel(&pixels, 32, 32), RED);
 }
 
 #[test]
@@ -133,7 +186,7 @@ fn gpu_a_mesh_hidden_by_its_if_is_not_drawn_and_shown_again_is_drawn_once() {
     let (mut rig, idle) = settled(&gpu);
     rig.signals.shown.set(true);
     let (_, _, shown) = frame(&mut rig.app, &gpu);
-    assert_eq!(pixel(&shown, 48, 32), BLACK);
+    assert_eq!(pixel(&shown, 48, 32), RED);
 
     // When
     rig.signals.shown.set(false);
@@ -142,7 +195,7 @@ fn gpu_a_mesh_hidden_by_its_if_is_not_drawn_and_shown_again_is_drawn_once() {
     let (_, again, _) = frame(&mut rig.app, &gpu);
 
     // Then
-    assert_ne!(pixel(&hidden, 48, 32), BLACK);
+    assert_ne!(pixel(&hidden, 48, 32), RED);
     assert_eq!(
         again.draw_calls,
         idle.draw_calls + 2,

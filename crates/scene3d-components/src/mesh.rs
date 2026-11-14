@@ -1,20 +1,19 @@
-//! `<Mesh geometry={..} colour={..} transform={..}>`: geometry drawn in
-//! one colour.
+//! `<Mesh geometry={..} transform={..}>`: geometry drawn in one colour,
+//! its anchor's computed `color`, and shown while its `visibility` is
+//! `visible` (docs/plans/css-for-3d.md C3).
 
 use crate::component::node_component;
-use crate::node::{Mounted, mount_node, refuse};
+use crate::node::{Mounted, mount_node};
 use crate::own_keys;
 use crate::placement::Placement;
-use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
+use vapors_dom::{Appearance, DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{Colour, GeometryId, NodeKind, Transform};
-use vapors_signals::{Effect, Signal};
+use vapors_signals::Signal;
 
 /// What a parent passes to [`Mesh::mount`].
 pub struct MeshProps {
     /// The triangles, from the renderer's `Meshes`; required.
     pub geometry: Option<GeometryId>,
-    /// Drawn unlit; a change writes the mesh's uniform alone.
-    pub colour: Signal<Colour>,
     /// Where the mesh sits in its parent; a change writes its uniform
     /// alone.
     pub transform: Signal<Transform>,
@@ -32,7 +31,6 @@ impl Default for MeshProps {
     fn default() -> Self {
         Self {
             geometry: None,
-            colour: Signal::new(Colour::BLACK),
             transform: Signal::new(Transform::IDENTITY),
             anchor: None,
         }
@@ -66,8 +64,9 @@ impl Mesh {
         let geometry = props.geometry.unwrap_or_else(|| {
             panic!("<Mesh> has no geometry: pass geometry={{Some(id)}} with an id from the renderer's Meshes")
         });
-        let colour = props.colour.get_untracked();
         let key = own_keys::anchor_key("Mesh", props.anchor, &own_keys::MESH);
+        // black until the first update gives the anchor's colour
+        let colour = Colour::BLACK;
         let kind = ("Mesh", key, NodeKind::Mesh { geometry, colour });
         let mounted = mount_node(
             dom,
@@ -76,24 +75,31 @@ impl Mesh {
             props.transform,
             &Snippet::empty(),
         );
-        mounted
-            .owner
-            .with(|| follow_colour(mounted.placement.clone(), props.colour));
+        let sink = appearance_sink(mounted.placement.clone());
+        dom.borrow_mut().watch_appearance(mounted.anchor, sink);
         Self { mounted }
     }
 }
 
-/// Writes each value of `colour` to the mesh and invalidates its surface.
-fn follow_colour(placement: Placement, colour: Signal<Colour>) {
-    Effect::new(move || {
-        let value = colour.get();
-        let written = placement
-            .scene
-            .borrow_mut()
-            .set_colour(placement.node, value);
-        refuse("Mesh", written);
-        placement.invalidate("Mesh");
-    });
+/// Writes each appearance the anchor reports to the mesh, and
+/// invalidates its surface when that changed the mesh.
+fn appearance_sink(placement: Placement) -> vapors_dom::AppearanceSink {
+    Box::new(
+        move |Appearance {
+                  rgb: [r, g, b],
+                  visible,
+              }| {
+            let failed = |error: &dyn std::fmt::Display| format!("<Mesh>: {error}");
+            let colour = Colour::srgb(r, g, b).map_err(|e| failed(&e))?;
+            let mut scene = placement.scene.borrow_mut();
+            let changed = scene.set_appearance(placement.node, colour, visible);
+            drop(scene);
+            if changed.map_err(|e| failed(&e))? {
+                placement.surface.invalidate().map_err(|e| failed(&e))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 node_component!(Mesh, MeshProps);

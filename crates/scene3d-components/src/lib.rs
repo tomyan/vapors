@@ -8,7 +8,7 @@
 //! <Scene scene={Some(scene)} surface={Some(surface)} camera={Some(eye)}>
 //!   <Camera handle={Some(eye)} projection={Some(lens)} transform={back} />
 //!   <Group transform={spin}>
-//!     <Mesh geometry={Some(cube)} colour={red} />
+//!     <Mesh geometry={Some(cube)} class="hull" class:lit={lit} />
 //!   </Group>
 //! </Scene>
 //! ```
@@ -21,18 +21,19 @@
 //! `display: none`, so an anchor has no box, no paint and no place in
 //! the accessibility tree. Each anchor's used style is a `SceneUsed`
 //! (vapors-elements; C2), and a declaration its tag does not read is
-//! refused at the update; nothing writes it to the node yet (C3): a
-//! mesh's colour is its `colour` prop, whatever colour its anchor
-//! computes. The anchor is the component's identity in the document: its
+//! refused at the update. A mesh's colour and visibility are its
+//! anchor's computed `color` and `visibility`, inherited from the HTML
+//! around the scene where no rule declares them (C3). The anchor is the component's identity in the document: its
 //! children, and the `{if}` and `{for}` blocks among them, are placed in
 //! it, and a node component finds its parent scene node from the
 //! anchor it is placed in, at mount and at any later rebuild of a block.
 //!
-//! Each node is added to the scene at mount. `transform` (and a mesh's
-//! `colour`) is a signal: a change writes it to that node alone and
-//! invalidates the surface, so the next frame writes that node's
-//! uniform (80 bytes; a group's subtree's), uploads no geometry, and
-//! counts the scene's draws in `FrameCounts::surfaces`.
+//! Each node is added to the scene at mount. `transform` is a signal,
+//! and a mesh's appearance follows its anchor's restyle: a change
+//! writes that node alone and invalidates the surface, so the next
+//! frame writes that node's uniform (80 bytes; a transform: its
+//! subtree's; a visibility change alone: none), uploads no geometry,
+//! and counts the scene's draws in `FrameCounts::surfaces`.
 //!
 //! A required prop is an `Option`, refused at mount when `None`, since
 //! a parent's props struct takes every unset prop from `Default`. Markup

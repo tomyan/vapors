@@ -37,8 +37,7 @@ fn a_mesh_without_geometry_is_refused() {
 }
 
 #[test]
-#[should_panic(expected = "was removed: use an id this scene returned")]
-fn a_colour_set_on_a_removed_mesh_is_refused() {
+fn a_colour_for_a_removed_mesh_refuses_the_update_naming_it() {
     // Given: the mesh's node removed behind the component's back
     let rig = Rig::new();
     let mut scene = rig.scene.borrow_mut();
@@ -48,7 +47,26 @@ fn a_colour_set_on_a_removed_mesh_is_refused() {
     drop(scene);
 
     // When
-    rig.signals.left_colour.set(support::red());
+    rig.signals.blue.set(true);
+    let viewport = vapors_elements::Viewport {
+        width: 64.0,
+        height: 64.0,
+        scale: 1.0,
+    };
+    let Err(errors) = rig.doc.borrow_mut().update(viewport) else {
+        panic!("the update succeeded; a refusal was expected")
+    };
+
+    // Then
+    let refused = errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        refused.contains("<mesh class=\"left blue\">") && refused.contains("was removed"),
+        "{refused}"
+    );
 }
 
 #[test]
