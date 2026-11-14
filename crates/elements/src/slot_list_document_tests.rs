@@ -28,8 +28,6 @@ fn page_with_one_added(count: usize) -> Document {
         })
         .collect();
     doc.update(VIEWPORT).expect("updates");
-    // the hits gathered, so the insert patches them in place
-    doc.painted.as_ref().expect("painted").kept_hits();
     let added = doc.create_element("div");
     doc.insert_before(body, added, Some(made[count / 2]));
     doc.update(VIEWPORT).expect("updates");

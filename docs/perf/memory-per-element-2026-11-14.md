@@ -108,16 +108,41 @@ by an insert that adds four boxes. The placement's six lists, the clip
 lists, the clip tree's two, the stackings and the style slots did the
 same. Each now grows by a quarter, as the box list does:
 
-| one row added at 16,384 rows | bytes the insert leaves | the insert's frames |
-|---|---|---|
-| main at 06b0c94 | 110,180,323 | 156 ms (one run) |
-| every per-slot list by a quarter | 58,483,505 | 67 to 77 ms (three runs) |
+| one row added at 16,384 rows | bytes the insert leaves |
+|---|---|
+| main at 06b0c94 | 110,180,323 |
+| every per-slot list by a quarter | 58,483,505 |
 
-Wall times at a 1-minute load near 1 to 8, with the counting allocator.
 The page itself is unchanged: 12,887 bytes per element on main and
 12,863 with this change (the slope from 4,096 to 16,384 rows; main's
 layout per element rose to 8,193 bytes since #333's 6,859, from the
 work merged in between).
+
+What the 58.5 MB is, from each list's capacity in bytes before and
+after the insert (a print added for the run, not kept):
+
+| list | grown by |
+|---|---|
+| layout's box list (159.6 MB → 199.6 MB) | 39.9 MB |
+| the kept boxes, `painted.kept_boxes` (48.6 MB → 60.8 MB) | 12.2 MB |
+| the other 13 lists (placement, clips, clip tree, stackings, layout's keys) | 5.0 MB |
+| total of the lists | 57.1 MB |
+
+The live heap grew 55.9 MB in that run, less than the lists' 57.1 MB:
+their growth is all of it, and the insert freed about 1.2 MB elsewhere
+(not located). The kept hits and style slots did not grow: an insert
+gathers the hits again, exactly, and the style slots had slack left.
+A list never shrinks, and a quarter of 65,538 slots is room for about
+4,096 more rows of four boxes before any of them grows again.
+
+Not measured: the time of many single-row adds, quarter growth against
+doubling. A list of n slots grown by a quarter grows again after n/4
+more slots, where doubled it grows after n, so over many adds it
+copies about four times as many entries (n/(1.25 - 1) against
+n/(2 - 1)); at 16,384 rows each growth of the box list
+copies about 160 MB. Not measured either: that copy's cost on wasm.
+One-run wall times are left out of the table: they were taken at
+different loads and do not compare.
 
 At about 740 bytes a slot, the kept boxes' list is the next per-element
 target after layout's boxes (a later slice).
