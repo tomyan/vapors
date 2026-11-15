@@ -67,9 +67,12 @@ fn a_run_asked_for_at_three_widths_is_shaped_once_and_broken_at_each() {
 /// One input changed in each, from `spanned(1)`.
 fn changed() -> Vec<(&'static str, InlineRun)> {
     let base = spanned(1);
+    // the span takes the block's change too: a run elements lays out
+    // has one size and line height (inline_check.rs refuses others)
     let restyled = |change: fn(&mut TextStyle)| {
         let mut run = base.clone();
         change(&mut run.style);
+        change(&mut run.spans[0].style);
         run
     };
     let respanned = |change: fn(&mut InlineSpan)| {

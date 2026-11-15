@@ -83,6 +83,11 @@ impl TextCache {
         let shaped = self.shaped_run(fonts, scale, run, key.shape());
         self.built += 1;
         let layout = Rc::new(shaped.lay_out(width, run.style.align));
+        // one answer with inline_check.rs, which refuses every line the
+        // text crate cannot place as Blink does before it is laid out
+        if let Some(why) = layout.baseline_refusal() {
+            panic!("a run inline_check.rs let through cannot be placed as Blink places it: {why}");
+        }
         self.layouts.insert(key, Rc::clone(&layout));
         layout
     }

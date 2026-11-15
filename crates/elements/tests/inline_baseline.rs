@@ -10,33 +10,50 @@ mod support;
 
 use support::{document, element, text, viewport};
 
+/// The span's box top and height, CSS px, in a 10 px Geist paragraph
+/// with 12 px lines at `scale`.
+fn span_box(scale: f32) -> (f32, f32) {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let p = element(&mut doc, body, "p", "");
+    let span = element(&mut doc, p, "span", "mark");
+    text(&mut doc, span, "Row 0");
+    doc.add_stylesheet(
+        "app.css",
+        "body { margin: 0; } p { margin: 0; font-size: 10px; line-height: 12px; } \
+         .mark { background-color: #ffcc00; }",
+    )
+    .expect("parses");
+
+    // When
+    let mut at = viewport(200.0, 100.0);
+    at.scale = scale;
+    doc.update(at).expect("updates");
+
+    // Then
+    let rect = doc
+        .painted()
+        .and_then(|p| p.border_box(span))
+        .expect("painted");
+    (rect.y, rect.height)
+}
+
 #[test]
-fn a_spans_box_starts_at_the_baseline_less_its_ascent_with_the_half_leading_floored() {
-    for (scale, wanted) in [(1.0_f32, (-1.0, 13.0)), (2.0, (-0.5, 13.0))] {
-        // Given
-        let mut doc = document();
-        let body = doc.body();
-        let p = element(&mut doc, body, "p", "");
-        let span = element(&mut doc, p, "span", "mark");
-        text(&mut doc, span, "Row 0");
-        doc.add_stylesheet(
-            "app.css",
-            "body { margin: 0; } p { margin: 0; font-size: 10px; line-height: 12px; } \
-             .mark { background-color: #ffcc00; }",
-        )
-        .expect("parses");
+fn at_1x_a_spans_box_starts_1_px_above_the_line() {
+    // Given, When: the baseline 9 below the line's top, the ascent 10
+    let (top, height) = span_box(1.0);
 
-        // When
-        let mut at = viewport(200.0, 100.0);
-        at.scale = scale;
-        doc.update(at).expect("updates");
+    // Then
+    assert_eq!((top, height), (-1.0, 13.0));
+}
 
-        // Then: at 2x, ascent 20.1 and descent 5.9 round to 20 and 6, and
-        // (24 - 26) / 2 = -1 device px: the baseline 19 device px down
-        let rect = doc
-            .painted()
-            .and_then(|p| p.border_box(span))
-            .expect("painted");
-        assert_eq!((rect.y, rect.height), wanted, "at {scale}x");
-    }
+#[test]
+fn at_2x_a_spans_box_starts_half_a_pixel_above_the_line() {
+    // Given, When: ascent 20.1 and descent 5.9 round to 20 and 6, and
+    // (24 - 26) / 2 = -1 device px: the baseline 19 device px down
+    let (top, height) = span_box(2.0);
+
+    // Then
+    assert_eq!((top, height), (-0.5, 13.0));
 }

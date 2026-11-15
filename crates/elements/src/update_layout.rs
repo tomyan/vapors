@@ -85,7 +85,7 @@ impl Document {
     #[cfg(debug_assertions)]
     fn check_layout(&mut self, placed: &Placed, viewport: Viewport) {
         let root = self.root();
-        let text_marks = self.focused_text_marks();
+        let text_marks = self.focused_text_marks(viewport.scale);
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let source = crate::layout::Source {
             arena: &self.arena,
@@ -105,7 +105,7 @@ impl Document {
     /// slots built and freed.
     fn rebuilt(&mut self, scale: f32) -> (Placed, Rebuilt) {
         let root = self.root();
-        let text_marks = self.focused_text_marks();
+        let text_marks = self.focused_text_marks(scale);
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         kept.calcs.begin();
         let source = crate::layout::Source {

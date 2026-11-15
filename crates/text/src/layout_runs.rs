@@ -4,6 +4,7 @@
 use parley::Alignment;
 use vapors_scene::Color;
 
+use crate::baseline::{BaselineRule, line_shift};
 use crate::layout_types::{Align, Glyph, GlyphRun};
 
 pub(crate) fn run_offset(line: &parley::Line<'_, Color>, run: &parley::Run<'_, Color>) -> f32 {
@@ -13,23 +14,13 @@ pub(crate) fn run_offset(line: &parley::Line<'_, Color>, run: &parley::Run<'_, C
         .sum()
 }
 
-/// `line`'s baseline as Blink places it (`baseline_below_top`), device
-/// pixels from the layout's top, in place of Parley's, which adds the
-/// font's metrics unrounded and the half-leading unfloored.
-pub(crate) fn baseline(line: &parley::Line<'_, Color>) -> f32 {
-    let metrics = line.metrics();
-    let height = metrics.block_max_coord - metrics.block_min_coord;
-    // the content area is the font's ascent and descent around the baseline
-    let ascent = metrics.baseline - metrics.content_block_min_coord;
-    let descent = metrics.content_block_max_coord - metrics.baseline;
-    metrics.block_min_coord + crate::line_metrics::baseline_below_top(height, ascent, descent)
-}
-
-pub(crate) fn glyph_runs(layout: &parley::Layout<Color>) -> Vec<GlyphRun> {
+/// Each line's glyph runs, moved onto the baseline `rule` gives the line
+/// (`baseline.rs`); left on Parley's when the rule is unresolvable.
+pub(crate) fn glyph_runs(layout: &parley::Layout<Color>, rule: &BaselineRule) -> Vec<GlyphRun> {
     layout
         .lines()
         .flat_map(|line| {
-            let shift = baseline(&line) - line.metrics().baseline;
+            let shift = line_shift(&line, rule, 1.0).unwrap_or(0.0);
             line.items().filter_map(move |item| match item {
                 parley::PositionedLayoutItem::GlyphRun(run) => Some(glyph_run(&run, shift)),
                 parley::PositionedLayoutItem::InlineBox(_) => None,

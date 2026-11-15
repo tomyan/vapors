@@ -39,7 +39,8 @@ fn shaped_and_broken(system: &mut FontSystem, options: &LayoutOptions) -> Layout
     inner.break_all_lines(options.width.map(|w| w * options.scale));
     let align = crate::layout_runs::alignment(options.align);
     inner.align(align, parley::AlignmentOptions::default());
-    Layout::broken(inner, TEXT.to_owned(), options.scale)
+    let rule = crate::baseline::baseline_rule(&base, &[bold()], options.scale);
+    Layout::broken(inner, TEXT.to_owned(), options.scale, rule)
 }
 
 /// A layout's lines, every glyph's id, x, y and advance, and its size.

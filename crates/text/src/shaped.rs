@@ -21,6 +21,8 @@ pub struct Shaped {
     inner: parley::Layout<Color>,
     text: String,
     scale: f32,
+    /// What its lines' baselines are placed by (`baseline.rs`).
+    rule: crate::baseline::BaselineRule,
 }
 
 impl Shaped {
@@ -49,6 +51,7 @@ impl Shaped {
             inner: builder.build(text),
             text: text.to_owned(),
             scale,
+            rule: crate::baseline::baseline_rule(base, spans, scale),
         }
     }
 
@@ -74,7 +77,7 @@ impl Shaped {
         break_lines(&mut self.inner, width.map(|w| w * self.scale));
         self.inner
             .align(alignment(align), AlignmentOptions::default());
-        Layout::broken(self.inner, self.text, self.scale)
+        Layout::broken(self.inner, self.text, self.scale, self.rule)
     }
 
     /// The text shaped.

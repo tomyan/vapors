@@ -6,7 +6,7 @@
 //! background behind the text.
 
 use vapors_scene::{Item, Quad};
-use vapors_text::{Layout, baseline_below_top, content_area};
+use vapors_text::{Layout, content_area};
 
 use crate::layout::{BoxRect, InlineRun, InlineSpan};
 use crate::paint::{PaintInput, snapped};
@@ -22,7 +22,7 @@ pub(crate) fn paint_spans(
     out: &mut Painting,
 ) {
     for span in &run.spans {
-        let fragments = fragments(span, run, layout, origin, input.scale);
+        let fragments = fragments(span, layout, origin, input.scale);
         if let Some(union) = union(&fragments) {
             out.rects.insert(span.node, union);
         }
@@ -47,23 +47,13 @@ pub(crate) fn paint_spans(
 }
 
 /// The span's fragments in CSS pixels, document coordinates. Each is
-/// placed as Chromium places an inline box: the line's baseline over
-/// the block's own font (`baseline_below_top`, the half-leading floored
-/// to a device pixel, as the glyphs are placed), less the span's
-/// ascent; every ascent and descent rounded to a device pixel.
-fn fragments(
-    span: &InlineSpan,
-    run: &InlineRun,
-    layout: &Layout,
-    origin: BoxRect,
-    scale: f32,
-) -> Vec<BoxRect> {
+/// placed as Chromium places an inline box: on the line's baseline, the
+/// glyphs' own (`LineInfo::baseline`), less the span's ascent; its
+/// ascent and descent rounded to a device pixel.
+fn fragments(span: &InlineSpan, layout: &Layout, origin: BoxRect, scale: f32) -> Vec<BoxRect> {
     let (ascent, descent) = metrics(&span.style.for_layout(), scale);
-    let (block_ascent, block_descent) = metrics(&run.style.for_layout(), scale);
-    let lines: Vec<(f32, f32)> = layout
-        .lines()
-        .map(|line| (line.top / scale, line.height / scale))
-        .collect();
+    // the glyphs' baselines (vapors_text's baseline.rs), the one answer
+    let baselines: Vec<f32> = layout.lines().map(|line| line.baseline / scale).collect();
     // An element holding no text still has a box: an empty fragment
     // where it lies, as Chromium gives it.
     let found = if span.range.is_empty() {
@@ -74,10 +64,7 @@ fn fragments(
     found
         .into_iter()
         .map(|fragment| {
-            let (top, height) = lines[fragment.line];
-            let device =
-                baseline_below_top(height * scale, block_ascent * scale, block_descent * scale);
-            let baseline = top + device / scale;
+            let baseline = baselines[fragment.line];
             BoxRect {
                 x: origin.x + fragment.x / scale,
                 y: origin.y + baseline - ascent,
