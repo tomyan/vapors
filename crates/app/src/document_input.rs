@@ -182,7 +182,7 @@ fn point_of(action: Action) -> Option<Point> {
         | Action::TouchMove(_, p)
         | Action::TouchUp(_, p)
         | Action::TouchCancel(_, p) => Some(p),
-        Action::Leave | Action::Pan(_) => None,
+        Action::Leave | Action::Pan(_) | Action::Fling(_) => None,
     }
 }
 

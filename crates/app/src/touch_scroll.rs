@@ -19,6 +19,9 @@ pub(crate) struct TouchScroll {
     fingers: Vec<u64>,
     down: Option<Point>,
     latched: Option<NodeId>,
+    /// The container the last gesture scrolled, once its fingers lifted:
+    /// its fling's.
+    released: Option<NodeId>,
     /// A finger touched since the mouse was last used.
     touching: bool,
     /// The fling under way.
@@ -70,10 +73,12 @@ impl TouchScroll {
         self.end_gesture();
     }
 
-    /// No gesture: the input mode and a fling are kept.
+    /// No gesture: the input mode and a fling are kept, and the
+    /// container the gesture scrolled, for its fling.
     fn end_gesture(&mut self) {
         *self = Self {
             touching: self.touching,
+            released: self.latched,
             fling: self.fling.take(),
             ..Self::default()
         };
@@ -87,6 +92,11 @@ impl TouchScroll {
     /// Whether scroll thumbs are drawn now.
     pub(crate) fn thumbs_shown(&self) -> bool {
         !self.touching || self.latched.is_some() || self.fling.is_some()
+    }
+
+    /// The container the gesture that just ended scrolled, if any.
+    pub(crate) fn released(&self) -> Option<NodeId> {
+        self.released
     }
 
     /// `fling` replaces the one under way.

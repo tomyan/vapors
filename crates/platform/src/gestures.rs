@@ -1,6 +1,7 @@
 //! Touch gestures from raw touches: one finger pans, two fingers pinch
 //! about their midpoint and pan by its movement, a quick still press is a
-//! tap, and the second of a run of taps close together is a double tap.
+//! tap, the second of a run of taps close together is a double tap, and
+//! a lone finger lifting after it panned flings at its velocity.
 //!
 //! Pure: fed each touch with a monotonic time, it returns the gestures
 //! that touch completed. The window module supplies the clock.
@@ -8,6 +9,7 @@
 use std::time::Duration;
 
 use crate::event::{Event, TouchPhase};
+use crate::velocity_tracker::VelocityTracker;
 
 // The numbers follow Android's ViewConfiguration where it has one:
 // DOUBLE_TAP_TIMEOUT is 300 ms, touch slop 8 dp, double-tap slop 100 dp,
@@ -47,6 +49,13 @@ pub struct Gestures {
     press: Option<Press>,
     /// The last tap, until it is too old to pair with.
     last_tap: Option<tap::Tap>,
+    /// The gesture's finger, while it is the only one there has been:
+    /// only it flings. RELAXED: a two-finger pan does not fling, where
+    /// Chromium flings at the fingers' mean velocity unless they moved
+    /// apart; retired when a fixture records one.
+    alone: Option<u64>,
+    /// Its velocity.
+    tracker: VelocityTracker,
     /// A confused stream (a repeated Started, an unknown finger) is
     /// reported once, because it repeats on every event after.
     reported: bool,
@@ -71,7 +80,12 @@ impl Gestures {
         let at = [x, y];
         match phase {
             TouchPhase::Started => self.started(id, at, now),
-            TouchPhase::Moved => self.moved(id, at),
+            TouchPhase::Moved => {
+                if self.alone == Some(id) {
+                    self.tracker.moved(at, now);
+                }
+                self.moved(id, at)
+            }
             TouchPhase::Ended => self.ended(id, at, now),
             TouchPhase::Cancelled => self.cancelled(id),
         }
@@ -83,6 +97,10 @@ impl Gestures {
             self.inconsistent(&format!("touch {id} started while already down"));
         } else {
             self.fingers.push(Finger { id, at });
+        }
+        self.alone = (self.fingers.len() == 1).then_some(id);
+        if self.alone.is_some() {
+            self.tracker.down(at, now);
         }
         self.press = (self.fingers.len() == 1).then_some(Press {
             id,
@@ -122,12 +140,26 @@ impl Gestures {
         }
         self.fingers.retain(|f| f.id != id);
         let Some(press) = self.press.take_if(|p| p.id == id) else {
-            return Vec::new();
+            return self.fling(id, now);
         };
         if now.saturating_sub(press.started) > TAP_TIME || distance(press.at, at) > TAP_SLOP {
             return Vec::new();
         }
         self.tapped(at, press.started, now)
+    }
+
+    /// The lone finger `id` lifted past the tap slop: a fling at its
+    /// velocity, unless it had stopped.
+    fn fling(&mut self, id: u64, now: Duration) -> Vec<Event> {
+        if self.alone.take() != Some(id) {
+            return Vec::new();
+        }
+        self.tracker.up(now);
+        let [vx, vy] = self.tracker.velocity(f32::MAX);
+        if vx == 0.0 && vy == 0.0 {
+            return Vec::new();
+        }
+        vec![Event::Fling { vx, vy }]
     }
 
     fn cancelled(&mut self, id: u64) -> Vec<Event> {
@@ -196,3 +228,7 @@ mod tests;
 #[cfg(test)]
 #[path = "gestures_tap_tests.rs"]
 mod tap_tests;
+
+#[cfg(test)]
+#[path = "gestures_fling_tests.rs"]
+mod fling_tests;
