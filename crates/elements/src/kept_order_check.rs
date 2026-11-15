@@ -55,3 +55,7 @@ fn first_differing_step(kept: &[Step], fresh: &[Step]) -> Option<String> {
         fresh.get(at)
     ))
 }
+
+#[cfg(test)]
+#[path = "kept_order_check_tests.rs"]
+mod tests;

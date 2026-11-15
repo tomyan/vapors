@@ -25,8 +25,11 @@ impl KeptOrder {
     ) -> Self {
         let (steps, labels, runs) = spliced_steps((&self.steps, &self.labels), splice.edits);
         let recent = std::mem::take(&mut self.recent);
-        let ((relabelled, relabel_all), recent) =
-            labelled_runs(&mut self.labels, (labels, runs), (self.spacing, &recent));
+        let ((relabelled, relabel_all), recent) = labelled_runs(
+            &mut self.labels,
+            (labels, runs),
+            (&mut self.spacing, &recent),
+        );
         self.recent = recent;
         self.steps = steps;
         let freed = || changed.freed.iter().map(|&(slot, _)| slot);
@@ -73,10 +76,8 @@ fn spliced_steps(
 ) -> (Vec<Step>, Vec<Label>, Vec<Range<usize>>) {
     edits.sort_by_key(|edit| (edit.at, edit.removed));
     let grown: usize = edits.iter().map(|edit| edit.inserted.len()).sum();
-    let mut out = (
-        Vec::with_capacity(steps.len() + grown),
-        Vec::with_capacity(steps.len() + grown),
-    );
+    let mut out_steps = Vec::with_capacity(steps.len() + grown);
+    let mut out_labels = Vec::with_capacity(steps.len() + grown);
     let mut runs: Vec<Range<usize>> = Vec::new();
     let mut from = 0;
     for edit in edits {
@@ -86,16 +87,17 @@ fn spliced_steps(
              anchors); reproduce with `cargo xtask test`",
             edit.at
         );
-        out.0.extend_from_slice(&steps[from..edit.at]);
-        out.1.extend_from_slice(&labels[from..edit.at]);
-        note_run(&mut runs, out.0.len()..out.0.len() + edit.inserted.len());
-        out.1.extend(std::iter::repeat_n(0, edit.inserted.len()));
-        out.0.extend(edit.inserted);
+        out_steps.extend_from_slice(&steps[from..edit.at]);
+        out_labels.extend_from_slice(&labels[from..edit.at]);
+        let at = out_steps.len();
+        note_run(&mut runs, at..at + edit.inserted.len());
+        out_labels.extend(std::iter::repeat_n(0, edit.inserted.len()));
+        out_steps.extend(edit.inserted);
         from = edit.at + edit.removed;
     }
-    out.0.extend_from_slice(&steps[from..]);
-    out.1.extend_from_slice(&labels[from..]);
-    (out.0, out.1, runs)
+    out_steps.extend_from_slice(&steps[from..]);
+    out_labels.extend_from_slice(&labels[from..]);
+    (out_steps, out_labels, runs)
 }
 
 /// Notes the run `run` of inserted positions, joined to the last when they
@@ -113,12 +115,13 @@ fn note_run(runs: &mut Vec<Range<usize>>, run: Range<usize>) {
 /// `labels` made the spliced `spliced` with each inserted run labelled
 /// (`paint_labels::label_run`, stepping `spacing` at the ends, leaning
 /// on a run the last splice put in, `recent`, when it touches one); the
-/// labels relabelled to make room, the times every label was, and the
-/// labels of each run put in.
+/// kept labels relabelled to make room, the times every label was, and
+/// the labels of each run put in. After a relabel of every label,
+/// `spacing` is theirs.
 fn labelled_runs(
     labels: &mut Vec<Label>,
     (spliced, runs): (Vec<Label>, Vec<Range<usize>>),
-    (spacing, recent): (u64, &[(Label, Label)]),
+    (spacing, recent): (&mut u64, &[(Label, Label)]),
 ) -> ((usize, usize), Vec<(Label, Label)>) {
     *labels = spliced;
     let (mut relabelled, mut all) = (0, 0);
@@ -126,18 +129,38 @@ fn labelled_runs(
         .iter()
         .map(|run| lean_of(labels, run, recent))
         .collect();
-    for (run, lean) in runs.iter().zip(leans) {
-        match crate::paint_labels::label_run(labels, run.clone(), (spacing, lean)) {
+    for (at, (run, lean)) in runs.iter().zip(leans).enumerate() {
+        let pending = &runs[at + 1..];
+        match crate::paint_labels::label_run(labels, (run.clone(), pending), (*spacing, lean)) {
             Relabelled::None => {}
-            Relabelled::Range(range) => relabelled += range.len(),
-            Relabelled::All => (relabelled, all) = (relabelled + labels.len(), all + 1),
+            Relabelled::Range(range) => relabelled += kept_in(&range, &runs),
+            Relabelled::All => {
+                relabelled += kept_in(&(0..labels.len()), &runs);
+                all += 1;
+            }
         }
+    }
+    if all > 0 {
+        // every label laid out afresh, at the spacing for their count.
+        // No test reaches this: a relabel of every label takes about
+        // 7.4e7 labels, (4/3)^63, too many for a unit test's memory.
+        *spacing = crate::paint_labels::spacing(labels.len());
     }
     let put_in = runs
         .iter()
         .map(|run| (labels[run.start], labels[run.end - 1]))
         .collect();
     ((relabelled, all), put_in)
+}
+
+/// How many positions of `range` hold kept steps: not in one of the
+/// `runs` this splice put in, whose labels a relabel sets, not moves.
+fn kept_in(range: &Range<usize>, runs: &[Range<usize>]) -> usize {
+    let overlap = |run: &Range<usize>| {
+        let (start, end) = (run.start.max(range.start), run.end.min(range.end));
+        end.saturating_sub(start)
+    };
+    range.len() - runs.iter().map(overlap).sum::<usize>()
 }
 
 /// Where `run`'s labels lean: on the left when the label before it ends

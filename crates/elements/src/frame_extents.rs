@@ -7,7 +7,7 @@
 //! two binary searches, and every step entirely above or below the view
 //! is outside them. A step with a surface (kept in its batch when
 //! culled) or a bound that is not a number spans every view. Patched
-//! for the steps painted again, shifted or freed, in label when a step
+//! for the steps painted again, shifted or freed, in place when a step
 //! keeps its position; made afresh when paint order is walked or more
 //! steps are patched at once than `REBUILD` allows. A debug build
 //! compares it with one made afresh after every paint

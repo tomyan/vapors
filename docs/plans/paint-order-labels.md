@@ -125,11 +125,13 @@ how a place is made, not how it is read. B changes every reader. So A.
   `KeptOrder.steps`. Refuse otherwise, naming the first two steps out of
   order.
 - The kept-paint check (`kept_paint_check.rs`) compares `DrawnSteps`,
-  `Extents` and the hits with ones made afresh. Made afresh, labels
-  differ, so those comparisons compare by order: each structure's steps
-  in label order against the fresh one's in place order, and each
-  entry's payload (its step, extent, reach, items or hit), so a wrong
-  entry under a right label still fails.
+  `Extents` and the hits with ones made afresh from the kept order and
+  its own labels, so the comparison is exact, labels and payloads (step,
+  extent, reach, items or hit) both. The kept order itself is compared
+  with a walk step by step (`kept_order_check.rs`), whose labels differ
+  and are not compared. That holds for slice 2 too, where the three are
+  patched rather than made afresh: the fresh ones are still made from
+  the kept labels.
 - A relabel that cannot find room (the whole list's labels are packed)
   relabels everything, counted as `paint_relabel_all`: never a silent
   overlap.

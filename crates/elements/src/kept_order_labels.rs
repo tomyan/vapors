@@ -12,6 +12,9 @@ pub(crate) type LabelOf<'a> = &'a dyn Fn(Step) -> Option<Label>;
 impl KeptOrder {
     /// The position along `steps` of the step labelled `label`, or a
     /// panic naming it: the drawing steps label only steps of this order.
+    /// The search needs the labels strictly increasing, which only the
+    /// debug build checks (`kept_order_check.rs`): in a release build a
+    /// duplicate label gives one of its equal steps here, not a panic.
     pub(crate) fn position_of(&self, label: Label) -> usize {
         self.labels.binary_search(&label).unwrap_or_else(|_| {
             panic!(
@@ -21,3 +24,7 @@ impl KeptOrder {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "kept_order_labels_tests.rs"]
+mod tests;

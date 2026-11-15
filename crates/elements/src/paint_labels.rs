@@ -4,8 +4,8 @@
 //! theirs and no later label moves. A walk spaces its labels evenly over
 //! `u64`, `ROOM` spacings free at each end; an append or a prepend steps
 //! by that spacing from the end label; an insert between two takes the
-//! midpoint, or leans on the run put in last when it touches it (`Lean`). When a gap runs out, the
-//! smallest aligned label range around it whose density is under its
+//! midpoint, or leans on the run put in last when it touches it
+//! (`Lean`). When a gap runs out, the smallest aligned label range around it whose density is under its
 //! threshold is relabelled evenly (Bender et al., "Two simplified
 //! algorithms for maintaining order in a list", with T = 1.5, which
 //! leaves room for 10^8 labels in `u64`): amortized O(log n) labels a
@@ -62,7 +62,7 @@ pub(crate) fn afresh(n: usize) -> Vec<Label> {
 #[cfg(test)]
 pub(crate) fn insert(labels: &mut Vec<Label>, at: usize, count: usize, step: u64) -> Relabelled {
     labels.splice(at..at, std::iter::repeat_n(0, count));
-    label_run(labels, at..at + count, (step, Lean::Middle))
+    label_run(labels, (at..at + count, &[]), (step, Lean::Middle))
 }
 
 /// Where in a gap a run's labels go: near the label put in last, when it
@@ -81,12 +81,14 @@ pub(crate) enum Lean {
 /// halving before a relabel.
 const LEAN: u64 = 16;
 
-/// Labels the positions `run` of `labels`, whose others increase, between
-/// the labels around it, leaning as `lean` says and stepping `step` from
-/// an end label: what changed besides the run's labels.
+/// Labels the positions `run` of `labels` between the labels around it,
+/// leaning as `lean` says and stepping `step` from an end label: what
+/// changed besides the run's labels. The labels increase but for `run`
+/// and the `pending` runs after it, unlabelled yet, which a relabel's
+/// search skips and its spread may label.
 pub(crate) fn label_run(
     labels: &mut [Label],
-    run: std::ops::Range<usize>,
+    (run, pending): (std::ops::Range<usize>, &[std::ops::Range<usize>]),
     (step, lean): (u64, Lean),
 ) -> Relabelled {
     if run.is_empty() {
@@ -98,7 +100,7 @@ pub(crate) fn label_run(
         labels[run].copy_from_slice(&new);
         return Relabelled::None;
     }
-    relabel_around(labels, run)
+    relabel_around(labels, run, pending)
 }
 
 /// `count` labels between `before` and `after`: stepped from the end label
@@ -150,14 +152,19 @@ fn between((a, b): (Label, Label), count: u64, lean: Lean) -> Option<Vec<Label>>
 
 /// Relabels the smallest aligned label range around the positions `new`
 /// (put in, unlabelled) whose density is under its threshold, every
-/// label in it spread evenly; every label when none is.
-fn relabel_around(labels: &mut [Label], new: std::ops::Range<usize>) -> Relabelled {
+/// label in it spread evenly; every label when none is. The `pending`
+/// runs, after `new` and unlabelled, are not searched.
+fn relabel_around(
+    labels: &mut [Label],
+    new: std::ops::Range<usize>,
+    pending: &[std::ops::Range<usize>],
+) -> Relabelled {
     let anchor = new.start.checked_sub(1).map_or(0, |i| labels[i]);
     for level in 1..64u32 {
         let size = 1u64 << level;
         let low = anchor & !(size - 1);
         let high = low.saturating_add(size - 1);
-        let range = positions_in(labels, (low, high), &new);
+        let range = positions_in(labels, (low, high), (&new, pending));
         if under_threshold(range.len(), level) {
             spread(&mut labels[range.clone()], low, size);
             return Relabelled::Range(range);
@@ -169,17 +176,36 @@ fn relabel_around(labels: &mut [Label], new: std::ops::Range<usize>) -> Relabell
 }
 
 /// The positions whose labels fall in `low..=high`, the unlabelled `new`
-/// ones among them (they sit where the range's labels are).
+/// ones among them (they sit where the range's labels are), and any of
+/// the unlabelled `pending` runs between those.
 fn positions_in(
     labels: &[Label],
     (low, high): (u64, u64),
-    new: &std::ops::Range<usize>,
+    (new, pending): (&std::ops::Range<usize>, &[std::ops::Range<usize>]),
 ) -> std::ops::Range<usize> {
-    let before = &labels[..new.start];
-    let after = &labels[new.end..];
-    let start = before.partition_point(|&label| label < low);
-    let end = new.end + after.partition_point(|&label| label <= high);
-    start..end
+    let start = labels[..new.start].partition_point(|&label| label < low);
+    start..first_above(labels, high, new.end, pending)
+}
+
+/// The first position from `from` whose label is above `high`, the
+/// `pending` runs skipped, as their placeholders are no labels to
+/// search; `labels.len()` when there is none.
+fn first_above(
+    labels: &[Label],
+    high: u64,
+    mut from: usize,
+    pending: &[std::ops::Range<usize>],
+) -> usize {
+    let end = labels.len()..labels.len();
+    for run in pending.iter().chain(std::iter::once(&end)) {
+        let kept = &labels[from..run.start];
+        let at = kept.partition_point(|&label| label <= high);
+        if at < kept.len() {
+            return from + at;
+        }
+        from = run.end;
+    }
+    labels.len()
 }
 
 /// Spreads `labels` evenly over the `size` labels from `low`.
