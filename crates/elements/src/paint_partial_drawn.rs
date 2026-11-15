@@ -75,7 +75,9 @@ fn hits_patched(painted: &mut Painted, slots: &[usize], spliced: bool) -> HitsCh
 /// `vapors-perf 8 2 --scaling Insert` (an unframed lane, half its boxes
 /// patched per splice) with each path forced (2026-11-15): making the
 /// three afresh costs 518 instructions a box, patching 1,932 a patched
-/// slot, so they cost the same at about 27% of the slots patched.
+/// slot, so they cost the same at about 27% of the slots patched. The
+/// switches and spans that measured it: `measure/4d1-threshold-switches`
+/// (456e8a44), its commit message giving the commands.
 fn many(patched: &[usize], painted: &Painted) -> bool {
     let share = painted.kept_boxes.len() / 4;
     patched.len() > crate::frame_extents::REBUILD.max(share)
