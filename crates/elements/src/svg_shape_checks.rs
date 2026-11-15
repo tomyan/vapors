@@ -39,28 +39,19 @@ pub(crate) fn mark(
     let mut shapes = shapes.borrow_mut();
     let paints = (paths(arena, svg).iter())
         .any(|path| used.get(path).is_some_and(|own| !paints_nothing(own)));
-    if route(arena, used, svg) == Some(Route::Shapes) && shown(arena, used, svg) && paints {
+    if route(arena, used, svg) == Some(Route::Shapes) && shown(used, svg) && paints {
         shapes.svgs.insert(svg, None);
     } else if shapes.svgs.contains_key(&svg) {
         shapes.release(svg);
     }
 }
 
-/// Whether `svg` paints: it is visible, and neither it nor an ancestor
-/// has `display: none`.
-fn shown(arena: &Arena, used: &UsedMap, svg: NodeId) -> bool {
-    let visible = used.get(&svg).is_some_and(|own| own.visible);
-    let mut node = Some(svg);
-    while let Some(at) = node {
-        if used
-            .get(&at)
-            .is_some_and(|own| own.layout.display == taffy::Display::None)
-        {
-            return false;
-        }
-        node = arena.get(at, "svg_shape_checks").parent;
-    }
-    visible
+/// Whether `svg` paints by its own style: visible, and not `display:
+/// none`. An ancestor's `display: none` leaves it no box, which the
+/// check after layout releases (`laid_out_reasons`).
+fn shown(used: &UsedMap, svg: NodeId) -> bool {
+    used.get(&svg)
+        .is_some_and(|own| own.visible && own.layout.display != taffy::Display::None)
 }
 
 impl Document {
@@ -101,6 +92,8 @@ impl Document {
     ) -> Vec<ElementError> {
         let slot = placed.slots.of(Key::Element(svg));
         let found = slot.and_then(|slot| Some((placed.boxes.get(slot)?, *rects.get(slot)?)));
+        // no box: an ancestor has display: none, or the box was built
+        // off the shapes route; either way it paints no shapes
         let Some((layout_box, border_box)) = found.filter(|(b, _)| b.svg_shapes.is_some()) else {
             self.shapes.borrow_mut().release(svg);
             return Vec::new();

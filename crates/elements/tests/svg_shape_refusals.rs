@@ -176,3 +176,28 @@ fn an_svg_under_an_ancestor_made_display_none_releases_its_shapes() {
     // Then: it has no box after layout, so its shapes are released
     assert_eq!(doc.update_counts().shapes_live, 0);
 }
+
+#[test]
+fn an_svg_two_levels_under_an_ancestor_made_display_none_is_released_after_layout() {
+    // Given: div.outer > div.middle > the filled svg, live
+    let (mut doc, svg) = icon(
+        "} .outer.gone { display: none; } .x {",
+        &[],
+        &[("fill", "red")],
+    );
+    let (outer, middle) = (doc.create_element("div"), doc.create_element("div"));
+    doc.set_attribute(outer, "class", "outer");
+    let body = doc.body();
+    doc.append(body, outer);
+    doc.append(outer, middle);
+    doc.append(middle, svg);
+    updated(&mut doc);
+    assert!(doc.update_counts().shapes_live > 0);
+
+    // When: only the outer div changes; the svg is not rechecked
+    doc.set_attribute(outer, "class", "outer gone");
+    updated(&mut doc);
+
+    // Then: it has no box after layout, which releases its shapes
+    assert_eq!(doc.update_counts().shapes_live, 0);
+}

@@ -19,11 +19,20 @@ pub(crate) enum Route {
     Shapes,
 }
 
-/// The route `svg`'s paths take; `None` before its paths are styled.
+/// The route `svg`'s paths take; `None` before the svg is styled.
+///
+/// # Panics
+/// When the svg is styled and a path of it is not: styling gives every
+/// element a used style, as paint relies on.
 pub(crate) fn route(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Route> {
     let own = used.get(&svg)?;
     let mut paths = paths(arena, svg).into_iter();
-    let icon = paths.all(|path| used.get(&path).is_some_and(|path| icon_draws(path, own)));
+    let icon = paths.all(|path| {
+        let path = used.get(&path).unwrap_or_else(|| {
+            panic!("a path of a styled svg has no used style; styling gives every element one")
+        });
+        icon_draws(path, own)
+    });
     Some(if icon { Route::Icon } else { Route::Shapes })
 }
 

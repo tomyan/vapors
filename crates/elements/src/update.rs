@@ -59,9 +59,10 @@ impl Document {
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let mut last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
-        // tessellations made between updates (an acquire outside one) are
-        // not this update's; style and layout refuse before paint, and
-        // paint cannot refuse, so no refused update has tessellated
+        // tessellations made outside this update are not its own: an
+        // acquire between updates, or the shape checks of an update that
+        // was refused after layout (which tessellate before refusing), so
+        // a refused update's tessellations are not counted anywhere
         self.shapes.borrow_mut().cache.take_tessellated();
         self.texts.begin(
             last.as_ref()
