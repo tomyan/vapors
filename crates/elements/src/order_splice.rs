@@ -13,8 +13,12 @@
 //! which is the exact answer. A debug build compares every spliced
 //! order with one walked afresh (`kept_order_check.rs`).
 
+use std::ops::Range;
+
+use rustc_hash::{FxHashMap, FxHashSet};
+
 use crate::changed_slots::ChangedSlots;
-use crate::layout::LayoutBox;
+use crate::layout::{Content, LayoutBox};
 use crate::paint_order::{Stacking, Stackings, Step};
 use crate::splice_decline::SpliceDecline;
 
@@ -58,7 +62,16 @@ pub(crate) fn plan(
     let [reshaped] = changed.reshaped.as_slice() else {
         return Err(Declined::NotOneOwner);
     };
-    let children = Children::of(&boxes[reshaped.slot].children, reshaped);
+    let (owner, old) = (&reshaped.slot, &reshaped.old_all);
+    let children = Children {
+        owner: *owner,
+        new: &boxes[*owner].children,
+        old: old
+            .iter()
+            .enumerate()
+            .map(|(rank, &slot)| (slot, rank))
+            .collect(),
+    };
     let mut splice = Splice::default();
     for run in children.inserted_runs(boxes)? {
         let below = in_flow_subtrees(boxes, stackings, children.owner, &children.new[run.clone()])?;
@@ -85,6 +98,43 @@ pub(crate) fn plan(
     }
     splice.edits.extend(removals(changed, place));
     Ok(splice)
+}
+
+/// The reshaped slot's children now, and the place each slot had among
+/// the children the slot held.
+struct Children<'a> {
+    owner: usize,
+    new: &'a [usize],
+    old: FxHashMap<usize, usize>,
+}
+
+impl Children<'_> {
+    /// The runs of `new` not in `old`, as ranges of `new`; `Declined`
+    /// when the slots in both are not in the same order, or a slot of
+    /// `old` not in `new` still holds a box (it moved to another parent).
+    fn inserted_runs(&self, boxes: &[LayoutBox]) -> Result<Vec<Range<usize>>, Declined> {
+        let now: FxHashSet<usize> = self.new.iter().copied().collect();
+        let moved =
+            |slot: &usize| !now.contains(slot) && !matches!(boxes[*slot].content, Content::Vacant);
+        if self.old.keys().any(moved) {
+            return Err(Declined::Moved);
+        }
+        let mut runs: Vec<Range<usize>> = Vec::new();
+        let mut last_rank = None;
+        for (at, slot) in self.new.iter().enumerate() {
+            match (self.old.get(slot), runs.last_mut()) {
+                (Some(rank), _) if last_rank < Some(rank) => last_rank = Some(rank),
+                (Some(_), _) => return Err(Declined::Reordered),
+                (None, Some(run)) if run.end == at => run.end = at + 1,
+                (None, _) => runs.push(at..at + 1),
+            }
+        }
+        Ok(runs)
+    }
+
+    fn kept(&self, slot: usize) -> bool {
+        self.old.contains_key(&slot)
+    }
 }
 
 /// The freed slots' box and outline steps taken out (after every decline
@@ -154,7 +204,3 @@ fn placed(place: Place<'_>, step: Step) -> usize {
 
 #[path = "order_splice_anchors.rs"]
 mod anchors;
-
-#[path = "order_splice_children.rs"]
-mod children;
-use children::Children;

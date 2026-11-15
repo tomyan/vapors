@@ -16,6 +16,8 @@ pub(crate) struct Reshaped {
     pub(crate) shared: Shared,
     /// The children the old box had between those.
     pub(crate) old_between: Vec<usize>,
+    /// Every child the old box had, for slice 1's splice plan.
+    pub(crate) old_all: Vec<usize>,
 }
 
 /// The box at `slot` with the children it replaced, when they differ;
@@ -34,6 +36,7 @@ pub(super) fn reshaped(boxes: &[LayoutBox], slot: usize, taken: &Taken) -> Optio
         slot,
         shared,
         old_between,
+        old_all: old.to_vec(),
     })
 }
 
