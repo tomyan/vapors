@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fling recorder</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 16px system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #bar { flex: none; padding: 8px 12px; background: #171b1f; color: #e4e8ec; }
+  #list { flex: 1; overflow-y: auto; }
+  .row { height: 48px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #dde1e5; }
+  .row:nth-child(even) { background: #f3f5f7; }
+</style>
+</head>
+<body>
+<div id="bar">Fling the list, slow to fast; each is saved when the list stops. <span id="saved">0 saved</span></div>
+<div id="list"></div>
+<script>
+// Records Chrome's own fling on a native overflow list (vapors' oracle
+// for touch momentum, brief-momentum.md step 1): every touch event with
+// its timeStamp and clientY, and every animation frame with the list's
+// scrollTop, both on the performance.now() clock. A recording runs from
+// a touchstart to 500 ms after the list last moved once the finger is
+// up, and is POSTed to save beside this page.
+const list = document.getElementById('list');
+for (let i = 0; i < 400; i++) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.textContent = 'Row ' + i;
+  list.appendChild(row);
+}
+let events = null, fingerUp = false, lastMove = 0, lastTop = 0, saved = 0;
+const touch = (e) => {
+  if (e.type === 'touchstart' && (events === null || fingerUp)) {
+    if (events !== null) save('interrupted');
+    events = []; fingerUp = false;
+  }
+  if (events === null) return;
+  const t = e.changedTouches[0];
+  events.push({ kind: e.type, t: e.timeStamp, id: t.identifier, x: t.clientX, y: t.clientY, touches: e.touches.length });
+  if (e.touches.length === 0) fingerUp = true;
+};
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+  list.addEventListener(type, touch, { passive: true });
+}
+list.addEventListener('scrollend', (e) => events && events.push({ kind: 'scrollend', t: e.timeStamp, top: list.scrollTop }));
+const frame = (now) => {
+  if (events !== null) {
+    const top = list.scrollTop;
+    events.push({ kind: 'frame', t: now, top });
+    if (top !== lastTop) { lastMove = now; lastTop = top; }
+    if (fingerUp && now - lastMove > 500) save('stopped');
+  }
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);
+function save(ended) {
+  const body = JSON.stringify({
+    ended,
+    userAgent: navigator.userAgent,
+    devicePixelRatio: devicePixelRatio,
+    viewport: [innerWidth, innerHeight],
+    list: { height: list.clientHeight, scrollHeight: list.scrollHeight, rowHeight: 48 },
+    events,
+  });
+  events = null; fingerUp = false;
+  fetch('save', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    .then((r) => { if (!r.ok) throw new Error('save answered ' + r.status); saved += 1; document.getElementById('saved').textContent = saved + ' saved'; })
+    .catch((error) => { document.getElementById('saved').textContent = 'NOT SAVED: ' + error.message; });
+}
+</script>
+</body>
+</html>
