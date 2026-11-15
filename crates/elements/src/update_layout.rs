@@ -151,6 +151,7 @@ impl Document {
         };
         changed.started = written.started.iter().filter(framed).copied().collect();
         changed.scroll_states = done.states_changed;
+        changed.reframed = done.reframed;
         self.made_from(placement, viewport.scale)
     }
 

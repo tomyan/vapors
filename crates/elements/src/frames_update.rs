@@ -38,6 +38,7 @@ impl Frames {
         for slot in ordered {
             let outer = inputs.clips.frame(slot);
             frames.nested.entry(outer).or_default().push(slot);
+            frames.outer.insert(slot, outer);
             frames.work_out(slot, inputs);
             frames
                 .entered
@@ -62,7 +63,7 @@ impl Frames {
         let mut done = FxHashSet::default();
         let mut moved = false;
         for start in starts {
-            self.assert_held(start);
+            self.assert_held(start, inputs);
             self.enter_again(start, inputs);
             moved |= self.descend(start, inputs, &mut done);
         }
@@ -111,7 +112,7 @@ impl Frames {
         let mut moved = false;
         let mut open = vec![start];
         while let Some(slot) = open.pop() {
-            self.assert_held(slot);
+            self.assert_held(slot, inputs);
             if !done.insert(slot) || !self.work_out(slot, inputs) {
                 continue;
             }
@@ -125,13 +126,24 @@ impl Frames {
         moved
     }
 
-    /// Panics, naming `slot`, when these frames were not made for it.
-    fn assert_held(&self, slot: usize) {
+    /// Panics, naming `slot`, when these frames were not made for it, or
+    /// were made with it in another outer frame: its frame and the
+    /// nested lists and indexes it is in would be the old frame's.
+    fn assert_held(&self, slot: usize, inputs: &FrameInputs<'_>) {
+        let made = self.outer.get(&slot).copied();
         assert!(
-            self.by_frame.contains_key(&slot) || self.relative.contains_key(&slot),
+            made.is_some(),
             "scroll container slot {slot} is updated but the kept frames were not made for it: \
              the kept frames and the stackings disagree on the scroll containers (paint_frames.rs \
              makes them afresh whenever paint order is walked or spliced); reproduce with \
+             `cargo xtask test`"
+        );
+        let now = inputs.clips.frame(slot);
+        assert!(
+            made == Some(now),
+            "scroll container slot {slot} is updated in frame {now} but the kept frames were made \
+             with it in frame {made:?}: a lane's framing flipped with the frames kept \
+             (paint_frames.rs makes them afresh when `ChangedSlots::reframed`); reproduce with \
              `cargo xtask test`"
         );
     }
@@ -140,6 +152,11 @@ impl Frames {
     /// part under a lane frame; whether it came out different.
     fn work_out(&mut self, slot: usize, inputs: &FrameInputs<'_>) -> bool {
         let outer = inputs.clips.frame(slot);
+        assert_ne!(
+            outer, slot,
+            "scroll frame {slot} would be in itself: it is a lane frame too (frames_check.rs \
+             `assert_scrollers_agree`); reproduce with `cargo xtask test`"
+        );
         let own = (inputs.shift)(slot);
         if self.under_lane(outer, inputs.lane_frame) {
             let inner = inputs.clips.inner(slot);

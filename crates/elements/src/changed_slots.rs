@@ -31,6 +31,10 @@ pub(crate) struct ChangedSlots {
     /// from when it was last settled (exact): their thumbs move, even
     /// when no slot is built or moved and no offset as applied moved.
     pub(crate) scroll_states: Vec<usize>,
+    /// A lane's children became frames of their own or stopped being
+    /// (`Placed::reframed`): scroll containers in them are in other
+    /// frames, so the scroll frames are made afresh (`paint_frames.rs`).
+    pub(crate) reframed: bool,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are
     /// spliced (`order_splice.rs`) or walked again (`kept_order.rs`).
@@ -60,6 +64,7 @@ impl ChangedSlots {
             offsets_moved: Vec::new(),
             started: Vec::new(),
             scroll_states: Vec::new(),
+            reframed: false,
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
@@ -78,6 +83,7 @@ impl ChangedSlots {
             offsets_moved: Vec::new(),
             started: Vec::new(),
             scroll_states: Vec::new(),
+            reframed: false,
             shape_changed: true,
             reshaped: Vec::new(),
             stackings: Patched {

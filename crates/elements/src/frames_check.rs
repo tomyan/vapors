@@ -26,6 +26,14 @@ pub(crate) fn assert_scrollers_agree(
              reproduce with `cargo xtask test`"
         );
     }
+    if let Some(slot) = scrollers.iter().find(|&&slot| lane_frame(slot)) {
+        panic!(
+            "slot {slot} is both a scroll frame and a lane frame, which frames name by slot: \
+             a lane whose child scrolls is declined (`LaneFrameScrollingChild`, lane_frame.rs), \
+             and the decline and paint disagree on whether it scrolls; reproduce with \
+             `cargo xtask test`"
+        );
+    }
     if cfg!(debug_assertions) {
         let named = (0..clips.len()).map(|slot| (slot, clips.frame(slot)));
         let stray = named

@@ -36,7 +36,7 @@ fn gpu_the_rows_pages_idle_frame_draws_the_rows_in_view_only() {
     // text are two runs instead of the button's text joining the next
     // row's label. 4f batches across lane frames (the lane shift as
     // per-instance data), which puts this back to 1 + (in view - 1) + 1
-    // unclipped runs, 35 texts in all.
+    // unclipped runs.
     let unclipped_runs = 2 * in_view;
     // One run per value in view.
     let texts = unclipped_runs + in_view;

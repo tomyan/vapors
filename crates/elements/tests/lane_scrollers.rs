@@ -149,11 +149,13 @@ fn a_scroll_of_a_scroller_nested_in_a_framed_row_moves_it_alone() {
     let page = scrolling_rows(true);
     page.edited(view(), |page| _ = page.insert_at(3));
 
-    // When: the outer one scrolled, then the nested one
-    page.edited(view(), |page| {
+    // When: the outer one scrolled, which works out its frame alone (the
+    // one nested in it keeps its own part), then the nested one
+    let outer = page.edited(view(), |page| {
         let node = scroller(page, 5, false);
         assert!(page.doc.borrow_mut().scroll_node_by(node, [0.0, 5.0]));
     });
+    assert_eq!(outer.scroll_frames_worked, 1, "{outer:?}");
     let counts = page.edited(view(), |page| {
         let node = scroller(page, 5, true);
         assert!(page.doc.borrow_mut().scroll_node_by(node, [0.0, 7.0]));
@@ -209,4 +211,66 @@ fn a_row_made_a_scroller_declines_its_list() {
         "{counts:?}"
     );
     assert_drawn_afresh(&page.doc, view(), "after the row scrolls");
+}
+
+#[test]
+fn a_list_framed_by_an_edit_that_neither_walks_nor_splices_keeps_its_scrollers_frames() {
+    // Given: nested scrollers in every row, one row half a pixel taller,
+    // so the list is declined (`LaneFramePixel`)
+    let page = scrolling_rows(true);
+    let css = "body { margin: 0; } .row.half { height: 20.5px; }";
+    page.doc
+        .borrow_mut()
+        .add_stylesheet("half.css", css)
+        .expect("parses");
+    page.edited(view(), |page| {
+        page.doc
+            .borrow_mut()
+            .set_attribute(page.rows[50], "class", "row half");
+    });
+
+    // When: the row made whole again, a restyle that keeps the shape, so
+    // the list is framed with no walk or splice
+    let counts = page.edited(view(), |page| {
+        page.doc
+            .borrow_mut()
+            .set_attribute(page.rows[50], "class", "row");
+    });
+    assert_eq!(counts.lane_unframed, None, "{counts:?}");
+    assert_eq!(
+        (counts.order_walks, counts.order_splices),
+        (0, 0),
+        "{counts:?}"
+    );
+
+    // Then: an insert above and a scroll of a row's scroller still put
+    // every frame where a full update does
+    page.edited(view(), |page| _ = page.insert_at(3));
+    page.edited(view(), |page| {
+        let node = scroller(page, 5, true);
+        assert!(page.doc.borrow_mut().scroll_node_by(node, [0.0, 7.0]));
+    });
+    assert_drawn_afresh(
+        &page.doc,
+        view(),
+        "after the flip, the insert and the scroll",
+    );
+}
+
+#[test]
+fn a_list_whose_rows_clip_their_overflow_is_framed() {
+    // Given: rows that hide their overflow, which makes no scroll frame
+    let page = header_list(
+        100,
+        &format!("{ROWS} {CSS} .row {{ overflow: hidden; }}"),
+        view(),
+    );
+
+    // When
+    let counts = page.edited(view(), |page| _ = page.insert_at(3));
+
+    // Then
+    assert_eq!(counts.lane_unframed, None, "{counts:?}");
+    assert!(counts.boxes_moved <= 3, "{counts:?}");
+    assert_drawn_afresh(&page.doc, view(), "after the insert");
 }

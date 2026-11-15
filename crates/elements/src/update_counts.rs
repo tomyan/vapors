@@ -169,6 +169,11 @@ pub struct UpdateCounts {
     /// whole device pixels before and after, its edges snapping as
     /// they did, moved.
     pub boxes_shifted: usize,
+    /// Scroll frames this update worked out (`paint_frames.rs`): every
+    /// one when they were made afresh, else those whose container
+    /// scrolled or whose clips were redone and the frames nested in them,
+    /// stopping at a frame kept by its own part (`frames_relative.rs`).
+    pub scroll_frames_worked: usize,
     /// Boxes whose kept paint paint read and kept rather than drew:
     /// those moved or whose clip was worked out again, but whose paint
     /// was made from the same rect, clip and padding (IU3 3c-3d2). The

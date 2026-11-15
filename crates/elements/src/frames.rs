@@ -37,6 +37,8 @@ pub(crate) struct Frames {
     /// on read (`frames_relative.rs`); none of them is in `by_frame`.
     relative: FxHashMap<usize, Relative>,
     nested: FxHashMap<usize, Vec<usize>>,
+    /// The frame each scroll container was in when these were made.
+    outer: FxHashMap<usize, usize>,
     index: FxHashMap<usize, NestedIndex>,
     entered: FxHashMap<usize, Option<Rect>>,
     /// The lane frames, resolved on read (`frames_lane.rs`).
@@ -72,6 +74,7 @@ impl Frames {
             by_frame: std::iter::once((PAGE, page)).collect(),
             relative: FxHashMap::default(),
             nested: FxHashMap::default(),
+            outer: FxHashMap::default(),
             index: FxHashMap::default(),
             entered: FxHashMap::default(),
             lanes: LaneFrames::default(),

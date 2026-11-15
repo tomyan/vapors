@@ -29,6 +29,7 @@ impl UpdateCounts {
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
         self.boxes_shifted = painted.boxes_shifted;
+        self.scroll_frames_worked = painted.frames_worked;
         self.parts_visited_kept = painted.parts_visited_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;

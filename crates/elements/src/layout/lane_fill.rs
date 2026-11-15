@@ -94,8 +94,9 @@ impl BoxTree<'_> {
         lane: &mut Lane<K>,
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
-        let overflow = self.boxes[slot].style.overflow;
-        let scrolls = overflow.x.is_scroll_container() || overflow.y.is_scroll_container();
+        // as paint asks it (`UsedStyle::scrolls`): `overflow: hidden`
+        // clips but makes no scroll frame, so it does not decline
+        let scrolls = self.boxes[slot].style.overflow.x == taffy::Overflow::Scroll;
         lane.facts.note(slot, &layout, self.scale, scrolls);
         lane.pending.insert(slot, layout);
         if K::reads_heights(&self.boxes[slot].style) {

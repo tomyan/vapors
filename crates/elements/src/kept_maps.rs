@@ -49,21 +49,19 @@ fn patch(painted: &mut Painted, placed: Placed<'_>, changed: &ChangedSlots) -> u
         .iter()
         .filter(|(_, key)| remove(painted, *key))
         .count();
-    let redone = &placed.2.redone;
-    let mut slots: Vec<usize> = changed
-        .rebuilt
-        .iter()
-        .chain(&changed.moved)
-        .chain(redone)
-        .copied()
-        .collect();
+    let slots = patched_slots(changed, &placed.2.redone);
+    let put = slots.into_iter().filter(|&slot| put(painted, placed, slot));
+    removed + put.count()
+}
+
+/// The rebuilt and moved slots and those whose clips were `redone`,
+/// each once, in slot order.
+fn patched_slots(changed: &ChangedSlots, redone: &[usize]) -> Vec<usize> {
+    let all = changed.rebuilt.iter().chain(&changed.moved).chain(redone);
+    let mut slots: Vec<usize> = all.copied().collect();
     slots.sort_unstable();
     slots.dedup();
-    removed
-        + slots
-            .into_iter()
-            .filter(|&slot| put(painted, placed, slot))
-            .count()
+    slots
 }
 
 /// Removes an element's entries; whether `key` is an element's.
