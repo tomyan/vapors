@@ -40,6 +40,8 @@ button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px sol
 .two { color: #27ae60; }
 .three { color: #2980b9; }
 .lit { color: #f1c40f; }
+/* the group's 3D hover (C4): the pointer over any of its cubes */
+.spin:hover .two { color: #e67e22; }
 .gone { visibility: hidden; }
 </style>
 
@@ -48,7 +50,7 @@ button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px sol
   <Scene scene={scene} surface={surface} camera={eye}>
     <Camera handle={eye} projection={lens} transform={looking()} />
     <Mesh geometry={ground.clone()} class="ground" transform={at(0.0, -0.5, 0.0)} />
-    <Group transform={turning(time)}>
+    <Group class="spin" transform={turning(time)}>
       <Mesh geometry={cube.clone()} class="one" class:lit={lit1.get()} transform={at(-2.0, 0.0, 0.0)} />
       <Mesh geometry={cube.clone()} class="two" class:lit={lit2.get()} transform={at(0.0, 0.0, 0.0)} />
       <Mesh geometry={cube.clone()} class="three" class:lit={lit3.get()} class:gone={gone(time.get())} transform={at(2.0, 0.0, 0.0)} />

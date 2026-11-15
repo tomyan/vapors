@@ -63,7 +63,9 @@ let surface = app.mount("view", Box::new(renderer))?;
   `GeometryHandle`: a counted claim, cloned to share and not `Copy`
   (lead decision (B), 2026-11-14). A mesh node holds a clone in
   `NodeKind::Mesh`, so a piece is held while the application keeps a
-  handle or any mesh node names it. Once the last handle is dropped,
+  handle or any mesh node names it. A handle shares the piece itself
+  (`GeometryHandle::geometry`), so `pick` reads a node's triangles
+  through its handle and needs no `Meshes` (lead decision, C4c). Once the last handle is dropped,
   `Meshes::release_unclaimed` releases it; each render runs that sweep
   and drops the renderer's buffers for every released piece
   (`RendererLog::made` and `freed` of `Resource::Geometry` count them). A
@@ -93,7 +95,7 @@ own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 
 ## Picking
 
-`pick(scene, meshes, PickAt { point, size }, skip)` returns the nearest
+`pick(scene, PickAt { point, size }, skip)` returns the nearest
 visible mesh under a surface point, or `None`
 (`vapors-scene3d/src/pick.rs`). It casts a ray from the active camera
 through the point, using the same view-projection the renderer draws
@@ -109,8 +111,8 @@ picks nothing.
 It refuses (`PickError`): a size that is not finite and positive, a
 point that is not finite, no resolvable active camera, a projection
 refused at the surface's aspect, a camera whose view-projection or its
-inverse is not finite, a visible mesh whose world matrix has no finite
-inverse, and a mesh whose geometry the `Meshes` does not hold.
+inverse is not finite, and a visible mesh whose world matrix has no
+finite inverse.
 
 It runs once per pointer move, not per frame. Cost grows linearly with
 mesh count. Figures from `cargo run --release -p vapors-scene3d

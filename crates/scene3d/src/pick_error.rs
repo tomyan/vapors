@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::{CameraError, GeometryId, NodeId, StoreError};
+use crate::{CameraError, NodeId, StoreError};
 
 /// Why nothing could be picked.
 #[derive(Clone, Debug, PartialEq)]
@@ -20,13 +20,6 @@ pub enum PickError {
     MeshNotInvertible(NodeId),
     /// A node read failed.
     Store(StoreError),
-    /// A mesh names geometry its `Meshes` does not hold.
-    GeometryNotHeld {
-        /// The mesh node.
-        node: NodeId,
-        /// The geometry it names.
-        geometry: GeometryId,
-    },
 }
 
 impl From<StoreError> for PickError {
@@ -62,10 +55,6 @@ impl fmt::Display for PickError {
                 "mesh {node}'s world matrix has no finite inverse, so it cannot be picked: give it and its ancestors transforms of moderate magnitude"
             ),
             Self::Store(error) => write!(f, "nothing can be picked: {error}"),
-            Self::GeometryNotHeld { node, geometry } => write!(
-                f,
-                "mesh {node} names {geometry}, which its Meshes does not hold: pick with the Meshes the scene's renderer draws from"
-            ),
         }
     }
 }

@@ -40,6 +40,14 @@
 //! that is not a node component, inside `<Scene>` or `<Group>`, is
 //! refused: the anchor would hide it.
 //!
+//! A `<Scene>` answers the pointer's hits on its surface
+//! (`Dom::watch_hits`, docs/plans/css-for-3d.md C4): the mesh `pick`
+//! finds through the camera is the target as its anchor, so `:hover`,
+//! `:active`, `cursor` and pointer events reach mesh anchors and bubble
+//! through the group and scene anchors. A mesh whose anchor's
+//! `pointer-events` is `none` or which is hidden is passed over, and a
+//! transform change tells the document the hits moved.
+//!
 //! Disposing a component's owner (an `{if}` hiding it, a `{for}`
 //! dropping its row, `unmount`) removes its node and the subtree under
 //! it, and invalidates the surface. Keeping identity across a keyed
@@ -49,6 +57,7 @@ mod camera;
 mod children;
 mod component;
 mod group;
+mod hits;
 mod mesh;
 mod node;
 mod own_keys;

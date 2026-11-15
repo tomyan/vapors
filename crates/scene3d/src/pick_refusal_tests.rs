@@ -1,9 +1,7 @@
 //! What `pick` refuses rather than answering "nothing here".
 
-use super::stage::{Stage, at, at_z, ortho, unit_square};
-use crate::{
-    CameraError, Meshes, PickAt, PickError, Quat, Scene, StoreError, Transform, Vec3, pick,
-};
+use super::stage::{Stage, at_z, ortho};
+use crate::{CameraError, PickAt, PickError, Quat, Scene, StoreError, Transform, Vec3, pick};
 
 #[test]
 fn a_scene_without_a_camera_is_refused() {
@@ -14,7 +12,7 @@ fn a_scene_without_a_camera_is_refused() {
     };
 
     // When
-    let refused = pick(&mut Scene::new(), &Meshes::new(), at, |_| false);
+    let refused = pick(&mut Scene::new(), at, |_| false);
 
     // Then
     let expected = PickError::Camera(CameraError::Store(StoreError::NoCamera));
@@ -131,19 +129,4 @@ fn a_visible_mesh_with_no_finite_inverse_is_refused_naming_it() {
             "scale {scale}"
         );
     }
-}
-
-#[test]
-fn a_mesh_naming_geometry_its_meshes_does_not_hold_is_refused_naming_both() {
-    // Given: geometry from another Meshes
-    let mut stage = Stage::new();
-    let foreign = unit_square(&mut Meshes::new(), 1.0);
-    let geometry = foreign.id();
-    let node = stage.mesh_at(foreign, at(Vec3::ZERO));
-
-    // When
-    let refused = stage.try_pick([50.0, 50.0]);
-
-    // Then
-    assert_eq!(refused, Err(PickError::GeometryNotHeld { node, geometry }));
 }

@@ -605,7 +605,7 @@ at the mesh, naming the declaration where it has one. Risk 2's note is
 built: `wisp-check` prints a note for each `<Mesh>` that no rule of its
 file, nor its literal `style`, can colour (`scene_notes.rs`).
 
-C4 as built (C4a, C4b; C4c pending): C4a is `vapors_scene3d::pick`
+C4 as built (C4a to C4c): C4a is `vapors_scene3d::pick`
 (`docs/scene3d.md`, Picking, with its cost against mesh count). C4b
 routes hits in vapors-elements, which does not know the scene:
 `Dom::watch_hits(scene anchor, surface name, source)` keeps a source per
@@ -631,7 +631,20 @@ target and are refused by the next update (once per message), which
 `SceneUsed` cursor. `Dom::hits_moved(scene anchor)` makes the next
 update test the hover again when the pointer is over that surface or
 one of the scene's anchors, and does nothing otherwise; a still scene
-under a still pointer tests nothing. The document does the same itself
+under a still pointer tests nothing. C4c: `<Scene>` watches its hits
+on its surface before its children mount; its source runs `pick` with
+a skip of every node no `<Mesh>` mounted and every mesh whose anchor
+does not take the pointer, and answers the picked node's anchor; a
+refused pick is its error. Each transform write calls `hits_moved`.
+`<Scene>` takes no `meshes` prop (lead decision, 2026-11-15): a
+`GeometryHandle` shares its piece's `Geometry` with the `Meshes`
+(`Rc`), which holds it while `held_by_a_handle` (a strong count above
+its own one) says so, so `pick` reads each node's triangles through
+its handle and no prop can be forgotten. The other required props,
+still `Option`s refused at mount, are issue #392. The one-scene
+example's group is `.spin`, and `.spin:hover .two` colours the middle
+cube while its script rests the pointer over the middle of the surface
+(every other 10 s); `confirm` and a pixel test hold it. The document does the same itself
 when a watched scene is removed, and when a restyle changes whether one
 of its anchors takes the pointer, since an anchor has no box for the
 changed hits to name. `Document::cursor` and the hover

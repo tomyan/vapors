@@ -38,9 +38,19 @@ fn every_kind_of_change_is_named_in_the_frame_it_is_due() {
     // Then
     assert_eq!(names(125), "click light 1");
     assert_eq!(names(313), "cube 3 hidden");
-    assert_eq!(names(625), "click light 2, cube 3 shown");
+    assert_eq!(
+        names(625),
+        "click light 2, cube 3 shown, pointer over the cubes"
+    );
+    assert_eq!(
+        names(1250),
+        "click light 1, cube 3 shown, pointer off the cubes"
+    );
     assert_eq!(names(938), "cube 3 hidden, night on");
-    assert_eq!(names(1875), "click light 3, cube 3 shown, night off");
+    assert_eq!(
+        names(1875),
+        "click light 3, cube 3 shown, night off, pointer over the cubes"
+    );
     assert_eq!(names(1), "");
 }
 
@@ -49,4 +59,28 @@ fn the_group_turns_with_the_clock() {
     // Then
     assert!(turn(Duration::ZERO).abs() < f32::EPSILON);
     assert!((turn(Duration::from_secs(2)) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn the_pointer_rests_over_the_cubes_in_every_other_ten_seconds() {
+    // Then
+    assert!(!pointing(Duration::from_millis(9_999)) && pointing(Duration::from_secs(10)));
+    assert!(!pointing(Duration::from_secs(20)) && pointing(Duration::from_secs(30)));
+}
+
+#[test]
+fn the_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
+    // Given: frame 1100 (17.6 s) is in the pointer's window, light 2
+    // lit by the click at frame 1000
+    let now = expected(1100);
+
+    // Then
+    assert!(now.hovered && now.lit[1]);
+    assert_eq!(now.cube(1), (CRAFT_HOVER, true));
+    assert_eq!(
+        now.cube(0).0,
+        LIT,
+        "light 1, lit at frame 875, is not hovered"
+    );
+    assert_eq!(expected(500).cube(1).0, LIT);
 }

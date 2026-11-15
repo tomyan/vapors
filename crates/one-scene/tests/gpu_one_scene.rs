@@ -32,10 +32,13 @@ const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 64 + 112;
 /// The surface's own draw in the composition, beside the meshes'.
 const COMPOSITION_DRAWS: u64 = 1;
 
-/// Frame `index` of the run at the frame clock's time, into a small
-/// target; what it asked for next and the scene's work.
+/// Frame `index` of the run at the frame clock's time; what it asked
+/// for next and the scene's work.
 fn frame(scene: &mut OneScene, gpu: &Gpu, start: Instant, index: usize) -> (Next, GpuWork) {
-    let texture = clear(&gpu.device, &gpu.queue, 320, 200, Color::default());
+    // the page's default viewport: smaller, the HUD covers the middle
+    // of the scene, where the script rests the pointer
+    let [width, height] = vapors_pixels::DEFAULT_VIEWPORT;
+    let texture = clear(&gpu.device, &gpu.queue, width, height, Color::default());
     let next = scene.frame(&Frame {
         adapter: &gpu.adapter,
         device: &gpu.device,

@@ -21,9 +21,10 @@ const THROUGH: [f32; 2] = [50.0, 50.0];
 
 fn main() {
     for count in COUNTS {
-        let (mut scene, meshes, nearest) = column(count);
-        let beside = time(&mut scene, &meshes, BESIDE, None);
-        let through = time(&mut scene, &meshes, THROUGH, Some(nearest));
+        // the Meshes is kept as an app keeps it; pick reads the handles
+        let (mut scene, _meshes, nearest) = column(count);
+        let beside = time(&mut scene, BESIDE, None);
+        let through = time(&mut scene, THROUGH, Some(nearest));
         println!(
             "pick_cost: {count} meshes: bounds only median {:?} p95 {:?}; every triangle median {:?} p95 {:?}",
             beside.0, beside.1, through.0, through.1
@@ -33,12 +34,7 @@ fn main() {
 
 /// The median and 95th percentile of 200 picks at `point`, failing
 /// loudly when the pick refuses or picks other than `expect`.
-fn time(
-    scene: &mut Scene,
-    meshes: &Meshes,
-    point: [f32; 2],
-    expect: Option<NodeId>,
-) -> (Duration, Duration) {
+fn time(scene: &mut Scene, point: [f32; 2], expect: Option<NodeId>) -> (Duration, Duration) {
     let at = PickAt {
         point,
         size: [100.0, 100.0],
@@ -46,7 +42,7 @@ fn time(
     let mut times = Vec::new();
     for round in 0..220 {
         let started = Instant::now();
-        let picked = pick(scene, meshes, at, |_| false).unwrap_or_else(|error| fail(&error));
+        let picked = pick(scene, at, |_| false).unwrap_or_else(|error| fail(&error));
         if round >= 20 {
             times.push(started.elapsed());
         }
