@@ -1093,6 +1093,7 @@ slice below measures its cause again before its code.
 | Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
 | Insert accessibility | about 4720 (FlexInsert about 1800) | `accessibility`: the take reads every started row again, as a record's bounds are from its parent node (section 5.3), and makes the take's index afresh (`AxIndex::of`) | 4i |
 | Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
+| Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
 
 The slices:
 
@@ -1126,11 +1127,26 @@ The slices:
   is kept in blocks, as the extents index's entries are (`blocks.rs`),
   so a removal or insert moves one block. Accepted when `paint` is
   within 2% across sizes on remove frames too.
+- **4k. Rows of fractional height framed.** A row's frame shift is its
+  start in device pixels rounded as an item's edge is (half up), and the
+  row's items are painted from that whole origin, so a row is snapped
+  as a unit rather than each item on the page. An item can then land a
+  pixel from where snapping it on the page puts it. Chromium snaps a
+  box's paint offset before its contents, so the first step is the
+  Chromium paint comparisons on a fractional-row page, framed and
+  declined. If framed rows match Chromium as well as declined rows do,
+  4k frames them; if not, they stay declined. In that case the plan
+  records the cost (every term above, per row, for such lists) and the
+  nightly scaling run reports a fractional-row page. Accepted when the
+  comparisons show no new difference, and `--scaling` on a 19.2 px row
+  page meets the exit checks the whole-row pages meet.
 
-Order: 4f-2 and 4f-3 first (the fold's required terms, already
-designed), then 4g (scroll is what a reader feels, and its term is the
-largest outside accessibility), 4h, 4i (the largest term, and a change
-to the mirror's bounds, so after the layout terms are out of the
-measurements), and 4j last (the smallest). Each slice is a stacked pull
-request with its own exit check in the 11.3 form, and the fold is gated
-once all of them are in.
+Order and fold (the lead, on #402):
+- 4f-2 and 4f-3 first: the fold's required terms, already designed.
+- **Then fold and gate.** That happens once 4f-3 is in and its checks pass: the correctness checks unchanged, and no phase worse than main at 1000, 3000 and 10000 rows. The terms left are reported in the fold's PR and pinned in the nightly scaling run as reported, not judged. The stack does not wait for 4j, which would put about 13 stacked PRs between main and the gains.
+- After the fold, each slice lands on main as an ordinary PR with its own exit check in the 11.3 form, in this order:
+  - **4g**, as scroll is what a reader feels;
+  - **4i**, the largest term by far. The phases are measured apart, so the layout terms do not confound it.
+  - **4h**;
+  - **4j**, the smallest;
+  - **4k**, which starts with the Chromium evidence and may end with the decline kept and its cost recorded.
