@@ -63,7 +63,7 @@ fn a_path_changed_after_the_first_update_to_one_the_cache_refuses_is_refused() {
     doc.set_attribute(path, "d", "M2 2L2 2");
 
     // Then: refused before paint, so paint does not panic
-    assert_refused(&mut doc, &["a path cannot be drawn", "path 1"]);
+    assert_refused(&mut doc, &["a shape cannot be drawn", "path 1"]);
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn a_path_drawn_past_the_largest_scale_is_refused() {
     );
 
     // When, Then
-    assert_refused(&mut doc, &["a path cannot be drawn", "past the 4096"]);
+    assert_refused(&mut doc, &["a shape cannot be drawn", "past the 4096"]);
 }
 
 #[test]

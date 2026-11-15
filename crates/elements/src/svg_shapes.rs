@@ -17,7 +17,7 @@ use crate::document_shapes::DocumentShapes;
 
 use crate::arena::Arena;
 use crate::style::{Used, UsedMap};
-use crate::svg_route::{Route, path_site, paths, route};
+use crate::svg_route::{Route, paths, route, shape_site};
 
 /// An svg drawn as shapes: its view box and each path, its data parsed
 /// once with its box, and the description that names it in messages.
@@ -60,7 +60,7 @@ pub(crate) fn of(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Rc<SvgSha
             let data = parsed(arena, node)?;
             Some(SvgPath {
                 node,
-                site: path_site(index),
+                site: shape_site(arena, node, index),
                 data,
             })
         })
@@ -68,9 +68,15 @@ pub(crate) fn of(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Rc<SvgSha
     Some(Rc::new(SvgShapes { view_box, paths }))
 }
 
-fn parsed(arena: &Arena, path: NodeId) -> Option<IconPath> {
-    let element = arena.get(path, "svg_shapes").element()?;
-    IconPath::parse(element.attributes.get("d")?).ok()
+/// The path a shape draws: a path's `d`, or a basic shape's outline.
+fn parsed(arena: &Arena, shape: NodeId) -> Option<IconPath> {
+    let element = arena.get(shape, "svg_shapes").element()?;
+    if element.tag == "path" {
+        return IconPath::parse(element.attributes.get("d")?).ok();
+    }
+    let attribute = |name: &str| element.attributes.get(name).map(String::as_str);
+    let outline = vapors_shapes::outline(&element.tag, attribute)?;
+    IconPath::parse(&outline).ok()
 }
 
 /// The device pixels per view box unit an svg with `view_box` draws at

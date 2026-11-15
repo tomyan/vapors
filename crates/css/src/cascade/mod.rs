@@ -25,7 +25,7 @@ mod restyle;
 mod share;
 mod supports;
 
-pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, declarations_of};
+pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, SVG_TAGS, declarations_of};
 pub use share::{Unshareable, rule_indices_for_key, unshareable};
 pub(crate) use {collect::rank, compute::initial, compute::resolve_for};
 pub use {computed::ComputedStyle, environment::Environment};

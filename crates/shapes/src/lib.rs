@@ -5,10 +5,12 @@
 //! element tree refuses what it does not, so a path that passes the
 //! check rasterises. No GPU and no text dependency.
 
+mod basic_shape;
 mod canonical;
 mod classify;
 mod classify_near;
 mod classify_round;
+mod css_number;
 mod geometry;
 mod geometry_box;
 mod mesh;
@@ -29,8 +31,10 @@ mod table_error;
 mod tessellate;
 mod tessellate_path;
 
+pub use basic_shape::{allowed, geometry_names, outline, refusal};
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
 pub use classify::{Classified, classify};
+pub use css_number::css_number;
 pub use geometry::{Geometry, MIN_RADIUS, check_geometry, fitted_radii};
 pub use geometry_box::transformed_box;
 pub use mesh::{CONVEX, INSIDE, MeshCorner, MeshTriangle, REFLEX};

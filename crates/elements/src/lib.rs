@@ -161,6 +161,7 @@ mod style;
 mod style_checks;
 mod surfaces;
 mod svg;
+mod svg_basic_shape_checks;
 mod svg_checks;
 mod svg_limit;
 mod svg_paint;

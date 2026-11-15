@@ -22,7 +22,7 @@ pub(crate) fn reasons(arena: &Arena, node: NodeId, used: &UsedMap) -> Vec<String
     }
     let parent = arena.get(node, "svg_style_checks").parent;
     match parent.and_then(|parent| used.get(&parent)) {
-        Some(svg) if crate::svg::is(arena, node, "path") => path(own, svg),
+        Some(svg) if crate::svg::is_shape(arena, node) => path(own, svg),
         _ => Vec::new(),
     }
 }

@@ -54,7 +54,8 @@ code sets it.
 - `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
 - `fill`, `stroke` and `stroke-width`, which its paths inherit (see
   `<path>`).
-- Children: `<path>` elements and whitespace only.
+- Children: `<path>`, `<rect>` and `<circle>` elements and whitespace
+  only.
 - CSS: sized by its attributes only, so `width`, `height`, `min-*` and
   `max-*` in CSS are refused (in Chromium the attributes are
   presentation hints that CSS overrides one axis at a time; vapors
@@ -108,8 +109,26 @@ code sets it.
   the svg's visibility, so a path shown otherwise would not be drawn as
   styled.
 
-touche's Dictate icon also uses `<rect rx>`; it is written as a path
-when that button moves, rather than widening the subset.
+`<rect>` and `<circle>` (one-scene S4b):
+
+- `<rect>`: `x`, `y` (0 when absent), `width`, `height` (required, above
+  0), `rx`, `ry` (0 or more; one given stands for both, and each is
+  clamped to half its side, as SVG 2 says). `<circle>`: `cx`, `cy` (0
+  when absent) and `r` (required, above 0). Each number is a bare
+  number in viewBox units; a unit or a percentage is refused. `fill`,
+  `stroke` and `stroke-width` as on `<path>`; anything else,
+  `transform` among them, is refused. What the template writes
+  literally is refused at build time, naming the file and line; a
+  bound value, or one set by `set_attribute`, at update time. Both
+  read through `vapors_shapes::refusal`.
+- Each is drawn as the path SVG 2 gives it, on the shapes route only:
+  an svg holding one is drawn as shapes. The shape classifier reads
+  that path back as a closed form (a rect with square, round or
+  elliptical corners, or a circle), so it is never tessellated. One
+  cache slot is held for each distinct shape, at every scale. A
+  `<path>` written as exactly that outline is the same closed form.
+- Messages name a shape by its tag and its index among the svg's
+  shapes, counting from 1: "rect 2" is the second shape, a rect.
 
 ## Layout
 

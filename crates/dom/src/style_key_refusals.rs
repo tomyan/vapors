@@ -12,6 +12,10 @@ use crate::{MAX_TOGGLES, SCOPE_ATTRIBUTE, StyleKey};
 /// does not depend on it; a test in vapors-elements holds them equal).
 pub const PRESENTATION: [&str; 3] = ["fill", "stroke", "stroke-width"];
 
+/// The SVG elements that take them; the same as
+/// `vapors_css::cascade::SVG_TAGS`, held equal as [`PRESENTATION`] is.
+pub const SVG_TAGS: [&str; 4] = ["svg", "path", "rect", "circle"];
+
 impl StyleKey {
     /// Why `set_attribute` of `name` is refused on an element with this
     /// key: `None` when it is not one the key fixes. The key fixes
@@ -37,10 +41,10 @@ impl StyleKey {
     }
 
     /// Whether `lower` (lowercased) is an SVG presentation attribute on
-    /// an svg or path: a style the build-time analysis must see, so it
+    /// an SVG element vapors draws: a style the build-time analysis must see, so it
     /// is set only in the template, as `style` is.
     fn paints(&self, lower: &str) -> bool {
-        matches!(self.tag, "svg" | "path") && PRESENTATION.contains(&lower)
+        SVG_TAGS.contains(&self.tag) && PRESENTATION.contains(&lower)
     }
 
     /// Whether `lower` (lowercased) names one of the key's attributes.

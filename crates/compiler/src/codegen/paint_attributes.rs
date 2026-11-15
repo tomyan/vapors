@@ -1,11 +1,12 @@
-//! SVG presentation attributes on an `<svg>` or `<path>` (one-scene
-//! S4a): a literal one is read by the cascade's own reading
-//! (`vapors_css::cascade::declarations_of`), so a value the runtime
+//! SVG presentation attributes on an `<svg>`, `<path>`, `<rect>` or
+//! `<circle>` (one-scene S4a, S4b): a literal one is read by the
+//! cascade's own reading (`vapors_css::cascade::declarations_of`), so a
+//! value the runtime
 //! would refuse fails the build naming the file and line; a bound one
 //! (`fill={..}`) is refused, as its run-time value could name a paint
 //! the style analysis cannot see (svg-support 3.12).
 
-use vapors_css::cascade::{PRESENTATION_ATTRIBUTES, declarations_of};
+use vapors_css::cascade::{PRESENTATION_ATTRIBUTES, SVG_TAGS, declarations_of};
 
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute};
@@ -19,7 +20,7 @@ pub(super) fn refuse_paint(
     attribute: &Attribute,
 ) -> Result<(), CompileError> {
     let name = attribute.name.as_str();
-    if !matches!(tag, "svg" | "path") || !PRESENTATION_ATTRIBUTES.contains(&name) {
+    if !SVG_TAGS.contains(&tag) || !PRESENTATION_ATTRIBUTES.contains(&name) {
         return Ok(());
     }
     let value = match &attribute.value {

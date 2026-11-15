@@ -33,6 +33,8 @@ const SUPPORTED: &[&str] = &[
     "gpu-surface",
     "svg",
     "path",
+    "rect",
+    "circle",
     "span",
     "a",
     "b",

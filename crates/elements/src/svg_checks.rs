@@ -2,8 +2,9 @@
 //! before layout, naming the element, the attribute and the fix: on an
 //! `svg`, attributes outside the subset, its `viewBox`, `width` and
 //! `height`, how it is named to the a11y tree, and children other than
-//! `path`s and whitespace; on a `path`, `svg_path_checks`; CSS on
-//! either, `svg_style_checks`.
+//! shapes (`path`, `rect`, `circle`) and whitespace; on a `path`,
+//! `svg_path_checks`; on a `rect` or `circle`, `svg_basic_shape_checks`;
+//! CSS on any, `svg_style_checks`.
 
 use std::collections::BTreeMap;
 
@@ -18,7 +19,7 @@ use std::cell::RefCell;
 use crate::document_shapes::DocumentShapes;
 
 use crate::style::UsedMap;
-use crate::svg::{NAMESPACE, positive, view_box};
+use crate::svg::{NAMESPACE, SHAPE_TAGS, positive, view_box};
 
 /// The attributes an `svg` takes; `fill`, `stroke` and `stroke-width`
 /// are presentation attributes its paths inherit.
@@ -79,7 +80,7 @@ pub(crate) fn mark_shapes(
 fn svgs_of(arena: &Arena, nodes: &[NodeId]) -> Vec<NodeId> {
     let mut svgs: Vec<NodeId> = Vec::new();
     for &node in nodes {
-        let svg = if crate::svg::is(arena, node, "path") {
+        let svg = if crate::svg::is_shape(arena, node) {
             arena.get(node, "svg_checks").parent
         } else {
             Some(node)
@@ -100,6 +101,9 @@ fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<Strin
     let mut found = match element.tag.as_str() {
         "svg" => svg_reasons(arena, (node, used), &element.attributes, scale),
         "path" => crate::svg_path_checks::reasons(arena, node, &element.attributes),
+        tag @ ("rect" | "circle") => {
+            crate::svg_basic_shape_checks::reasons(arena, node, tag, &element.attributes)
+        }
         _ => return Vec::new(),
     };
     found.extend(crate::svg_style_checks::reasons(arena, node, used));
@@ -205,34 +209,32 @@ fn namespace(attributes: &BTreeMap<String, String>) -> Option<String> {
     ))
 }
 
-/// Children other than `path`s and whitespace, and no `path` at all.
+/// Children other than shapes and whitespace, and no shape at all.
 fn children(arena: &Arena, node: NodeId) -> Vec<String> {
     let kids = arena.children(node);
     let mut found: Vec<String> = kids
         .iter()
         .filter_map(|&child| child_reason(arena, child))
         .collect();
-    if !kids
-        .iter()
-        .any(|&child| crate::svg::is(arena, child, "path"))
-    {
+    if !kids.iter().any(|&child| crate::svg::is_shape(arena, child)) {
         found.push(
-            "holds no <path>, so it draws nothing; add a <path> or remove the svg".to_owned(),
+            "holds no <path>, <rect> or <circle>, so it draws nothing; add one or remove the svg"
+                .to_owned(),
         );
     }
     found
 }
 
-/// Why `child` of an svg is refused: anything but a `path` or whitespace.
+/// Why `child` of an svg is refused: anything but a shape or whitespace.
 fn child_reason(arena: &Arena, child: NodeId) -> Option<String> {
     match &arena.get(child, "svg_checks").kind {
         Kind::Text(text) if text.trim().is_empty() => None,
         Kind::Text(text) => Some(format!(
-            "holds the text {text:?}, and an icon holds <path> elements and whitespace only; remove the text, or name the icon with aria-label"
+            "holds the text {text:?}, and an svg holds <path>, <rect> and <circle> elements and whitespace only; remove the text, or name the icon with aria-label"
         )),
-        Kind::Element(element) if element.tag == "path" => None,
+        Kind::Element(element) if SHAPE_TAGS.contains(&element.tag.as_str()) => None,
         Kind::Element(_) => Some(format!(
-            "holds {}, and an icon holds <path> elements and whitespace only; move it out of the svg",
+            "holds {}, and an svg holds <path>, <rect> and <circle> elements and whitespace only; move it out of the svg",
             describe(arena, child)
         )),
     }

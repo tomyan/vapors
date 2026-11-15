@@ -5,7 +5,9 @@
 //! open question and not on this plan's path (one-scene 1.1, lead
 //! 2026-11-14), so a path the icon route draws stays on it; a path it
 //! cannot draw (a fill, a stroke in another colour) goes to shapes,
-//! and with it the whole svg, so its paths keep their paint order.
+//! and with it the whole svg, so its paths keep their paint order. A
+//! `<rect>` or `<circle>` is drawn by the shapes route only (S4b), so an
+//! svg holding one takes that route.
 
 use vapors_dom::NodeId;
 
@@ -26,12 +28,12 @@ pub(crate) enum Route {
 /// element a used style, as paint relies on.
 pub(crate) fn route(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Route> {
     let own = used.get(&svg)?;
-    let mut paths = paths(arena, svg).into_iter();
-    let icon = paths.all(|path| {
-        let path = used.get(&path).unwrap_or_else(|| {
-            panic!("a path of a styled svg has no used style; styling gives every element one")
+    let mut shapes = paths(arena, svg).into_iter();
+    let icon = shapes.all(|shape| {
+        let styled = used.get(&shape).unwrap_or_else(|| {
+            panic!("a shape of a styled svg has no used style; styling gives every element one")
         });
-        icon_draws(path, own)
+        crate::svg::is(arena, shape, "path") && icon_draws(styled, own)
     });
     Some(if icon { Route::Icon } else { Route::Shapes })
 }
@@ -52,21 +54,21 @@ pub(crate) fn paints_nothing(own: &Used) -> bool {
     own.svg.fill.is_none() && (own.svg.stroke.is_none() || own.svg.stroke_width <= 0.0)
 }
 
-/// Why `svg` is on the shapes route: the first path the icon route
+/// Why `svg` is on the shapes route: the first shape the icon route
 /// cannot draw, by its index, and what it has; `None` on the icon route.
 pub(crate) fn why_shapes(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<String> {
     let own = used.get(&svg)?;
-    let (index, path) = paths(arena, svg)
-        .into_iter()
-        .enumerate()
-        .find(|(_, path)| !used.get(path).is_some_and(|path| icon_draws(path, own)))?;
-    let has = used
-        .get(&path)
-        .map_or("no used style", |path| what_it_has(path, own));
-    Some(format!(
-        "it is drawn as shapes because {} {has}",
-        path_site(index)
-    ))
+    let is_path = |shape| crate::svg::is(arena, shape, "path");
+    let (index, shape) = (paths(arena, svg).into_iter().enumerate()).find(|&(_, shape)| {
+        !(is_path(shape) && used.get(&shape).is_some_and(|path| icon_draws(path, own)))
+    })?;
+    let has = match used.get(&shape) {
+        _ if !is_path(shape) => "is drawn by the shapes route only",
+        Some(path) => what_it_has(path, own),
+        None => "no used style",
+    };
+    let site = shape_site(arena, shape, index);
+    Some(format!("it is drawn as shapes because {site} {has}"))
 }
 
 /// What a path styled `own` in an svg styled `svg` has that keeps it
@@ -83,17 +85,23 @@ fn what_it_has(own: &Used, svg: &Used) -> &'static str {
     }
 }
 
-/// How messages name an svg's path: by its index among the svg's paths,
-/// counting from 1, which a bare path's description cannot tell apart.
-pub(crate) fn path_site(index: usize) -> String {
-    format!("path {}", index + 1)
+/// How messages name an svg's shape `node`: its tag and its index among
+/// the svg's shapes, counting from 1 ("rect 2" is the second shape, a
+/// rect), which a bare element's description cannot tell apart.
+pub(crate) fn shape_site(arena: &Arena, node: NodeId, index: usize) -> String {
+    let tag = arena
+        .get(node, "svg_route")
+        .element()
+        .map_or("shape", |element| element.tag.as_str());
+    format!("{tag} {}", index + 1)
 }
 
-/// The `path` children of `svg`, in order.
+/// The shapes of `svg` (`path`, `rect` and `circle` children), in
+/// order.
 pub(crate) fn paths(arena: &Arena, svg: NodeId) -> Vec<NodeId> {
     arena
         .children(svg)
         .into_iter()
-        .filter(|&child| crate::svg::is(arena, child, "path"))
+        .filter(|&child| crate::svg::is_shape(arena, child))
         .collect()
 }
