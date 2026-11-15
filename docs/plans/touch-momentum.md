@@ -171,8 +171,8 @@ flings the container the gesture scrolled.
   build. An up handled 80 ms late after a stall alone cannot be told
   from a finger held still, and answers stopped. The fling starts at
   the lift's handling time, on the clock frames are drawn on, where
-  Chromium starts it at the last scroll update's. Retired when winit
-  exposes event times.
+  Chromium starts it at the last scroll update's. Retired by #403 (real
+  touch times; upstream rust-windowing/winit#1194).
 - **Not ported:** scroll rails (`SnapScrollController`), which zero the
   off-axis velocity of a mostly straight fling; the recorded flings are
   vertical lists, where it changes nothing.

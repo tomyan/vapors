@@ -18,7 +18,8 @@
 //! not a stopped finger, and same-time samples can leave no fit: both
 //! answer [`Velocity::Unresolvable`]. An up handled 80 ms late after a
 //! stall alone cannot be told from a finger held still, and answers
-//! stopped. Retired when winit exposes event times.
+//! stopped. Retired by #403 (real touch times; upstream
+//! rust-windowing/winit#1194).
 
 use std::time::Duration;
 
