@@ -46,6 +46,8 @@ pub(crate) struct LayoutBox {
     pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
     /// The icon an `svg` draws, for paint.
     pub(crate) icon: Option<std::rc::Rc<vapors_text::Icon>>,
+    /// What an svg on the shapes route draws (`svg_shapes`).
+    pub(crate) svg_shapes: Option<std::rc::Rc<crate::svg_shapes::SvgShapes>>,
     /// The name of the renderer a `gpu-surface` shows, for paint.
     pub(crate) surface: Option<std::rc::Rc<str>>,
     /// The numbers of an `input type=range`, for paint (3-E3a).
@@ -77,6 +79,7 @@ impl LayoutBox {
             natural: None,
             image: None,
             icon: None,
+            svg_shapes: None,
             surface: None,
             range: None,
             checked: None,

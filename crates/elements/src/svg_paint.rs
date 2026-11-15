@@ -16,16 +16,17 @@ use crate::paint::PaintInput;
 use crate::painting::Painting;
 use crate::style::UsedMap;
 use crate::svg::view_box;
+use crate::svg_route::Route;
 
-/// The icon `node` draws when it is an `svg`; `None` for any other
-/// element.
+/// The icon `node` draws when it is an `svg` on the icon route
+/// (`svg_route`); `None` for any other element.
 ///
 /// # Panics
 /// When the svg is outside the subset: `svg_checks` refuses it before
 /// layout, so reaching here with one is a bug in those checks.
 pub(crate) fn icon(arena: &Arena, used: &UsedMap, node: NodeId) -> Option<Rc<Icon>> {
     let element = arena.get(node, "svg_paint").element()?;
-    if element.tag != "svg" {
+    if element.tag != "svg" || crate::svg_route::route(arena, used, node)? != Route::Icon {
         return None;
     }
     let passed = "svg_checks passed this svg, so its view box and paths are in the subset";
@@ -48,23 +49,39 @@ fn stroke(arena: &Arena, used: &UsedMap, child: NodeId) -> Option<IconStroke> {
     Some(IconStroke { path, width })
 }
 
-/// Paints the icon `layout_box` shows over its content box (border box
-/// `border_box`, CSS px), when it has one and is visible.
+/// Paints what the svg `layout_box` is shows over its content box
+/// (border box `border_box`, CSS px): its icon or its shapes, when it is
+/// visible. An svg on the icon route releases the shapes it had; a
+/// hidden one's are released by its checks (`svg_shape_checks`).
+///
+/// # Panics
+/// When an svg's box has no used style: styling gives every element
+/// one before boxes are built.
 pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
     out: &mut Painting,
 ) {
-    let (Some(icon), &Content::Element(node)) = (&layout_box.icon, &layout_box.content) else {
+    let (true, &Content::Element(node)) = (
+        layout_box.icon.is_some() || layout_box.svg_shapes.is_some(),
+        &layout_box.content,
+    ) else {
         return;
     };
     let used = &input.used[&node];
-    if !used.visible {
-        return;
-    }
     let content = crate::clip::content_box(layout_box, border_box);
-    push_icon(icon, content, used.text.color, input.scale, out);
+    match (&layout_box.icon, &layout_box.svg_shapes) {
+        (Some(icon), _) if used.visible => {
+            input.shapes.borrow_mut().release(node);
+            push_icon(icon, content, used.text.color, input.scale, out);
+        }
+        (_, Some(shapes)) if used.visible => {
+            crate::svg_shapes_paint::paint((node, shapes), content, input, out);
+        }
+        // a hidden svg's shapes are released by its checks
+        _ => {}
+    }
 }
 
 /// One `Item::Icon` of `icon` over `content` snapped to device pixels.

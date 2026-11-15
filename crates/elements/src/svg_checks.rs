@@ -13,6 +13,10 @@ use crate::arena::Arena;
 use crate::check::describe;
 use crate::error::ElementError;
 use crate::node::Kind;
+use std::cell::RefCell;
+
+use crate::document_shapes::DocumentShapes;
+
 use crate::style::UsedMap;
 use crate::svg::{NAMESPACE, positive, view_box};
 
@@ -33,7 +37,9 @@ const ATTRIBUTES: [&str; 12] = [
     "stroke-width",
 ];
 
-/// The refusals of every `svg` and `path` among `nodes`.
+/// The refusals of every `svg` and `path` among `nodes`. An svg's
+/// shapes are checked after layout (`svg_shape_checks`), for the svgs
+/// [`mark_shapes`] marks.
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
@@ -53,12 +59,46 @@ pub(crate) fn refusals(
         .collect()
 }
 
+/// Marks each svg among the rechecked `nodes`, or holding a path among
+/// them, to have its shapes checked after layout, so a change to a path
+/// alone (its `d`, its paint) rechecks its svg's shapes (#381 review,
+/// H1). Called on the update's rechecked nodes only, never by the debug
+/// walk over the tree, so debug and release mark alike.
+pub(crate) fn mark_shapes(
+    arena: &Arena,
+    nodes: &[NodeId],
+    used: &UsedMap,
+    shapes: &RefCell<DocumentShapes>,
+) {
+    for svg in svgs_of(arena, nodes) {
+        crate::svg_shape_checks::mark((arena, used), svg, shapes);
+    }
+}
+
+/// Each svg among `nodes` or holding a path among them, once, in order.
+fn svgs_of(arena: &Arena, nodes: &[NodeId]) -> Vec<NodeId> {
+    let mut svgs: Vec<NodeId> = Vec::new();
+    for &node in nodes {
+        let svg = if crate::svg::is(arena, node, "path") {
+            arena.get(node, "svg_checks").parent
+        } else {
+            Some(node)
+        };
+        if let Some(svg) =
+            svg.filter(|&svg| crate::svg::is(arena, svg, "svg") && !svgs.contains(&svg))
+        {
+            svgs.push(svg);
+        }
+    }
+    svgs
+}
+
 fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<String> {
     let Some(element) = arena.get(node, "svg_checks").element() else {
         return Vec::new();
     };
     let mut found = match element.tag.as_str() {
-        "svg" => svg_reasons(arena, node, &element.attributes, scale),
+        "svg" => svg_reasons(arena, (node, used), &element.attributes, scale),
         "path" => crate::svg_path_checks::reasons(arena, node, &element.attributes),
         _ => return Vec::new(),
     };
@@ -68,13 +108,16 @@ fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<Strin
 
 fn svg_reasons(
     arena: &Arena,
-    node: NodeId,
+    (node, used): (NodeId, &UsedMap),
     attributes: &BTreeMap<String, String>,
     scale: f32,
 ) -> Vec<String> {
     let mut found = outside(attributes, &ATTRIBUTES, "<svg>");
     found.extend(sizes(attributes));
-    found.extend(crate::svg_limit::reason(attributes, scale));
+    // the atlas's cap is the icon route's; shapes have none
+    if crate::svg_route::route(arena, used, node) != Some(crate::svg_route::Route::Shapes) {
+        found.extend(crate::svg_limit::reason(attributes, scale));
+    }
     found.extend(named(attributes));
     found.extend(namespace(attributes));
     found.extend(children(arena, node));

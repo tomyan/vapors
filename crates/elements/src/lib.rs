@@ -162,6 +162,10 @@ mod svg_checks;
 mod svg_limit;
 mod svg_paint;
 mod svg_path_checks;
+mod svg_route;
+mod svg_shape_checks;
+mod svg_shapes;
+mod svg_shapes_paint;
 mod svg_style_checks;
 mod tags;
 #[cfg(feature = "test-support")]

@@ -136,6 +136,7 @@ paint_tests![
     paint_boxes,
     image_paint,
     stacking,
+    svg_shapes_paint,
 ];
 
 #[test]

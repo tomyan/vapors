@@ -91,6 +91,8 @@ impl Document {
 
     /// Checks `nodes`' used styles and media again and keeps their calcs.
     pub(crate) fn recheck_styled(&mut self, nodes: &[NodeId], scale: f32) {
+        let used = &self.kept.as_ref().expect("restyle keeps the styles").used;
+        crate::svg_checks::mark_shapes(&self.arena, nodes, used, &self.shapes);
         for &node in nodes {
             self.counts.elements_visited += 1;
             let refuses = !self.styled_refusals(&[node], scale).is_empty();

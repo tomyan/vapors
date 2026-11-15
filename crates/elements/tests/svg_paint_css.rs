@@ -5,7 +5,7 @@
 
 mod support;
 
-use support::svg_page::{assert_accepted, assert_refused, icon};
+use support::svg_page::{assert_accepted, icon};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Painted};
 use vapors_scene::Item;
@@ -80,13 +80,4 @@ fn a_stroke_width_in_px_is_accepted_as_chromium_accepts_it() {
     // When, Then
     assert_accepted(&mut doc);
     assert!(stroked(updated(&mut doc), 1.0));
-}
-
-#[test]
-fn a_rule_stroking_a_path_in_another_colour_is_refused_naming_the_fix() {
-    // Given
-    let (mut doc, _) = icon("} .icon path { stroke: red", &[], &[]);
-
-    // When, Then
-    assert_refused(&mut doc, &["stroke other than its color", "currentColor"]);
 }
