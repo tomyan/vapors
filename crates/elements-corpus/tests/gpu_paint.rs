@@ -115,6 +115,29 @@ fn check_placement(name: &str, scale: u32) {
 }
 
 fn check(name: &str, scale: u32) {
+    let (found, out) = differences(name, scale);
+    assert!(
+        found.is_empty(),
+        "{name} at {scale}x ({}) differs from Chromium's: {}",
+        out.display(),
+        found[..found.len().min(6)].join("; ")
+    );
+}
+
+/// The tripwire for an `only_1x` fixture: panics once it matches
+/// Chromium pixel for pixel at `scale`, so its relaxation comes off.
+fn check_still_differs(name: &str, scale: u32) {
+    let (found, out) = differences(name, scale);
+    assert!(
+        !found.is_empty(),
+        "{name} now matches Chromium pixel for pixel at {scale}x ({}): move it out of `only_1x` in gpu_paint.rs and close the issue its reason names",
+        out.display()
+    );
+}
+
+/// Where `name` at `scale` differs from Chromium's, and the composite
+/// written for a look.
+fn differences(name: &str, scale: u32) -> (Vec<String>, PathBuf) {
     let fixture = paint_fixtures()
         .into_iter()
         .find(|f| f.name == name)
@@ -136,12 +159,7 @@ fn check(name: &str, scale: u32) {
         &image(&theirs),
         &regions(&doc.borrow(), scale),
     );
-    assert!(
-        found.is_empty(),
-        "{name} at {scale}x ({}) differs from Chromium's: {}",
-        out.display(),
-        found[..found.len().min(6)].join("; ")
-    );
+    (found, out)
 }
 
 /// One test per fixture and scale, so nextest runs them in parallel and
@@ -151,7 +169,8 @@ fn check(name: &str, scale: u32) {
 /// holds this list to the fixtures marked `/* paint`.
 /// Fixtures after `only_1x:` are compared pixel by pixel at 1x alone, and
 /// at 2x for placement only (the rows and columns that hold ink); each is
-/// declared there with its reason and the issue that retires it.
+/// declared there with its reason and the issue that retires it, and
+/// `gpu_at_2x_still_differs` fails once it matches at 2x.
 macro_rules! paint_tests {
     ($($name:ident),* $(,)? ; only_1x: $($one:ident),* $(,)?) => {
         const TESTED: &[&str] = &[$(stringify!($name),)* $(stringify!($one)),*];
@@ -161,6 +180,7 @@ macro_rules! paint_tests {
         }
         mod gpu_at_2x { $(#[test] fn $name() { super::check(stringify!($name), 2); })* }
         mod gpu_at_2x_placement { $(#[test] fn $one() { super::check_placement(stringify!($one), 2); })* }
+        mod gpu_at_2x_still_differs { $(#[test] fn $one() { super::check_still_differs(stringify!($one), 2); })* }
     };
 }
 
