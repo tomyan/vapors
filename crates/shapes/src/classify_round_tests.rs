@@ -1,9 +1,11 @@
 //! Rounded rectangles: SVG's `<rect rx ry>` outline, from any of its
-//! points and either way round, is a rect with radii; a near miss is a
-//! path.
+//! points and either way round, is a rect with radii that the closed-
+//! form check draws, a pill an f32 ulp short of its radii among them.
+//! The near misses are in `classify_round_near_tests.rs`.
 
 use crate::canonical::{FillRule, Paint};
 use crate::classify::{Classified, classify};
+use crate::geometry::{Geometry, check_geometry};
 use crate::path::IconPath;
 
 const FILL: Paint = Paint::Fill(FillRule::NonZero);
@@ -52,67 +54,44 @@ fn svgs_rounded_rect_outline_is_a_rect_with_its_radii() {
 
     // When, Then
     for (data, paint, expected) in cases {
-        assert_eq!(classified(data, paint), expected, "{data}");
+        let found = classified(data, paint);
+        assert_eq!(found, expected, "{data}");
+        assert_eq!(check_geometry(&geometry(found)), Ok(()), "{data}");
     }
 }
 
-/// Asserts each of `cases` stays a path.
-fn paths(cases: &[(&str, Paint)]) {
-    for &(data, paint) in cases {
-        assert_eq!(classified(data, paint), Classified::Path, "{data}");
+/// The geometry a classified rect draws.
+fn geometry(found: Classified) -> Geometry<'static> {
+    let Classified::Rect {
+        origin,
+        size,
+        radius,
+    } = found
+    else {
+        panic!("{found:?} is not a rect");
+    };
+    Geometry::Rect {
+        origin,
+        size,
+        radius,
     }
 }
 
 #[test]
-fn a_rounded_rect_with_a_segment_out_of_place_is_a_path() {
-    // Given: an arc 0.001 short; one corner of radius 1; an extra
-    // segment (a side in two lines); an open stroke; a second subpath;
-    // a top side sloping 0.2, with its right side short to match
-    let rest = "A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 3 1";
-    paths(&[
-        (&format!("M3 1H9A2 2 0 0 1 10.999 3V5{rest}Z"), FILL),
-        (&format!("M3 1H10A1 1 0 0 1 11 2V5{rest}Z"), FILL),
-        (&format!("M3 1H6H9A2 2 0 0 1 11 3V5{rest}Z"), FILL),
-        (&format!("M3 1H9A2 2 0 0 1 11 3V5{rest}"), STROKE),
-        (&format!("M3 1H9A2 2 0 0 1 11 3V5{rest}ZM1 1h1v1z"), FILL),
-        (&format!("M3 1L9 1.2A2 2 0 0 1 11 3.2V5{rest}Z"), FILL),
-    ]);
-}
+fn a_pill_an_ulp_short_of_its_radii_is_clamped_to_a_rect_the_check_draws() {
+    // Given: SVG's outline of <rect x=1 y=0.05 width=10 height=1 rx=0.5>,
+    // whose height is 1.05 - 0.05 = 0.99999994 in f32, under 2 ry (#387
+    // review, H1)
+    let pill = "M1.5 0.05H10.5A0.5 0.5 0 0 1 11 0.55V0.55A0.5 0.5 0 0 1 10.5 1.05H1.5A0.5 0.5 0 0 1 1 0.55V0.55A0.5 0.5 0 0 1 1.5 0.05Z";
 
-#[test]
-fn a_rounded_rect_with_an_arc_of_another_shape_is_a_path() {
-    // Given: one corner turned in; every corner turned in; a rotated
-    // arc; a large arc; two arcs spanning other than their radii (the
-    // top side shifted 0.5 right); one arc of radius 3 spanning 2 x 2;
-    // corners below the closed form's floor (geometry::MIN_RADIUS)
-    paths(&[
-        (
-            "M3 1H9A2 2 0 0 0 11 3V5A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 3 1Z",
-            FILL,
-        ),
-        (
-            "M3 1H9A2 2 0 0 0 11 3V5A2 2 0 0 0 9 7H3A2 2 0 0 0 1 5V3A2 2 0 0 0 3 1Z",
-            FILL,
-        ),
-        (
-            "M3 1H9A2 2 30 0 1 11 3V5A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 3 1Z",
-            FILL,
-        ),
-        (
-            "M3 1H9A2 2 0 1 1 11 3V5A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 3 1Z",
-            FILL,
-        ),
-        (
-            "M2.5 1H8.5A2 2 0 0 1 11 3V5A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 2.5 1Z",
-            FILL,
-        ),
-        (
-            "M3 1H9A2 2 0 0 1 11 3V5A2 2 0 0 1 9 7H3A3 3 0 0 1 1 5V3A2 2 0 0 1 3 1Z",
-            FILL,
-        ),
-        (
-            "M1e-10 0H3e-10A1e-10 1e-10 0 0 1 4e-10 1e-10V3e-10A1e-10 1e-10 0 0 1 3e-10 4e-10H1e-10A1e-10 1e-10 0 0 1 0 3e-10V1e-10A1e-10 1e-10 0 0 1 1e-10 0Z",
-            FILL,
-        ),
-    ]);
+    // When
+    let found = classified(pill, FILL);
+
+    // Then: ry is clamped to half the height, and the check draws it
+    let Classified::Rect { size, radius, .. } = found else {
+        panic!("{found:?}");
+    };
+    assert_eq!(radius, [0.5, size[1] / 2.0]);
+    assert!(size[1] < 1.0, "{size:?}: the case is an ulp short");
+    assert_eq!(check_geometry(&geometry(found)), Ok(()));
 }

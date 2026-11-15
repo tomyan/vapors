@@ -141,3 +141,24 @@ fn a_radius_above_zero_too_small_for_the_shader_is_refused() {
         Ok(())
     );
 }
+
+#[test]
+fn a_radius_over_half_its_side_by_less_than_the_tolerance_is_clamped() {
+    // Given: the pill <rect x=1 y=0.05 width=10 height=1 rx=0.5> as f32
+    // gives it (#387 review, H1), and one over by 0.01
+    let height = 1.05f32 - 0.05;
+
+    // When
+    let fitted = fitted_radii([1.0, 0.05], [10.0, height], [0.5, 0.5]);
+    let over = fitted_radii([1.0, 0.05], [10.0, 1.0], [0.5, 0.51]);
+
+    // Then
+    assert_eq!(fitted, Ok([0.5, height / 2.0]));
+    assert!(over.is_err(), "{over:?}");
+    let pill = Geometry::Rect {
+        origin: [1.0, 0.05],
+        size: [10.0, height],
+        radius: [0.5, 0.5],
+    };
+    assert_eq!(check_geometry(&pill), Ok(()));
+}

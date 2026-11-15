@@ -141,3 +141,23 @@ fn a_rects_corner_radii_sit_at_rx_12_and_ry_14() {
     assert_eq!(instance[8..12], [1.0, 2.0, 10.0, 8.0]);
     assert_eq!(instance[12..16], [3.0, 0.0, 1.5, 0.0]);
 }
+
+#[test]
+fn a_radius_the_check_clamps_is_drawn_clamped() {
+    // Given: a pill whose height f32 leaves an ulp under 2 ry (#387
+    // review, H1)
+    let height = 1.05f32 - 0.05;
+    let pill = Geometry::Rect {
+        origin: [1.0, 0.05],
+        size: [10.0, height],
+        radius: [0.5, 0.5],
+    };
+
+    // When
+    let drawn = shape(&pill, None, IDENTITY)
+        .expect("drawable")
+        .expect("has area");
+
+    // Then: ry is half the height
+    assert_eq!(drawn.instance()[12..15], [0.5, 0.0, height / 2.0]);
+}

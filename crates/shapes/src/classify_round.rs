@@ -4,36 +4,50 @@
 //! start. Each line lies along the rectangle's edge, as long as the
 //! side less both corners. Each arc is an unrotated small arc of one
 //! radius pair, spanning exactly its radii, swept the way the path
-//! goes round, so that its centre is inside. Anything else, such as a
-//! short arc, corners of different radii or an extra segment, stays a
-//! path, which the tessellator draws exactly.
+//! goes round, so that its centre is inside. A stroke ends exactly at
+//! the start. Anything else, such as a short arc, corners of different
+//! radii or a curved side, stays a path, which the tessellator draws
+//! exactly. The radii come out through `geometry::fitted_radii`, the
+//! check's own clamp, so what this accepts the check draws (#387
+//! review, H1). Each guard has a near miss that only it catches
+//! (`classify_round_near_tests.rs`). Tolerances are relative to the
+//! shape's own coordinates, with no floor of 1 as `classify_near` has, so
+//! a shape under a unit across is held to its own size (#387 review,
+//! L1).
 
 use zeno::Point;
 
 use crate::canonical::Paint;
 use crate::classify::Classified;
-use crate::classify_near::{near, near_value, scale_of};
+use crate::classify_near::TOLERANCE;
+use crate::geometry::fitted_radii;
 use crate::segment::Segment;
 
 /// The rounded rectangle `segments` draw under `paint`, if they draw
 /// exactly one.
 pub(crate) fn round_rect(segments: &[Segment], paint: Paint) -> Option<Classified> {
     let (start, body) = outline(segments, paint)?;
-    let points = ends(start, body)?;
-    let scale = scale_of(&points);
+    let points = ends(start, body, paint)?;
+    let scale = magnitude_of(&points);
     let (radii, sweep) = arcs(body, scale)?;
     let [lo, hi] = bounds(&points);
     let size = [hi.x - lo.x, hi.y - lo.y];
-    let fits = (0..2).all(|i| 2.0 * radii[i] <= size[i] + scale * crate::classify_near::TOLERANCE);
     let turns = (signed_area(&points) > 0.0) == sweep;
     // a radius the closed-form check refuses stays a path
     let drawable = radii.iter().all(|r| *r >= crate::geometry::MIN_RADIUS);
     let sides = (body.iter().zip(points.windows(2)))
         .all(|(segment, ends)| side(segment, [ends[0], ends[1]], [lo, hi], radii, scale));
-    (fits && turns && sides && drawable).then_some(Classified::Rect {
+    if !(turns && sides && drawable) {
+        return None;
+    }
+    // each side line within the tolerance of its side less both corners
+    // holds each radius within half the tolerance of half its side
+    let radius = fitted_radii([lo.x, lo.y], size, radii)
+        .unwrap_or_else(|reason| panic!("the side check fits the radii: {reason}"));
+    Some(Classified::Rect {
         origin: [lo.x, lo.y],
         size,
-        radius: radii,
+        radius,
     })
 }
 
@@ -59,8 +73,11 @@ fn is_arc(segment: &Segment) -> bool {
 }
 
 /// The start and each segment's end, when every segment is a line or an
-/// arc and the last ends at the start.
-fn ends(start: Point, body: &[Segment]) -> Option<Vec<Point>> {
+/// arc and the last ends at the start: exactly for a stroke, whose close
+/// from a point only near the start would be a segment with joins
+/// (#387 review, L2; `rect_corners` holds strokes the same way), and
+/// within the tolerance for a fill.
+fn ends(start: Point, body: &[Segment], paint: Paint) -> Option<Vec<Point>> {
     let mut points = vec![start];
     for segment in body {
         points.push(match *segment {
@@ -69,7 +86,14 @@ fn ends(start: Point, body: &[Segment]) -> Option<Vec<Point>> {
         });
     }
     let back = points[points.len() - 1];
-    near(back, start, scale_of(&points)).then_some(points)
+    let closed = match paint {
+        Paint::Stroke { .. } => back == start,
+        Paint::Fill(_) => {
+            let scale = magnitude_of(&points);
+            within(back.x, start.x, scale) && within(back.y, start.y, scale)
+        }
+    };
+    closed.then_some(points)
 }
 
 /// The radii and sweep every arc shares, when each is unrotated and
@@ -89,7 +113,7 @@ fn arcs(body: &[Segment], scale: f32) -> Option<([f32; 2], bool)> {
             continue;
         };
         let (first, first_sweep) = *shared.get_or_insert((radii, sweep));
-        let same = near_value(radii[0], first[0], scale) && near_value(radii[1], first[1], scale);
+        let same = within(radii[0], first[0], scale) && within(radii[1], first[1], scale);
         if rotation != 0.0 || large || sweep != first_sweep || !same {
             return None;
         }
@@ -109,15 +133,27 @@ fn side(
 ) -> bool {
     let [a, b] = ends;
     let span = [(b.x - a.x).abs(), (b.y - a.y).abs()];
-    let near_span = |x: f32, y: f32| near_value(span[0], x, scale) && near_value(span[1], y, scale);
+    let near_span = |x: f32, y: f32| within(span[0], x, scale) && within(span[1], y, scale);
     if is_arc(segment) {
         return near_span(radii[0], radii[1]);
     }
-    let on_edge =
-        |v: f32, low: f32, high: f32| near_value(v, low, scale) || near_value(v, high, scale);
+    let on_edge = |v: f32, low: f32, high: f32| within(v, low, scale) || within(v, high, scale);
     let across = near_span(hi.x - lo.x - 2.0 * radii[0], 0.0) && on_edge(a.y, lo.y, hi.y);
     let down = near_span(0.0, hi.y - lo.y - 2.0 * radii[1]) && on_edge(a.x, lo.x, hi.x);
     across || down
+}
+
+/// Whether `a` and `b` are the same within [`TOLERANCE`] of `scale`.
+fn within(a: f32, b: f32, scale: f32) -> bool {
+    (a - b).abs() <= TOLERANCE * scale
+}
+
+/// The largest coordinate magnitude among `points`, with no floor.
+fn magnitude_of(points: &[Point]) -> f32 {
+    points
+        .iter()
+        .map(|p| p.x.abs().max(p.y.abs()))
+        .fold(0.0, f32::max)
 }
 
 /// The low and high corners of the box holding `points`.
@@ -146,3 +182,11 @@ fn signed_area(points: &[Point]) -> f32 {
 #[cfg(test)]
 #[path = "classify_round_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "classify_round_near_tests.rs"]
+mod near_tests;
+
+#[cfg(test)]
+#[path = "classify_round_stroke_tests.rs"]
+mod stroke_tests;
