@@ -39,7 +39,9 @@ mod tooltip_style;
 mod touch_scroll;
 mod wheel_scroll;
 
-pub use document_input::{DocumentInput, FlingError, Given, Route, Unplaced};
+pub use document_input::{
+    CURVE_SPEED_LIMIT, DocumentInput, FlingError, Given, MAX_FLING_SPEED, Route, Unplaced,
+};
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
     Invalidated, PerFrame, StartState, SurfaceHandle,

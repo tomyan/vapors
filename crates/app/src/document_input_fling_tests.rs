@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use vapors_platform::{Event, Instant, Platform, TouchPhase};
 
-use super::{DocumentInput, FlingError, MAX_FLING_SPEED};
+use super::{CURVE_SPEED_LIMIT, DocumentInput, FlingError, MAX_FLING_SPEED};
 use crate::scroll_fixture::{nested, offset};
 
 #[test]
@@ -94,37 +94,21 @@ fn a_fling_while_a_finger_is_down_is_refused() {
 }
 
 #[test]
-fn a_fling_at_any_speed_runs_at_most_the_maximum_and_ends() {
-    // Given flings at the maximum and far beyond it, which the curve
-    // could not carry (1e30 px/s)
-    let run = |speed: f32| {
-        let (doc, outer, _) = nested();
-        let mut input = DocumentInput::new();
-        let start = Instant::now();
-        input
-            .fling(&doc.borrow(), outer, [0.0, speed], start)
-            .expect("starts");
-        let first = start + Duration::from_millis(2);
-        input.advance_fling(&mut doc.borrow_mut(), first);
-        let after_one = offset(&doc, outer);
-        let frames = (2..1000)
-            .take_while(|n| {
-                input.advance_fling(
-                    &mut doc.borrow_mut(),
-                    start + Duration::from_millis(16) * *n,
-                )
-            })
-            .count();
-        (after_one, frames)
-    };
+fn a_fling_the_curve_cannot_carry_is_refused_and_one_it_can_is_not_clamped() {
+    // Given
+    let (doc, outer, _) = nested();
+    let mut input = DocumentInput::new();
+    let now = Instant::now();
 
-    // When
-    let (at_max, over) = (run(MAX_FLING_SPEED), run(1e30));
+    // When: past the curve's limit, then a boosted chain's speed above
+    // the release maximum
+    let absurd = input.fling(&doc.borrow(), outer, [0.0, 1e30], now);
+    let chained = input.fling(&doc.borrow(), outer, [0.0, 3.0 * MAX_FLING_SPEED], now);
 
-    // Then: the same first frame (2 ms in, inside the 100 px range), and
-    // both stop at the list's end
-    assert_eq!(over.0, at_max.0);
-    assert!(over.1 < 10 && at_max.1 < 10, "{over:?} {at_max:?}");
+    // Then
+    assert_eq!(absurd, Err(FlingError::TooFast([0.0, 1e30])));
+    assert_eq!(chained, Ok(()));
+    const { assert!(CURVE_SPEED_LIMIT > 3.0 * MAX_FLING_SPEED) };
 }
 
 #[test]

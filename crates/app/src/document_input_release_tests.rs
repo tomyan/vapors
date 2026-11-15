@@ -150,3 +150,36 @@ fn a_touch_fling_is_boosted_from_and_a_programmatic_one_is_not() {
     // Then
     assert_eq!(input.touch.boost_from(), [0.0, 0.0]);
 }
+
+#[test]
+fn a_boosted_release_starts_above_the_maximum_unclamped() {
+    // Given a 3000 px/s flick lifted 100 ms ago, drawn once since (about
+    // 48 px, inside the outer list's 100)
+    let lift = Instant::now()
+        .checked_sub(Duration::from_millis(100))
+        .expect("a clock past 100 ms");
+    let (doc, _, mut input) = flick(80.0, -3000.0, lift);
+    input.advance_fling(&mut doc.borrow_mut(), lift + Duration::from_millis(16));
+    let platform = Platform::detached();
+
+    // When a finger cuts the coast, drags on, and flicks at the maximum
+    for event in [
+        touch(TouchPhase::Started, 80.0),
+        touch(TouchPhase::Moved, 55.0),
+        Event::Pan { dx: 0.0, dy: -25.0 },
+        touch(TouchPhase::Ended, 55.0),
+        Event::Fling {
+            vx: 0.0,
+            vy: -8000.0,
+            at: Instant::now(),
+        },
+    ] {
+        input.give(&doc, &event, &platform).expect("placed");
+    }
+
+    // Then: the boost adds the first start after the clamp, and the
+    // fling runs at the sum, unclamped (the curve's start is within 2%)
+    assert_eq!(input.touch.boost_from(), [0.0, 11_000.0]);
+    let speed = input.touch.fling_starting_speed().expect("flinging");
+    assert!(speed > 10_500.0, "{speed}");
+}

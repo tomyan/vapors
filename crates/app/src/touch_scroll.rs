@@ -173,6 +173,12 @@ impl TouchScroll {
         self.booster.start(velocity, now)
     }
 
+    /// The running fling's speed at its start.
+    #[cfg(test)]
+    pub(crate) fn fling_starting_speed(&self) -> Option<f32> {
+        self.fling.as_ref().map(Fling::starting_speed)
+    }
+
     /// What the booster would boost the next fling by.
     #[cfg(test)]
     pub(crate) fn boost_from(&self) -> [f32; 2] {

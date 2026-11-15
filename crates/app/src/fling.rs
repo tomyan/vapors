@@ -65,6 +65,14 @@ impl Fling {
         self.container
     }
 
+    /// The curve's speed at its start, CSS px/s (the first segment's
+    /// slope, within 2% of the speed it was started at).
+    #[cfg(test)]
+    pub(crate) fn starting_speed(&self) -> f32 {
+        let [x, y] = self.curve.velocity_at(std::time::Duration::ZERO);
+        x.hypot(y)
+    }
+
     /// The velocity at the last frame that moved the fling, CSS px/s.
     pub(crate) fn velocity(&self) -> [f32; 2] {
         self.velocity
