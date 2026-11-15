@@ -24,9 +24,11 @@ pub(crate) fn drawn_updated(
 ) {
     let spliced = order.walks.splices > 0;
     if walked(order) || (spliced && many(patched, painted)) {
+        let _zr = tracing::trace_span!("update phase", phase = "zr_rebuild").entered();
         drawn_afresh(painted, order);
         return;
     }
+    let _zp = tracing::trace_span!("update phase", phase = "zr_patch").entered();
     if spliced {
         spliced_into(painted, &order.splice_edits);
         painted.splice_patched = true;
@@ -77,6 +79,12 @@ fn hits_patched(painted: &mut Painted, slots: &[usize], spliced: bool) -> HitsCh
 /// three afresh costs 518 instructions a box, patching 1,932 a patched
 /// slot, so they cost the same at about 27% of the slots patched.
 fn many(patched: &[usize], painted: &Painted) -> bool {
+    // measurement only: ZFORCE=patch or ZFORCE=rebuild forces a path
+    match std::env::var("ZFORCE").as_deref() {
+        Ok("patch") => return false,
+        Ok("rebuild") => return true,
+        _ => {}
+    }
     let share = painted.kept_boxes.len() / 4;
     patched.len() > crate::frame_extents::REBUILD.max(share)
 }

@@ -18,7 +18,9 @@ use crate::stats::{Distribution, median_count};
 /// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
 /// repack and per `gpu-surface` that renders); the rest of draw is the
 /// painter's own work. The app's other phases are [`APP_PHASES`].
-pub const PHASES: [&str; 9] = [
+pub const PHASES: [&str; 11] = [
+    "zr_rebuild",
+    "zr_patch",
     "update",
     "style",
     "layout",
@@ -40,7 +42,9 @@ pub const APP_PHASES: [&str; 5] = ["input", "tasks", "tick", "accessibility", "r
 
 /// Every phase a frame records, in frame order: [`PHASES`] and
 /// [`APP_PHASES`]. What the first frame reports and `--scaling` judges.
-pub const EVERY_PHASE: [&str; 14] = [
+pub const EVERY_PHASE: [&str; 16] = [
+    "zr_rebuild",
+    "zr_patch",
     "input",
     "tasks",
     "tick",
