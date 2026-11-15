@@ -6,7 +6,7 @@
 //! background behind the text.
 
 use vapors_scene::{Item, Quad};
-use vapors_text::{Layout, content_area};
+use vapors_text::{Layout, baseline_below_top, content_area};
 
 use crate::layout::{BoxRect, InlineRun, InlineSpan};
 use crate::paint::{PaintInput, snapped};
@@ -47,10 +47,10 @@ pub(crate) fn paint_spans(
 }
 
 /// The span's fragments in CSS pixels, document coordinates. Each is
-/// placed as Chromium places an inline box: the line's half-leading
-/// over the block's own font, then the block's ascent to the baseline,
-/// less the span's ascent; every ascent and descent rounded to a device
-/// pixel.
+/// placed as Chromium places an inline box: the line's baseline over
+/// the block's own font (`baseline_below_top`, the half-leading floored
+/// to a device pixel, as the glyphs are placed), less the span's
+/// ascent; every ascent and descent rounded to a device pixel.
 fn fragments(
     span: &InlineSpan,
     run: &InlineRun,
@@ -75,7 +75,9 @@ fn fragments(
         .into_iter()
         .map(|fragment| {
             let (top, height) = lines[fragment.line];
-            let baseline = top + (height - block_ascent - block_descent) / 2.0 + block_ascent;
+            let device =
+                baseline_below_top(height * scale, block_ascent * scale, block_descent * scale);
+            let baseline = top + device / scale;
             BoxRect {
                 x: origin.x + fragment.x / scale,
                 y: origin.y + baseline - ascent,

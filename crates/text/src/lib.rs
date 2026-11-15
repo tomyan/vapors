@@ -56,7 +56,7 @@ pub use font_system::FontSystem;
 pub use icon::{Icon, IconError, IconStroke};
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
 pub use layout_ranges::Fragment;
-pub use line_metrics::content_area;
+pub use line_metrics::{baseline_below_top, content_area};
 pub use parley;
 pub use pipeline::{BlendParams, TextPipeline};
 pub use quads::TextDraw;

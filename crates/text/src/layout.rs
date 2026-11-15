@@ -84,7 +84,7 @@ impl Layout {
     pub fn lines(&self) -> impl Iterator<Item = LineInfo> + '_ {
         self.inner.lines().map(|line| LineInfo {
             text_range: line.text_range(),
-            baseline: line.metrics().baseline,
+            baseline: crate::layout_runs::baseline(&line),
             top: line.metrics().block_min_coord,
             height: line.metrics().block_max_coord - line.metrics().block_min_coord,
             advance: line.metrics().advance,
@@ -146,6 +146,10 @@ impl Layout {
         &self.inner
     }
 }
+
+#[cfg(test)]
+#[path = "layout_baseline_tests.rs"]
+mod baseline_tests;
 
 #[cfg(test)]
 #[path = "layout_tests.rs"]
