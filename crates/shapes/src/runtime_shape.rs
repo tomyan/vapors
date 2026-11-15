@@ -25,8 +25,15 @@ pub struct RuntimeShape {
 /// What a run-time shape draws, owned.
 #[derive(Debug, PartialEq)]
 enum Drawn {
-    Rect { origin: [f32; 2], size: [f32; 2] },
-    Ellipse { centre: [f32; 2], radii: [f32; 2] },
+    Rect {
+        origin: [f32; 2],
+        size: [f32; 2],
+        radius: [f32; 2],
+    },
+    Ellipse {
+        centre: [f32; 2],
+        radii: [f32; 2],
+    },
     Mesh(Vec<MeshTriangle>),
 }
 
@@ -41,7 +48,21 @@ impl RuntimeShape {
         mesh: Option<(Vec<MeshTriangle>, f32)>,
     ) -> Self {
         let (drawn, tolerance) = match (classified, mesh) {
-            (Classified::Rect { origin, size }, _) => (Drawn::Rect { origin, size }, 0.0),
+            (
+                Classified::Rect {
+                    origin,
+                    size,
+                    radius,
+                },
+                _,
+            ) => (
+                Drawn::Rect {
+                    origin,
+                    size,
+                    radius,
+                },
+                0.0,
+            ),
             (Classified::Ellipse { centre, radii }, _) => (Drawn::Ellipse { centre, radii }, 0.0),
             (Classified::Path, Some((triangles, tolerance))) => (Drawn::Mesh(triangles), tolerance),
             (Classified::Path, None) => unreachable!("a path is tessellated before it is kept"),
@@ -70,10 +91,14 @@ impl RuntimeShape {
     #[must_use]
     pub fn geometry(&self) -> Geometry<'_> {
         match &self.drawn {
-            Drawn::Rect { origin, size } => Geometry::Rect {
+            Drawn::Rect {
+                origin,
+                size,
+                radius,
+            } => Geometry::Rect {
                 origin: *origin,
                 size: *size,
-                radius: [0.0, 0.0],
+                radius: *radius,
             },
             Drawn::Ellipse { centre, radii } => Geometry::Ellipse {
                 centre: *centre,

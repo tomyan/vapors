@@ -8,6 +8,7 @@
 mod canonical;
 mod classify;
 mod classify_near;
+mod classify_round;
 mod geometry;
 mod geometry_box;
 mod mesh;
