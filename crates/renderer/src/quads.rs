@@ -4,7 +4,7 @@
 
 use vapors_scene::{Color, Quad};
 
-use crate::instanced::{Instanced, instance_bytes, row_of};
+use crate::instanced::{Instanced, rowed_instances};
 use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws quads. Create once per target format.
@@ -18,7 +18,7 @@ impl QuadPipeline {
             device,
             format,
             "quads",
-            include_str!("quads.wgsl"),
+            &RowOffsets::shader(include_str!("quads.wgsl")),
             8,
         ))
     }
@@ -36,11 +36,15 @@ impl QuadPipeline {
     }
 
     /// The instance bytes of `quads`, item `i` in row `rows[i]` of the
-    /// batch's [`RowOffsets`] (row 0 past the end of `rows`).
+    /// batch's [`RowOffsets`], or every item in row 0 for an empty `rows`.
+    ///
+    /// # Panics
+    ///
+    /// When `rows` is neither empty nor one index an item, or names a row
+    /// past the table ([`RowOffsets::CAPACITY`]).
     #[must_use]
     pub fn bytes_in_rows(quads: &[Quad], rows: &[u32]) -> Vec<u8> {
-        let rowed = quads.iter().enumerate();
-        instance_bytes(rowed.map(|(at, item)| (instance(item), row_of(rows, at))))
+        rowed_instances(("quads", 8), (quads, rows), instance)
     }
 
     /// Writes `bytes` ([`QuadPipeline::bytes`] of a run) into the kept buffer,

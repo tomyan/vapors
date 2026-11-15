@@ -15,7 +15,7 @@ struct Params {
     contrast: f32,
     viewport: vec2<f32>,
     shift: vec2<f32>,
-    rows: array<vec4<f32>, 64>,
+    rows: array<vec4<f32>, ROW_PAIRS>,
 }
 
 struct VertexIn {

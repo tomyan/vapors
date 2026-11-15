@@ -66,7 +66,9 @@ impl TextPipeline {
             device,
             wgpu::ShaderModuleDescriptor {
                 label: Some("text"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(
+                    RowOffsets::shader(include_str!("text.wgsl")).into(),
+                ),
             },
         );
         let layout = bind_group_layout(device);
@@ -161,3 +163,7 @@ mod tests {
         assert_eq!(params.contrast, 0.2);
     }
 }
+
+#[cfg(test)]
+#[path = "pipeline_layout_tests.rs"]
+mod layout_tests;

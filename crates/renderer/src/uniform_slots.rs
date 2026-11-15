@@ -6,6 +6,7 @@
 //! slot.
 
 use crate::encoder_turn::EncoderTurn;
+use crate::word_hash::{WordHashing, word_hash};
 use crate::{ArenaFull, FrameEncoder, Holding, RowOffsets, WorkCounter};
 
 /// Slots in a new buffer: 4 KiB at the 256-byte alignment WebGPU, ANV
@@ -31,13 +32,15 @@ pub struct UniformSlots<const SIZE: usize = 16> {
     generation: u64,
 }
 
-/// Whether a held value is the one looked up.
-type Same<'a, const SIZE: usize> = dyn Fn(&[u8; SIZE]) -> bool + 'a;
+/// Whether a held slot holds the value looked up.
+type Same<'a, const SIZE: usize> = dyn Fn(&Slot<SIZE>) -> bool + 'a;
 
-/// A slot's value, its hash, and the last encoder whose draw read it.
+/// A slot's value, its hash, whether its rows' offsets are the empty
+/// table (`slot_with_rows`), and the last encoder whose draw read it.
 struct Slot<const SIZE: usize> {
     value: [u8; SIZE],
     hash: u64,
+    rows_none: bool,
     encoder: u64,
 }
 
@@ -104,8 +107,9 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         work: &WorkCounter,
         value: [u8; SIZE],
     ) -> Option<u32> {
-        let same = |held: &[u8; SIZE]| *held == value;
-        self.slot_found(frame, (queue, work), (word_hash(&value), &same), &|| value)
+        let same = |held: &Slot<SIZE>| held.value == value;
+        let written = (word_hash(&value), false);
+        self.slot_found(frame, (queue, work), (written, &same), &|| value)
     }
 
     /// As [`UniformSlots::slot`], for the value of `head` followed by
@@ -131,14 +135,11 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
             self.label
         );
         let hash = word_hash(&head).rotate_left(5) ^ rows.hash();
-        let same = |held: &[u8; SIZE]| held[..HEAD] == head && held[HEAD..] == rows.bytes()[..];
-        let value = || {
-            let mut value = [0; SIZE];
-            value[..HEAD].copy_from_slice(&head);
-            value[HEAD..].copy_from_slice(rows.bytes());
-            value
-        };
-        self.slot_found(frame, (queue, work), (hash, &same), &value)
+        let same = |held: &Slot<SIZE>| holds(held, (&head, rows));
+        let written = (hash, rows.is_none());
+        self.slot_found(frame, (queue, work), (written, &same), &|| {
+            joined(head, rows)
+        })
     }
 
     /// The slot of the value of hash `hash` that `same` accepts, else a
@@ -147,17 +148,17 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         &mut self,
         frame: &FrameEncoder,
         (queue, work): (&wgpu::Queue, &WorkCounter),
-        (hash, same): (u64, &Same<'_, SIZE>),
+        ((hash, rows_none), same): ((u64, bool), &Same<'_, SIZE>),
         value: &dyn Fn() -> [u8; SIZE],
     ) -> Option<u32> {
         self.turn.begin(frame);
         let held = self.by_hash.get(&hash).and_then(|slots| {
             let mut held = slots.iter().copied();
-            held.find(|&at| same(&self.slots[at].value))
+            held.find(|&at| same(&self.slots[at]))
         });
         let at = match held {
             Some(at) => at,
-            None => self.write(frame, (queue, work), (hash, value()))?,
+            None => self.write(frame, (queue, work), (hash, rows_none, value()))?,
         };
         self.slots[at].encoder = frame.id();
         Some(self.offset(at))
@@ -167,21 +168,33 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         &mut self,
         frame: &FrameEncoder,
         (queue, work): (&wgpu::Queue, &WorkCounter),
-        (hash, value): (u64, [u8; SIZE]),
+        (hash, rows_none, value): (u64, bool, [u8; SIZE]),
     ) -> Option<usize> {
         let at = self.free_slot(frame)?;
         work.write_uniform(queue, &self.buffer, u64::from(self.offset(at)), &value);
         let slot = Slot {
             value,
             hash,
+            rows_none,
             encoder: frame.id(),
         };
         let was = std::mem::replace(&mut self.slots[at], slot);
-        if let Some(slots) = self.by_hash.get_mut(&was.hash) {
-            slots.retain(|&held| held != at);
-        }
+        self.forget(was.hash, at);
         self.by_hash.entry(hash).or_default().push(at);
         Some(at)
+    }
+
+    /// Takes slot `at` out of the slots held for `hash`, and the hash
+    /// out of the map when it holds none: the map holds a key for each
+    /// slot at most, however many values a session writes.
+    fn forget(&mut self, hash: u64, at: usize) {
+        let Some(slots) = self.by_hash.get_mut(&hash) else {
+            return;
+        };
+        slots.retain(|&held| held != at);
+        if slots.is_empty() {
+            self.by_hash.remove(&hash);
+        }
     }
 
     /// A slot no draw of `frame` reads: an unused one in the buffer,
@@ -205,6 +218,7 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         self.slots.push(Slot {
             value: [0; SIZE],
             hash: 0,
+            rows_none: false,
             encoder: frame.id(),
         });
         self.slots.len() - 1
@@ -236,53 +250,56 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         usize::try_from(self.buffer.size() / self.align).expect("a buffer the device allows")
     }
 
+    /// The keys of the map and the slots held, for the tests that the
+    /// map stays bounded.
+    #[cfg(test)]
+    pub(crate) fn keys_and_slots(&self) -> (usize, usize) {
+        (self.by_hash.len(), self.slots.len())
+    }
+
     fn offset(&self, at: usize) -> u32 {
         u32::try_from(at as u64 * self.align).expect("an offset in a buffer the device allows")
     }
 }
 
-/// Hashes a uniform value eight bytes at a time (an `FxHash`-style
-/// multiply and rotate): a value is up to a kilobyte, looked up on every
-/// draw, and holds no input an attacker chooses. Zero bytes hash to 0.
-pub(crate) fn word_hash(bytes: &[u8]) -> u64 {
-    let mut hasher = WordHasher::default();
-    std::hash::Hasher::write(&mut hasher, bytes);
-    hasher.0
-}
-
-type WordHashing = std::hash::BuildHasherDefault<WordHasher>;
-
-#[derive(Default)]
-struct WordHasher(u64);
-
-impl std::hash::Hasher for WordHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        let (words, rest) = bytes.as_chunks::<8>();
-        for &word in words {
-            self.add(u64::from_le_bytes(word));
-        }
-        for &byte in rest {
-            self.add(u64::from(byte));
-        }
-    }
-
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-impl WordHasher {
-    fn add(&mut self, word: u64) {
-        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
-    }
-}
-
 /// A new buffer's size: `FIRST_SLOTS` slots `align` apart, or as many
-/// whole slots as the device's `max_buffer_size` holds, at least one;
-/// growing past it is refused where it happens (`grow`).
+/// whole slots as the device's `max_buffer_size` holds; growing past it
+/// is refused where it happens (`grow`).
+///
+/// # Panics
+///
+/// When the device's `max_buffer_size` holds no slot.
 fn first_size(device: &wgpu::Device, align: u64) -> u64 {
     let limit = device.limits().max_buffer_size;
-    (FIRST_SLOTS * align).min(limit / align * align).max(align)
+    assert!(
+        limit >= align,
+        "a uniform slot of {align} bytes is over the device's max_buffer_size of {limit} \
+         (uniform_slots.rs); reproduce with `cargo xtask test`"
+    );
+    (FIRST_SLOTS * align).min(limit / align * align)
+}
+
+/// Whether `slot` holds `head` followed by `rows`' bytes. An empty table
+/// is known by the slot's flag, its kilobyte not compared; the hash
+/// already parts most values, and this decides on a collision.
+fn holds<const HEAD: usize, const SIZE: usize>(
+    slot: &Slot<SIZE>,
+    (head, rows): (&[u8; HEAD], &RowOffsets),
+) -> bool {
+    let same_rows = if rows.is_none() {
+        slot.rows_none
+    } else {
+        !slot.rows_none && slot.value[HEAD..] == rows.bytes()[..]
+    };
+    slot.value[..HEAD] == head[..] && same_rows
+}
+
+/// The value of `head` followed by `rows`' bytes.
+fn joined<const HEAD: usize, const SIZE: usize>(head: [u8; HEAD], rows: &RowOffsets) -> [u8; SIZE] {
+    let mut value = [0; SIZE];
+    value[..HEAD].copy_from_slice(&head);
+    value[HEAD..].copy_from_slice(rows.bytes());
+    value
 }
 
 fn buffer(device: &wgpu::Device, label: &str, size: u64) -> wgpu::Buffer {
@@ -293,3 +310,7 @@ fn buffer(device: &wgpu::Device, label: &str, size: u64) -> wgpu::Buffer {
         mapped_at_creation: false,
     })
 }
+
+#[cfg(test)]
+#[path = "uniform_slots_tests.rs"]
+mod tests;

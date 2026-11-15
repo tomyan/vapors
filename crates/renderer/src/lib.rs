@@ -36,6 +36,10 @@ mod solid;
 mod target;
 mod uniform_slots;
 mod upload;
+mod word_hash;
+
+#[cfg(test)]
+mod gpu_uniform_slots_tests;
 mod work;
 
 pub use arena_full::{ArenaFull, Holding};

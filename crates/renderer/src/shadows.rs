@@ -4,7 +4,7 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, instance_bytes, row_of};
+use crate::instanced::{Instanced, rowed_instances};
 use crate::quads::rgba;
 use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
@@ -19,7 +19,7 @@ impl ShadowPipeline {
             device,
             format,
             "shadows",
-            include_str!("shadows.wgsl"),
+            &RowOffsets::shader(include_str!("shadows.wgsl")),
             7,
         ))
     }
@@ -36,11 +36,15 @@ impl ShadowPipeline {
     }
 
     /// The instance bytes of `shadows`, item `i` in row `rows[i]` of the
-    /// batch's [`RowOffsets`] (row 0 past the end of `rows`).
+    /// batch's [`RowOffsets`], or every item in row 0 for an empty `rows`.
+    ///
+    /// # Panics
+    ///
+    /// When `rows` is neither empty nor one index an item, or names a row
+    /// past the table ([`RowOffsets::CAPACITY`]).
     #[must_use]
     pub fn bytes_in_rows(shadows: &[Shadow], rows: &[u32]) -> Vec<u8> {
-        let rowed = shadows.iter().enumerate();
-        instance_bytes(rowed.map(|(at, item)| (instance(item), row_of(rows, at))))
+        rowed_instances(("shadows", 7), (shadows, rows), instance)
     }
 
     /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,

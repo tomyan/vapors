@@ -190,6 +190,12 @@ fn params_head(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS
 /// (`vapors-renderer`'s retained.rs); the padding, under one vertex, is
 /// never drawn (`vertex_count` rounds down).
 pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
+    assert!(
+        floats.len().is_multiple_of(FLOATS_PER_VERTEX),
+        "{} text vertex floats, not a whole number of {FLOATS_PER_VERTEX}-float vertices: the \
+         row index would land inside one (draw.rs); reproduce with `cargo xtask test`",
+        floats.len()
+    );
     let mut bytes = Vec::new();
     for vertex in floats.chunks(FLOATS_PER_VERTEX) {
         bytes.extend(vertex.iter().flat_map(|f| f.to_le_bytes()));

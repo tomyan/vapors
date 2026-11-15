@@ -229,20 +229,61 @@ pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
 /// each, then the rows' offsets (`RowOffsets::bytes`).
 pub(crate) const VIEW_SIZE: usize = 16 + RowOffsets::CAPACITY * 8;
 
-/// Little-endian bytes of each instance's floats followed by its row's
-/// index, padded to 16 bytes: the instance buffer's layout.
-pub(crate) fn instance_bytes(instances: impl IntoIterator<Item = (Vec<f32>, u32)>) -> Vec<u8> {
+/// The instance bytes of `items` for the pipeline `label`: each item's
+/// `vec4s` four-float attributes (`floats`), then its row's index in
+/// `rows`, padded to 16 bytes. An empty `rows` puts every item in row 0
+/// (a batch in one frame).
+///
+/// # Panics
+///
+/// When `rows` is neither empty nor one index an item, when an index is
+/// past the [`RowOffsets`] table (the shader would read it clamped,
+/// silently), or when an item's floats are not `vec4s` four-float
+/// attributes.
+pub(crate) fn rowed_instances<T>(
+    (label, vec4s): (&str, usize),
+    (items, rows): (&[T], &[u32]),
+    floats: impl Fn(&T) -> Vec<f32>,
+) -> Vec<u8> {
+    assert_rows(label, items.len(), rows);
     let mut bytes = Vec::new();
-    for (floats, row) in instances {
+    for (at, item) in items.iter().enumerate() {
+        let floats = floats(item);
+        assert_eq!(
+            floats.len(),
+            vec4s * 4,
+            "{label}: an instance is {vec4s} vec4s"
+        );
         bytes.extend(floats.into_iter().flat_map(f32::to_le_bytes));
-        bytes.extend(row.to_le_bytes());
+        bytes.extend(rows.get(at).copied().unwrap_or(0).to_le_bytes());
         bytes.extend([0; 12]);
     }
     bytes
 }
 
-/// Each row index of `rows` or, past its end (an empty `rows` for a
-/// batch in one frame), row 0.
-pub(crate) fn row_of(rows: &[u32], at: usize) -> u32 {
-    rows.get(at).copied().unwrap_or(0)
+/// Panics, naming `label`, unless `rows` is empty or holds one index for
+/// each of `items` items, every one inside the [`RowOffsets`] table.
+pub(crate) fn assert_rows(label: &str, items: usize, rows: &[u32]) {
+    assert!(
+        rows.is_empty() || rows.len() == items,
+        "{label}: {} row indexes for {items} items; give one an item, or none for a batch in one \
+         frame (instanced.rs); reproduce with `cargo xtask test`",
+        rows.len()
+    );
+    let past = rows
+        .iter()
+        .position(|&row| row as usize >= RowOffsets::CAPACITY);
+    if let Some(at) = past {
+        panic!(
+            "{label}: item {at} names row {}, past the {} rows a batch's table holds; split the \
+             run into batches of at most that many rows (row_offsets.rs); reproduce with \
+             `cargo xtask test`",
+            rows[at],
+            RowOffsets::CAPACITY
+        );
+    }
 }
+
+#[cfg(test)]
+#[path = "instanced_layout_tests.rs"]
+mod layout_tests;

@@ -15,6 +15,8 @@ rust-version = "1.99"
 tempfile = "3.27.0"
 clap = { version = "4", features = ["derive"] }
 wgpu = "30"
+# wgpu's shader front end, for the tests that read a shader's layout
+naga = { version = "30", features = ["wgsl-in"] }
 pollster = "1"
 # winit's default features, except Wayland's client-side decorations
 # without their title text (`-notitle`): the titled variant pulls in
