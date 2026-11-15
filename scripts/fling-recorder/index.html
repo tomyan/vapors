@@ -61,7 +61,7 @@ function save(ended) {
     userAgent: navigator.userAgent,
     devicePixelRatio: devicePixelRatio,
     viewport: [innerWidth, innerHeight],
-    list: { height: list.clientHeight, scrollHeight: list.scrollHeight, rowHeight: 48 },
+    list: (() => { const r = list.getBoundingClientRect(); return { top: r.top, left: r.left, width: list.clientWidth, height: list.clientHeight, scrollHeight: list.scrollHeight, rowHeight: 48, rows: 400 }; })(),
     events,
   });
   events = null; fingerUp = false;
