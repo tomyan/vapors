@@ -1,58 +1,25 @@
-//! Replays the coast of a fling Chrome scrolled (a transcript from
-//! scripts/fling-recorder and its `.coast.json` from `fit.py coast`;
-//! docs/plans/touch-momentum.md) through vapors: a page with the
-//! recorder's list, its scroll offset set to where Chrome's coast began,
-//! flung at the start time and velocity fitted to Chrome's frames, an
-//! app frame at each of Chrome's coast frames, and the list's offset read
-//! after each beside Chrome's `scrollTop`. The drag is not replayed: the
-//! plan says why.
-
-#![allow(
-    clippy::cast_possible_truncation,
-    reason = "a transcript's numbers are a phone page's CSS pixels and milliseconds, far inside f32"
-)]
+//! Replays a fling transcript's coast (`fling_transcript.rs`) through
+//! vapors: a page with the recorder's list, its scroll offset set to
+//! where Chrome's coast began, flung at the start time and velocity
+//! fitted to Chrome's first frames, an app frame at each of Chrome's
+//! frames, and the list's offset read after each beside Chrome's
+//! `scrollTop`; then frames on until the app stops asking for them.
+//! The drag is not replayed: docs/plans/touch-momentum.md says why.
 
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde_json::Value;
 use vapors_app::ElementsApp;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 use vapors_gpu_harness::Gpu;
-use vapors_platform::{App, Frame, Instant, Platform, Start};
+use vapors_platform::{App, Frame, Instant, Next, Platform, Start};
 use vapors_renderer::clear;
 use vapors_scene::Color;
 use vapors_text::FontSystem;
 
-/// The recorder's list: its size and its content's height, CSS px.
-pub struct List {
-    pub width: f32,
-    pub height: f32,
-    pub scroll_height: f32,
-}
-
-/// Where and how fast Chrome's coast began (`fit.py coast`), and its
-/// first frame, ms on the transcript's clock and CSS px.
-pub struct Coast {
-    pub first_frame_ms: f64,
-    pub start_ms: f64,
-    pub start_top: f32,
-    pub velocity: f32,
-}
-
-/// A transcript's coast: its file, the page's density and list, the
-/// fitted start, and Chrome's frames from the coast's first on.
-pub struct Transcript {
-    pub file: String,
-    pub scale: f32,
-    pub list: List,
-    pub coast: Coast,
-    /// Chrome's frames: time in ms, `scrollTop`.
-    pub frames: Vec<(f64, f32)>,
-}
+use crate::fling_transcript::{List, Transcript};
 
 /// One of Chrome's frames, with Chrome's scroll offset and vapors'.
 pub struct Compared {
@@ -61,72 +28,127 @@ pub struct Compared {
     pub ours: f32,
 }
 
-fn json(path: &Path) -> Result<Value, String> {
-    let file = path.display();
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{file}: {e}"))?;
-    serde_json::from_str(&text).map_err(|e| format!("{file}: not JSON: {e}"))
+/// The replay: Chrome's frames compared, and at every frame drawn
+/// (Chrome's, then on until the app went idle or `SETTLE_FRAMES`
+/// passed) vapors' offset and what the app asked for next.
+pub struct Replayed {
+    pub compared: Vec<Compared>,
+    pub frames: Vec<(f32, Next)>,
 }
 
-fn number(file: &str, value: &Value, name: &str) -> Result<f64, String> {
-    value[name]
-        .as_f64()
-        .ok_or_else(|| format!("{file}: `{name}` is not a number"))
+/// Frames drawn past Chrome's last, at 60 Hz, waiting for the app to go
+/// idle: 2 s, longer than any recorded coast runs past its recording.
+const SETTLE_FRAMES: u32 = 120;
+const FRAME: Duration = Duration::from_micros(16_667);
+
+/// The app showing the page, on the transcript's clock.
+struct Rig<'a> {
+    app: ElementsApp,
+    doc: Rc<RefCell<Document>>,
+    list: NodeId,
+    gpu: &'a Gpu,
+    transcript: &'a Transcript,
+    /// The instant of the transcript's `origin` ms.
+    base: Instant,
+    origin: f64,
 }
 
-/// The transcript in `path` and its coast beside it
-/// (`<name>.coast.json`).
+impl Rig<'_> {
+    fn at(&self, t: f64) -> Instant {
+        self.base + Duration::from_secs_f64((t - self.origin) / 1000.0)
+    }
+
+    fn offset(&self) -> f32 {
+        self.doc
+            .borrow()
+            .scroll_offset(self.list)
+            .map_or(f32::NAN, |o| o[1])
+    }
+
+    /// One app frame at `now`, at the list's size in device pixels.
+    fn frame(&mut self, now: Instant) -> Next {
+        let (width, height) = size(self.transcript);
+        let texture = clear(
+            &self.gpu.device,
+            &self.gpu.queue,
+            width,
+            height,
+            Color::default(),
+        );
+        self.app.frame(&Frame {
+            adapter: &self.gpu.adapter,
+            device: &self.gpu.device,
+            queue: &self.gpu.queue,
+            texture: &texture,
+            index: 0,
+            scale_factor: f64::from(self.transcript.scale),
+            now,
+        })
+    }
+}
+
+/// `transcript`'s coast replayed on `gpu`.
 ///
 /// # Errors
-/// A file that does not read or parse, a field missing or of another
-/// shape, or an event of a kind the recorder does not write, naming the
-/// file and the field or event.
-pub fn load(path: &Path) -> Result<Transcript, String> {
-    let file = path.display().to_string();
-    let (recorded, fitted) = (json(path)?, json(&path.with_extension("coast.json"))?);
-    let list = &recorded["list"];
-    let coast = Coast {
-        first_frame_ms: number(&file, &fitted, "first_frame_ms")?,
-        start_ms: number(&file, &fitted, "start_ms")?,
-        start_top: number(&file, &fitted, "start_top")? as f32,
-        velocity: number(&file, &fitted, "velocity")? as f32,
-    };
-    let events = recorded["events"]
-        .as_array()
-        .ok_or_else(|| format!("{file}: no `events` list"))?;
-    let mut frames = Vec::new();
-    for (at, event) in events.iter().enumerate() {
-        if let Some(frame) =
-            recorded_frame(event).map_err(|e| format!("{file}: event {at}: {e}"))?
-        {
-            frames.push(frame);
-        }
+/// `App::start` refused, the list not scrolling to the coast's start,
+/// or the fling refused.
+pub fn replay(transcript: &Transcript, gpu: &Gpu) -> Result<Replayed, String> {
+    let mut rig = flung(transcript, gpu)?;
+    let (mut compared, mut frames) = (Vec::new(), Vec::new());
+    for &(t, chrome) in &transcript.frames {
+        let next = rig.frame(rig.at(t));
+        compared.push(Compared {
+            t,
+            chrome,
+            ours: rig.offset(),
+        });
+        frames.push((rig.offset(), next));
     }
-    frames.retain(|(t, _)| *t >= coast.first_frame_ms);
-    Ok(Transcript {
-        scale: number(&file, &recorded, "devicePixelRatio")? as f32,
-        list: List {
-            width: number(&file, list, "width")? as f32,
-            height: number(&file, list, "height")? as f32,
-            scroll_height: number(&file, list, "scrollHeight")? as f32,
-        },
-        coast,
-        frames,
-        file,
-    })
+    settle(&mut rig, &mut frames);
+    Ok(Replayed { compared, frames })
 }
 
-/// `event`'s time and `scrollTop` when it is a frame; `None` for the
-/// other kinds the recorder writes.
-fn recorded_frame(event: &Value) -> Result<Option<(f64, f32)>, String> {
-    let number = |name: &str| {
-        event[name]
-            .as_f64()
-            .ok_or(format!("`{name}` is not a number"))
+/// The app started on the page, drawn once, the list at the coast's
+/// start and flung.
+fn flung<'a>(transcript: &'a Transcript, gpu: &'a Gpu) -> Result<Rig<'a>, String> {
+    let (file, coast) = (&transcript.file, &transcript.coast);
+    let (doc, list) = page(&transcript.list);
+    let mut rig = Rig {
+        app: ElementsApp::new(Rc::clone(&doc)),
+        doc,
+        list,
+        gpu,
+        transcript,
+        base: Instant::now(),
+        // the clock starts 50 ms before the coast
+        origin: coast.first_frame_ms.min(coast.start_ms) - 50.0,
     };
-    match event["kind"].as_str().ok_or("no `kind`")? {
-        "frame" => Ok(Some((number("t")?, number("top")? as f32))),
-        "scrollend" | "touchstart" | "touchmove" | "touchend" | "touchcancel" => Ok(None),
-        other => Err(format!("unknown kind `{other}`")),
+    rig.app
+        .start(&start(transcript, gpu))
+        .map_err(|e| format!("{file}: App::start: {e}"))?;
+    rig.frame(rig.base);
+    if !rig.doc.borrow_mut().scroll_to(list, [0.0, coast.start_top]) {
+        return Err(format!(
+            "{file}: the list did not scroll to {}",
+            coast.start_top
+        ));
+    }
+    let at = rig.at(coast.start_ms);
+    rig.app
+        .fling(list, [0.0, coast.velocity], at, &Platform::detached())
+        .map_err(|e| format!("{file}: {e}"))?;
+    Ok(rig)
+}
+
+/// Frames past Chrome's last, at 60 Hz, until the app asks for none.
+fn settle(rig: &mut Rig<'_>, frames: &mut Vec<(f32, Next)>) {
+    let last = rig.at(rig.transcript.frames.last().map_or(rig.origin, |f| f.0));
+    for n in 1..=SETTLE_FRAMES {
+        let next = rig.frame(last + FRAME * n);
+        frames.push((rig.offset(), next));
+        if next == Next::Wait {
+            return;
+        }
     }
 }
 
@@ -153,48 +175,6 @@ fn page(list: &List) -> (Rc<RefCell<Document>>, NodeId) {
     (Rc::new(RefCell::new(doc)), scroller)
 }
 
-/// `transcript`'s coast replayed on `gpu`: each of Chrome's frames,
-/// compared.
-///
-/// # Errors
-/// `App::start` refused, the list not a scroll container, or the fling
-/// refused.
-pub fn replay(transcript: &Transcript, gpu: &Gpu) -> Result<Vec<Compared>, String> {
-    let file = &transcript.file;
-    let (doc, list) = page(&transcript.list);
-    let mut app = ElementsApp::new(Rc::clone(&doc));
-    let (platform, base) = (Platform::detached(), Instant::now());
-    // the clock starts 50 ms before the coast's first frame
-    let origin = transcript
-        .coast
-        .first_frame_ms
-        .min(transcript.coast.start_ms)
-        - 50.0;
-    let at = |t: f64| base + Duration::from_secs_f64((t - origin) / 1000.0);
-    app.start(&start(transcript, gpu))
-        .map_err(|e| format!("{file}: App::start: {e}"))?;
-    frame(&mut app, gpu, transcript, base);
-    let coast = &transcript.coast;
-    if !doc.borrow_mut().scroll_to(list, [0.0, coast.start_top]) {
-        return Err(format!(
-            "{file}: the list did not scroll to {}",
-            coast.start_top
-        ));
-    }
-    app.fling(list, [0.0, coast.velocity], at(coast.start_ms), &platform)
-        .map_err(|e| format!("{file}: {e}"))?;
-    let mut compared = Vec::new();
-    for &(t, chrome) in &transcript.frames {
-        frame(&mut app, gpu, transcript, at(t));
-        let ours = doc
-            .borrow()
-            .scroll_offset(list)
-            .map_or(f32::NAN, |offset| offset[1]);
-        compared.push(Compared { t, chrome, ours });
-    }
-    Ok(compared)
-}
-
 fn start<'a>(transcript: &Transcript, gpu: &'a Gpu) -> Start<'a> {
     let (width, height) = size(transcript);
     Start {
@@ -209,27 +189,15 @@ fn start<'a>(transcript: &Transcript, gpu: &'a Gpu) -> Start<'a> {
 }
 
 /// The list's size in device pixels.
-#[allow(clippy::cast_sign_loss, reason = "a list's size is positive")]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "a phone list's size, positive and small"
+)]
 fn size(transcript: &Transcript) -> (u32, u32) {
-    let scale = transcript.scale;
-    let list = &transcript.list;
+    let (scale, list) = (transcript.scale, &transcript.list);
     (
         (list.width * scale).ceil() as u32,
         (list.height * scale).ceil() as u32,
     )
-}
-
-/// One app frame at `now`, at the list's size in device pixels.
-fn frame(app: &mut ElementsApp, gpu: &Gpu, transcript: &Transcript, now: Instant) {
-    let (width, height) = size(transcript);
-    let texture = clear(&gpu.device, &gpu.queue, width, height, Color::default());
-    app.frame(&Frame {
-        adapter: &gpu.adapter,
-        device: &gpu.device,
-        queue: &gpu.queue,
-        texture: &texture,
-        index: 0,
-        scale_factor: f64::from(transcript.scale),
-        now,
-    });
 }

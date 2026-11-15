@@ -60,17 +60,21 @@ impl TouchScroll {
         };
         self.fingers.remove(at);
         if self.fingers.is_empty() {
-            *self = Self {
-                touching: self.touching,
-                ..Self::default()
-            };
+            self.end_gesture();
         }
     }
 
-    /// Every finger was taken away at once (the window lost focus).
+    /// Every finger was taken away at once (the window lost focus); a
+    /// fling runs on.
     pub(crate) fn forget(&mut self) {
+        self.end_gesture();
+    }
+
+    /// No gesture: the input mode and a fling are kept.
+    fn end_gesture(&mut self) {
         *self = Self {
             touching: self.touching,
+            fling: self.fling.take(),
             ..Self::default()
         };
     }
@@ -88,6 +92,16 @@ impl TouchScroll {
     /// `fling` replaces the one under way.
     pub(crate) fn fling(&mut self, fling: Fling) {
         self.fling = Some(fling);
+    }
+
+    /// Whether a finger is down.
+    pub(crate) fn finger_down(&self) -> bool {
+        !self.fingers.is_empty()
+    }
+
+    /// The wheel scrolled or a button went down: the fling stops.
+    pub(crate) fn stop_fling(&mut self) {
+        self.fling = None;
     }
 
     /// Whether a fling is running.

@@ -1,8 +1,7 @@
 {
  "first_frame_ms": 16446.9,
  "start_ms": 16446.4,
- "start_top": 648.818,
- "velocity": -3280,
- "first12_px": 2.88,
- "whole_px": 4.22
+ "start_top": 649.8181762695312,
+ "velocity": -3290,
+ "fit_frames": 12
 }

@@ -34,7 +34,8 @@ fn a_fling_moves_its_container_along_the_curve() {
     let start = Instant::now();
     let mut fling = Fling::new(outer, curve(500.0), start);
 
-    // When: a frame a quarter of the way through
+    // When: a first frame, then one a quarter of the way through
+    fling.advance(&mut doc.borrow_mut(), start + FRAME);
     let running = fling.advance(&mut doc.borrow_mut(), start + Duration::from_micros(83_318));
 
     // Then: the spline at 0.25 × 58.3 px
@@ -72,6 +73,7 @@ fn a_fling_ends_at_its_curves_end_without_its_last_delta() {
     let (doc, outer, _) = nested();
     let start = Instant::now();
     let mut fling = Fling::new(outer, curve(300.0), start);
+    fling.advance(&mut doc.borrow_mut(), start + FRAME);
     fling.advance(&mut doc.borrow_mut(), start + Duration::from_millis(200));
     let before_end = offset(&doc, outer);
 
@@ -100,4 +102,46 @@ fn a_fling_stops_at_its_containers_edge() {
     // that moved nothing
     assert_eq!(offset(&doc, inner), 40.0);
     assert!(frames < 5, "{frames} frames");
+}
+
+#[test]
+fn a_fling_first_drawn_two_frames_late_starts_a_frame_before_that_draw() {
+    // Given two flings, one drawn first a frame after its start and one
+    // 50 ms after
+    let (on_time_doc, on_time_list, _) = nested();
+    let (late_doc, late_list, _) = nested();
+    let start = Instant::now();
+    let mut on_time = Fling::new(on_time_list, curve(500.0), start);
+    let mut late = Fling::new(late_list, curve(500.0), start);
+
+    // When
+    on_time.advance(&mut on_time_doc.borrow_mut(), start + FRAME);
+    late.advance(
+        &mut late_doc.borrow_mut(),
+        start + Duration::from_millis(50),
+    );
+
+    // Then: the late one moved as far as the one on time, not 50 ms' worth
+    assert_eq!(
+        offset(&late_doc, late_list),
+        offset(&on_time_doc, on_time_list)
+    );
+}
+
+#[test]
+fn a_frame_before_the_last_one_that_moved_moves_nothing() {
+    // Given a fling that moved at two frames
+    let (doc, outer, _) = nested();
+    let start = Instant::now();
+    let mut fling = Fling::new(outer, curve(500.0), start);
+    fling.advance(&mut doc.borrow_mut(), start + FRAME);
+    fling.advance(&mut doc.borrow_mut(), start + FRAME * 2);
+    let moved = offset(&doc, outer);
+
+    // When: a frame time between the two
+    let running = fling.advance(&mut doc.borrow_mut(), start + FRAME * 3 / 2);
+
+    // Then
+    assert!(running);
+    assert_eq!(offset(&doc, outer), moved);
 }

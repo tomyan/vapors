@@ -33,29 +33,33 @@ const END_TENSION: f64 = 1.0;
 /// (`SplineConstants`): a cubic Bézier in time inverted by bisection,
 /// each search starting where the last one ended, as Chromium's does.
 static POSITIONS: LazyLock<[f64; SAMPLES + 1]> = LazyLock::new(|| {
+    let mut positions = [1.0; SAMPLES + 1];
+    let mut x_min = 0.0;
+    for (i, position) in positions.iter_mut().take(SAMPLES).enumerate() {
+        let x = time_inverse(sample_time(i), &mut x_min);
+        *position = 3.0 * x * (1.0 - x) * ((1.0 - x) * START_TENSION + x) + x * x * x;
+    }
+    positions
+});
+
+/// The Bézier parameter at which the spline's time is `alpha`, by
+/// bisection from `x_min` up, which it raises as it goes, until within
+/// 1e-5 (Chromium's `ApproxEquals`; in f64 this takes about 17 steps).
+fn time_inverse(alpha: f64, x_min: &mut f64) -> f64 {
     let (p1, p2) = (
         START_TENSION * INFLEXION,
         1.0 - END_TENSION * (1.0 - INFLEXION),
     );
-    let mut positions = [1.0; SAMPLES + 1];
-    let mut x_min = 0.0;
-    for (i, position) in positions.iter_mut().take(SAMPLES).enumerate() {
-        let alpha = sample_time(i);
-        let (mut x_max, mut x) = (1.0, 0.0);
-        let mut coef = 0.0;
-        for _ in 0..64 {
-            x = x_min + (x_max - x_min) / 2.0;
-            coef = 3.0 * x * (1.0 - x);
-            let time = coef * ((1.0 - x) * p1 + x * p2) + x * x * x;
-            if (time - alpha).abs() < 1e-5 {
-                break;
-            }
-            if time > alpha { x_max = x } else { x_min = x }
+    let mut x_max = 1.0;
+    loop {
+        let x = *x_min + (x_max - *x_min) / 2.0;
+        let time = 3.0 * x * (1.0 - x) * ((1.0 - x) * p1 + x * p2) + x * x * x;
+        if (time - alpha).abs() < 1e-5 {
+            return x;
         }
-        *position = coef * ((1.0 - x) * START_TENSION + x) + x * x * x;
+        if time > alpha { x_max = x } else { *x_min = x }
     }
-    positions
-});
+}
 
 #[allow(clippy::cast_precision_loss, reason = "sample indices are at most 100")]
 fn sample_time(i: usize) -> f64 {

@@ -6,13 +6,11 @@ fling recorder saved.
       worst coast frame of a fit to the first 12 coast frames
 
   python3 fit.py coast <out-dir> <fling.json>...
-      per recording: the coast's start time, offset and velocity fitted
-      jointly to its first 12 frames (6 px allowance) and the whole coast
-      (11 px), from the coast frame at `first_frame_ms` on, among those
-      whose replay (as crates/app/src/fling.rs moves it) comes to rest
-      within a frame of Chrome's, written as
-      <out-dir>/<name>.coast.json for the replay test
-      (crates/app/tests/gpu_fling_replay.rs)
+      per recording: the coast's start time and velocity fitted to its
+      first 12 frames alone (from `first_frame_ms`, whose offset is the
+      start), written as <out-dir>/<name>.coast.json for the replay test
+      (crates/app/tests/gpu_fling_replay.rs). The rest of the coast, its
+      rest frame included, is left for the test to check
 
 The constants and the spline are ui/events/mobile_scroller.cc's, read at
 chromium 1555c8bf68dca9c1c73be452fa5a982afe33fdda (see
@@ -26,7 +24,7 @@ G = 9.80665
 TUNE = G * 39.37 * 160 * 0.84
 FR = 0.015
 DR = 2.3582018
-FIRST_FRAMES, FIRST_ALLOWANCE, WHOLE_ALLOWANCE, REST_FRAMES_APART = 12, 6.0, 11.0, 1
+FIRST_FRAMES = 12
 
 
 def table():
@@ -113,59 +111,15 @@ def first_frames_fit(frames, sign):
     return k, v, dt0
 
 
-MIN_DELTA, END_THRESHOLD, REST = 0.1, 0.1, 0.5
-
-
-def replayed(frames, coast, scroll_range):
-    """The offset at each frame as vapors' fling moves it (crates/app/src/
-    fling.rs, after Chromium's FlingController): no delta of 0.1 px or
-    less, none once the curve ends (at its duration or within 0.1 px of
-    its end), and the fling stopped by a delta that moves nothing."""
-    start_ms, top, velocity = coast
-    lo, hi = scroll_range
-    T, D, sign = dur(velocity), dist(velocity), (1 if velocity > 0 else -1)
-    reached, running, out = 0.0, True, []
-    for t, _ in frames:
-        u = (t - start_ms) / 1000 / T
-        if running and u > 0:
-            covered = spline(u) * D if u < 1 else D
-            if u >= 1 or D - covered < END_THRESHOLD:
-                running = False
-            else:
-                delta, reached = covered - reached, covered
-                moved = min(hi, max(lo, top + sign * delta)) if abs(delta) > MIN_DELTA else top
-                running = moved != top or abs(delta) <= MIN_DELTA
-                top = moved
-        out.append(top)
-    return out
-
-
-def last_moving(offsets):
-    return max((i for i, o in enumerate(offsets) if abs(o - offsets[-1]) > REST), default=None)
-
-
-def joint_fit(path):
-    frames, sign, scroll_range = load(path)
-    k, v_first, dt_first = first_frames_fit(frames, sign)
+def early_fit(path):
+    """The coast's start time and velocity fitted to its first
+    FIRST_FRAMES frames alone, from the frame it starts on: nothing later
+    in the coast, its rest frame included, is seen by the fit."""
+    frames, sign, _ = load(path)
+    k, v, dt0 = first_frames_fit(frames, sign)
     t0, p0 = frames[k]
-    best = None
-    for v in range(v_first - 200, v_first + 201, 10):
-        for dt0 in range(-8, 9):
-            for dp in [x / 2 for x in range(-8, 9)]:
-                coast = (t0 + dt_first + dt0, p0 + dp, sign * v)
-                ours = replayed(frames[k:], coast, scroll_range)
-                rest = (last_moving(ours), last_moving([top for _, top in frames[k:]]))
-                if None in rest or abs(rest[0] - rest[1]) > REST_FRAMES_APART:
-                    continue
-                e = [abs(o - top) for o, (_, top) in zip(ours, frames[k:])]
-                score = max(max(e[:FIRST_FRAMES]) / FIRST_ALLOWANCE, max(e) / WHOLE_ALLOWANCE)
-                if best is None or score < best[0]:
-                    best = (score, coast, max(e[:FIRST_FRAMES]), max(e))
-    if best is None:
-        sys.exit(f"{path}: no start, velocity and time near the first frames' fit comes to rest within a frame of Chrome's")
-    _, (start_ms, start_top, velocity), first, whole = best
-    return {"first_frame_ms": t0, "start_ms": round(start_ms, 2), "start_top": round(start_top, 3),
-            "velocity": velocity, "first12_px": round(first, 2), "whole_px": round(whole, 2)}
+    return {"first_frame_ms": t0, "start_ms": round(t0 + dt0, 2), "start_top": p0,
+            "velocity": sign * v, "fit_frames": FIRST_FRAMES}
 
 
 def summary(path):
@@ -179,7 +133,7 @@ def summary(path):
 
 
 def coast(out_dir, path):
-    fitted = joint_fit(path)
+    fitted = early_fit(path)
     name = os.path.basename(path).removesuffix(".json")
     with open(os.path.join(out_dir, f"{name}.coast.json"), "w") as f:
         json.dump(fitted, f, indent=1)

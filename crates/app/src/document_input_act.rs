@@ -28,6 +28,7 @@ impl DocumentInput {
                 Document::pointer_moved(document, point);
             }
             Action::Press(point, clicks, modifiers) => {
+                self.touch.stop_fling();
                 Document::pointer_pressed_with(document, point, clicks, modifiers);
             }
             Action::Release(point, modifiers) => {
@@ -45,6 +46,7 @@ impl DocumentInput {
             Action::DoubleTap(_) => {}
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
+                self.touch.stop_fling();
                 let now = vapors_platform::Instant::now();
                 self.wheel
                     .scroll(&mut document.borrow_mut(), point, delta, now);

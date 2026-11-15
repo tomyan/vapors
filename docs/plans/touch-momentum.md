@@ -75,8 +75,12 @@ Worked values from those formulas:
 | 8000 | 2566.6 ms | 7186.4 DIP |
 
 **The frame loop** (`components/input/fling_controller.cc`,
-`ProgressFling`, read at chromium 1555c8bf): nothing moves at or before
-the fling's start time. At each later frame the curve gives its offset
+`ProgressFling`, lines 197-270, read at chromium 1555c8bf): until a
+change has been sent, a frame two frames' time (1/30 s) or more after
+the start moves the start to one frame (1/60 s) before that frame
+(`kMaxMicrosecondsFromFlingTimestampToFirstProgress`), so a fling drawn
+first late does not jump. Nothing moves at a frame at or before the
+start, or before the last frame that sent a change. At each later frame the curve gives its offset
 since the start (`WebGestureCurveImpl::Advance`), and the change since
 the last frame is sent as a momentum scroll update, unless it is 0.1 px
 or less on both axes (`kMinInertialScrollDelta`); the skipped change is
@@ -86,7 +90,14 @@ not sent. A momentum update the scroller does not consume, at the
 content's edge, stops the fling
 (`RenderWidgetHostViewInput::StopFlingingIfNecessary`,
 `components/input/render_widget_host_view_input.cc:264-282`).
-`crates/app/src/fling.rs` follows these rules.
+`crates/app/src/fling.rs` follows these rules. Each axis of a fling's
+velocity is clamped to the maximum fling velocity, as the gesture
+detector clamps the release velocity (`MAX_FLING_SPEED`, below under
+the release velocity). A fling cannot start while a finger is down
+(Chromium starts one only from a gesture's end, and a finger down stops
+it). A wheel scroll or a button press stops a fling; vapors has no
+keyboard scrolling yet, and when it does, a key scroll stops one too.
+Losing the window's focus does not.
 
 **The release velocity** (`ui/events/velocity_tracker/velocity_tracker.cc`):
 the gesture detector's tracker defaults to `STRATEGY_DEFAULT = LSQ2`
@@ -101,8 +112,10 @@ the minimum and maximum fling velocities are Android's
 `ViewConfiguration` values, read on the device
 (`GetMinimumFlingVelocityInDipsPerSecond`,
 `GetMaximumFlingVelocityInDipsPerSecond`). They are not in Chromium's
-source. AOSP's defaults are 50 and 8000 DIP/s, but the Pixel's are
-unverified until the transcripts show them.
+source. AOSP's defaults are 50 and 8000 DIP/s. The transcripts show the
+Pixel's maximum is higher than 8000: 010 and 016 started at 13 214 and
+15 502. vapors clamps at 16 000 (`MAX_FLING_SPEED`), that measured lower
+bound rounded up, until #400 reads the Pixel's real value.
 
 ## Plan
 
@@ -123,26 +136,26 @@ unverified until the transcripts show them.
 
 27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device
 pixel ratio 2.75 (`~/.cache/fling-recordings`, made with the recorder
-above). `scripts/fling-recorder/fit.py` fits the curve above to each
-coast: the start frame, its time to the half millisecond, and the
-starting velocity, chosen so the curve ends at the recorded resting
-offset (a fling that ran to rest) or best fits the first 12 coast
-frames (one cut short by the next touch or the list's end).
+above). `scripts/fling-recorder/fit.py coast` fits the curve above to
+each coast's first 12 frames alone: the start frame, its time to the
+half millisecond, and the starting velocity. Nothing later in the coast
+is seen by the fit.
 
-**The curve is MobileScroller's.** Every fling that ran to rest away
-from the list's ends fits it:
+**The curve is MobileScroller's.** Three coasts ran to rest away from
+the list's ends (006, 021, 023); fitted on their first 12 frames, the
+curve's duration and distance match where they came to rest:
 
-| recording | starting velocity | curve | recorded coast | worst frame |
+| recording | starting velocity | curve | recorded coast | worst frame after the fit's 12 |
 |---|---|---|---|---|
-| 023 | 3015 DIP/s | 1251 ms over 1320 px | 1233 ms | 7.3 px |
-| 003 | 3226 DIP/s | 1315 ms over 1485 px | 1250 ms | 8.5 px |
-| 021 | 3131 DIP/s | 1286 ms over 1410 px | 1266 ms | 7.8 px |
-| 005 | 2848 DIP/s | 1200 ms over 1196 px | 1066 ms | 6.3 px |
+| 006 | 3134 DIP/s | 1287 ms over 1412 px | 1267 ms over 1424 px | 11.7 px |
+| 021 | 3140 DIP/s | 1289 ms over 1417 px | 1267 ms over 1410 px | 13.6 px |
+| 023 | 2938 DIP/s | 1228 ms over 1262 px | 1200 ms over 1268 px | 8.7 px |
 
-Over the first 12 coast frames every fling fits within 3 to 5 px. The
-worst frames over a whole coast are where the recorded offset is
-quantised to device pixels (1/2.75 CSS px) and the fit's start time is
-a frame's.
+003, 005 and 022 do not show a duration: the next touch cut each
+while it still moved 1 to 3 px a frame (`"ended": "interrupted"`), so
+their recorded coasts are the time until that touch. (An earlier
+version of this table listed 003 and 005 as coasts to rest.) Over the
+first 12 coast frames every fling fits within 2.1 to 4.6 px.
 
 **The content edge stops a fling.** 010 and 016 run to the list's
 ends (18 901.5 and 0) and 019 to its top: their coasts end there, cut
@@ -169,26 +182,45 @@ release velocity rebuilt from the drag's frames comes out at about half
 the starting velocity Chrome's coast shows. A replay of the drag would
 hold vapors to that lag, not to Chrome's tracker.
 
-So the replay starts each coast where Chrome's started: at the fitted
-start time, offset and velocity (`scripts/fling-recorder/fit.py
---joint`, written beside each fixture as a sidecar JSON). It holds the
+So the replay starts each coast where Chrome's started: at the start
+time and velocity fitted to its first 12 frames, from that frame's
+offset (`scripts/fling-recorder/fit.py coast`, written beside each
+fixture as a `.coast.json`). The rest of the coast, the rest frame and
+the edge are checks the fit never saw. It holds the
 curve, the frame loop and the edge stop to the recorded frames: within
-6 px over the first 12 coast frames and 11 px over the whole coast,
-coming to rest within one frame of Chrome, and at the list's end where
-Chrome's coast stopped at it. The allowances are recording noise, not
-slack for vapors: they are the worst error of Chrome's own curve fitted
-to Chrome's recordings (5.6 px and 10.1 px, on 010), rounded up. The
-one frame is Chrome's last moving frame, which moves 0.4 to 0.7 px past
-where its fitted curve ends (006, 021, 023); #395 asks whether Chrome's
-fling resampling explains it. The release velocity is a port of
+6 px over the first 12 coast frames (the fit came within 2.1 to 4.6 px
+of them), within 1.2% of the distance the coast travelled after them,
+coming to rest within one frame of Chrome on the six that came to rest,
+at the list's end where Chrome's coast stopped at it, and asking for no
+frame within two frames of its last movement. The 1.2% is measured out
+of sample, the worst whole-coast error over distance travelled, rounded
+up:
+
+| fixture | worst frame | travelled | ratio |
+|---|---|---|---|
+| 003 (cut) | 16.75 px | 1485 px | 0.0113 |
+| 005 (cut) | 10.67 px | 1196 px | 0.0089 |
+| 006 | 11.70 px | 1424 px | 0.0082 |
+| 010 (edge) | 20.63 px | 3479 px | 0.0059 |
+| 016 (edge) | 34.06 px | 7061 px | 0.0048 |
+| 019 (edge) | 5.44 px | 650 px | 0.0084 |
+| 021 | 13.61 px | 1410 px | 0.0097 |
+| 022 (cut) | 12.60 px | 1287 px | 0.0098 |
+| 023 | 8.69 px | 1268 px | 0.0068 |
+
+It still catches a real error: friction or the deceleration constant
+10% off either way, or the start a frame (16.7 ms) early or late, each
+fails the replay. The one frame is Chrome's last moving frame, which
+moves 0.4 to 0.7 px past where the fitted curve ends (006, 021, 023);
+#395 asks whether Chrome's fling resampling explains it. The release velocity is a port of
 Chromium's LSQ2 tracker (`ui/events/velocity_tracker/`), tested against
 that tracker's own behaviour on synthetic samples.
 
-**Fixtures for the replay:** coasts to rest, 023, 003, 005, 006, 021
-and 022 (the last five each cut by the next touch below 350 px/s, so no
-boost and almost no distance lost), and the edges, 010 and 016 (the
-list's two ends) and 019 (its top). All nine are held to the same
-allowances. Boost, 008 to 009 and 013 to 015, goes with the slice that
+**Fixtures for the replay:** coasts to rest, 006, 021 and 023;
+coasts cut by the next touch, 003, 005 and 022 (held to their path, with
+no rest frame); and the edges, 010 and 016 (the list's two ends) and
+019 (its top). The touches that cut or followed them came below
+350 px/s, so no boost. All nine are held to the same allowances. Boost, 008 to 009 and 013 to 015, goes with the slice that
 builds it.
 
 **First PR or later:** the first PR builds the curve, the frame loop, a

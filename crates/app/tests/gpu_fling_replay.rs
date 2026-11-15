@@ -1,49 +1,48 @@
 //! GPU tier: each fling coast Chrome on Android scrolled (a transcript
 //! in tests/fling/, recorded with scripts/fling-recorder on the Pixel,
-//! and its fitted start beside it; docs/plans/touch-momentum.md),
-//! started in vapors where and as fast as Chrome's began, scrolls the
-//! list as Chrome did: within `FIRST_ALLOWANCE` over the first
-//! `FIRST_FRAMES` frames, within `WHOLE_ALLOWANCE` over the coast, and
-//! coming to rest (within `REST` of its end) within `REST_FRAMES_APART`
-//! of Chrome's frame, at an edge where Chrome's stopped at one.
+//! and its start fitted to its first 12 frames beside it;
+//! docs/plans/touch-momentum.md), started in vapors where and as fast
+//! as Chrome's began, scrolls the list as Chrome did (`fling_checks.rs`).
+//! The fit saw only the first frames: the rest of the path, the rest
+//! frame and the edge are checks it never saw.
 
+#[path = "support/fling_checks.rs"]
+mod fling_checks;
 #[path = "support/fling_replay.rs"]
 mod fling_replay;
+#[path = "support/fling_transcript.rs"]
+mod fling_transcript;
 
 use std::path::PathBuf;
 
-use fling_replay::{Compared, load, replay};
+use fling_checks::{
+    FIRST_FRAMES, came_to_rest, not_idle, off_edge, off_path, rest_apart, rest_gap, travelled,
+    worst,
+};
+use fling_replay::{Replayed, replay};
+use fling_transcript::load;
 use vapors_gpu_harness::gpu;
 
-/// The coast's first frames, held to `FIRST_ALLOWANCE`.
-const FIRST_FRAMES: usize = 12;
-/// How far vapors' offset may be from Chrome's over the first frames,
-/// CSS px, and over the whole coast. These are recording noise, not
-/// slack for vapors: Chrome's own curve, fitted to Chrome's recordings,
-/// is off by up to 5.6 px over the first 12 frames and 10.1 px over a
-/// coast (010; the plan's Pixel findings), rounded up. Its frames are
-/// quantised to device pixels and its start time is fitted.
-const FIRST_ALLOWANCE: f32 = 6.0;
-const WHOLE_ALLOWANCE: f32 = 11.0;
-/// Closer to its final offset than this, a list is at rest, CSS px.
-const REST: f32 = 0.5;
-/// How many frames apart vapors and Chrome may come to rest. Chrome's
-/// last moving frame moves 0.4 to 0.7 px, past where its fitted curve
-/// ends, so the curve comes to rest a frame early on 006, 021 and 023.
-/// Retires with #395 (Chrome's fling resampling), if that
-/// explains the tail.
-const REST_FRAMES_APART: usize = 1;
+/// How a recorded coast ended.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Ending {
+    /// The list came to rest (or to its end) and held still.
+    Rest,
+    /// The next touch cut the coast while it still moved 1 to 3 px a
+    /// frame: it has no rest frame to hold vapors to.
+    Cut,
+}
 
-const FIXTURES: &[&str] = &[
-    "fling-003",
-    "fling-005",
-    "fling-006",
-    "fling-010",
-    "fling-016",
-    "fling-019",
-    "fling-021",
-    "fling-022",
-    "fling-023",
+const FIXTURES: &[(&str, Ending)] = &[
+    ("fling-003", Ending::Cut),
+    ("fling-005", Ending::Cut),
+    ("fling-006", Ending::Rest),
+    ("fling-010", Ending::Rest),
+    ("fling-016", Ending::Rest),
+    ("fling-019", Ending::Rest),
+    ("fling-021", Ending::Rest),
+    ("fling-022", Ending::Cut),
+    ("fling-023", Ending::Rest),
 ];
 
 fn dir() -> PathBuf {
@@ -70,93 +69,12 @@ fn transcripts() -> Vec<String> {
     found
 }
 
-/// Whether `off` is at most `allowance` (not when it is NaN).
-fn within(off: f32, allowance: f32) -> bool {
-    off.abs() <= allowance
-}
-
-/// The last frame at which the offset `pick` reads is not yet at rest.
-fn last_moving(compared: &[Compared], pick: fn(&Compared) -> f32) -> Option<usize> {
-    let end = compared.last().map_or(0.0, pick);
-    compared
-        .iter()
-        .rposition(|frame| (pick(frame) - end).abs() > REST)
-}
-
-/// Frames off Chrome's path by more than their allowance, as lines.
-fn off_path(file: &str, compared: &[Compared]) -> Vec<String> {
-    compared
-        .iter()
-        .enumerate()
-        .filter(|(at, frame)| {
-            let allowance = if *at < FIRST_FRAMES {
-                FIRST_ALLOWANCE
-            } else {
-                WHOLE_ALLOWANCE
-            };
-            !within(frame.ours - frame.chrome, allowance)
-        })
-        .map(|(at, frame)| {
-            format!(
-                "{file} frame {at} at {:.1} ms: ours {:.1}, Chrome's {:.1}",
-                frame.t, frame.ours, frame.chrome
-            )
-        })
-        .collect()
-}
-
-/// Where the replay stops apart from Chrome, as lines.
-fn rest_apart(file: &str, compared: &[Compared]) -> Vec<String> {
-    let mut found = Vec::new();
-    let (ours, chrome) = (
-        last_moving(compared, |f| f.ours),
-        last_moving(compared, |f| f.chrome),
-    );
-    let apart = ours.zip(chrome).map(|(ours, chrome)| ours.abs_diff(chrome));
-    if apart.is_none_or(|apart| apart > REST_FRAMES_APART) {
-        found.push(format!(
-            "{file}: still moving until frame {ours:?} in vapors, {chrome:?} in Chrome"
-        ));
-    }
-    if let Some(last) = compared
-        .last()
-        .filter(|f| !within(f.ours - f.chrome, WHOLE_ALLOWANCE))
-    {
-        found.push(format!(
-            "{file}: at rest at {:.1}, Chrome at {:.1}",
-            last.ours, last.chrome
-        ));
-    }
-    found
-}
-
-/// Chrome's coast ending this close to an end of the list ended there,
-/// CSS px: its `scrollTop` is quantised to device pixels (1/2.75 px).
-const AT_EDGE: f32 = 1.0;
-
-/// Where Chrome's coast stopped at an end of the list and vapors' did
-/// not stop exactly there, as a line.
-fn off_edge(file: &str, compared: &[Compared], max: f32) -> Option<String> {
-    let last = compared.last()?;
-    let edge = [0.0, max]
-        .into_iter()
-        .find(|edge| (last.chrome - edge).abs() <= AT_EDGE)?;
-    #[allow(
-        clippy::float_cmp,
-        reason = "a scroll clamped to its end is exactly there"
-    )]
-    let at_edge = last.ours == edge;
-    (!at_edge).then(|| {
-        format!(
-            "{file}: Chrome stopped at the edge {edge}, vapors at {:.2}",
-            last.ours
-        )
-    })
-}
-
 #[test]
 fn every_transcript_in_tests_fling_is_held_to_something() {
-    let listed: Vec<String> = FIXTURES.iter().map(|name| (*name).to_owned()).collect();
+    let listed: Vec<String> = FIXTURES
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
     assert_eq!(
         transcripts(),
         listed,
@@ -166,22 +84,66 @@ fn every_transcript_in_tests_fling_is_held_to_something() {
 }
 
 #[test]
-fn gpu_each_recorded_coast_scrolls_as_chrome_scrolled_it() {
-    let gpu = gpu();
-    let mut found = Vec::new();
-    for name in FIXTURES {
+fn every_coast_was_fitted_on_the_frames_held_to_the_first_allowance() {
+    for (name, _) in FIXTURES {
         let transcript =
             load(&dir().join(format!("{name}.json"))).unwrap_or_else(|e| panic!("{e}"));
-        let compared = replay(&transcript, &gpu).unwrap_or_else(|e| panic!("{e}"));
-        found.extend(off_path(name, &compared));
-        found.extend(rest_apart(name, &compared));
+        #[allow(clippy::cast_precision_loss, reason = "12")]
+        let held = FIRST_FRAMES as f64;
+        assert!(
+            (transcript.coast.fit_frames - held).abs() < f64::EPSILON,
+            "{name}: fitted on {} frames, held to {FIRST_FRAMES}; refit with `python3 scripts/fling-recorder/fit.py coast crates/app/tests/fling crates/app/tests/fling/fling-*[0-9].json`",
+            transcript.coast.fit_frames
+        );
+    }
+}
+
+/// What `name` departs from, as lines: its path, its rest frame when it
+/// came to rest, the edge, going idle, and its ending as declared.
+fn departures(name: &str, ending: Ending, replayed: &Replayed, max: f32) -> Vec<String> {
+    let compared = &replayed.compared;
+    let mut found = off_path(name, compared);
+    let recorded = if came_to_rest(compared) {
+        Ending::Rest
+    } else {
+        Ending::Cut
+    };
+    if recorded != ending {
+        found.push(format!(
+            "{name}: declared {ending:?} in FIXTURES, recorded {recorded:?}"
+        ));
+    }
+    if ending == Ending::Rest {
+        found.extend(rest_apart(name, compared));
+    }
+    found.extend(off_edge(name, compared, max));
+    found.extend(not_idle(name, replayed));
+    found
+}
+
+#[test]
+fn gpu_each_recorded_coast_scrolls_as_chrome_scrolled_it() {
+    let gpu = gpu();
+    let (mut found, mut measured) = (Vec::new(), Vec::new());
+    for &(name, ending) in FIXTURES {
+        let transcript =
+            load(&dir().join(format!("{name}.json"))).unwrap_or_else(|e| panic!("{e}"));
+        let replayed = replay(&transcript, &gpu).unwrap_or_else(|e| panic!("{e}"));
         let max = transcript.list.scroll_height - transcript.list.height;
-        found.extend(off_edge(name, &compared, max));
+        found.extend(departures(name, ending, &replayed, max));
+        let (first, whole) = worst(&replayed.compared);
+        let gap = rest_gap(&replayed.compared);
+        measured.push(format!(
+            "{name}: first 12 {first:.2} px, whole {whole:.2} px over {:.0} px ({:.4}), rest gap {gap:?}",
+            travelled(&replayed.compared),
+            whole / travelled(&replayed.compared)
+        ));
     }
     assert!(
         found.is_empty(),
-        "{} departures from Chrome:\n{}",
+        "{} departures from Chrome:\n{}\nmeasured:\n{}",
         found.len(),
-        found.join("\n")
+        found.join("\n"),
+        measured.join("\n")
     );
 }
