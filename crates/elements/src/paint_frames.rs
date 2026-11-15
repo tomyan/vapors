@@ -26,6 +26,7 @@ pub(crate) fn updated(
     (changed, kept): (&ChangedSlots, bool),
 ) -> bool {
     let reshaped = !kept || order.walks.reshaped();
+    let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
     // Relaxed in a release build: the scan runs only when the frames are
     // made afresh. The scroll containers change only when paint order is
     // walked or spliced (a box that starts or stops scrolling is
@@ -33,7 +34,6 @@ pub(crate) fn updated(
     // refuses a container the frames were not made for in its place.
     if reshaped || cfg!(debug_assertions) {
         let scrolls = |slot| input.stackings.scrolls(slot);
-        let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
         let named = (
             &scrolls as &dyn Fn(usize) -> bool,
             &lane_frame as &dyn Fn(usize) -> bool,
@@ -47,6 +47,7 @@ pub(crate) fn updated(
         clips: &order.clips,
         depth: &depth,
         shift: &shift,
+        lane_frame: &lane_frame,
     };
     let moved = if reshaped {
         let spliced = kept && order.walks.order == 0;

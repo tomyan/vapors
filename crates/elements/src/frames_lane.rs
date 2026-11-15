@@ -160,6 +160,17 @@ impl Frames {
         Some(at)
     }
 
+    /// Frame `frame` from the memo, or made by `make` and memoised until
+    /// the next update; no borrow is held while `make` reads other frames.
+    pub(super) fn memoised(&self, frame: usize, make: impl FnOnce() -> FrameAt) -> FrameAt {
+        if let Some(&at) = self.lanes.memo.borrow().get(&frame) {
+            return at;
+        }
+        let at = make();
+        self.lanes.memo.borrow_mut().insert(frame, at);
+        at
+    }
+
     /// Frame `frame` worked out from the lanes as they are, reading and
     /// filling no memo, for the debug checks: a check that filled the
     /// memo would leave a debug build reading lane frames that a release
@@ -167,6 +178,7 @@ impl Frames {
     pub(crate) fn resolved_afresh(&self, frame: usize) -> FrameAt {
         let outer = |outer| self.resolved_afresh(outer);
         self.lane_resolved(frame, &outer)
+            .or_else(|| self.relative_afresh(frame))
             .unwrap_or_else(|| self.at(frame))
     }
 

@@ -42,6 +42,7 @@ fn made(clips: &Clips, outer: [f32; 2]) -> Frames {
         clips,
         depth: &depth,
         shift: &shift,
+        lane_frame: &|_| false,
     };
     Frames::of(&(1..=102).collect::<Vec<_>>(), &inputs, 1.0)
 }
@@ -59,6 +60,7 @@ fn updated(
         clips,
         depth: &depth,
         shift: &shift,
+        lane_frame: &|_| false,
     };
     frames.update(changed, &inputs)
 }
@@ -174,6 +176,7 @@ fn nested_at(scale: f32, shift: f32, top: f32) -> Frames {
         clips: &clips,
         depth: &depth,
         shift: &own,
+        lane_frame: &|_| false,
     };
     Frames::of(&[1, 2], &inputs, scale)
 }

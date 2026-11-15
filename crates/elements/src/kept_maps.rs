@@ -36,19 +36,34 @@ pub(crate) fn build(painted: &mut Painted, placed: Placed<'_>) -> usize {
 }
 
 /// Removes the freed elements' entries, then puts the rebuilt and moved
-/// elements' entries; how many elements. Removing first lets a node
-/// freed and built again in one update keep its new entries. An
-/// element's frame changes only with a box built again: a box that
-/// starts or stops scrolling, or changes containing block, is restyled,
-/// which builds its subtree again.
+/// elements' entries, and those whose clips were redone; how many
+/// elements. Removing first lets a node freed and built again in one
+/// update keep its new entries. A box that starts or stops scrolling,
+/// or changes containing block, is restyled, which builds its subtree
+/// again; a lane whose framing flips moves its children's subtrees to
+/// other frames with no box built or moved, which the clips redone
+/// under them (`KeptOrder::redone`) name.
 fn patch(painted: &mut Painted, placed: Placed<'_>, changed: &ChangedSlots) -> usize {
     let removed = changed
         .freed
         .iter()
         .filter(|(_, key)| remove(painted, *key))
         .count();
-    let slots = changed.rebuilt.iter().chain(&changed.moved);
-    removed + slots.filter(|slot| put(painted, placed, **slot)).count()
+    let redone = &placed.2.redone;
+    let mut slots: Vec<usize> = changed
+        .rebuilt
+        .iter()
+        .chain(&changed.moved)
+        .chain(redone)
+        .copied()
+        .collect();
+    slots.sort_unstable();
+    slots.dedup();
+    removed
+        + slots
+            .into_iter()
+            .filter(|&slot| put(painted, placed, slot))
+            .count()
 }
 
 /// Removes an element's entries; whether `key` is an element's.

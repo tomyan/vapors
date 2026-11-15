@@ -10,17 +10,20 @@ use rustc_hash::FxHashSet;
 use vapors_scene::Rect;
 
 use super::NestedIndex;
-use super::{FrameAt, Frames, meet};
+use super::{Frames, Relative, meet};
 use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
 use crate::paint::snapped;
 
 /// What a frame is worked out from: each box's clips and frame, each
-/// scroll container's depth, and its own shift (device pixels).
+/// scroll container's depth, its own shift (device pixels), and which
+/// frames are lane frames, as placement decided them, so making a frame
+/// resolves no lane frame (section 11.2, 4e).
 pub(crate) struct FrameInputs<'a> {
     pub(crate) clips: &'a Clips,
     pub(crate) depth: &'a dyn Fn(usize) -> usize,
     pub(crate) shift: &'a dyn Fn(usize) -> [f32; 2],
+    pub(crate) lane_frame: &'a dyn Fn(usize) -> bool,
 }
 
 impl Frames {
@@ -113,7 +116,11 @@ impl Frames {
                 continue;
             }
             moved = true;
-            open.extend(self.nested.get(&slot).into_iter().flatten().copied());
+            // the frames in a relative frame keep their own parts too,
+            // which its change does not touch
+            if !self.relative.contains_key(&slot) {
+                open.extend(self.nested.get(&slot).into_iter().flatten().copied());
+            }
         }
         moved
     }
@@ -121,7 +128,7 @@ impl Frames {
     /// Panics, naming `slot`, when these frames were not made for it.
     fn assert_held(&self, slot: usize) {
         assert!(
-            self.by_frame.contains_key(&slot),
+            self.by_frame.contains_key(&slot) || self.relative.contains_key(&slot),
             "scroll container slot {slot} is updated but the kept frames were not made for it: \
              the kept frames and the stackings disagree on the scroll containers (paint_frames.rs \
              makes them afresh whenever paint order is walked or spliced); reproduce with \
@@ -129,11 +136,16 @@ impl Frames {
         );
     }
 
-    /// Works out frame `slot` from the frame it is in; whether it came
-    /// out different.
+    /// Works out frame `slot` from the frame it is in, or only its own
+    /// part under a lane frame; whether it came out different.
     fn work_out(&mut self, slot: usize, inputs: &FrameInputs<'_>) -> bool {
-        let outer = self.at(inputs.clips.frame(slot));
+        let outer = inputs.clips.frame(slot);
         let own = (inputs.shift)(slot);
+        if self.under_lane(outer, inputs.lane_frame) {
+            let inner = inputs.clips.inner(slot);
+            return self.insert_relative(slot, Relative { outer, own, inner });
+        }
+        let outer = self.at(outer);
         let shift = [outer.shift[0] + own[0], outer.shift[1] + own[1]];
         let inner = inputs
             .clips
@@ -145,12 +157,8 @@ impl Frames {
     /// Notes frame `slot` at `shift` under the page clip `clip`; whether
     /// it differs from what was noted.
     fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) -> bool {
-        let device_clip = clip.map(|clip| snapped(clip, self.scale));
-        let at = FrameAt {
-            shift,
-            clip,
-            device_clip,
-        };
+        let at = self.frame_at(shift, clip);
+        self.relative.remove(&slot);
         self.by_frame.insert(slot, at) != Some(at)
     }
 }

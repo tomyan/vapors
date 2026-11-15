@@ -64,7 +64,10 @@ impl BoxTree<'_> {
         Ok(())
     }
 
-    /// The `children` of the lane laid out again, their leaves set.
+    /// The `children` of the lane laid out again, their leaves set; each
+    /// whose leaf changed noted as moved. Later starts fold from the
+    /// leaves alone, so a child laid out to the leaf it had (a label
+    /// grown in width) starts no later child elsewhere.
     fn lay_out_again<K: LaneKind>(
         &mut self,
         children: Vec<usize>,
@@ -73,8 +76,11 @@ impl BoxTree<'_> {
     ) -> Result<(), LaneDecline> {
         for child in children {
             let leaf = self.leaf_of(child, c, lane)?;
-            lane.tree.set(lane.handle(child), leaf);
-            lane.moved.push(child);
+            let handle = lane.handle(child);
+            if lane.tree.summary(handle) != leaf {
+                lane.tree.set(handle, leaf);
+                lane.moved.push(child);
+            }
         }
         Ok(())
     }
@@ -88,8 +94,7 @@ impl BoxTree<'_> {
         lane: &mut Lane<K>,
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
-        let scrolls = self.scroller_at_or_below(slot);
-        lane.facts.note(slot, &layout, self.scale, scrolls);
+        lane.facts.note(slot, &layout, self.scale);
         lane.pending.insert(slot, layout);
         if K::reads_heights(&self.boxes[slot].style) {
             lane.height_readers.insert(slot);
@@ -97,39 +102,6 @@ impl BoxTree<'_> {
             lane.height_readers.remove(&slot);
         }
         Ok(leaf)
-    }
-}
-
-impl BoxTree<'_> {
-    /// Notes, in each lane holding it or an ancestor, every rebuilt
-    /// owner in `changed` holding a scroll container: an owner laid out
-    /// alone that answers as before (`isolated.rs`) leaves its ancestors'
-    /// caches, so no lane lays out the row it is in and learns of it.
-    /// O(each owner's subtree), which building it was too. Noted
-    /// whatever the owner answers: the lane's rows hold one now.
-    pub(super) fn note_scrollers(&mut self, changed: &[super::isolated::Changed]) {
-        for owner in changed {
-            if !self.scroller_at_or_below(owner.slot) {
-                continue;
-            }
-            for &slot in std::iter::once(&owner.slot).chain(&owner.ancestors) {
-                self.lanes.note_scroller(slot);
-            }
-        }
-    }
-
-    /// Whether the box in `slot` or one below it scrolls (its content a
-    /// scroll frame): O(the subtree), which laying the child out is too.
-    fn scroller_at_or_below(&self, slot: usize) -> bool {
-        let mut open = vec![slot];
-        while let Some(at) = open.pop() {
-            let overflow = self.boxes[at].style.overflow;
-            if overflow.x.is_scroll_container() || overflow.y.is_scroll_container() {
-                return true;
-            }
-            open.extend_from_slice(&self.boxes[at].children);
-        }
-        false
     }
 }
 

@@ -26,6 +26,9 @@ pub(crate) struct Before {
     rects: Vec<BoxRect>,
     paddings: Vec<taffy::Rect<f32>>,
     offsets: Vec<[f32; 2]>,
+    /// Whether each slot was a lane frame: a slot whose framing flips
+    /// moved to another frame, whatever its rect in it.
+    framed: Vec<bool>,
 }
 
 /// A fresh placement: each slot's rect in its frame, padding, offset,
@@ -45,6 +48,7 @@ impl Before {
             rects: kept.rects.clone(),
             paddings: kept.paddings.clone(),
             offsets: kept.offsets.clone(),
+            framed: kept.framed.clone(),
         }
     }
 }
@@ -111,7 +115,13 @@ pub(crate) fn assert_same(
         fail("the offsets by element differ from a fresh settle");
     }
     if !changed.every {
-        assert_moved_same(before, &fresh, &held, (&placed.moved, changed));
+        assert_moved_same(
+            before,
+            &fresh,
+            &held,
+            (&placed.moved, changed),
+            &kept.framed,
+        );
         assert_offsets_moved_same(before, &fresh, &held, (&placed.offsets_moved, changed));
     }
 }
@@ -150,12 +160,15 @@ fn assert_moved_same(
     fresh: &Fresh,
     held: &[usize],
     (moved, changed): (&[usize], &ChangedSlots),
+    framed: &[bool],
 ) {
     let changed = built_or_freed(changed);
     let differs = |slot: &&usize| {
         let slot = **slot;
         let was = (before.rects.get(slot), before.paddings.get(slot));
-        !changed.contains(&slot) && was != (fresh.rects.get(slot), fresh.paddings.get(slot))
+        let reframed = before.framed.get(slot) != framed.get(slot);
+        let now = (fresh.rects.get(slot), fresh.paddings.get(slot));
+        !changed.contains(&slot) && (was != now || reframed)
     };
     let expected: Vec<usize> = held.iter().filter(differs).copied().collect();
     let mut reported = moved.to_vec();

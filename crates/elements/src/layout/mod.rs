@@ -143,7 +143,6 @@ pub(crate) fn lay_out(
         lane_counts: LaneCounts::default(),
     };
     let changed = settling.changed;
-    tree.note_scrollers(&changed);
     let available = Size {
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),

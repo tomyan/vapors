@@ -30,8 +30,6 @@ pub(super) trait LaneView {
     fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>>;
     /// The child in `slot`'s `position: relative` offset along the axis.
     fn relative(&self, slot: usize) -> f32;
-    /// Notes that the child in `slot` holds a scroll container.
-    fn note_scroller(&mut self, slot: usize);
     /// The child in `slot` put in after `after`.
     fn child_inserted(&mut self, slot: usize, after: Option<usize>);
     /// The child in `slot` taken out, `next` in its place.
@@ -84,10 +82,6 @@ impl<K: LaneKind> LaneView for Lane<K> {
 
     fn relative(&self, slot: usize) -> f32 {
         self.relative.get(&slot).copied().unwrap_or(0.0)
-    }
-
-    fn note_scroller(&mut self, slot: usize) {
-        self.facts.note_scroller(slot);
     }
 
     fn child_inserted(&mut self, slot: usize, after: Option<usize>) {

@@ -31,6 +31,7 @@ fn nested(outer: [f32; 2], inner: [f32; 2], scale: f32) -> Frames {
         clips: &clips,
         depth: &|slot| slot,
         shift: &shift,
+        lane_frame: &|_| false,
     };
     Frames::of(&[2, 1], &inputs, scale)
 }

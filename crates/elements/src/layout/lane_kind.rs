@@ -17,7 +17,7 @@ use crate::lane_decline::LaneDecline;
 
 /// A layout algorithm a lane lays a container's children out with.
 pub(crate) trait LaneKind: Sized + Debug {
-    type Summary: Summary + Copy + Default + Debug;
+    type Summary: Summary + Copy + Default + Debug + PartialEq;
     /// The container's inputs, settled for one ask.
     type Container;
     /// What every child's leaf depends on but the height bases.

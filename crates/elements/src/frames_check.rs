@@ -55,7 +55,15 @@ pub(crate) fn assert_frames_follow_placement(
     if !cfg!(debug_assertions) {
         return;
     }
-    let placed = |frame| chain_shift(&from.placement, scrolls, from.scale, frame);
+    // a scroll frame under a framed row is shifted by the lane offsets
+    // on its chain too; none for one under no framed row
+    let placed = |frame| {
+        let [x, y] = chain_shift(&from.placement, scrolls, from.scale, frame);
+        [
+            x,
+            y + lane_offset(&from.placement, lanes, frame) * from.scale,
+        ]
+    };
     let mut shifts = frames
         .scrollers()
         .map(|(frame, at)| (frame, at.shift, placed(frame)));

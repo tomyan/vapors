@@ -111,17 +111,6 @@ impl Lanes {
         found.expect("a lane holds that many children").0
     }
 
-    /// Notes that the child in `child` holds a scroll container, in the
-    /// lane holding it, if any (`FrameFacts::note_scroller`).
-    pub(crate) fn note_scroller(&mut self, child: usize) {
-        let Some(container) = self.container_of(child) else {
-            return;
-        };
-        if let Some(lane) = self.lane_mut(container) {
-            lane.note_scroller(child);
-        }
-    }
-
     /// The children of the lane container in `container` from the one
     /// in `first` on, by slot, in order; `None` when it has no lane
     /// holding `first`: a `started` entry whose lane a later ask of the

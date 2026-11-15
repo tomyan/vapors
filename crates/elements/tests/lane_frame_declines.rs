@@ -1,8 +1,9 @@
 //! Lanes whose children cannot be frames (`docs/plans/splice-layout.md`,
-//! section 11.1): a start that is not whole device pixels at the scale,
-//! or a scroll container in a row, however it got there, is counted and
-//! the lane keeps the placement from before; a lane whose starts are
-//! whole at the scale is framed. Each case matches a full update.
+//! section 11.1): a start that is not whole device pixels at the scale
+//! is counted and the lane keeps the placement from before; a lane
+//! whose starts are whole at the scale is framed. A scroll container in
+//! a row no longer declines (`lane_scrollers.rs`). Each case matches a
+//! full update.
 
 mod support;
 
@@ -47,70 +48,6 @@ fn a_list_with_a_fractional_row_is_counted_and_placed_as_before() {
         "{counts:?}"
     );
     assert!(counts.boxes_moved > 0, "{counts:?}");
-}
-
-#[test]
-fn a_list_with_a_scroller_in_a_row_is_counted_and_placed_as_before() {
-    // Given: one row's cell scrolls
-    let page = header_list(
-        100,
-        &format!("{ROWS} {HEAD} .scroll {{ overflow: auto; }}"),
-        view(1.0),
-    );
-
-    // When
-    let counts = page.edited(view(1.0), |page| {
-        let mut doc = page.doc.borrow_mut();
-        let cell = doc.children(page.rows[10])[0];
-        doc.set_attribute(cell, "class", "cell scroll");
-    });
-
-    // Then
-    assert_eq!(
-        counts.lane_unframed,
-        Some(LaneDecline::LaneFrameScroller),
-        "{counts:?}"
-    );
-}
-
-#[test]
-fn a_scroller_put_in_a_fixed_size_cell_is_counted_and_placed_as_before() {
-    // Given: a cell of a fixed size holding a label, which gives its
-    // baseline, and a spacer; a cell given a new child that answers as
-    // before is laid out alone, and no row is laid out again
-    let css = format!(
-        "{ROWS} {HEAD} .cell {{ height: 20px; display: flex; flex-direction: column; }} \
-         .label, .spacer {{ width: 40px; height: 10px; }} .scroll {{ overflow: auto; }}"
-    );
-    let page = header_list(100, &css, view(1.0));
-    let spacer = {
-        let mut doc = page.doc.borrow_mut();
-        let cell = doc.children(page.rows[10])[0];
-        let text = doc.children(cell)[0];
-        doc.remove(text);
-        let label = support::element(&mut doc, cell, "div", "label");
-        support::text(&mut doc, label, "x");
-        let spacer = support::element(&mut doc, cell, "div", "spacer");
-        doc.update(view(1.0)).expect("updates");
-        spacer
-    };
-
-    // When: the spacer replaced by a scroll container of its size
-    let counts = page.edited(view(1.0), |page| {
-        let mut doc = page.doc.borrow_mut();
-        let cell = doc.children(page.rows[10])[0];
-        doc.remove(spacer);
-        support::element(&mut doc, cell, "div", "spacer scroll");
-    });
-
-    // Then: the cell laid out alone, and the lane learns of the scroll
-    // container, counts it and keeps the placement
-    assert_eq!(counts.owners_isolated, 1, "{counts:?}");
-    assert_eq!(
-        counts.lane_unframed,
-        Some(LaneDecline::LaneFrameScroller),
-        "{counts:?}"
-    );
 }
 
 #[test]

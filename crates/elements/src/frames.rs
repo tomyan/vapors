@@ -33,6 +33,9 @@ pub(crate) struct FrameAt {
 pub(crate) struct Frames {
     scale: f32,
     by_frame: FxHashMap<usize, FrameAt>,
+    /// The scroll frames under a lane frame, by their own part, composed
+    /// on read (`frames_relative.rs`); none of them is in `by_frame`.
+    relative: FxHashMap<usize, Relative>,
     nested: FxHashMap<usize, Vec<usize>>,
     index: FxHashMap<usize, NestedIndex>,
     entered: FxHashMap<usize, Option<Rect>>,
@@ -67,6 +70,7 @@ impl Frames {
         Self {
             scale,
             by_frame: std::iter::once((PAGE, page)).collect(),
+            relative: FxHashMap::default(),
             nested: FxHashMap::default(),
             index: FxHashMap::default(),
             entered: FxHashMap::default(),
@@ -79,6 +83,7 @@ impl Frames {
     pub(crate) fn get(&self, frame: usize) -> Option<FrameAt> {
         self.primed_at(frame)
             .or_else(|| self.by_frame.get(&frame).copied())
+            .or_else(|| self.relative_at(frame))
             .or_else(|| self.lane_at(frame))
     }
 
@@ -96,10 +101,25 @@ impl Frames {
         })
     }
 
-    /// Each frame but the page's, by its scroll container's slot.
-    pub(crate) fn scrollers(&self) -> impl Iterator<Item = (usize, &FrameAt)> {
+    /// Each scroll frame, by its scroll container's slot, those under a
+    /// lane frame composed afresh (for the debug checks).
+    pub(crate) fn scrollers(&self) -> impl Iterator<Item = (usize, FrameAt)> + '_ {
         let frames = self.by_frame.iter().filter(|&(&frame, _)| frame != PAGE);
-        frames.map(|(&frame, at)| (frame, at))
+        let relative = self.relative.keys().map(|&frame| {
+            let at = self.relative_afresh(frame).expect("a relative frame");
+            (frame, at)
+        });
+        frames.map(|(&frame, &at)| (frame, at)).chain(relative)
+    }
+
+    /// A frame at `shift` under the page clip `clip`, its device clip
+    /// snapped from it.
+    fn frame_at(&self, shift: [f32; 2], clip: Option<BoxRect>) -> FrameAt {
+        FrameAt {
+            shift,
+            clip,
+            device_clip: clip.map(|clip| crate::paint::snapped(clip, self.scale)),
+        }
     }
 
     /// Every frame but the page's shifted by `shift` more, device
@@ -145,6 +165,10 @@ mod update;
 
 #[path = "frames_compare.rs"]
 mod compare;
+
+#[path = "frames_relative.rs"]
+mod relative;
+use relative::Relative;
 
 #[path = "frames_lane.rs"]
 mod lane;
