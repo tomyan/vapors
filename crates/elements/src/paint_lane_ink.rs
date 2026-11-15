@@ -11,13 +11,15 @@ use crate::paint::PaintInput;
 use crate::painted::Painted;
 
 /// Notes the ink of the lane frames this update painted: every one when
-/// paint order was `reshaped`, else those holding the `patched` slots.
+/// paint order was `walked`, which makes the frames afresh with no ink,
+/// else those holding the `patched` slots (a splice carries the ink into
+/// the frames it makes, `paint_frames.rs`).
 pub(crate) fn note_painted(
     painted: &mut Painted,
     input: &PaintInput<'_>,
-    (reshaped, patched): (bool, &[usize]),
+    (walked, patched): (bool, &[usize]),
 ) {
-    if reshaped {
+    if walked {
         note(painted, input, 0..painted.kept_boxes.len());
     } else {
         note(painted, input, patched.iter().copied());
