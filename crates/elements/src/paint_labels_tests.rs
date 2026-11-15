@@ -129,7 +129,7 @@ fn leaned(times: usize, after: impl Fn(usize) -> bool) -> (Vec<Label>, usize) {
         labels.insert(at, 0);
         relabelled += match label_run(&mut labels, (at..at + 1, &[]), (step, lean)) {
             Relabelled::None => 0,
-            Relabelled::Range(range) => range.len(),
+            Relabelled::Range(range, _) => range.len(),
             Relabelled::All => labels.len(),
         };
         assert!(increasing(&labels), "labels out of order after insert {i}");
@@ -179,7 +179,7 @@ fn a_relabel_does_not_search_the_runs_still_to_be_labelled() {
     let relabelled = label_run(&mut labels, (1..2, pending), (1, Lean::Middle));
 
     // Then: the range ends at 1000, the first label above it
-    assert_eq!(relabelled, Relabelled::Range(0..3));
+    assert_eq!(relabelled, Relabelled::Range(0..3, vec![10, 0, 11]));
     assert_eq!(labels[3..], [1000, 0, 5000]);
     assert!(increasing(&labels[..4]), "{labels:?}");
 }
