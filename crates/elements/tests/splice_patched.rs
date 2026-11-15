@@ -94,9 +94,15 @@ fn rows_put_in_at_two_places_in_turn_in_a_framed_list_relabel_a_range_while_patc
 
 #[test]
 fn a_row_put_in_near_the_top_of_a_long_unframed_list_is_made_afresh() {
-    // Given: 400 rows under body, not a framed lane, so every later row
+    // Given: 400 rows under body, a half-pixel padding above them so
+    // their lane is not framed (`LaneFramePixel`) and every later row
     // moves
     let page = page(400);
+    page.doc
+        .borrow_mut()
+        .add_stylesheet("pixel.css", "body { padding-top: 0.5px; }")
+        .expect("parses");
+    updated(&page);
 
     // When
     inserted(&page, Some(10), "");

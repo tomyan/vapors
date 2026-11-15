@@ -3,8 +3,9 @@
 //! scroller in a row is framed, however the scroller got there; an
 //! insert above the row moves no row and leaves the scroller's frame
 //! where it shows; a scroll inside a row, nested or not, moves that
-//! frame alone. Each case matches a full update and draws as the whole
-//! scene does.
+//! frame alone. A row that is itself a scroller declines its list
+//! (`LaneFrameScrollingChild`). Each case matches a full update and
+//! draws as the whole scene does.
 
 mod support;
 
@@ -12,7 +13,7 @@ use support::lane_page::{HeaderList, assert_drawn_afresh, header_list};
 use support::narrow_list::ROWS;
 use support::viewport;
 use vapors_dom::{Dom, NodeId};
-use vapors_elements::Viewport;
+use vapors_elements::{LaneDecline, Viewport};
 
 /// The header a whole 10px; scrollers 20px tall over 60px of content,
 /// and a nested scroller of 10px over 40px.
@@ -161,4 +162,51 @@ fn a_scroll_of_a_scroller_nested_in_a_framed_row_moves_it_alone() {
     // Then
     assert_eq!(counts.lane_unframed, None, "{counts:?}");
     assert_drawn_afresh(&page.doc, view(), "after the nested scroll");
+}
+
+#[test]
+fn a_list_whose_rows_scroll_themselves_is_counted_and_placed_as_before() {
+    // Given: every row a scroller
+    let page = header_list(
+        100,
+        &format!("{ROWS} {CSS} .row {{ overflow: auto; }}"),
+        view(),
+    );
+
+    // When
+    let counts = page.edited(view(), |page| _ = page.insert_at(3));
+
+    // Then: the list keeps the placement from before lane frames
+    assert_eq!(
+        counts.lane_unframed,
+        Some(LaneDecline::LaneFrameScrollingChild),
+        "{counts:?}"
+    );
+    assert_drawn_afresh(&page.doc, view(), "after the insert");
+}
+
+#[test]
+fn a_row_made_a_scroller_declines_its_list() {
+    // Given: a framed list
+    let page = header_list(
+        100,
+        &format!("{ROWS} {CSS} .row.own {{ overflow: auto; }}"),
+        view(),
+    );
+    page.edited(view(), |page| _ = page.insert_at(3));
+
+    // When: one row made a scroller itself
+    let counts = page.edited(view(), |page| {
+        page.doc
+            .borrow_mut()
+            .set_attribute(page.rows[10], "class", "row own");
+    });
+
+    // Then
+    assert_eq!(
+        counts.lane_unframed,
+        Some(LaneDecline::LaneFrameScrollingChild),
+        "{counts:?}"
+    );
+    assert_drawn_afresh(&page.doc, view(), "after the row scrolls");
 }

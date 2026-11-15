@@ -94,7 +94,9 @@ impl BoxTree<'_> {
         lane: &mut Lane<K>,
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
-        lane.facts.note(slot, &layout, self.scale);
+        let overflow = self.boxes[slot].style.overflow;
+        let scrolls = overflow.x.is_scroll_container() || overflow.y.is_scroll_container();
+        lane.facts.note(slot, &layout, self.scale, scrolls);
         lane.pending.insert(slot, layout);
         if K::reads_heights(&self.boxes[slot].style) {
             lane.height_readers.insert(slot);

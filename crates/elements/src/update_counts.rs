@@ -105,7 +105,7 @@ pub struct UpdateCounts {
     /// framed and those kept framed.
     pub lanes_framed: usize,
     /// Lane containers placed this update whose children could not be
-    /// frames of their own (`LaneFramePixel`): their
+    /// frames of their own (`LaneFramePixel`, `LaneFrameScrollingChild`): their
     /// children keep the placement from before lane frames
     /// (`docs/plans/splice-layout.md`, section 11).
     pub lanes_unframed: usize,

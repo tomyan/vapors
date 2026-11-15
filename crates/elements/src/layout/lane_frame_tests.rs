@@ -25,8 +25,8 @@ fn laid(height: f32, margins: [f32; 2]) -> Layout {
 fn whole_heights_and_origin_frame_the_children() {
     // Given
     let mut facts = FrameFacts::default();
-    facts.note(1, &laid(20.0, [2.0, 3.0]), 1.0);
-    facts.note(2, &laid(20.5, [0.0, 0.0]), 2.0);
+    facts.note(1, &laid(20.0, [2.0, 3.0]), 1.0, false);
+    facts.note(2, &laid(20.5, [0.0, 0.0]), 2.0, false);
     facts.top = 4.0;
 
     // Then: 20.5 is whole at scale 2
@@ -36,7 +36,7 @@ fn whole_heights_and_origin_frame_the_children() {
 #[test]
 fn a_fractional_child_gap_or_origin_does_not() {
     let mut facts = FrameFacts::default();
-    facts.note(1, &laid(20.0, [0.0, 0.0]), 1.0);
+    facts.note(1, &laid(20.0, [0.0, 0.0]), 1.0, false);
     assert_eq!(
         facts.framable(0.5, 0.0, 1.0),
         Err(LaneDecline::LaneFramePixel)
@@ -45,7 +45,7 @@ fn a_fractional_child_gap_or_origin_does_not() {
         facts.framable(0.0, 0.25, 1.0),
         Err(LaneDecline::LaneFramePixel)
     );
-    facts.note(2, &laid(10.21, [0.0, 0.0]), 1.0);
+    facts.note(2, &laid(10.21, [0.0, 0.0]), 1.0, false);
     assert_eq!(
         facts.framable(0.0, 0.0, 1.0),
         Err(LaneDecline::LaneFramePixel)
@@ -64,4 +64,16 @@ fn whole_means_whole_device_pixels() {
     assert!(whole(1.5, 2.0));
     assert!(!whole(1.25, 2.0));
     assert!(!whole(f64::NAN, 1.0));
+}
+
+#[test]
+fn a_child_that_scrolls_itself_does_not_until_it_stops() {
+    let mut facts = FrameFacts::default();
+    facts.note(1, &laid(20.0, [0.0, 0.0]), 1.0, true);
+    assert_eq!(
+        facts.framable(0.0, 0.0, 1.0),
+        Err(LaneDecline::LaneFrameScrollingChild)
+    );
+    facts.note(1, &laid(20.0, [0.0, 0.0]), 1.0, false);
+    assert_eq!(facts.framable(0.0, 0.0, 1.0), Ok(()));
 }
