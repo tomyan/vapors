@@ -101,6 +101,7 @@ fixtures![
     svg_shapes_paint::SvgShapesPaint,
     text::Text,
     text_align::TextAlign,
+    text_line_box_paint::TextLineBoxPaint,
     text_wrap::TextWrap,
     titles::Titles,
     undo::Undo,

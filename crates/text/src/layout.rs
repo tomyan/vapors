@@ -3,6 +3,7 @@
 
 use vapors_scene::{Color, Rect};
 
+use crate::baseline::{BaselineRule, line_shift};
 use crate::font_system::FontSystem;
 use crate::layout_runs::{glyph_runs, run_offset};
 pub use crate::layout_types::{Align, Glyph, GlyphRun, LayoutOptions, LineInfo, PlacedGlyph};
@@ -16,6 +17,8 @@ pub struct Layout {
     scale: f32,
     runs: Vec<GlyphRun>,
     ink: Rect,
+    /// What the lines' baselines are placed by.
+    rule: BaselineRule,
 }
 
 impl Layout {
@@ -44,14 +47,31 @@ impl Layout {
     }
 
     /// A paragraph Parley has broken into lines and aligned.
-    pub(crate) fn broken(inner: parley::Layout<Color>, text: String, scale: f32) -> Self {
-        let runs = glyph_runs(&inner);
+    pub(crate) fn broken(
+        inner: parley::Layout<Color>,
+        text: String,
+        scale: f32,
+        rule: BaselineRule,
+    ) -> Self {
+        let runs = glyph_runs(&inner, &rule);
         Self {
             inner,
             text,
             scale,
             ink: crate::layout_ink::ink(&runs),
             runs,
+            rule,
+        }
+    }
+
+    /// Why the lines keep Parley's baselines rather than Blink's, when
+    /// they do (`baseline.rs`): a caller that must match Chromium
+    /// refuses such a layout.
+    #[must_use]
+    pub fn baseline_refusal(&self) -> Option<&str> {
+        match &self.rule {
+            BaselineRule::Unresolvable(why) => Some(why),
+            BaselineRule::Primary { .. } => None,
         }
     }
 
@@ -84,7 +104,7 @@ impl Layout {
     pub fn lines(&self) -> impl Iterator<Item = LineInfo> + '_ {
         self.inner.lines().map(|line| LineInfo {
             text_range: line.text_range(),
-            baseline: line.metrics().baseline,
+            baseline: line.metrics().baseline + line_shift(&line, &self.rule, 1.0).unwrap_or(0.0),
             top: line.metrics().block_min_coord,
             height: line.metrics().block_max_coord - line.metrics().block_min_coord,
             advance: line.metrics().advance,
@@ -146,6 +166,10 @@ impl Layout {
         &self.inner
     }
 }
+
+#[cfg(test)]
+#[path = "layout_baseline_tests.rs"]
+mod baseline_tests;
 
 #[cfg(test)]
 #[path = "layout_tests.rs"]

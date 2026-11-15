@@ -38,7 +38,20 @@ pub fn content_area(family: &Family<'_>, size: f32, scale: f32) -> Option<(f32, 
     ))
 }
 
-fn device_metrics(family: &Family<'_>, size: f32, scale: f32) -> Option<Metrics> {
+/// How far below a line's top Blink puts its baseline, all in device
+/// pixels: the font's `ascent` and `descent` each rounded, as
+/// `SimpleFontData` rounds them, and the half-leading (the line's
+/// `height` less the two, halved) floored, as Blink's layout
+/// `FontHeight::AddLeading` floors it. A 10 px Geist line 12 px tall:
+/// ascent 10.05 and descent 2.95 round to 10 and 3, (12 - 13) / 2 floors
+/// to -1, so 9, where the unrounded 9.55 drew a pixel low (#368).
+#[must_use]
+pub fn baseline_below_top(height: f32, ascent: f32, descent: f32) -> f32 {
+    let (ascent, descent) = (ascent.round(), descent.round());
+    ascent + ((height - ascent - descent) / 2.0).floor()
+}
+
+pub(crate) fn device_metrics(family: &Family<'_>, size: f32, scale: f32) -> Option<Metrics> {
     let bytes = match family {
         Family::Geist => GEIST,
         Family::GeistMono => GEIST_MONO,
