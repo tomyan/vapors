@@ -29,6 +29,7 @@ pub mod scene_hits_page;
 pub mod scroll_list;
 pub mod splice_page;
 pub mod svg_page;
+pub mod svg_shapes_page;
 pub mod sweep_page;
 pub mod sweep_paths;
 pub mod text_page;

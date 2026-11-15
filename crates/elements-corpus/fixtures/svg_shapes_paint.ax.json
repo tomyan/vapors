@@ -87,6 +87,87 @@
         "invalid=false"
       ],
       "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Box",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Rounded",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Elliptical",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Elliptical stroke",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "One zero",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Rounded path",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Disc",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Ring",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Over",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
     }
   ],
   "viewport": [

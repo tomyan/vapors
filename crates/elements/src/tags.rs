@@ -33,6 +33,8 @@ const SUPPORTED: &[&str] = &[
     "gpu-surface",
     "svg",
     "path",
+    "rect",
+    "circle",
     "span",
     "a",
     "b",
@@ -127,6 +129,14 @@ pub(crate) fn unfired(event: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tree_implements_every_svg_element_the_cascade_paints() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        for tag in vapors_css::cascade::SVG_TAGS {
+            assert_eq!(unsupported(tag), None, "{tag}");
+        }
+    }
 
     #[test]
     fn a_block_container_is_supported() {

@@ -27,8 +27,11 @@ pub(crate) const PRESENTATION_SPECIFICITY: Specificity = Specificity {
 /// its name.
 pub const PRESENTATION_ATTRIBUTES: [&str; 3] = ["fill", "stroke", "stroke-width"];
 
-/// The elements that take them: the SVG elements vapors draws.
-const SVG_TAGS: [&str; 2] = ["svg", "path"];
+/// The elements that take them: the SVG elements vapors draws. The
+/// compiler reads this list; `vapors_dom::SVG_TAGS` is the same (that
+/// crate does not depend on this one; a test in vapors-elements holds
+/// them equal).
+pub const SVG_TAGS: [&str; 4] = ["svg", "path", "rect", "circle"];
 
 /// The element's presentation attributes as declarations; empty for an
 /// element that is not an SVG element vapors draws.

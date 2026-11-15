@@ -3,8 +3,8 @@
 
 /// The recognised element vocabulary (sumi's, plus `canvas`, `br`,
 /// `fieldset`, `legend`, `small`, `sub`, `sup`, `figure`, `figcaption`, vapors's
-/// `gpu-surface`, docs/gpu-surface.md, and the inline SVG icon subset,
-/// `svg` and `path`, docs/icons.md).
+/// `gpu-surface`, docs/gpu-surface.md, and the inline SVG subset,
+/// `svg`, `path`, `rect` and `circle`, docs/icons.md).
 const HTML_TAGS: &[&str] = &[
     "a",
     "abbr",
@@ -16,6 +16,7 @@ const HTML_TAGS: &[&str] = &[
     "button",
     "canvas",
     "caption",
+    "circle",
     "code",
     "col",
     "colgroup",
@@ -55,6 +56,7 @@ const HTML_TAGS: &[&str] = &[
     "path",
     "pre",
     "progress",
+    "rect",
     "s",
     "samp",
     "section",
@@ -100,5 +102,13 @@ mod tests {
     fn vocabulary_is_sorted_for_binary_search() {
         // Then
         assert!(HTML_TAGS.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn the_template_takes_every_svg_element_the_cascade_paints() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        for tag in vapors_css::cascade::SVG_TAGS {
+            assert!(HTML_TAGS.contains(&tag), "{tag}");
+        }
     }
 }

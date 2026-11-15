@@ -20,8 +20,8 @@ use crate::error::ElementError;
 use crate::layout::{BoxRect, Key, Placed};
 use crate::slot_list::SlotList;
 use crate::style::UsedMap;
-use crate::svg_route::{Route, paints_nothing, path_site, paths, route, why_shapes};
-use crate::svg_shapes::{PathShape, SvgShapes, acquired, local_box, per_unit};
+use crate::svg_route::{Route, paints_nothing, route, why_shapes};
+use crate::svg_shapes::{PaintedShape, SvgShapes, acquired, local_box, per_unit};
 
 /// Slack for f32 rounding of a shape's box against the view box, as a
 /// share of the view box's size.
@@ -37,7 +37,7 @@ pub(crate) fn mark(
     shapes: &RefCell<DocumentShapes>,
 ) {
     let mut shapes = shapes.borrow_mut();
-    let paints = (paths(arena, svg).iter())
+    let paints = (crate::svg_route::shapes(arena, svg).iter())
         .any(|path| used.get(path).is_some_and(|own| !paints_nothing(own)));
     if route(arena, used, svg) == Some(Route::Shapes) && shown(used, svg) && paints {
         shapes.svgs.insert(svg, None);
@@ -119,16 +119,18 @@ impl Document {
     /// cannot be drawn.
     fn reasons_at(&self, svg: NodeId, shapes: &SvgShapes, at: f32) -> Vec<String> {
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
-        let paths: Vec<_> = (shapes.paths.iter())
+        let parts: Vec<_> = (shapes.parts.iter())
             .map(|path| (path.site.as_str(), &path.data, &*used[&path.node]))
             .collect();
-        let made = match acquired(&self.shapes, svg, &paths, at) {
+        let made = match acquired(&self.shapes, svg, &parts, at) {
             Ok(made) => made,
-            Err(reason) => return vec![format!("a path cannot be drawn: {reason}")],
+            Err(reason) => return vec![format!("a shape cannot be drawn: {reason}")],
         };
         let reach = outside(&self.shapes, &made, shapes.view_box);
-        let overflow =
-            |(path, reach)| overflow(&self.arena, used, svg, (path, reach, shapes.view_box));
+        let overflow = |(part, reach): (usize, _)| {
+            let site = shapes.parts[part].site.as_str();
+            overflow(&self.arena, used, svg, (site, reach, shapes.view_box))
+        };
         reach.map(overflow).into_iter().collect()
     }
 }
@@ -137,11 +139,11 @@ impl Document {
 /// index and the box it draws.
 fn outside(
     shapes: &RefCell<DocumentShapes>,
-    made: &[PathShape],
+    made: &[PaintedShape],
     view_box: [f32; 4],
 ) -> Option<(usize, [[f32; 2]; 2])> {
     made.iter()
-        .map(|shape| (shape.path, local_box(shapes, shape)))
+        .map(|shape| (shape.part, local_box(shapes, shape)))
         .find(|(_, reach)| !inside(*reach, view_box))
 }
 
@@ -149,16 +151,12 @@ fn overflow(
     arena: &Arena,
     used: &UsedMap,
     svg: NodeId,
-    (path, [lo, hi], [x, y, w, h]): (usize, [[f32; 2]; 2], [f32; 4]),
+    (site, [lo, hi], [x, y, w, h]): (&str, [[f32; 2]; 2], [f32; 4]),
 ) -> String {
     let why = why_shapes(arena, used, svg).unwrap_or_default();
     format!(
-        "its {} draws from ({}, {}) to ({}, {}) in viewBox units, outside its viewBox \"{x} {y} {w} {h}\"; {why}, and an svg drawn as shapes is not clipped yet (the icon route clips to the box), so keep the path and its stroke inside the viewBox",
-        path_site(path),
-        lo[0],
-        lo[1],
-        hi[0],
-        hi[1]
+        "its {site} draws from ({}, {}) to ({}, {}) in viewBox units, outside its viewBox \"{x} {y} {w} {h}\"; {why}, and an svg drawn as shapes is not clipped yet (the icon route clips to the box), so keep the shape and its stroke inside the viewBox",
+        lo[0], lo[1], hi[0], hi[1]
     )
 }
 

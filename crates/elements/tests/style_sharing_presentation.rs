@@ -109,3 +109,8 @@ fn the_key_refuses_the_presentation_attributes_the_cascade_reads() {
         vapors_css::cascade::PRESENTATION_ATTRIBUTES
     );
 }
+
+#[test]
+fn the_key_and_the_cascade_take_presentation_attributes_on_the_same_elements() {
+    assert_eq!(vapors_dom::SVG_TAGS, vapors_css::cascade::SVG_TAGS);
+}

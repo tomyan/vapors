@@ -41,6 +41,7 @@ pub use scene_hits::{HitAsk, HitSource};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
 pub use style_key::{MAX_TOGGLES, StyleKey};
 pub use style_key_refusals::PRESENTATION as PRESENTATION_ATTRIBUTES;
+pub use style_key_refusals::SVG_TAGS;
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
