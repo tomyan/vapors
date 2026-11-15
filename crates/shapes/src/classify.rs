@@ -175,7 +175,8 @@ fn ellipse(from: Point, [rx, ry]: [f32; 2], to: Point) -> Classified {
     } else {
         return Classified::Path;
     };
-    if offset > TOLERANCE * scale {
+    // a radius the closed-form check refuses stays a path
+    if offset > TOLERANCE * scale || rx.min(ry) < crate::geometry::MIN_RADIUS {
         return Classified::Path;
     }
     let centre = [f32::midpoint(from.x, to.x), f32::midpoint(from.y, to.y)];

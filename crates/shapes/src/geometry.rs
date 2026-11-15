@@ -56,7 +56,8 @@ impl Geometry<'_> {
 /// Why `geometry` cannot be drawn, if it cannot: a value that is not a
 /// finite number, a size or radius that is not above zero, a corner
 /// radius that is negative, over half the rect's side, or zero while the
-/// other is not, or a mesh [`check_mesh`] refuses.
+/// other is not, a radius above zero below [`MIN_RADIUS`], or a mesh
+/// [`check_mesh`] refuses.
 ///
 /// # Errors
 /// The reason, without the crate and site [`ShapeTable::check`] adds.
@@ -73,7 +74,8 @@ pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
         }
         Geometry::Ellipse { centre, radii } => {
             finite("centre", *centre)?;
-            positive("radii", *radii)
+            positive("radii", *radii)?;
+            not_tiny("radii", *radii)
         }
         Geometry::Mesh { triangles } => check_mesh(triangles),
     }
@@ -98,7 +100,27 @@ fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
             "corner radii {radius:?} have one zero; SVG draws square corners when either is zero, so the emitter writes both zero"
         ));
     }
+    if radius[0] > 0.0 {
+        not_tiny("corner radii", radius)?;
+    }
     Ok(())
+}
+
+/// The smallest radius the closed-form shader takes, viewBox units. It
+/// squares a radius and divides by one (`quarter_ellipse`): 1e-9
+/// squared is 1e-18, twenty orders above f32's smallest normal number
+/// (1.2e-38), so a GPU that flushes denormals to zero still gets a
+/// number. A smaller radius underflows to 0 there, and coverage is NaN.
+pub const MIN_RADIUS: f32 = 1e-9;
+
+/// A refusal when a radius of `values` is below [`MIN_RADIUS`].
+fn not_tiny(name: &str, values: [f32; 2]) -> Result<(), String> {
+    if values.iter().all(|v| *v >= MIN_RADIUS) {
+        return Ok(());
+    }
+    Err(format!(
+        "{name} {values:?} include one below {MIN_RADIUS}, which the shader's arithmetic underflows; draw it as a square corner or a point, or scale the viewBox up"
+    ))
 }
 
 fn finite(name: &str, values: [f32; 2]) -> Result<(), String> {

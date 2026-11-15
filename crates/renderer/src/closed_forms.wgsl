@@ -123,32 +123,81 @@ fn round_corners(folded: vec2<f32>, half: vec2<f32>, radius: f32, side: vec2<f32
     return vec3(d, gradient);
 }
 
-// As `round_corners`, with elliptical corners of `radii`: past the
-// corner's centre on both axes, the distance to that quarter ellipse
-// (to first order, as `ellipse_distance`); elsewhere the nearer edge's.
+// As `round_corners`, with elliptical corners of `radii`, exact to the
+// refinement's convergence at any depth: the nearest of the top edge,
+// the side edge and the quarter ellipse, each as a piece of the
+// outline (a point past an edge's end is nearer the arc). The sign
+// is taken from the outline itself, so a stroke deeper than the
+// smaller radius stays continuous where the pieces meet.
 fn elliptical_corners(folded: vec2<f32>, half: vec2<f32>, radii: vec2<f32>, side: vec2<f32>) -> vec3<f32> {
     let corner = half - radii;
-    if (all(folded > corner)) {
-        let dg = ellipse_distance(folded, corner, radii);
-        return vec3(dg.x, side * dg.yz);
+    let q = folded - corner;
+    var d = length(vec2(max(q.x, 0.0), folded.y - half.y));
+    var normal = vec2(0.0, 1.0);
+    let to_side = length(vec2(folded.x - half.x, max(q.y, 0.0)));
+    if (to_side < d) {
+        d = to_side;
+        normal = vec2(1.0, 0.0);
     }
-    let edge = folded - half;
-    let axis = select(vec2(0.0, side.y), vec2(side.x, 0.0), edge.x > edge.y);
-    return vec3(max(edge.x, edge.y), axis);
+    if (any(q > vec2(0.0))) {
+        let t = quarter_ellipse(q, radii);
+        let to_arc = length(q - radii * t);
+        if (to_arc < d) {
+            d = to_arc;
+            normal = normalize(vec2(radii.y * t.x, radii.x * t.y));
+        }
+    }
+    let past_arc = all(q > vec2(0.0)) && dot(q / radii, q / radii) > 1.0;
+    let inside = all(folded < half) && !past_arc;
+    return vec3(select(d, -d, inside), side * normal);
+}
+
+// Refinement steps for `quarter_ellipse`. Measured against the exact
+// distance (a dense search refined by ternary search) over radii from
+// 1 x 1 to 200 x 25 px, ratios to 8:1, points across the whole corner:
+// 3 steps leave 0.0077 px at 100 x 50 px, 4 leave 3e-5 px, so 4.
+const ELLIPSE_STEPS: i32 = 4;
+
+// The point of the quarter ellipse of `radii` (x, y >= 0, centred on
+// the origin) nearest `q`, as the (cos t, sin t) of (rx cos t, ry sin t).
+// Each step moves along the ellipse by the arc of the circle of
+// curvature through the current point, centred on the evolute (C.
+// Chatfield's trig-free method), clamped to the quarter. A point the
+// clamp leaves with no direction (q below and left of the centre)
+// takes the end of the nearer axis.
+fn quarter_ellipse(q: vec2<f32>, radii: vec2<f32>) -> vec2<f32> {
+    let k = (radii.x * radii.x - radii.y * radii.y) * vec2(1.0 / radii.x, -1.0 / radii.y);
+    var t = vec2(0.70710678);
+    for (var step = 0; step < ELLIPSE_STEPS; step++) {
+        let evolute = k * t * t * t;
+        let radius = length(radii * t - evolute);
+        let towards = q - evolute;
+        let along = towards * radius / max(length(towards), 1e-30);
+        let next = clamp((along + evolute) / radii, vec2(0.0), vec2(1.0));
+        let axis = select(vec2(0.0, 1.0), vec2(1.0, 0.0), q.x > q.y);
+        t = select(normalize(next), axis, all(next == vec2(0.0)));
+    }
+    return t;
 }
 
 // The distance from `p` to an ellipse about `centre` with `radii`,
-// negative inside (exact for a circle, to first order at any ellipse's
-// outline, where coverage is taken), and its gradient's direction. At
-// the centre, where the formula is 0 / 0, the smaller radius.
+// negative inside, exact to the refinement's convergence, and its
+// gradient: the outward normal at the nearest point, a unit vector. A
+// circle takes its exact distance without the refinement; the radii
+// are flat per instance, so the branch is the same across a quad.
 fn ellipse_distance(p: vec2<f32>, centre: vec2<f32>, radii: vec2<f32>) -> vec3<f32> {
     let q = p - centre;
-    let k0 = length(q / radii);
-    let k1 = length(q / (radii * radii));
-    let d = select(-min(radii.x, radii.y), k0 * (k0 - 1.0) / k1, k1 > 0.0);
-    let normal = q / (radii * radii);
-    let gradient = select(vec2(1.0, 0.0), normalize(normal), dot(normal, normal) > 0.0);
-    return vec3(d, gradient);
+    if (radii.x == radii.y) {
+        let gradient = select(vec2(1.0, 0.0), normalize(q), dot(q, q) > 0.0);
+        return vec3(length(q) - radii.x, gradient);
+    }
+    let side = select(vec2(-1.0), vec2(1.0), q >= vec2(0.0));
+    let folded = abs(q);
+    let t = quarter_ellipse(folded, radii);
+    let d = length(folded - radii * t);
+    let inside = dot(folded / radii, folded / radii) < 1.0;
+    let normal = normalize(vec2(radii.y * t.x, radii.x * t.y));
+    return vec3(select(d, -d, inside), side * normal);
 }
 
 @fragment
