@@ -988,6 +988,34 @@ Lane frames are lighter than scroll frames:
     culled in its own row's view, as now.
   - Every pipeline with positions takes the index: quads, shadows,
     texts, images and icons. Surfaces keep one frame a batch.
+  - **Index stability.** A batch's indexes are given when the batch is
+    made, in the order its rows first appear, and a kept batch keeps
+    them: its table's values change with its rows' offsets, its
+    instances never. A row inserted inside a batch's run changes that
+    batch's items, so the batch is made again (`KeptBatches`, as for
+    any change to a batch's run), its indexes given afresh and its
+    instances written: that batch's instances only, O(rows shown).
+    Every other batch keeps its instances and indexes.
+  - **Table capacity.** The table rides in the batch's uniform, 128
+    rows (two offsets to each `vec4<f32>`, 1 KiB), well inside
+    WebGPU's guaranteed 64 KiB uniform binding and above the rows in
+    view on the screens measured (17 on the rows page, about 46 at the
+    Pixel's 915 CSS px). A run over more rows than that is split into
+    batches of at most 128 rows each, never truncated or wrapped; a
+    test pins the split at the 129th row.
+  - **Rounding.** No offset is rounded. A lane frame's shift today is
+    its base frame's shift plus the child's start times the scale
+    (`lane_child_at`), and framing requires that start to be whole
+    device pixels (`LaneFramePixel` declines otherwise), so it is an
+    exact integer. A row's offset is that same term, computed by the
+    same function, so an item lands on the pixel it lands on today.
+    The debug check that compares the kept batches put on the page by
+    their frames with the scene batched on the page
+    (`kept_batches_check.rs` `assert_same`) adds each instance's row
+    offset, item by item. A test at scale 2.75 (the Pixel's) runs it
+    with rows whose height is whole in device pixels (framed) and with
+    rows 20.5 px tall (56.375 device px, declined), and asserts both
+    draw as the scene batched on the page.
   - Accepted when `gpu_rows_draws` is back at 35 text draws (the pin
     4e relaxed), `draw` within 2% across sizes for `--scaling Insert`
     and `FlexInsert`, the kept-batches check (`kept_batches_check.rs`)
