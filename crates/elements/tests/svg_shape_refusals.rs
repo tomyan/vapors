@@ -156,3 +156,23 @@ fn a_grown_svg_whose_width_changes_without_a_change_to_it_is_checked_again() {
     // asserts so)
     assert_eq!(drawn(painted).1.len(), 2);
 }
+
+#[test]
+fn an_svg_under_an_ancestor_made_display_none_releases_its_shapes() {
+    // Given: a filled svg in the body, live
+    let (mut doc, _) = icon(
+        "} body.gone { display: none; } .x {",
+        &[],
+        &[("fill", "red")],
+    );
+    updated(&mut doc);
+    assert!(doc.update_counts().shapes_live > 0);
+
+    // When: only the body changes; the svg is not restyled
+    let body = doc.body();
+    doc.set_attribute(body, "class", "gone");
+    updated(&mut doc);
+
+    // Then: it has no box after layout, so its shapes are released
+    assert_eq!(doc.update_counts().shapes_live, 0);
+}
