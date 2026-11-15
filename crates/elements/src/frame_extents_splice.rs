@@ -36,16 +36,24 @@ impl Extents {
 
     /// Where `step`'s entry, labelled `label`, is: its frame, and its
     /// position among the short entries or the tall; none when it does
-    /// not draw.
+    /// not draw. A short entry found there with another label or step is
+    /// refused, naming both: a relabel would write over it.
     fn entry_at(&self, step: Step, label: Label) -> Option<(usize, Result<Pos, usize>)> {
         let (frame, top, tall) = self.at_of(step)?;
         let index = &self.frames[&frame];
-        let at = if tall {
-            Err(index.tall_position(label))
-        } else {
-            Ok(index.position(top, label))
-        };
-        Some((frame, at))
+        if tall {
+            return Some((frame, Err(index.tall_position(label))));
+        }
+        let at = index.position(top, label);
+        let found = index.entries.get(at).map(|entry| (entry.label, entry.step));
+        assert_eq!(
+            found,
+            Some((label, step)),
+            "the extents index finds another entry where {step:?}, labelled {label}, was \
+             noted: its `at` or its order is stale (frame_extents_splice.rs); reproduce with \
+             `cargo xtask test`"
+        );
+        Some((frame, Ok(at)))
     }
 
     /// The entry at `place` given the label `label`.
@@ -66,3 +74,7 @@ impl Extents {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "frame_extents_splice_tests.rs"]
+mod tests;

@@ -66,6 +66,10 @@ pub struct Painted {
     pub(crate) boxes_drawn: usize,
     /// Boxes this update shifted in place (`kept_shift.rs`), for `UpdateCounts`.
     pub(crate) boxes_shifted: usize,
+    /// This update's splice was followed by patching the drawing steps,
+    /// the extents index and the hits, not by making them afresh
+    /// (`paint_partial_drawn.rs`), for `UpdateCounts`.
+    pub(crate) splice_patched: bool,
     /// Kept parts this update read without painting (`paint_partial.rs`), for `UpdateCounts`.
     pub(crate) parts_visited_kept: usize,
     /// Scroll frames this update worked out (`paint_frames.rs`).
@@ -107,6 +111,7 @@ impl Painted {
             kept_batches: std::cell::RefCell::new(None),
             boxes_drawn: 0,
             boxes_shifted: 0,
+            splice_patched: false,
             parts_visited_kept: 0,
             items_built: 0,
             frames_worked: 0,

@@ -100,6 +100,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
     (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
+    last.splice_patched = false;
     (last, Some(order))
 }
 

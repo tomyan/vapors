@@ -51,10 +51,23 @@ impl KeptHits {
         }
     }
 
-    /// Where the hits labelled `label` are in frame `frame`'s list.
+    /// Where the hits labelled `label` are in frame `frame`'s list, or a
+    /// panic naming both when there are none: `frames` notes a label
+    /// only while its hits are in that frame's list.
     fn positions(&self, frame: usize, label: Label) -> std::ops::Range<usize> {
         let list = &self.by_frame[&frame];
         let start = list.partition_point(|&(at, _)| at < label);
-        start..list.partition_point(|&(at, _)| at <= label)
+        let found = start..list.partition_point(|&(at, _)| at <= label);
+        assert!(
+            !found.is_empty(),
+            "the kept hits note label {label} in frame {frame}, whose list holds no hit \
+             labelled so: `frames` and the lists disagree (kept_hits.rs `put`, `take`); \
+             reproduce with `cargo xtask test`"
+        );
+        found
     }
 }
+
+#[cfg(test)]
+#[path = "kept_hits_splice_tests.rs"]
+mod tests;

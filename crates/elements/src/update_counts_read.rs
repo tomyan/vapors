@@ -39,6 +39,7 @@ impl UpdateCounts {
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);
         self.order_splices = walks.splices;
+        self.order_splices_patched = usize::from(painted.splice_patched);
         self.splices_declined = usize::from(walks.declined.is_some());
         self.splice_decline = walks.declined;
         (self.paint_relabelled, self.paint_relabel_all) = (walks.relabelled, walks.relabel_all);

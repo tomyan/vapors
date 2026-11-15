@@ -26,7 +26,7 @@ use crate::scene_view::frame_items;
 
 /// Patching more steps than this, or than a sixteenth of the entries,
 /// makes the index afresh: each patch is a search and a block's move.
-pub(super) const REBUILD: usize = 64;
+pub(crate) const REBUILD: usize = 64;
 
 /// One drawing step in its frame's index.
 #[derive(Clone, Copy, Debug, PartialEq)]

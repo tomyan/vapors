@@ -57,6 +57,7 @@ pub mod select;
 pub mod shader_cache;
 mod span_instructions;
 pub mod spans;
+pub mod splice_tally;
 pub mod stats;
 pub mod workloads;
 

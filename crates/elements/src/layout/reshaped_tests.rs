@@ -69,3 +69,23 @@ fn the_shared_head_and_tail_do_not_overlap_in_the_shorter_list() {
     // Then: the head takes all 100, the tail none of them again
     assert_eq!(shared, Shared { head: 100, tail: 0 });
 }
+
+#[test]
+fn the_shared_head_and_tail_end_at_two_children_swapped() {
+    // Given: in 0..200, swaps on chunk edges, across one, and at the end
+    for (a, b) in [(64, 127), (63, 128), (0, 199), (198, 199), (127, 128)] {
+        let old: Vec<usize> = (0..200).collect();
+        let mut new = old.clone();
+        new.swap(a, b);
+
+        // When
+        let shared = Shared::of(&old, &new);
+
+        // Then: the head stops at the first, the tail after the second
+        let expected = Shared {
+            head: a,
+            tail: 199 - b,
+        };
+        assert_eq!(shared, expected, "{a} and {b} swapped");
+    }
+}

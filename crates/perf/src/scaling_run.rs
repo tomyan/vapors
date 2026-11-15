@@ -51,6 +51,7 @@ fn measure(
         .sample(workload, settings)
         .map_err(|e| format!("{name}: {e}"))?;
     samples_counted(&name, &samples)?;
+    println!("{}", workload.splices().line(rows));
     by_kind(rows, &samples, change.frame_kinds())
 }
 

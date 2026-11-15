@@ -214,6 +214,10 @@ pub struct UpdateCounts {
     /// spliced for inserted and removed in-flow boxes in place of being
     /// walked (`order_splice.rs`, `docs/plans/splice.md` (c)): 1 or 0.
     pub order_splices: usize,
+    /// Of those, the splices whose drawing steps, extents index and hits
+    /// were patched by the splice's edits, not made afresh
+    /// (`paint_partial_drawn.rs` `many`): 1 or 0.
+    pub order_splices_patched: usize,
     /// Times a shape change could not be spliced and the whole tree was
     /// walked instead: a changed slot's children reordered, a box with
     /// a stacking other than the default inserted or removed, or a

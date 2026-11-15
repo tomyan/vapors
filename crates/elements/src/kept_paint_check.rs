@@ -80,12 +80,15 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
 
 /// "hits" when `kept`'s hits are not `fresh`'s, in painting order; the
 /// first kept hit for hit testing that differs from a fresh gather of
-/// `kept`'s scene. The kept hits are gathered when none are, so every
-/// later update patches them and is compared.
+/// `kept`'s scene, or, when every hit is the same in order, the first
+/// label held under another frame or none (a relabel keeps the order,
+/// so only the labels show it). The kept hits are gathered when none
+/// are, so every later update patches them and is compared.
 fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = String> {
     let hits = !kept.scene().hits().eq(fresh.scene().hits());
     let gathered = crate::kept_hits::KeptHits::of(&kept.scene());
-    let first = first_differing_hit(kept.kept_hits(), &gathered);
+    let first = first_differing_hit(kept.kept_hits(), &gathered)
+        .or_else(|| kept.kept_hits().first_label_differing(&gathered));
     hits.then(|| "hits".to_owned()).into_iter().chain(first)
 }
 

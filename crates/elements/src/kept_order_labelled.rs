@@ -38,24 +38,7 @@ impl Labelled {
         runs: &[Range<usize>],
         (spacing, recent): (&mut u64, &[(Label, Label)]),
     ) -> Self {
-        let leans: Vec<Lean> = runs
-            .iter()
-            .map(|run| lean_of(&labels, run, recent))
-            .collect();
-        let mut edits = SpliceEdits::default();
-        for (at, (run, lean)) in runs.iter().zip(leans).enumerate() {
-            let pending = &runs[at + 1..];
-            let done = crate::paint_labels::label_run(
-                &mut labels,
-                (run.clone(), pending),
-                (*spacing, lean),
-            );
-            note(&mut edits, (steps, &labels, runs), done);
-        }
-        if edits.all {
-            // every label laid out afresh, at the spacing for their count
-            *spacing = crate::paint_labels::spacing(labels.len());
-        }
+        let mut edits = label_runs((steps, &mut labels), runs, (spacing, recent));
         for run in runs {
             let put = run.clone().map(|at| (labels[at], steps[at]));
             edits.inserted.extend(put);
@@ -70,6 +53,31 @@ impl Labelled {
             put_in,
         }
     }
+}
+
+/// Labels each run of `runs` in `labels`, the later runs not yet
+/// labelled skipped by a relabel's search; what the relabels did
+/// besides. After a relabel of every label, `spacing` is theirs.
+fn label_runs(
+    (steps, labels): (&[Step], &mut [Label]),
+    runs: &[Range<usize>],
+    (spacing, recent): (&mut u64, &[(Label, Label)]),
+) -> SpliceEdits {
+    let leans: Vec<Lean> = runs
+        .iter()
+        .map(|run| lean_of(labels, run, recent))
+        .collect();
+    let mut edits = SpliceEdits::default();
+    for (at, (run, lean)) in runs.iter().zip(leans).enumerate() {
+        let pending = &runs[at + 1..];
+        let done = crate::paint_labels::label_run(labels, (run.clone(), pending), (*spacing, lean));
+        note(&mut edits, (steps, labels, runs), done);
+    }
+    if edits.all {
+        // every label laid out afresh, at the spacing for their count
+        *spacing = crate::paint_labels::spacing(labels.len());
+    }
+    edits
 }
 
 /// Notes in `edits` what labelling a run did besides labelling it: the

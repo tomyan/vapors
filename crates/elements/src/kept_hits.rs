@@ -45,6 +45,33 @@ impl KeptHits {
         hits
     }
 
+    /// The first label, in order, that `self` and `other` hold under
+    /// different frames or that one holds and the other does not, with
+    /// both frames; `None` when they hold the same labels in the same
+    /// frames and the same hits under each (for the kept-paint check).
+    pub(crate) fn first_label_differing(&self, other: &Self) -> Option<String> {
+        if self == other {
+            return None;
+        }
+        let mut labels: Vec<Label> = self
+            .frames
+            .keys()
+            .chain(other.frames.keys())
+            .copied()
+            .collect();
+        labels.sort_unstable();
+        labels.dedup();
+        let differs = |label: &Label| self.frames.get(label) != other.frames.get(label);
+        let first = labels.into_iter().find(differs);
+        Some(first.map_or_else(
+            || "kept hits: the same labels and frames, other hits under them".to_owned(),
+            |label| {
+                let (kept, fresh) = (self.frames.get(&label), other.frames.get(&label));
+                format!("kept hits' label {label}: in frame {kept:?}, gathered afresh {fresh:?}")
+            },
+        ))
+    }
+
     /// Puts `hits`, of the box step at `label`, in their frame's list.
     fn put(&mut self, label: Label, hits: impl Iterator<Item = FramedHit>) {
         for hit in hits {

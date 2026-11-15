@@ -12,63 +12,73 @@ use crate::paint_order::Step;
 use crate::painted::Painted;
 
 /// `painted`'s drawing steps made afresh, its kept batches unsorted and
-/// its hits dropped, when `order` was walked again or its splice
-/// relabelled every label; else the three following its splice, if any,
-/// and patched for the `patched` slots, the hits for the first
-/// `with_hits` only, noting the hits that changed.
+/// its hits dropped, when `order` was walked again, its splice
+/// relabelled every label, or it patched too many slots (`many`); else
+/// the three following its splice, if any, and patched for the
+/// `patched` slots, the hits for the first `with_hits` only, noting the
+/// hits that changed and whether a splice was patched.
 pub(crate) fn drawn_updated(
     painted: &mut Painted,
     order: &KeptOrder,
     (patched, with_hits): (&[usize], usize),
 ) {
-    if walked(order) || (order.walks.splices > 0 && many(patched, painted)) {
-        painted.drawn = DrawnSteps::of((&order.steps, &order.labels), &painted.kept_boxes);
-        let slots = painted.kept_boxes.len();
-        painted.extents = Extents::of(&painted.drawn, slots, &painted.kept_boxes);
-        batches_unsorted(painted);
-        painted.hits = std::cell::OnceCell::new();
-        painted.hits_changed = HitsChanged::Unknown;
+    let spliced = order.walks.splices > 0;
+    if walked(order) || (spliced && many(patched, painted)) {
+        drawn_afresh(painted, order);
         return;
     }
-    let spliced = order.walks.splices > 0;
     if spliced {
         spliced_into(painted, &order.splice_edits);
+        painted.splice_patched = true;
     }
     painted
         .drawn
         .patch(patched.iter().copied(), &painted.kept_boxes);
     extents_patched(painted, patched);
-    painted.hits_changed = match painted.hits.get_mut() {
-        // a splice took hits out with its rows: any may differ
-        Some(hits) if spliced => {
-            hits.patch(
-                patched[..with_hits].iter().copied(),
-                &painted.drawn,
-                &painted.kept_boxes,
-            );
-            HitsChanged::Unknown
-        }
-        Some(hits) => {
-            let slots = patched[..with_hits].iter().copied();
-            let changed = hits.patch(slots, &painted.drawn, &painted.kept_boxes);
-            HitsChanged::on_page(changed, &painted.frames)
-        }
-        // Only a release build reaches this arm: the debug check gathers
-        // the hits after every paint (`kept_paint_check.rs`). Unknown is
-        // the safe answer either way; a gather is one hit test's cost.
-        None => HitsChanged::Unknown,
-    };
+    painted.hits_changed = hits_patched(painted, &patched[..with_hits], spliced);
     batches_patched(painted, patched);
     let drawn = painted.drawn.take_counts();
     painted.index_counts = drawn.and(painted.extents.take_counts());
 }
 
-/// Whether the `patched` slots are more than a sixteenth of `painted`'s:
-/// a splice that moved that many (a lane not framed) makes the drawing
-/// steps, the extents index and the hits afresh, a pass, rather than
-/// patch each, as the extents index does for a patch past `REBUILD`.
+/// `painted`'s drawing steps and extents index made afresh from
+/// `order`, its kept batches unsorted and its hits dropped.
+fn drawn_afresh(painted: &mut Painted, order: &KeptOrder) {
+    painted.drawn = DrawnSteps::of((&order.steps, &order.labels), &painted.kept_boxes);
+    let slots = painted.kept_boxes.len();
+    painted.extents = Extents::of(&painted.drawn, slots, &painted.kept_boxes);
+    batches_unsorted(painted);
+    painted.hits = std::cell::OnceCell::new();
+    painted.hits_changed = HitsChanged::Unknown;
+}
+
+/// `painted`'s kept hits, if gathered, patched for the `slots`; the hits
+/// that changed, every one when a splice took hits out with its rows.
+fn hits_patched(painted: &mut Painted, slots: &[usize], spliced: bool) -> HitsChanged {
+    let Some(hits) = painted.hits.get_mut() else {
+        // Only a release build reaches this arm: the debug check gathers
+        // the hits after every paint (`kept_paint_check.rs`). Unknown is
+        // the safe answer either way; a gather is one hit test's cost.
+        return HitsChanged::Unknown;
+    };
+    let changed = hits.patch(slots.iter().copied(), &painted.drawn, &painted.kept_boxes);
+    if spliced {
+        return HitsChanged::Unknown;
+    }
+    HitsChanged::on_page(changed, &painted.frames)
+}
+
+/// Whether a splice that patched the `patched` slots makes the drawing
+/// steps, the extents index and the hits afresh: when they are more
+/// than `REBUILD` (64, the extents index's floor, so a small page
+/// patches) and more than a quarter of `painted`'s slots. Measured on
+/// `vapors-perf 8 2 --scaling Insert` (an unframed lane, half its boxes
+/// patched per splice) with each path forced (2026-11-15): making the
+/// three afresh costs 518 instructions a box, patching 1,932 a patched
+/// slot, so they cost the same at about 27% of the slots patched.
 fn many(patched: &[usize], painted: &Painted) -> bool {
-    patched.len() * 16 > painted.kept_boxes.len()
+    let share = painted.kept_boxes.len() / 4;
+    patched.len() > crate::frame_extents::REBUILD.max(share)
 }
 
 /// Whether `order` was walked, or its splice relabelled every label:

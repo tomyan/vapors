@@ -150,7 +150,14 @@ how a place is made, not how it is read. B changes every reader. So A.
 2. The splice patches `DrawnSteps`, `Extents` and the hits by its edits.
    Accepted when FlexInsert's and Insert's paint phases are within 2%
    across sizes (with 4e for Insert), and the Chromium paint comparisons
-   and the kept-paint check are unchanged.
+   and the kept-paint check are unchanged. A splice whose update patches
+   more slots than `REBUILD` (64, the extents index's floor) and more
+   than a quarter of the kept boxes makes the three afresh instead:
+   measured with each path forced on `--scaling Insert` (2026-11-15),
+   making them afresh costs 518 instructions a box and patching 1,932 a
+   patched slot, equal at about 27% of the boxes patched.
+   `UpdateCounts::order_splices_patched` tells the two apart, and
+   `--scaling` prints the splices, those patched and the relabels.
 
 ## 7. Review decisions (lead, 2026-11-14)
 

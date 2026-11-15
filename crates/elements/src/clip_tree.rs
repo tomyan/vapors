@@ -56,22 +56,33 @@ impl ClipTree {
             let at = group.partition_point(|&dependent| dependent < slot);
             group.insert(at, slot);
         }
-        for slot in freed {
+        // every freed slot out of its group before any group is cleared:
+        // a freed slot's parent can be freed too
+        let freed: Vec<usize> = freed.collect();
+        for &slot in &freed {
             self.leave(slot);
             self.depth[slot] = 0;
+        }
+        for &slot in &freed {
             self.dependents[slot].clear();
         }
     }
 
-    /// Takes `slot` out of its parent's group, if it has a parent.
+    /// Takes `slot` out of its parent's group, if it has a parent;
+    /// a panic naming both when the group does not hold it.
     fn leave(&mut self, slot: usize) {
         let Some(parent) = self.parent[slot].take() else {
             return;
         };
         let group = &mut self.dependents[parent];
-        if let Ok(at) = group.binary_search(&slot) {
-            group.remove(at);
-        }
+        let at = group.binary_search(&slot).unwrap_or_else(|_| {
+            panic!(
+                "slot {slot} has clip parent {parent} but is not among its dependents: the \
+                 groups are out of slot order or were not kept by a splice (clip_tree.rs \
+                 `spliced`); reproduce with `cargo xtask test`"
+            )
+        });
+        group.remove(at);
     }
 
     /// The slots in the tree: one past the last.
@@ -132,3 +143,7 @@ fn grouped(parent: &[Option<usize>]) -> Vec<Vec<usize>> {
     }
     dependents
 }
+
+#[cfg(test)]
+#[path = "clip_tree_tests.rs"]
+mod tests;

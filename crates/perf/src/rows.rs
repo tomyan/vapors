@@ -13,6 +13,7 @@ use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
 
 use crate::run::{Counts, Workload};
+use crate::splice_tally::SpliceTally;
 
 #[path = "../../elements/tests/support/basics.rs"]
 pub(crate) mod basics;
@@ -35,6 +36,8 @@ pub struct Rows {
     change: RowChange,
     /// The row `Insert` added and has not yet removed.
     inserted: Option<NodeId>,
+    /// The splices and relabels of the frames run (`splice_tally.rs`).
+    splices: std::cell::Cell<SpliceTally>,
 }
 
 impl Rows {
@@ -70,6 +73,7 @@ impl Rows {
             app,
             change,
             inserted: None,
+            splices: std::cell::Cell::default(),
         }
     }
 }
@@ -110,6 +114,14 @@ impl Rows {
         if !page.scroll_body(1.0) {
             page.scroll_body_to_top();
         }
+    }
+}
+
+impl Rows {
+    /// The splices and relabels of the frames run so far.
+    #[must_use]
+    pub fn splices(&self) -> SpliceTally {
+        self.splices.get()
     }
 }
 
@@ -160,6 +172,8 @@ impl Workload for Rows {
     }
 
     fn check(&self, next: Next) -> Result<(), String> {
+        let counts = self.page.doc().borrow().update_counts();
+        self.splices.set(self.splices.get().and(&counts));
         match (next, self.app.failure().get()) {
             (_, Some(failure)) => Err(failure),
             (Next::Exit, None) => Err("the app exited without a failure".into()),
