@@ -20,8 +20,9 @@ pub enum Geometry<'a> {
         size: [f32; 2],
         /// Corner radii `rx`, `ry`: zero or more, at most half the
         /// width and the height (SVG clamps them there; the emitter
-        /// clamps before the table), and equal until the shader draws
-        /// elliptical corners (S4b, with `<rect rx ry>`).
+        /// clamps before the table), both zero or both above it (SVG
+        /// draws square corners when either is zero; the emitter writes
+        /// both zero).
         radius: [f32; 2],
     },
     /// An ellipse; a circle when the radii are equal.
@@ -54,8 +55,9 @@ impl Geometry<'_> {
 
 /// Why `geometry` cannot be drawn, if it cannot: a value that is not a
 /// finite number, a size or radius that is not above zero, a corner
-/// radius that is negative, over half the rect's side, or not equal to
-/// the other, or a mesh [`check_mesh`] refuses.
+/// radius that is negative, over half the rect's side, or zero while the
+/// other is not, a radius above zero below [`MIN_RADIUS`], or a mesh
+/// [`check_mesh`] refuses.
 ///
 /// # Errors
 /// The reason, without the crate and site [`ShapeTable::check`] adds.
@@ -72,17 +74,17 @@ pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
         }
         Geometry::Ellipse { centre, radii } => {
             finite("centre", *centre)?;
-            positive("radii", *radii)
+            positive("radii", *radii)?;
+            not_tiny("radii", *radii)
         }
         Geometry::Mesh { triangles } => check_mesh(triangles),
     }
 }
 
 /// The corner radii the closed-form shader draws: finite, not negative,
-/// within half the side (`rect_distance` clamps nothing), and circular:
-/// the emitter writes equal radii, so the comparison is exact, not
-/// within a margin.
-#[allow(clippy::float_cmp)]
+/// within half the side (`rect_distance` clamps nothing), and both zero
+/// or both above zero: an elliptical corner with one radius zero has
+/// no curve for the shader's ellipse distance to follow.
 fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
     finite("radius", radius)?;
     if radius.iter().any(|r| *r < 0.0) {
@@ -93,12 +95,32 @@ fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
             "a corner radius of {radius:?} is over half the size {size:?}; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does"
         ));
     }
-    if radius[0] != radius[1] {
+    if (radius[0] > 0.0) != (radius[1] > 0.0) {
         return Err(format!(
-            "corner radii {radius:?} differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>"
+            "corner radii {radius:?} have one zero; SVG draws square corners when either is zero, so the emitter writes both zero"
         ));
     }
+    if radius[0] > 0.0 {
+        not_tiny("corner radii", radius)?;
+    }
     Ok(())
+}
+
+/// The smallest radius the closed-form shader takes, viewBox units. It
+/// squares a radius and divides by one (`quarter_ellipse`): 1e-9
+/// squared is 1e-18, twenty orders above f32's smallest normal number
+/// (1.2e-38), so a GPU that flushes denormals to zero still gets a
+/// number. A smaller radius underflows to 0 there, and coverage is NaN.
+pub const MIN_RADIUS: f32 = 1e-9;
+
+/// A refusal when a radius of `values` is below [`MIN_RADIUS`].
+fn not_tiny(name: &str, values: [f32; 2]) -> Result<(), String> {
+    if values.iter().all(|v| *v >= MIN_RADIUS) {
+        return Ok(());
+    }
+    Err(format!(
+        "{name} {values:?} include one below {MIN_RADIUS}, which the shader's arithmetic underflows; draw it as a square corner or a point, or scale the viewBox up"
+    ))
 }
 
 fn finite(name: &str, values: [f32; 2]) -> Result<(), String> {

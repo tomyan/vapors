@@ -120,3 +120,24 @@ fn a_shape_is_five_vec4s_with_its_stroke_flagged() {
     assert_eq!(stroked.instance(), expected);
     assert_eq!(filled.instance()[13], 0.0, "filled");
 }
+
+#[test]
+fn a_rects_corner_radii_sit_at_rx_12_and_ry_14() {
+    // Given: corners of rx 3, ry 1.5 (#386 review, L3)
+    let rect = Geometry::Rect {
+        origin: [1.0, 2.0],
+        size: [10.0, 8.0],
+        radius: [3.0, 1.5],
+    };
+
+    // When
+    let drawn = shape(&rect, None, IDENTITY)
+        .expect("drawable")
+        .expect("has area");
+
+    // Then: kind 0, the form, then rx, filled, ry, unused
+    let instance = drawn.instance();
+    assert_eq!(instance[6], 0.0, "a rect");
+    assert_eq!(instance[8..12], [1.0, 2.0, 10.0, 8.0]);
+    assert_eq!(instance[12..16], [3.0, 0.0, 1.5, 0.0]);
+}

@@ -16,8 +16,8 @@ pub struct ClosedFormShape {
     kind: f32,
     /// A rect's origin and size, or an ellipse's centre and radii.
     numbers: [f32; 4],
-    /// A rect's corner radius.
-    radius: f32,
+    /// A rect's corner radii, rx and ry.
+    radius: [f32; 2],
     /// The stroke width, when stroked.
     stroke: Option<f32>,
     transform: [f32; 6],
@@ -69,8 +69,8 @@ impl ClosedFormShape {
 
     /// The five four-float attributes `closed_forms.wgsl` reads: the
     /// transform's linear part; its translation, the kind and the
-    /// stroke width; the form's four numbers; the radius and whether
-    /// it is stroked (1) or filled (0); the colour.
+    /// stroke width; the form's four numbers; rx, whether it is
+    /// stroked (1) or filled (0), and ry; the colour.
     pub(crate) fn instance(&self) -> [f32; 20] {
         let [linear @ .., e, f] = self.transform;
         let (stroked, width) = self.stroke.map_or((0.0, 0.0), |w| (1.0, w));
@@ -79,7 +79,7 @@ impl ClosedFormShape {
             linear,
             [e, f, self.kind, width],
             self.numbers,
-            [self.radius, stroked, 0.0, 0.0],
+            [self.radius[0], stroked, self.radius[1], 0.0],
             [colour.r, colour.g, colour.b, colour.a],
         ]
         .concat()
@@ -88,17 +88,16 @@ impl ClosedFormShape {
     }
 }
 
-/// The kind, the four numbers and the radius of a checked closed form.
-fn form(geometry: &Geometry) -> Result<(f32, [f32; 4], f32), ClosedFormError> {
+/// The kind, the four numbers and the radii of a checked closed form.
+fn form(geometry: &Geometry) -> Result<(f32, [f32; 4], [f32; 2]), ClosedFormError> {
     match *geometry {
-        // check_geometry refuses radii that differ.
         Geometry::Rect {
             origin,
             size,
             radius,
-        } => Ok((0.0, [origin[0], origin[1], size[0], size[1]], radius[0])),
+        } => Ok((0.0, [origin[0], origin[1], size[0], size[1]], radius)),
         Geometry::Ellipse { centre, radii } => {
-            Ok((1.0, [centre[0], centre[1], radii[0], radii[1]], 0.0))
+            Ok((1.0, [centre[0], centre[1], radii[0], radii[1]], [0.0; 2]))
         }
         Geometry::Mesh { .. } => Err(refused(
             "a mesh is not a closed form",

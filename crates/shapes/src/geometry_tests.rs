@@ -29,6 +29,7 @@ fn drawable_geometries_pass() {
     let drawable = [
         rect([2.0, 3.0], [0.0, 0.0]),
         rect([2.0, 3.0], [1.0, 1.0]),
+        rect([2.0, 3.0], [0.5, 1.0]),
         ellipse([8.0, 8.0], [3.0, 3.0]),
     ];
 
@@ -103,8 +104,8 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
             "a corner radius of [3.0, 3.0] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
         ),
         (
-            rect([2.0, 3.0], [0.5, 1.0]),
-            "corner radii [0.5, 1.0] differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>",
+            rect([2.0, 3.0], [0.0, 1.0]),
+            "corner radii [0.0, 1.0] have one zero; SVG draws square corners when either is zero, so the emitter writes both zero",
         ),
     ];
 
@@ -112,4 +113,31 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
     for (geometry, reason) in &cases {
         refused(geometry, reason);
     }
+}
+
+#[test]
+fn a_radius_above_zero_too_small_for_the_shader_is_refused() {
+    // Given: a corner radius and an ellipse radius just under the floor,
+    // and both at it, which pass
+    let tiny = MIN_RADIUS / 2.0;
+    let reason = |name: &str, values: [f32; 2]| {
+        format!(
+            "{name} {values:?} include one below {MIN_RADIUS}, which the shader's arithmetic underflows; draw it as a square corner or a point, or scale the viewBox up"
+        )
+    };
+
+    // When, Then
+    refused(
+        &rect([2.0, 3.0], [tiny, 1.0]),
+        &reason("corner radii", [tiny, 1.0]),
+    );
+    refused(
+        &ellipse([8.0, 8.0], [3.0, tiny]),
+        &reason("radii", [3.0, tiny]),
+    );
+    assert_eq!(check_geometry(&rect([2.0, 3.0], [MIN_RADIUS; 2])), Ok(()));
+    assert_eq!(
+        check_geometry(&ellipse([8.0, 8.0], [MIN_RADIUS; 2])),
+        Ok(())
+    );
 }

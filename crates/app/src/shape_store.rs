@@ -71,7 +71,7 @@ impl ShapeStore {
     ///
     /// # Errors
     /// [`ShapeError::Table`] when the table's check refuses it (an
-    /// undrawable geometry, a rect with elliptical corners, bytes that
+    /// undrawable geometry, a rect corner with one radius zero, bytes that
     /// begin with no paint, among others), and
     /// [`ShapeError::MeshBytes`] when its meshes would take the entry
     /// buffer past the device's `max_buffer_size`; nothing is

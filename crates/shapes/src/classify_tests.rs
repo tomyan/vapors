@@ -126,7 +126,8 @@ fn arcs_that_do_not_form_one_ellipse_are_a_path() {
     // answer, pinned); sweeps that differ; a chord that is not a
     // diameter; a chord 6e-5 short of the diameter, whose two centres
     // are 0.019 apart; three arcs; not back to the start; zero-radius
-    // arcs, which the pen made lines
+    // arcs, which the pen made lines; radii below the closed form's
+    // floor (geometry::MIN_RADIUS)
     let cases = [
         "M2 8a6 6 0 1 0 12 0a7 7 0 1 0-12 0z",
         "M2 8a6 6 30 1 0 12 0a6 6 30 1 0-12 0z",
@@ -136,6 +137,7 @@ fn arcs_that_do_not_form_one_ellipse_are_a_path() {
         "M2 8a6 6 0 0 0 6-6a6 6 0 0 0 6 6a6 6 0 0 0-12 0z",
         "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 1z",
         "M2 8a0 0 0 1 0 12 0a0 0 0 1 0-12 0z",
+        "M0 0A1e-10 1e-10 0 1 0 2e-10 0A1e-10 1e-10 0 1 0 0 0z",
     ];
 
     // When, Then
