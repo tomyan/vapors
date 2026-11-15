@@ -74,7 +74,8 @@ impl DocumentInput {
     /// no timestamp (as `Input::counted` says for clicks). Retired when
     /// winit exposes event times.
     pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2]) {
-        let velocity = velocity.map(|v| v.clamp(-MAX_FLING_SPEED, MAX_FLING_SPEED));
+        // `fling` clamps to the maximum; the minimum is checked first, on
+        // values the clamp leaves alone
         if velocity.iter().all(|v| v.abs() <= MIN_FLING_SPEED) {
             return;
         }
