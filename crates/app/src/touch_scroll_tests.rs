@@ -2,12 +2,16 @@ use super::*;
 
 use crate::scroll_fixture::{nested, offset};
 
+fn now() -> vapors_platform::Instant {
+    vapors_platform::Instant::now()
+}
+
 #[test]
 fn a_gesture_keeps_the_container_it_first_moved() {
     // Given: a finger down on the inner list
     let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
 
     // When: it pans to the inner list's end, then past it
     touch.pan(
@@ -36,16 +40,16 @@ fn the_next_gesture_finds_its_container_again() {
     // Given: a gesture that left the inner list at its end
     let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 50.0],
         vapors_platform::Instant::now(),
     );
-    touch.up(1);
+    touch.up(1, now());
 
     // When: another gesture at the same place
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 30.0],
@@ -86,9 +90,9 @@ fn thumbs_show_fully_while_a_mouse_is_in_use() {
         1.0,
         "a mouse until a finger touches"
     );
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
-    touch.up(1);
+    touch.up(1, now());
 
     // When the mouse moves again
     touch.mouse();
@@ -105,7 +109,7 @@ fn a_finger_down_shows_no_thumbs_until_it_scrolls() {
     let mut touch = TouchScroll::default();
 
     // When
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
 
     // Then
     assert_eq!(
@@ -120,7 +124,7 @@ fn a_scroll_shows_only_the_scrolled_containers_thumbs() {
     let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
 
     // When the inner list scrolls
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
@@ -137,9 +141,9 @@ fn thumbs_stay_after_the_lift_then_fade_300_ms_after_the_scroll() {
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
     let ms = |n: u64| at + std::time::Duration::from_millis(n);
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
-    touch.up(1);
+    touch.up(1, now());
 
     // Then
     assert_eq!(touch.thumb_opacity(inner, ms(10)), 1.0);
@@ -152,8 +156,8 @@ fn a_second_finger_lifting_does_not_end_the_gesture() {
     // Given: two fingers down, the gesture scrolling the inner list
     let (doc, _outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down(1, [10.0, 10.0]);
-    touch.down(2, [30.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
+    touch.down(2, [30.0, 10.0], now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 10.0],
@@ -161,7 +165,7 @@ fn a_second_finger_lifting_does_not_end_the_gesture() {
     );
 
     // When: the second finger lifts, and the first pans on
-    touch.up(2);
+    touch.up(2, now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 10.0],
@@ -173,8 +177,8 @@ fn a_second_finger_lifting_does_not_end_the_gesture() {
 
     // When / Then: the last finger lifting ends it; a new gesture finds
     // its container again
-    touch.up(1);
-    touch.down(1, [10.0, 80.0]);
+    touch.up(1, now());
+    touch.down(1, [10.0, 80.0], now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 10.0],
@@ -188,7 +192,7 @@ fn a_finger_lifted_twice_or_never_down_ends_nothing() {
     // Given: one finger down and scrolling
     let (doc, _outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 10.0],
@@ -196,7 +200,7 @@ fn a_finger_lifted_twice_or_never_down_ends_nothing() {
     );
 
     // When: a finger that was never down lifts
-    touch.up(7);
+    touch.up(7, now());
     touch.pan(
         &mut doc.borrow_mut(),
         [0.0, 10.0],
@@ -217,7 +221,7 @@ fn a_finger_down_stops_a_fling() {
     touch.fling(Fling::new(outer, curve, start));
 
     // When
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
 
     // Then: it no longer runs or moves the list
     let running = touch.advance(
@@ -235,8 +239,8 @@ fn a_fling_shows_the_thumbs_at_each_frame_it_moves_them() {
     let (doc, outer, _) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    touch.down(1, [10.0, 10.0]);
-    touch.up(1);
+    touch.down(1, [10.0, 10.0], now());
+    touch.up(1, now());
     assert_eq!(touch.thumb_opacity(outer, at), 0.0);
     let curve = crate::fling_curve::FlingCurve::new([0.0, 500.0]).expect("moving");
     touch.fling(Fling::new(outer, curve, at));
@@ -255,8 +259,8 @@ fn a_fling_stopped_by_the_edge_fades_the_thumbs_and_does_not_hide_them() {
     let (doc, _, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    touch.down(1, [10.0, 10.0]);
-    touch.up(1);
+    touch.down(1, [10.0, 10.0], now());
+    touch.up(1, now());
     let curve = crate::fling_curve::FlingCurve::new([0.0, 3000.0]).expect("moving");
     touch.fling(Fling::new(inner, curve, at));
     let frame = |n: u32| at + std::time::Duration::from_micros(16_667) * n;
@@ -284,12 +288,12 @@ fn a_finger_down_does_not_hide_thumbs_still_showing() {
     let (doc, _, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
-    touch.up(1);
+    touch.up(1, now());
 
     // When the next finger goes down
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
 
     // Then they fade on their own time, as Chrome's do
     assert_eq!(
@@ -304,9 +308,9 @@ fn the_mouse_taking_over_mid_fade_leaves_no_fade_to_draw() {
     let (doc, _, _) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    touch.down(1, [10.0, 10.0]);
+    touch.down(1, [10.0, 10.0], now());
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
-    touch.up(1);
+    touch.up(1, now());
 
     // When the mouse moves, and a frame draws the thumbs
     touch.mouse();

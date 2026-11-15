@@ -11,6 +11,7 @@ mod cursor;
 mod document_input;
 mod elements_app;
 mod fling;
+mod fling_booster;
 mod fling_curve;
 pub mod frame;
 #[cfg(test)]

@@ -135,3 +135,19 @@ fn offset_at_the_start_is_zero() {
     assert_eq!(x, 0.0);
     assert!(y.abs() < 0.05, "{y}");
 }
+
+#[test]
+fn velocity_starts_near_the_flings_and_falls_to_zero_at_its_end() {
+    // Given a fling at 3000 px/s up and to the right, 3 across for 4 up
+    let fling = curve([1800.0, -2400.0]);
+
+    // When
+    let [x, y] = fling.velocity_at(Duration::ZERO);
+    let at_end = fling.velocity_at(fling.duration() + Duration::from_millis(1));
+
+    // Then: the first segment's slope × distance / duration is within
+    // 2% of the starting speed, along the fling's direction
+    assert!((x.hypot(y) - 3000.0).abs() < 60.0, "{x}, {y}");
+    assert!((x / y + 0.75).abs() < 1e-4, "{x}, {y}");
+    assert_eq!(at_end, [0.0, 0.0]);
+}

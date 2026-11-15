@@ -42,6 +42,9 @@ pub(crate) struct Fling {
     reached: [f32; 2],
     /// The last frame that sent a delta (`last_progress_time_`).
     last_sent: Option<Instant>,
+    /// The curve's velocity at that frame (`current_fling_parameters_
+    /// .velocity`, which the booster observes).
+    velocity: [f32; 2],
 }
 
 impl Fling {
@@ -53,12 +56,18 @@ impl Fling {
             curve,
             reached: [0.0; 2],
             last_sent: None,
+            velocity: [0.0; 2],
         }
     }
 
     /// The container it moves.
     pub(crate) fn container(&self) -> NodeId {
         self.container
+    }
+
+    /// The velocity at the last frame that moved the fling, CSS px/s.
+    pub(crate) fn velocity(&self) -> [f32; 2] {
+        self.velocity
     }
 
     /// The fling moved on to `now`; whether it is still running.
@@ -83,6 +92,7 @@ impl Fling {
             return true;
         }
         self.last_sent = Some(now);
+        self.velocity = self.curve.velocity_at(elapsed);
         document.scroll_node_by(self.container, delta)
     }
 }

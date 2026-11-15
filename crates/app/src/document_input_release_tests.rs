@@ -94,7 +94,7 @@ fn a_fling_after_a_gesture_that_scrolled_nothing_starts_nothing() {
 }
 
 #[test]
-fn a_fling_faster_than_16000_px_a_second_coasts_as_16000_does() {
+fn a_fling_faster_than_8000_px_a_second_coasts_as_8000_does() {
     // Given three flicks lifted at one instant, at, over and under the
     // maximum, each drawn 3 ms after the lift
     let lift = Instant::now();
@@ -106,7 +106,7 @@ fn a_fling_faster_than_16000_px_a_second_coasts_as_16000_does() {
     };
 
     // When
-    let (max, over, under) = (moved(-16_000.0), moved(-50_000.0), moved(-15_000.0));
+    let (max, over, under) = (moved(-8000.0), moved(-50_000.0), moved(-7000.0));
 
     // Then: on one clock the clamped fling moves exactly as the maximum
     // does; 1000 px/s slower moves at least half of 1000 px/s × 3 ms less
@@ -134,4 +134,19 @@ fn a_second_fling_for_one_gesture_starts_nothing() {
 
     // Then
     assert!(!input.flinging());
+}
+
+#[test]
+fn a_touch_fling_is_boosted_from_and_a_programmatic_one_is_not() {
+    // Given a flick, which the next touch fling could boost from
+    let (doc, outer, mut input) = flick(80.0, -600.0, Instant::now());
+    assert_eq!(input.touch.boost_from(), [0.0, 600.0]);
+
+    // When the app flings the list itself
+    input
+        .fling(&doc.borrow(), outer, [0.0, 900.0], Instant::now())
+        .expect("starts");
+
+    // Then
+    assert_eq!(input.touch.boost_from(), [0.0, 0.0]);
 }
