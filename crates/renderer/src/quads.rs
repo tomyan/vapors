@@ -4,8 +4,8 @@
 
 use vapors_scene::{Color, Quad};
 
-use crate::instanced::{Instanced, float_bytes};
-use crate::{GpuWork, KeptRange, Shift, Target};
+use crate::instanced::{Instanced, instance_bytes, row_of};
+use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws quads. Create once per target format.
 pub struct QuadPipeline(Instanced);
@@ -32,7 +32,15 @@ impl QuadPipeline {
     /// The instance bytes of `quads`, as a draw writes them.
     #[must_use]
     pub fn bytes(quads: &[Quad]) -> Vec<u8> {
-        float_bytes(quads.iter().flat_map(instance))
+        Self::bytes_in_rows(quads, &[])
+    }
+
+    /// The instance bytes of `quads`, item `i` in row `rows[i]` of the
+    /// batch's [`RowOffsets`] (row 0 past the end of `rows`).
+    #[must_use]
+    pub fn bytes_in_rows(quads: &[Quad], rows: &[u32]) -> Vec<u8> {
+        let rowed = quads.iter().enumerate();
+        instance_bytes(rowed.map(|(at, item)| (instance(item), row_of(rows, at))))
     }
 
     /// Writes `bytes` ([`QuadPipeline::bytes`] of a run) into the kept buffer,
@@ -50,7 +58,22 @@ impl QuadPipeline {
     ///
     /// If `kept` was kept by another pipeline.
     pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, shift);
+        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
+    }
+
+    /// As [`Self::draw_kept`], each instance moved by its row's offset in
+    /// `rows` as well.
+    ///
+    /// # Panics
+    ///
+    /// If `kept` was kept by another pipeline.
+    pub fn draw_kept_in_rows(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        (shift, rows): (Shift, &RowOffsets),
+    ) {
+        self.0.draw_kept(target, kept, (shift, rows));
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

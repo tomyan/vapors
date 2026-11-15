@@ -6,7 +6,7 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::{KeptRange, Shift};
+use vapors_renderer::{KeptRange, RowOffsets, Shift};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
@@ -97,13 +97,34 @@ impl TextPipeline {
         params: BlendParams,
         shift: Shift,
     ) {
+        self.draw_kept_in_rows(
+            target,
+            atlas,
+            (kept, pins),
+            (params, (shift, &RowOffsets::NONE)),
+        );
+    }
+
+    /// As [`TextPipeline::draw_kept`], each vertex moved by its row's
+    /// offset in `rows` as well.
+    ///
+    /// # Panics
+    ///
+    /// As [`TextPipeline::draw_kept`].
+    pub fn draw_kept_in_rows(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        (kept, pins): (&KeptRange, &AtlasPins),
+        (params, moved): (BlendParams, (Shift, &RowOffsets)),
+    ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(
             built, now,
             "text: kept bytes built at atlas generation {built} drawn at {now}; build them again \
              when the generation moves on (draw_kept.rs); reproduce with `cargo xtask test`"
         );
-        let Some(params) = self.prepare(target, atlas, (params, shift)) else {
+        let Some(params) = self.prepare(target, atlas, (params, moved)) else {
             return;
         };
         self.record_draw(target, Vertices::Kept(kept), params);

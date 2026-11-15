@@ -4,10 +4,12 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed, Shift};
+use vapors_renderer::{KeptRange, Placed, RowOffsets, Shift};
 use vapors_scene::Size;
 
-use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline, VERTEX_SIZE};
+use crate::pipeline::{
+    self, BlendParams, FLOATS_PER_VERTEX, PARAMS_SIZE, TextPipeline, VERTEX_SIZE,
+};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -74,7 +76,8 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let Some(params) = self.prepare(target, atlas, (params, Shift::NONE)) else {
+        let Some(params) = self.prepare(target, atlas, (params, (Shift::NONE, &RowOffsets::NONE)))
+        else {
             return;
         };
         self.draw_quads(target, quads, params);
@@ -91,11 +94,11 @@ impl TextPipeline {
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        (params, shift): (BlendParams, Shift),
+        (params, moved): (BlendParams, (Shift, &RowOffsets)),
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
-        let params = params_bytes(params, target.viewport, shift);
+        let params = params_bytes(params, target.viewport, moved);
         self.params
             .slot(target.encoder, target.queue, &self.work, params)
     }
@@ -161,9 +164,13 @@ pub(crate) enum Vertices<'a> {
 }
 
 /// The params uniform's bytes: gamma, contrast, the viewport's width
-/// and height and `shift`, in device pixels.
+/// and height and `shift`, in device pixels, then `rows`.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_SIZE] {
+fn params_bytes(
+    params: BlendParams,
+    viewport: Size,
+    (shift, rows): (Shift, &RowOffsets),
+) -> [u8; PARAMS_SIZE] {
     let [dx, dy] = shift.pixels();
     let floats = [
         params.gamma,
@@ -177,12 +184,22 @@ fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAM
     for (at, float) in floats.into_iter().enumerate() {
         bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
     }
+    bytes[32..].copy_from_slice(rows.bytes());
     bytes
 }
 
-/// Little-endian bytes of vertex floats.
+/// Little-endian bytes of vertex floats, each vertex in row 0, padded
+/// to a multiple of 16 bytes as the kept buffer takes them
+/// (`vapors-renderer`'s retained.rs); the padding, under one vertex, is
+/// never drawn (`vertex_count` rounds down).
 pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
-    floats.iter().flat_map(|f| f.to_le_bytes()).collect()
+    let mut bytes = Vec::new();
+    for vertex in floats.chunks(FLOATS_PER_VERTEX) {
+        bytes.extend(vertex.iter().flat_map(|f| f.to_le_bytes()));
+        bytes.extend(0u32.to_le_bytes());
+    }
+    bytes.resize(bytes.len().next_multiple_of(16), 0);
+    bytes
 }
 
 /// How many vertices `bytes` bytes hold.

@@ -1,8 +1,9 @@
 //! A pipeline that draws one quad per instance: the shared machinery of
 //! the box and shadow pipelines. Each instance is `vec4s` four-float
-//! attributes, in device pixels where they are positions; the viewport
-//! size and a scroll frame's shift (device pixels, added to every
-//! position) are a uniform, kept per value seen and bound by its offset. Alpha
+//! attributes, in device pixels where they are positions, then its row's
+//! index (`row_offsets.rs`); the viewport size, a frame's shift and the
+//! rows' offsets (device pixels, added to every position) are a
+//! uniform, kept per value seen and bound by its offset. Alpha
 //! blends over what the target holds, in instance order, in one draw
 //! recorded into the target's encoder.
 
@@ -12,7 +13,7 @@ use crate::frame_arena::{FrameArena, Placed};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::quads_setup::{bind_group_layout, render_pipeline};
 use crate::uniform_slots::UniformSlots;
-use crate::{KeptRange, Retained, Shift, Target, WorkCounter};
+use crate::{KeptRange, Retained, RowOffsets, Shift, Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
 
@@ -20,7 +21,7 @@ pub(crate) struct Instanced {
     label: &'static str,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
-    viewports: UniformSlots,
+    viewports: UniformSlots<VIEW_SIZE>,
     bind_group: KeptBindGroup,
     instances: FrameArena,
     kept: Retained,
@@ -44,13 +45,22 @@ impl Instanced {
             },
         );
         let layout = bind_group_layout(device);
-        let stride = u64::from(vec4s) * 16;
+        let floats = u64::from(vec4s) * 16;
+        // the row index padded to 16 bytes: kept instances are whole
+        // 16-byte rows (retained.rs)
+        let stride = floats + 16;
+        let row = wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Uint32,
+            offset: floats,
+            shader_location: vec4s,
+        };
         let attributes: Vec<wgpu::VertexAttribute> = (0..vec4s)
             .map(|i| wgpu::VertexAttribute {
                 format: wgpu::VertexFormat::Float32x4,
                 offset: u64::from(i) * 16,
                 shader_location: i,
             })
+            .chain(std::iter::once(row))
             .collect();
         let instance = wgpu::VertexBufferLayout {
             array_stride: stride,
@@ -81,7 +91,7 @@ impl Instanced {
         let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
             return;
         };
-        let Some(viewport) = self.viewport_slot(target, Shift::NONE) else {
+        let Some(viewport) = self.viewport_slot(target, (Shift::NONE, &RowOffsets::NONE)) else {
             return;
         };
         self.record(target, count, Instances::Placed(&instances), viewport);
@@ -107,12 +117,17 @@ impl Instanced {
         self.kept.keep(frame, queue, &self.work, bytes)
     }
 
-    /// Draws the instances `kept` holds, moved by `shift` (device
-    /// pixels); not when the viewport slot is refused (the refusal is on
-    /// the encoder).
-    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
+    /// Draws the instances `kept` holds, moved by `shift` and each by its
+    /// row's offset in `rows` (device pixels); not when the viewport slot
+    /// is refused (the refusal is on the encoder).
+    pub(crate) fn draw_kept(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        moved: (Shift, &RowOffsets),
+    ) {
         let count = self.count(self.kept.len(kept));
-        let Some(viewport) = self.viewport_slot(target, shift) else {
+        let Some(viewport) = self.viewport_slot(target, moved) else {
             return;
         };
         self.record(target, count, Instances::Kept(kept), viewport);
@@ -143,10 +158,10 @@ impl Instanced {
         })
     }
 
-    /// The dynamic offset of the target's viewport and `shift` in the
-    /// slots.
-    fn viewport_slot(&mut self, target: &Target<'_>, shift: Shift) -> Option<u32> {
-        let viewport = viewport_bytes(target.viewport, shift);
+    /// The dynamic offset of the target's viewport, `shift` and `rows`
+    /// in the slots.
+    fn viewport_slot(&mut self, target: &Target<'_>, moved: (Shift, &RowOffsets)) -> Option<u32> {
+        let viewport = view_bytes(target.viewport, moved);
         let (frame, queue) = (target.encoder, target.queue);
         self.viewports.slot(frame, queue, &self.work, viewport)
     }
@@ -191,7 +206,9 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The viewport uniform's bytes: its size and `shift`, two floats each.
+/// The viewport uniform's bytes for a pipeline that draws one item a
+/// draw (images): its size and `shift`, two floats each; an item's row
+/// offset is in its shift.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
 pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
     let [dx, dy] = shift.pixels();
@@ -203,7 +220,33 @@ pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
     bytes
 }
 
-/// Little-endian bytes of `floats`, the instance buffer's layout.
-pub(crate) fn float_bytes(floats: impl IntoIterator<Item = f32>) -> Vec<u8> {
-    floats.into_iter().flat_map(f32::to_le_bytes).collect()
+/// The view uniform's bytes: the viewport size and `shift`, two floats
+/// each, then the rows' offsets (`RowOffsets::bytes`).
+pub(crate) const VIEW_SIZE: usize = 16 + RowOffsets::CAPACITY * 8;
+
+/// The view uniform's bytes for `viewport`, moved by `shift` and `rows`.
+#[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
+pub(crate) fn view_bytes(viewport: Size, (shift, rows): (Shift, &RowOffsets)) -> [u8; VIEW_SIZE] {
+    let mut bytes = [0; VIEW_SIZE];
+    bytes[..16].copy_from_slice(&viewport_bytes(viewport, shift));
+    bytes[16..].copy_from_slice(rows.bytes());
+    bytes
+}
+
+/// Little-endian bytes of each instance's floats followed by its row's
+/// index, padded to 16 bytes: the instance buffer's layout.
+pub(crate) fn instance_bytes(instances: impl IntoIterator<Item = (Vec<f32>, u32)>) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for (floats, row) in instances {
+        bytes.extend(floats.into_iter().flat_map(f32::to_le_bytes));
+        bytes.extend(row.to_le_bytes());
+        bytes.extend([0; 12]);
+    }
+    bytes
+}
+
+/// Each row index of `rows` or, past its end (an empty `rows` for a
+/// batch in one frame), row 0.
+pub(crate) fn row_of(rows: &[u32], at: usize) -> u32 {
+    rows.get(at).copied().unwrap_or(0)
 }

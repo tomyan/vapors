@@ -4,9 +4,9 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, float_bytes};
+use crate::instanced::{Instanced, instance_bytes, row_of};
 use crate::quads::rgba;
-use crate::{GpuWork, KeptRange, Shift, Target};
+use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -32,7 +32,15 @@ impl ShadowPipeline {
     /// The instance bytes of `shadows`, as a draw writes them.
     #[must_use]
     pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
-        float_bytes(shadows.iter().flat_map(instance))
+        Self::bytes_in_rows(shadows, &[])
+    }
+
+    /// The instance bytes of `shadows`, item `i` in row `rows[i]` of the
+    /// batch's [`RowOffsets`] (row 0 past the end of `rows`).
+    #[must_use]
+    pub fn bytes_in_rows(shadows: &[Shadow], rows: &[u32]) -> Vec<u8> {
+        let rowed = shadows.iter().enumerate();
+        instance_bytes(rowed.map(|(at, item)| (instance(item), row_of(rows, at))))
     }
 
     /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,
@@ -50,7 +58,22 @@ impl ShadowPipeline {
     ///
     /// If `kept` was kept by another pipeline.
     pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, shift);
+        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
+    }
+
+    /// As [`Self::draw_kept`], each instance moved by its row's offset in
+    /// `rows` as well.
+    ///
+    /// # Panics
+    ///
+    /// If `kept` was kept by another pipeline.
+    pub fn draw_kept_in_rows(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        (shift, rows): (Shift, &RowOffsets),
+    ) {
+        self.0.draw_kept(target, kept, (shift, rows));
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

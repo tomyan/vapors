@@ -64,7 +64,9 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
     // Then
     let work = frame.pipeline.take_work();
     assert_eq!(frame.row(), [BACKGROUND, BACKGROUND, RED]);
-    assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 16));
+    // one view written: the viewport, the shift and the rows' offsets
+    // (row_offsets.rs), 16 + 1024 bytes
+    assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 1040));
     frame.pipeline.release(red);
 }
 

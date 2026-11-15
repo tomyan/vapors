@@ -10,7 +10,7 @@ mod painter;
 use std::cell::RefCell;
 
 use painter::Painter;
-use vapors_renderer::{KeptRange, Shift};
+use vapors_renderer::{KeptRange, RowOffsets, Shift};
 use vapors_text::{
     AtlasConfig, AtlasPins, BlendParams, Family, Layout, LayoutOptions, Style, TextDraw,
     TextPipeline,
@@ -124,6 +124,37 @@ fn gpu_kept_text_drawn_with_a_shift_matches_the_text_drawn_at_the_moved_origin()
 
     // Then
     assert!(shifted.pixels == moved.pixels, "shifted kept text differs");
+    painter.atlas.unpin(pins);
+    painter.pipeline.release(range);
+}
+
+#[test]
+fn gpu_kept_text_drawn_in_a_row_matches_the_text_drawn_at_the_rows_offset() {
+    // Given: "Hello" drawn at 5, 19
+    let mut immediate = Painter::new(PAGE);
+    let layout = immediate.layout("Hello");
+    let moved = immediate.frame(|pipeline, atlas, target| {
+        pipeline.draw(target, atlas, &layout, [5.0, 19.0], BlendParams::default())
+    });
+    let mut painter = Painter::new(PAGE);
+    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
+
+    // When: its bytes kept at 2, 4 drawn shifted by 3, 5, in row 0 of a
+    // lane, ten pixels down
+    let rowed = painter.frame(|pipeline, atlas, target| {
+        let rows = RowOffsets::whole(&[[0.0, 10.0]]);
+        let moved = (Shift::whole([3.0, 5.0]), &rows);
+        pipeline.draw_kept_in_rows(
+            target,
+            atlas,
+            (&range, &pins),
+            (BlendParams::default(), moved),
+        );
+        Ok(())
+    });
+
+    // Then
+    assert!(rowed.pixels == moved.pixels, "kept text in a row differs");
     painter.atlas.unpin(pins);
     painter.pipeline.release(range);
 }
