@@ -1,14 +1,15 @@
-//! Replays a fling Chrome scrolled (a transcript from
-//! scripts/fling-recorder, docs/plans/touch-momentum.md) through vapors:
-//! a page laid out as the recorder's list, its touches fed to the
-//! platform's `Gestures` and to `ElementsApp` as the window does, an app
-//! frame at each of Chrome's frames, and the list's scroll offset read
-//! after each beside Chrome's `scrollTop`.
+//! Replays the coast of a fling Chrome scrolled (a transcript from
+//! scripts/fling-recorder and its `.coast.json` from `fit.py coast`;
+//! docs/plans/touch-momentum.md) through vapors: a page with the
+//! recorder's list, its scroll offset set to where Chrome's coast began,
+//! flung at the start time and velocity fitted to Chrome's frames, an
+//! app frame at each of Chrome's coast frames, and the list's offset read
+//! after each beside Chrome's `scrollTop`. The drag is not replayed: the
+//! plan says why.
 
 #![allow(
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "a transcript's numbers are a phone page's CSS pixels, row counts and touch ids, far inside f32, usize and u64"
+    reason = "a transcript's numbers are a phone page's CSS pixels and milliseconds, far inside f32"
 )]
 
 use std::cell::RefCell;
@@ -21,42 +22,36 @@ use vapors_app::ElementsApp;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 use vapors_gpu_harness::Gpu;
-use vapors_platform::{App, Event, Frame, Gestures, Instant, Platform, Start, TouchPhase};
+use vapors_platform::{App, Frame, Instant, Platform, Start};
 use vapors_renderer::clear;
 use vapors_scene::Color;
 use vapors_text::FontSystem;
 
-/// The recorder's list: where it is on the page, its size, its rows.
+/// The recorder's list: its size and its content's height, CSS px.
 pub struct List {
-    pub top: f32,
-    pub left: f32,
     pub width: f32,
     pub height: f32,
-    pub row_height: f32,
-    pub rows: usize,
+    pub scroll_height: f32,
 }
 
-/// One recorded event, its time in ms on `performance.now()`'s clock.
-pub enum Recorded {
-    Touch {
-        t: f64,
-        phase: TouchPhase,
-        id: u64,
-        x: f32,
-        y: f32,
-    },
-    Frame {
-        t: f64,
-        top: f32,
-    },
+/// Where and how fast Chrome's coast began (`fit.py coast`), and its
+/// first frame, ms on the transcript's clock and CSS px.
+pub struct Coast {
+    pub first_frame_ms: f64,
+    pub start_ms: f64,
+    pub start_top: f32,
+    pub velocity: f32,
 }
 
-/// A transcript: its file, the page's density and list, its events.
+/// A transcript's coast: its file, the page's density and list, the
+/// fitted start, and Chrome's frames from the coast's first on.
 pub struct Transcript {
     pub file: String,
     pub scale: f32,
     pub list: List,
-    pub events: Vec<Recorded>,
+    pub coast: Coast,
+    /// Chrome's frames: time in ms, `scrollTop`.
+    pub frames: Vec<(f64, f32)>,
 }
 
 /// One of Chrome's frames, with Chrome's scroll offset and vapors'.
@@ -66,121 +61,143 @@ pub struct Compared {
     pub ours: f32,
 }
 
-/// The transcript in `path`.
+fn json(path: &Path) -> Result<Value, String> {
+    let file = path.display();
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{file}: {e}"))?;
+    serde_json::from_str(&text).map_err(|e| format!("{file}: not JSON: {e}"))
+}
+
+fn number(file: &str, value: &Value, name: &str) -> Result<f64, String> {
+    value[name]
+        .as_f64()
+        .ok_or_else(|| format!("{file}: `{name}` is not a number"))
+}
+
+/// The transcript in `path` and its coast beside it
+/// (`<name>.coast.json`).
 ///
 /// # Errors
-/// A file that does not read or parse, or a field missing or of
-/// another shape, naming the file and the field or event.
+/// A file that does not read or parse, a field missing or of another
+/// shape, or an event of a kind the recorder does not write, naming the
+/// file and the field or event.
 pub fn load(path: &Path) -> Result<Transcript, String> {
     let file = path.display().to_string();
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{file}: {e}"))?;
-    let json: Value = serde_json::from_str(&text).map_err(|e| format!("{file}: not JSON: {e}"))?;
-    let list = &json["list"];
-    let number = |value: &Value, name: &str| {
-        value[name]
-            .as_f64()
-            .ok_or_else(|| format!("{file}: `{name}` is not a number"))
+    let (recorded, fitted) = (json(path)?, json(&path.with_extension("coast.json"))?);
+    let list = &recorded["list"];
+    let coast = Coast {
+        first_frame_ms: number(&file, &fitted, "first_frame_ms")?,
+        start_ms: number(&file, &fitted, "start_ms")?,
+        start_top: number(&file, &fitted, "start_top")? as f32,
+        velocity: number(&file, &fitted, "velocity")? as f32,
     };
-    let list = List {
-        top: number(list, "top")? as f32,
-        left: number(list, "left")? as f32,
-        width: number(list, "width")? as f32,
-        height: number(list, "height")? as f32,
-        row_height: number(list, "rowHeight")? as f32,
-        rows: number(list, "rows")? as usize,
-    };
-    let events = json["events"]
+    let events = recorded["events"]
         .as_array()
         .ok_or_else(|| format!("{file}: no `events` list"))?;
-    let events = events
-        .iter()
-        .enumerate()
-        .filter_map(|(at, event)| {
-            recorded(event)
-                .map_err(|e| format!("{file}: event {at}: {e}"))
-                .transpose()
-        })
-        .collect::<Result<_, _>>()?;
+    let mut frames = Vec::new();
+    for (at, event) in events.iter().enumerate() {
+        if let Some(frame) =
+            recorded_frame(event).map_err(|e| format!("{file}: event {at}: {e}"))?
+        {
+            frames.push(frame);
+        }
+    }
+    frames.retain(|(t, _)| *t >= coast.first_frame_ms);
     Ok(Transcript {
-        scale: number(&json, "devicePixelRatio")? as f32,
+        scale: number(&file, &recorded, "devicePixelRatio")? as f32,
+        list: List {
+            width: number(&file, list, "width")? as f32,
+            height: number(&file, list, "height")? as f32,
+            scroll_height: number(&file, list, "scrollHeight")? as f32,
+        },
+        coast,
+        frames,
         file,
-        list,
-        events,
     })
 }
 
-/// `event` as a touch or a frame; `None` for one the replay does not
-/// use (`scrollend`).
-fn recorded(event: &Value) -> Result<Option<Recorded>, String> {
-    let kind = event["kind"].as_str().ok_or("no `kind`")?;
+/// `event`'s time and `scrollTop` when it is a frame; `None` for the
+/// other kinds the recorder writes.
+fn recorded_frame(event: &Value) -> Result<Option<(f64, f32)>, String> {
     let number = |name: &str| {
         event[name]
             .as_f64()
             .ok_or(format!("`{name}` is not a number"))
     };
-    let phase = match kind {
-        "frame" => {
-            return Ok(Some(Recorded::Frame {
-                t: number("t")?,
-                top: number("top")? as f32,
-            }));
-        }
-        "scrollend" => return Ok(None),
-        "touchstart" => TouchPhase::Started,
-        "touchmove" => TouchPhase::Moved,
-        "touchend" => TouchPhase::Ended,
-        "touchcancel" => TouchPhase::Cancelled,
-        other => return Err(format!("unknown kind `{other}`")),
-    };
-    Ok(Some(Recorded::Touch {
-        t: number("t")?,
-        phase,
-        id: number("id")? as u64,
-        x: number("x")? as f32,
-        y: number("y")? as f32,
-    }))
+    match event["kind"].as_str().ok_or("no `kind`")? {
+        "frame" => Ok(Some((number("t")?, number("top")? as f32))),
+        "scrollend" | "touchstart" | "touchmove" | "touchend" | "touchcancel" => Ok(None),
+        other => Err(format!("unknown kind `{other}`")),
+    }
 }
 
-/// A page laid out as the recorder's: the list at the top left, its
-/// rows each `row_height` tall; the document and the list.
+/// A page with the recorder's list at the top left. The list holds one
+/// block as tall as Chrome's content: its 400 rows were 48 px plus a
+/// border Chrome drew 2 device px thick (19 491 px at 2.75), and the
+/// scroll range is what the coast meets.
 fn page(list: &List) -> (Rc<RefCell<Document>>, NodeId) {
     let mut doc = Document::new(FontSystem::bundle_only());
     let css = format!(
-        "body {{ margin: 0; }} .list {{ height: {}px; overflow: auto; }} .row {{ height: {}px; }}",
-        list.height, list.row_height
+        "body {{ margin: 0; }} .list {{ height: {}px; overflow: auto; }} .content {{ height: {}px; }}",
+        list.height, list.scroll_height
     );
     doc.add_stylesheet("fling.css", &css).expect("parses");
-    let body = doc.body();
-    let scroller = doc.create_element("div");
+    let (body, scroller, content) = (
+        doc.body(),
+        doc.create_element("div"),
+        doc.create_element("div"),
+    );
     doc.set_attribute(scroller, "class", "list");
+    doc.set_attribute(content, "class", "content");
     doc.append(body, scroller);
-    for _ in 0..list.rows {
-        let row = doc.create_element("div");
-        doc.set_attribute(row, "class", "row");
-        doc.append(scroller, row);
-    }
+    doc.append(scroller, content);
     (Rc::new(RefCell::new(doc)), scroller)
 }
 
-/// `transcript` replayed on `gpu`: each of Chrome's frames, compared.
+/// `transcript`'s coast replayed on `gpu`: each of Chrome's frames,
+/// compared.
 ///
 /// # Errors
-/// A transcript with no frame before its first touch, to lay the page
-/// out on.
+/// `App::start` refused, the list not a scroll container, or the fling
+/// refused.
 pub fn replay(transcript: &Transcript, gpu: &Gpu) -> Result<Vec<Compared>, String> {
+    let file = &transcript.file;
     let (doc, list) = page(&transcript.list);
     let mut app = ElementsApp::new(Rc::clone(&doc));
-    let (platform, mut gestures, base) = (Platform::detached(), Gestures::new(), Instant::now());
-    let first = transcript
-        .events
-        .first()
-        .ok_or(format!("{}: no events", transcript.file))?;
-    let start = match first {
-        Recorded::Frame { t, .. } | Recorded::Touch { t, .. } => *t,
-    };
-    let at = |t: f64| Duration::from_secs_f64(((t - start) / 1000.0).max(0.0));
+    let (platform, base) = (Platform::detached(), Instant::now());
+    // the clock starts 50 ms before the coast's first frame
+    let origin = transcript
+        .coast
+        .first_frame_ms
+        .min(transcript.coast.start_ms)
+        - 50.0;
+    let at = |t: f64| base + Duration::from_secs_f64((t - origin) / 1000.0);
+    app.start(&start(transcript, gpu))
+        .map_err(|e| format!("{file}: App::start: {e}"))?;
+    frame(&mut app, gpu, transcript, base);
+    let coast = &transcript.coast;
+    if !doc.borrow_mut().scroll_to(list, [0.0, coast.start_top]) {
+        return Err(format!(
+            "{file}: the list did not scroll to {}",
+            coast.start_top
+        ));
+    }
+    app.fling(list, [0.0, coast.velocity], at(coast.start_ms), &platform)
+        .map_err(|e| format!("{file}: {e}"))?;
+    let mut compared = Vec::new();
+    for &(t, chrome) in &transcript.frames {
+        frame(&mut app, gpu, transcript, at(t));
+        let ours = doc
+            .borrow()
+            .scroll_offset(list)
+            .map_or(f32::NAN, |offset| offset[1]);
+        compared.push(Compared { t, chrome, ours });
+    }
+    Ok(compared)
+}
+
+fn start<'a>(transcript: &Transcript, gpu: &'a Gpu) -> Start<'a> {
     let (width, height) = size(transcript);
-    let started = Start {
+    Start {
         adapter: &gpu.adapter,
         device: &gpu.device,
         queue: &gpu.queue,
@@ -188,55 +205,18 @@ pub fn replay(transcript: &Transcript, gpu: &Gpu) -> Result<Vec<Compared>, Strin
         width,
         height,
         scale_factor: f64::from(transcript.scale),
-    };
-    app.start(&started)
-        .map_err(|e| format!("{}: App::start: {e}", transcript.file))?;
-    frame(&mut app, gpu, transcript, base);
-    let mut compared = Vec::new();
-    for event in &transcript.events {
-        match *event {
-            Recorded::Touch { t, phase, id, x, y } => {
-                let (x, y) = device(transcript, x, y);
-                app.event(Event::Touch { id, phase, x, y }, &platform);
-                for gesture in gestures.touch(id, phase, x, y, at(t)) {
-                    app.event(gesture, &platform);
-                }
-            }
-            Recorded::Frame { t, top } => {
-                frame(&mut app, gpu, transcript, base + at(t));
-                let ours = doc
-                    .borrow()
-                    .scroll_offset(list)
-                    .map_or(f32::NAN, |offset| offset[1]);
-                compared.push(Compared {
-                    t,
-                    chrome: top,
-                    ours,
-                });
-            }
-        }
     }
-    Ok(compared)
-}
-
-/// A touch at page CSS pixels (`x`, `y`) in the replay's device pixels,
-/// the list at its top left.
-fn device(transcript: &Transcript, x: f32, y: f32) -> (f32, f32) {
-    let list = &transcript.list;
-    (
-        (x - list.left) * transcript.scale,
-        (y - list.top) * transcript.scale,
-    )
 }
 
 /// The list's size in device pixels.
+#[allow(clippy::cast_sign_loss, reason = "a list's size is positive")]
 fn size(transcript: &Transcript) -> (u32, u32) {
     let scale = transcript.scale;
-    let (width, height) = (
-        transcript.list.width * scale,
-        transcript.list.height * scale,
-    );
-    (width.ceil() as u32, height.ceil() as u32)
+    let list = &transcript.list;
+    (
+        (list.width * scale).ceil() as u32,
+        (list.height * scale).ceil() as u32,
+    )
 }
 
 /// One app frame at `now`, at the list's size in device pixels.

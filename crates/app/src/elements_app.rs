@@ -190,6 +190,8 @@ mod counts;
 mod decision;
 #[path = "elements_app_failure.rs"]
 mod failure;
+#[path = "elements_app_fling.rs"]
+mod fling;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
 #[path = "elements_app_give.rs"]

@@ -188,6 +188,9 @@ fn point_of(action: Action) -> Option<Point> {
 
 #[path = "document_input_act.rs"]
 mod act;
+#[path = "document_input_fling.rs"]
+mod fling;
+pub use fling::FlingError;
 #[path = "document_input_keys.rs"]
 mod keys;
 use keys::key;

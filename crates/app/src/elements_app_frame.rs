@@ -172,6 +172,8 @@ impl ElementsApp {
         if let Some(per_frame) = &mut self.per_frame {
             per_frame(&shown_times(self.last_times.as_ref()));
         }
+        self.input
+            .advance_fling(&mut self.document.borrow_mut(), frame.now);
         let mut phases = AppFrame { app: self, frame };
         let times =
             run_frame(&mut phases, frame.now, &SystemClock).map_err(|error| error.to_string())?;

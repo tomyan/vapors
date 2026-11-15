@@ -10,6 +10,8 @@
 mod cursor;
 mod document_input;
 mod elements_app;
+mod fling;
+mod fling_curve;
 pub mod frame;
 #[cfg(test)]
 mod gpu_start_tests;
@@ -35,7 +37,7 @@ mod tooltip_style;
 mod touch_scroll;
 mod wheel_scroll;
 
-pub use document_input::{DocumentInput, Given, Route, Unplaced};
+pub use document_input::{DocumentInput, FlingError, Given, Route, Unplaced};
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
     Invalidated, PerFrame, StartState, SurfaceHandle,

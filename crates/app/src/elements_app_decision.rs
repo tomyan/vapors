@@ -26,13 +26,15 @@ pub struct FrameDecision {
     /// for no frame. Taking it here keeps the next event from asking
     /// for a frame for it again.
     pub tooltip_changed: bool,
+    /// A fling is running (`DocumentInput::flinging`).
+    pub flinging: bool,
 }
 
 impl FrameDecision {
     /// Whether any reason holds: the app draws again at once.
     #[must_use]
     pub fn wants_frame(self) -> bool {
-        self.document_changed || self.surface_invalidated || self.surfaces_want
+        self.document_changed || self.surface_invalidated || self.surfaces_want || self.flinging
     }
 
     /// The next frame: at once when a reason holds, else at the
@@ -50,8 +52,9 @@ impl FrameDecision {
 impl ElementsApp {
     /// What to do after a frame: draw again at once if the document
     /// changed since it was last asked (by something outside an event,
-    /// or by the update itself), or a surface was invalidated or wants
-    /// a frame (`ScenePainter::wants_frame`), else wait until an armed
+    /// or by the update itself), a surface was invalidated or wants
+    /// a frame (`ScenePainter::wants_frame`), or a fling is running,
+    /// else wait until an armed
     /// tooltip's deadline, asked again every frame until it shows, or
     /// for the next change.
     pub fn next_after_frame(&mut self) -> Next {
@@ -61,6 +64,7 @@ impl ElementsApp {
             surfaces_want: self.painter.as_ref().is_some_and(ScenePainter::wants_frame),
             tooltip_deadline: self.input.tooltip_deadline(),
             tooltip_changed: self.input.take_tooltip_changed(),
+            flinging: self.input.flinging(),
         };
         self.decision.next()
     }
@@ -118,5 +122,17 @@ mod tests {
         assert_eq!(armed.next(), Next::WaitUntil(deadline));
         assert_eq!(changed.next(), Next::Continue);
         assert_eq!(FrameDecision::default().next(), Next::Wait);
+    }
+
+    #[test]
+    fn a_running_fling_draws_again_at_once() {
+        // Given
+        let flinging = FrameDecision {
+            flinging: true,
+            ..FrameDecision::default()
+        };
+
+        // Then
+        assert_eq!(flinging.next(), Next::Continue);
     }
 }

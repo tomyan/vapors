@@ -74,6 +74,20 @@ Worked values from those formulas:
 | 3000 | 1246.6 ms | 1308.9 DIP |
 | 8000 | 2566.6 ms | 7186.4 DIP |
 
+**The frame loop** (`components/input/fling_controller.cc`,
+`ProgressFling`, read at chromium 1555c8bf): nothing moves at or before
+the fling's start time. At each later frame the curve gives its offset
+since the start (`WebGestureCurveImpl::Advance`), and the change since
+the last frame is sent as a momentum scroll update, unless it is 0.1 px
+or less on both axes (`kMinInertialScrollDelta`); the skipped change is
+not carried to the next frame. Once the curve has ended, at its duration
+or within 0.1 px of its end, the fling ends and that frame's change is
+not sent. A momentum update the scroller does not consume, at the
+content's edge, stops the fling
+(`RenderWidgetHostViewInput::StopFlingingIfNecessary`,
+`components/input/render_widget_host_view_input.cc:264-282`).
+`crates/app/src/fling.rs` follows these rules.
+
 **The release velocity** (`ui/events/velocity_tracker/velocity_tracker.cc`):
 the gesture detector's tracker defaults to `STRATEGY_DEFAULT = LSQ2`
 (`velocity_tracker.h:95`), a second-degree least-squares fit over the
@@ -94,11 +108,11 @@ unverified until the transcripts show them.
 
 1. **Oracle:** recordings from the Pixel, saved as fixtures (waiting on
    the page being served on the tailnet).
-2. **Red:** `crates/app/tests/gpu_fling_replay.rs` replays each
-   transcript's touches through `Gestures` and `ElementsApp` on a page
-   laid out like the recorder's. It asserts the scroll offset at each of
-   Chrome's frames within a stated tolerance, and pins the end position
-   and the time the list stops.
+2. **Red:** `crates/app/tests/gpu_fling_replay.rs` starts each
+   fixture's coast at Chrome's fitted start, offset and velocity on a
+   page laid out like the recorder's, frames `ElementsApp` at Chrome's
+   frame times, and asserts the offsets and the rest frame (see the
+   Pixel findings below for why the drag is not replayed).
 3. **Green:** the release velocity (LSQ2 over the last 100 ms), the
    curve above, the frame loop asking for frames while a fling runs
    (`Next::Wait` otherwise), a new touch stopping the fling, and the
@@ -146,21 +160,40 @@ fling (a tap, or a drag that stops) cancels the running fling.
 
 **Taps:** 001, 011, 012, 017 and 020 have no coast.
 
-**What the page saw of the finger.** Chrome delivers only the first
-few touchmoves to a passive listener once it scrolls (five touch
+**Why the touch replay is not the oracle.** Chrome delivers only the
+first few touchmoves to a passive listener once it scrolls (five touch
 events per fling here: a touchstart, three moves, the touchend), so the
 recordings do not hold the samples Chrome's velocity tracker used. The
-drag shows instead in `scrollTop`, which follows the finger frame by
-frame once past the touch slop. The replay therefore feeds vapors the
-finger reconstructed from `scrollTop` at each frame of the drag, with
-the recorded touchstart and touchend.
+drag does show in `scrollTop`, but `scrollTop` lags the finger: a
+release velocity rebuilt from the drag's frames comes out at about half
+the starting velocity Chrome's coast shows. A replay of the drag would
+hold vapors to that lag, not to Chrome's tracker.
 
-**Fixtures for the replay:** coasts to rest, 023, and 003, 005, 006,
-021 and 022 (each cut by the next touch below 350 px/s, so no boost
-and almost no distance lost); edges, 010, 016 and 019. Boost, 008 to
-009 and 013 to 015, goes with the slice that builds it.
+So the replay starts each coast where Chrome's started: at the fitted
+start time, offset and velocity (`scripts/fling-recorder/fit.py
+--joint`, written beside each fixture as a sidecar JSON). It holds the
+curve, the frame loop and the edge stop to the recorded frames: within
+6 px over the first 12 coast frames and 11 px over the whole coast,
+coming to rest within one frame of Chrome, and at the list's end where
+Chrome's coast stopped at it. The allowances are recording noise, not
+slack for vapors: they are the worst error of Chrome's own curve fitted
+to Chrome's recordings (5.6 px and 10.1 px, on 010), rounded up. The
+one frame is Chrome's last moving frame, which moves 0.4 to 0.7 px past
+where its fitted curve ends (006, 021, 023); #395 asks whether Chrome's
+fling resampling explains it. The release velocity is a port of
+Chromium's LSQ2 tracker (`ui/events/velocity_tracker/`), tested against
+that tracker's own behaviour on synthetic samples.
 
-**First PR or later:** the first PR builds the curve, the release
-velocity, the frame loop, a new touch stopping the fling and the edge
-stopping it, held to the coast and edge fixtures. Boost is the next
-PR, held to the boost chains, so each stays near 400 lines.
+**Fixtures for the replay:** coasts to rest, 023, 003, 005, 006, 021
+and 022 (the last five each cut by the next touch below 350 px/s, so no
+boost and almost no distance lost), and the edges, 010 and 016 (the
+list's two ends) and 019 (its top). All nine are held to the same
+allowances. Boost, 008 to 009 and 013 to 015, goes with the slice that
+builds it.
+
+**First PR or later:** the first PR builds the curve, the frame loop, a
+new touch stopping the fling and the edge stopping it, started by
+`ElementsApp::fling` and held to the coast and edge fixtures. The
+release velocity (the LSQ2 port, fed touch times by the platform's
+`Gestures`, which starts the fling at a touch's end) is the second.
+Boost is the third, held to the boost chains.
