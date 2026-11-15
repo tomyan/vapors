@@ -1074,3 +1074,63 @@ and `accessibility` is within its ceiling (`INSERT_A11Y_PER_ROW`,
 `FLEX_INSERT_A11Y_PER_ROW`) and no more per row than the base, without
 raising either; any term left over the base is reported before the
 gate.
+
+## 12. The per-row terms left after the lane stack
+
+The lane stack (4b to 4f-1) does not finish property 3 alone. Measured
+with `target/release/vapors-perf 60 10 --scaling <change>` at 4e
+(ce006910), in instructions per extra row from 1000 to 3000 rows, insert
+frames unless named. Where a term comes from was found with temporary
+spans around the update's steps and `perf record --call-graph lbr`; each
+slice below measures its cause again before its code.
+
+| Term | Per row | Where | Removed by |
+|---|---|---|---|
+| The a11y touch of started rows | about 100 | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set | 4f-3 |
+| Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
+| Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
+| Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
+| Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
+| Insert accessibility | about 4720 (FlexInsert about 1800) | `accessibility`: the take reads every started row again, as a record's bounds are from its parent node (section 5.3), and makes the take's index afresh (`AxIndex::of`) | 4i |
+| Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
+
+The slices:
+
+- **4f-2, 4f-3** as section 11.2 says (#398).
+- **4g. Placement visits only the marked children of a framed lane.**
+  A framed lane's children are in their own frames, so a scroll of the
+  container or an insert before a child moves none of them in its
+  frame; placement visits the children marked (built again, or with a
+  descendant that changed) and finds each by its handle, not every
+  child by its start. The settle after a scroll settles the scrolled
+  container's own range, not its children's boxes. Accepted when
+  `--scaling Scroll`'s and `Insert`'s `layout` hold no per-row term from
+  placement, and the placement check (`placement_check.rs`) and the
+  scroll tests are unchanged.
+- **4h. An owner's children edited, not walked.** An insert or removal
+  under an owner rebuilds the owner's box with its children list made
+  again from every child; the child edits (`child_edits.rs`) already
+  name the one inserted or removed, so the list is edited at that
+  place and the other children's slots are not looked up. Accepted
+  when `Insert`'s and `FlexInsert`'s box build holds no per-row term.
+- **4i. A lane row's a11y record bounded in its lane frame.** A started
+  row has not moved in its frame; its record's bounds are taken from
+  its frame (resolved as `Frames::at` does) rather than from its parent
+  node, so the take reads the rows the update changed, not every
+  started row, and the take's index is patched, not made afresh.
+  Accepted when `accessibility` for `Insert` and `FlexInsert` holds no
+  per-row term from started rows, the mirror model checks
+  (`a11y_mirror` tests) are unchanged, and the platform a11y bounds
+  equal a full take's.
+- **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
+  is kept in blocks, as the extents index's entries are (`blocks.rs`),
+  so a removal or insert moves one block. Accepted when `paint` is
+  within 2% across sizes on remove frames too.
+
+Order: 4f-2 and 4f-3 first (the fold's required terms, already
+designed), then 4g (scroll is what a reader feels, and its term is the
+largest outside accessibility), 4h, 4i (the largest term, and a change
+to the mirror's bounds, so after the layout terms are out of the
+measurements), and 4j last (the smallest). Each slice is a stacked pull
+request with its own exit check in the 11.3 form, and the fold is gated
+once all of them are in.
