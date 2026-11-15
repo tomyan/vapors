@@ -160,10 +160,15 @@ impl Instanced {
 
     /// The dynamic offset of the target's viewport, `shift` and `rows`
     /// in the slots.
-    fn viewport_slot(&mut self, target: &Target<'_>, moved: (Shift, &RowOffsets)) -> Option<u32> {
-        let viewport = view_bytes(target.viewport, moved);
+    fn viewport_slot(
+        &mut self,
+        target: &Target<'_>,
+        (shift, rows): (Shift, &RowOffsets),
+    ) -> Option<u32> {
+        let head = viewport_bytes(target.viewport, shift);
         let (frame, queue) = (target.encoder, target.queue);
-        self.viewports.slot(frame, queue, &self.work, viewport)
+        self.viewports
+            .slot_with_rows(frame, (queue, &self.work), (head, rows))
     }
 
     /// Records the draw with the viewport slot at `viewport`, through
@@ -223,15 +228,6 @@ pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
 /// The view uniform's bytes: the viewport size and `shift`, two floats
 /// each, then the rows' offsets (`RowOffsets::bytes`).
 pub(crate) const VIEW_SIZE: usize = 16 + RowOffsets::CAPACITY * 8;
-
-/// The view uniform's bytes for `viewport`, moved by `shift` and `rows`.
-#[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-pub(crate) fn view_bytes(viewport: Size, (shift, rows): (Shift, &RowOffsets)) -> [u8; VIEW_SIZE] {
-    let mut bytes = [0; VIEW_SIZE];
-    bytes[..16].copy_from_slice(&viewport_bytes(viewport, shift));
-    bytes[16..].copy_from_slice(rows.bytes());
-    bytes
-}
 
 /// Little-endian bytes of each instance's floats followed by its row's
 /// index, padded to 16 bytes: the instance buffer's layout.

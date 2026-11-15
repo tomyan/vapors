@@ -6,7 +6,7 @@
 //! slot.
 
 use crate::encoder_turn::EncoderTurn;
-use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, Holding, RowOffsets, WorkCounter};
 
 /// Slots in a new buffer: 4 KiB at the 256-byte alignment WebGPU, ANV
 /// and lavapipe give. A frame needing more moves to a buffer twice as
@@ -24,16 +24,20 @@ pub struct UniformSlots<const SIZE: usize = 16> {
     align: u64,
     buffer: wgpu::Buffer,
     slots: Vec<Slot<SIZE>>,
-    /// The slot holding each value.
-    by_value: std::collections::HashMap<[u8; SIZE], usize, WordHashing>,
+    /// The slots holding values of each hash (`word_hash`).
+    by_hash: std::collections::HashMap<u64, Vec<usize>, WordHashing>,
     turn: EncoderTurn,
     /// Counts the buffers made; a bind group is for one buffer.
     generation: u64,
 }
 
-/// A slot's value and the last encoder whose draw read it.
+/// Whether a held value is the one looked up.
+type Same<'a, const SIZE: usize> = dyn Fn(&[u8; SIZE]) -> bool + 'a;
+
+/// A slot's value, its hash, and the last encoder whose draw read it.
 struct Slot<const SIZE: usize> {
     value: [u8; SIZE],
+    hash: u64,
     encoder: u64,
 }
 
@@ -59,7 +63,7 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
             align,
             buffer: buffer(device, label, first_size(device, align)),
             slots: Vec::new(),
-            by_value: std::collections::HashMap::default(),
+            by_hash: std::collections::HashMap::default(),
             turn: EncoderTurn::new(label),
             generation: 1,
         }
@@ -100,10 +104,60 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         work: &WorkCounter,
         value: [u8; SIZE],
     ) -> Option<u32> {
+        let same = |held: &[u8; SIZE]| *held == value;
+        self.slot_found(frame, (queue, work), (word_hash(&value), &same), &|| value)
+    }
+
+    /// As [`UniformSlots::slot`], for the value of `head` followed by
+    /// `rows`' bytes. The table is hashed when it is made
+    /// ([`RowOffsets`]), so a draw hashes `head` alone and builds the
+    /// value only to write it.
+    ///
+    /// # Panics
+    ///
+    /// As [`UniformSlots::slot`], or when `head` and the table do not
+    /// fill `SIZE` bytes.
+    pub fn slot_with_rows<const HEAD: usize>(
+        &mut self,
+        frame: &FrameEncoder,
+        (queue, work): (&wgpu::Queue, &WorkCounter),
+        (head, rows): ([u8; HEAD], &RowOffsets),
+    ) -> Option<u32> {
+        assert_eq!(
+            HEAD + RowOffsets::CAPACITY * 8,
+            SIZE,
+            "{}: a {HEAD}-byte head and the rows' offsets do not fill a {SIZE}-byte value \
+             (uniform_slots.rs)",
+            self.label
+        );
+        let hash = word_hash(&head).rotate_left(5) ^ rows.hash();
+        let same = |held: &[u8; SIZE]| held[..HEAD] == head && held[HEAD..] == rows.bytes()[..];
+        let value = || {
+            let mut value = [0; SIZE];
+            value[..HEAD].copy_from_slice(&head);
+            value[HEAD..].copy_from_slice(rows.bytes());
+            value
+        };
+        self.slot_found(frame, (queue, work), (hash, &same), &value)
+    }
+
+    /// The slot of the value of hash `hash` that `same` accepts, else a
+    /// slot `value` is written into.
+    fn slot_found(
+        &mut self,
+        frame: &FrameEncoder,
+        (queue, work): (&wgpu::Queue, &WorkCounter),
+        (hash, same): (u64, &Same<'_, SIZE>),
+        value: &dyn Fn() -> [u8; SIZE],
+    ) -> Option<u32> {
         self.turn.begin(frame);
-        let at = match self.by_value.get(&value) {
-            Some(&at) => at,
-            None => self.write(frame, queue, work, value)?,
+        let held = self.by_hash.get(&hash).and_then(|slots| {
+            let mut held = slots.iter().copied();
+            held.find(|&at| same(&self.slots[at].value))
+        });
+        let at = match held {
+            Some(at) => at,
+            None => self.write(frame, (queue, work), (hash, value()))?,
         };
         self.slots[at].encoder = frame.id();
         Some(self.offset(at))
@@ -112,17 +166,21 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
     fn write(
         &mut self,
         frame: &FrameEncoder,
-        queue: &wgpu::Queue,
-        work: &WorkCounter,
-        value: [u8; SIZE],
+        (queue, work): (&wgpu::Queue, &WorkCounter),
+        (hash, value): (u64, [u8; SIZE]),
     ) -> Option<usize> {
         let at = self.free_slot(frame)?;
         work.write_uniform(queue, &self.buffer, u64::from(self.offset(at)), &value);
-        let was = std::mem::replace(&mut self.slots[at].value, value);
-        if self.by_value.get(&was) == Some(&at) {
-            self.by_value.remove(&was);
+        let slot = Slot {
+            value,
+            hash,
+            encoder: frame.id(),
+        };
+        let was = std::mem::replace(&mut self.slots[at], slot);
+        if let Some(slots) = self.by_hash.get_mut(&was.hash) {
+            slots.retain(|&held| held != at);
         }
-        self.by_value.insert(value, at);
+        self.by_hash.entry(hash).or_default().push(at);
         Some(at)
     }
 
@@ -146,6 +204,7 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
     fn push(&mut self, frame: &FrameEncoder) -> usize {
         self.slots.push(Slot {
             value: [0; SIZE],
+            hash: 0,
             encoder: frame.id(),
         });
         self.slots.len() - 1
@@ -168,7 +227,7 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
         }
         self.buffer = buffer(frame.device(), self.label, size);
         self.slots.clear();
-        self.by_value.clear();
+        self.by_hash.clear();
         self.generation += 1;
         Some(())
     }
@@ -184,7 +243,13 @@ impl<const SIZE: usize> UniformSlots<SIZE> {
 
 /// Hashes a uniform value eight bytes at a time (an `FxHash`-style
 /// multiply and rotate): a value is up to a kilobyte, looked up on every
-/// draw, and holds no input an attacker chooses.
+/// draw, and holds no input an attacker chooses. Zero bytes hash to 0.
+pub(crate) fn word_hash(bytes: &[u8]) -> u64 {
+    let mut hasher = WordHasher::default();
+    std::hash::Hasher::write(&mut hasher, bytes);
+    hasher.0
+}
+
 type WordHashing = std::hash::BuildHasherDefault<WordHasher>;
 
 #[derive(Default)]

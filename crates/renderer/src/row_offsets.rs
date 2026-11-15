@@ -10,7 +10,12 @@
 /// first. Rows not given are at no offset. Held as the uniform's bytes,
 /// made once, as every draw writes or looks them up.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RowOffsets([u8; Self::CAPACITY * 8]);
+pub struct RowOffsets {
+    bytes: [u8; Self::CAPACITY * 8],
+    /// The bytes' hash (`uniform_slots.rs` `word_hash`), made once: a
+    /// draw looks its uniform up by it.
+    hash: u64,
+}
 
 impl RowOffsets {
     /// The rows one batch's table holds: two to each `vec4<f32>` of the
@@ -18,7 +23,11 @@ impl RowOffsets {
     pub const CAPACITY: usize = 128;
 
     /// Every row at no offset: items in one frame.
-    pub const NONE: Self = Self([0; Self::CAPACITY * 8]);
+    pub const NONE: Self = Self {
+        bytes: [0; Self::CAPACITY * 8],
+        // zero bytes hash to 0
+        hash: 0,
+    };
 
     /// The table of `offsets`, row `i` at `offsets[i]`.
     ///
@@ -45,17 +54,25 @@ impl RowOffsets {
             );
             for (axis, value) in offset.iter().enumerate() {
                 let at = (at * 2 + axis) * 4;
-                table.0[at..at + 4].copy_from_slice(&value.to_le_bytes());
+                table.bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
             }
         }
+        table.hash = crate::uniform_slots::word_hash(&table.bytes);
         table
+    }
+
+    /// The bytes' hash, as [`crate::UniformSlots::slot_with_rows`] finds
+    /// a uniform by.
+    #[must_use]
+    pub fn hash(&self) -> u64 {
+        self.hash
     }
 
     /// The table's bytes as the uniform holds it: two rows to each
     /// sixteen bytes, little-endian.
     #[must_use]
     pub fn bytes(&self) -> &[u8; Self::CAPACITY * 8] {
-        &self.0
+        &self.bytes
     }
 }
 

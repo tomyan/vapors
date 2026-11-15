@@ -35,9 +35,11 @@ pub(crate) const FLOATS_PER_VERTEX: usize = 8;
 /// A vertex's bytes: its floats, then its row's index (`u32`).
 pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 4) as u64;
 
-/// Bytes of the params uniform: gamma, contrast, the viewport and a
-/// frame's shift, padded to 32, then the rows' offsets.
-pub(crate) const PARAMS_SIZE: usize = 32 + RowOffsets::CAPACITY * 8;
+/// Bytes of the params uniform before the rows' offsets: gamma,
+/// contrast, the viewport and a frame's shift, padded to 32.
+pub(crate) const PARAMS_HEAD: usize = 32;
+/// Bytes of the params uniform: its head, then the rows' offsets.
+pub(crate) const PARAMS_SIZE: usize = PARAMS_HEAD + RowOffsets::CAPACITY * 8;
 
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {

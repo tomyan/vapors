@@ -32,3 +32,10 @@ fn one_row_over_the_table_is_refused() {
 fn an_offset_that_is_not_whole_is_refused() {
     let _ = RowOffsets::whole(&[[0.0, 0.0], [0.0, 2.5]]);
 }
+
+#[test]
+fn the_empty_tables_hash_is_its_bytes_hash() {
+    let none = RowOffsets::NONE;
+    assert_eq!(none.hash(), crate::uniform_slots::word_hash(none.bytes()));
+    assert_eq!(RowOffsets::whole(&[]).hash(), none.hash());
+}

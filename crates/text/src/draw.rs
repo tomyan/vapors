@@ -8,7 +8,7 @@ use vapors_renderer::{KeptRange, Placed, RowOffsets, Shift};
 use vapors_scene::Size;
 
 use crate::pipeline::{
-    self, BlendParams, FLOATS_PER_VERTEX, PARAMS_SIZE, TextPipeline, VERTEX_SIZE,
+    self, BlendParams, FLOATS_PER_VERTEX, PARAMS_HEAD, TextPipeline, VERTEX_SIZE,
 };
 use crate::quads::{TextDraw, quads};
 
@@ -98,9 +98,10 @@ impl TextPipeline {
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
-        let params = params_bytes(params, target.viewport, moved);
+        let (shift, rows) = moved;
+        let head = params_head(params, target.viewport, shift);
         self.params
-            .slot(target.encoder, target.queue, &self.work, params)
+            .slot_with_rows(target.encoder, (target.queue, &self.work), (head, rows))
     }
 
     /// Draws `quads` with the params slot at `params`.
@@ -163,14 +164,11 @@ pub(crate) enum Vertices<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The params uniform's bytes: gamma, contrast, the viewport's width
-/// and height and `shift`, in device pixels, then `rows`.
+/// The params uniform's first 32 bytes, before the rows' offsets: gamma,
+/// contrast, the viewport's width and height and `shift`, in device
+/// pixels.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_bytes(
-    params: BlendParams,
-    viewport: Size,
-    (shift, rows): (Shift, &RowOffsets),
-) -> [u8; PARAMS_SIZE] {
+fn params_head(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_HEAD] {
     let [dx, dy] = shift.pixels();
     let floats = [
         params.gamma,
@@ -180,11 +178,10 @@ fn params_bytes(
         dx,
         dy,
     ];
-    let mut bytes = [0; PARAMS_SIZE];
+    let mut bytes = [0; PARAMS_HEAD];
     for (at, float) in floats.into_iter().enumerate() {
         bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
     }
-    bytes[32..].copy_from_slice(rows.bytes());
     bytes
 }
 
