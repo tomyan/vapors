@@ -63,7 +63,9 @@ let surface = app.mount("view", Box::new(renderer))?;
   `GeometryHandle`: a counted claim, cloned to share and not `Copy`
   (lead decision (B), 2026-11-14). A mesh node holds a clone in
   `NodeKind::Mesh`, so a piece is held while the application keeps a
-  handle or any mesh node names it. Once the last handle is dropped,
+  handle or any mesh node names it. A handle shares the piece itself
+  (`GeometryHandle::geometry`), so `pick` reads a node's triangles
+  through its handle and needs no `Meshes` (lead decision, C4c). Once the last handle is dropped,
   `Meshes::release_unclaimed` releases it; each render runs that sweep
   and drops the renderer's buffers for every released piece
   (`RendererLog::made` and `freed` of `Resource::Geometry` count them). A
@@ -93,7 +95,7 @@ own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 
 ## Picking
 
-`pick(scene, meshes, PickAt { point, size }, skip)` returns the nearest
+`pick(scene, PickAt { point, size }, skip)` returns the nearest
 visible mesh under a surface point, or `None`
 (`vapors-scene3d/src/pick.rs`). It casts a ray from the active camera
 through the point, using the same view-projection the renderer draws
@@ -109,11 +111,20 @@ picks nothing.
 It refuses (`PickError`): a size that is not finite and positive, a
 point that is not finite, no resolvable active camera, a projection
 refused at the surface's aspect, a camera whose view-projection or its
-inverse is not finite, a visible mesh whose world matrix has no finite
-inverse, and a mesh whose geometry the `Meshes` does not hold.
+inverse is not finite, and a visible mesh whose world matrix has no
+finite inverse.
 
-It runs once per pointer move, not per frame. Cost grows linearly with
-mesh count. Figures from `cargo run --release -p vapors-scene3d
+How often it runs: once per pointer move over the surface (twice with
+`Document::cursor`, which asks again), and once per update while the
+pointer rests over a scene in which a node moved, since each transform
+write calls `Dom::hits_moved` and that update tests the hover again.
+A scene animated every frame under a resting pointer is picked once a
+frame: in the one-scene example (4 meshes) that is under 2.2 µs a frame
+(the 10-mesh row below, every triangle tested); at 10,000 meshes, up
+to 2.1 ms a frame (the p95 of the last row). Each moving node also
+borrows the document once a frame for `hits_moved`, which returns
+after checking the hovered element. A still scene, or a pointer away
+from it, picks nothing. Cost grows linearly with mesh count. Figures from `cargo run --release -p vapors-scene3d
 --example pick_cost`, on an i5-10500T at load average 1.0, 2026-11-14:
 the lowest median and lowest 95th percentile per row over six runs of
 200 picks each, unit cubes of 12 triangles in a column:

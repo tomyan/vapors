@@ -2,13 +2,14 @@
 //! C4): a ray from the active camera through the point, tested against
 //! each mesh's bounds in its own space, then against the triangles of
 //! the meshes whose bounds it enters; the nearest hit wins. It runs per
-//! pointer move, not per frame. Cost: one bounds test per mesh, and a
+//! pointer move, and per update while a node moves under a resting
+//! pointer (docs/scene3d.md, Picking). Cost: one bounds test per mesh, and a
 //! triangle test per triangle of each mesh the ray's bounds test lets
 //! through (measured by `examples/pick_cost.rs`; the figures are in
 //! docs/scene3d.md).
 
 use crate::pick_ray::{Ray, enters, triangle};
-use crate::{Meshes, NodeId, NodeKind, PickError, Scene, StoreError};
+use crate::{NodeId, NodeKind, PickError, Scene, StoreError};
 
 /// Where to pick: a point in surface pixels (+Y down, from the top left)
 /// on a surface of `size` pixels.
@@ -31,11 +32,10 @@ pub struct PickAt {
 /// # Errors
 /// A size not finite and positive, a point not finite, the active
 /// camera's view-projection refused ([`Scene::view_projection`]) or with
-/// no finite inverse, a visible mesh whose world matrix has no finite
-/// inverse, or one whose geometry `meshes` does not hold.
+/// no finite inverse, or a visible mesh whose world matrix has no
+/// finite inverse.
 pub fn pick(
     scene: &mut Scene,
-    meshes: &Meshes,
     at: PickAt,
     skip: impl Fn(NodeId) -> bool,
 ) -> Result<Option<NodeId>, PickError> {
@@ -49,7 +49,7 @@ pub fn pick(
         if skip(node) || !scene.visible(node)? {
             continue;
         }
-        if let Some(t) = hit(scene, meshes, node, ray)?
+        if let Some(t) = hit(scene, node, ray)?
             && nearest.is_none_or(|(best, _)| t < best)
         {
             nearest = Some((t, node));
@@ -93,14 +93,12 @@ fn nodes(scene: &Scene) -> Result<Vec<NodeId>, StoreError> {
 }
 
 /// Where along `ray` mesh `node` is first hit, if it is a mesh and is.
-fn hit(scene: &Scene, meshes: &Meshes, node: NodeId, ray: Ray) -> Result<Option<f32>, PickError> {
+fn hit(scene: &Scene, node: NodeId, ray: Ray) -> Result<Option<f32>, PickError> {
     let NodeKind::Mesh { geometry, .. } = scene.kind(node)? else {
         return Ok(None);
     };
-    let id = geometry.id();
-    let geometry = meshes
-        .get(id)
-        .ok_or(PickError::GeometryNotHeld { node, geometry: id })?;
+    // the node's handle shares its triangles (`GeometryHandle`)
+    let geometry = geometry.geometry();
     let local = ray.into(scene.world(node)?.inverse());
     if !local.is_finite() {
         return Err(PickError::MeshNotInvertible(node));

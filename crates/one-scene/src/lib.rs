@@ -43,6 +43,8 @@ pub struct OneScene {
     document: Rc<RefCell<Document>>,
     scene: Rc<RefCell<Scene>>,
     clock: Clock,
+    /// Where the script last left the pointer resting (`script.rs`).
+    pub(crate) rest: Option<script::Rest>,
     _page: Page,
 }
 
@@ -67,6 +69,7 @@ impl OneScene {
             document,
             scene,
             clock,
+            rest: None,
             _page: page,
         })
     }

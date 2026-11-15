@@ -75,6 +75,8 @@ fn follow_transform(component: &'static str, placement: Placement, transform: Si
             .set_transform(placement.node, local);
         refuse(component, written);
         placement.invalidate(component);
+        // what is under the pointer may have moved with it
+        placement.hits.moved();
     });
 }
 

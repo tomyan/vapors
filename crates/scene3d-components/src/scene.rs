@@ -3,13 +3,14 @@
 
 use crate::children::render_children;
 use crate::component::node_component;
+use crate::hits::{SceneHits, hit_source};
 use crate::node::{Mounted, anchor};
 use crate::own_keys;
 use crate::placement::{Placement, place};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::SurfaceHandle;
-use vapors_dom::{DynDom, NodeId as ElementId, Root, Snippet, StyleKey};
+use vapors_dom::{Dom, DynDom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{CameraHandle, Scene as Store};
 use vapors_signals::Owner;
 
@@ -65,20 +66,15 @@ impl Scene {
             )
         };
         scene.borrow_mut().set_camera(props.camera);
-        let node = scene.borrow().root();
-        let placement = Placement {
-            scene,
-            node,
-            surface,
-        };
         let owner = Owner::new();
         let key = own_keys::anchor_key("Scene", props.anchor, &own_keys::SCENE);
-        let anchor = owner.with(|| {
+        let (anchor, placement) = owner.with(|| {
             let anchor = anchor(dom, key, (parent, before));
+            let placement = root_placement(dom, anchor, scene, surface);
             place(&mut *dom.borrow_mut(), anchor, placement.clone());
             placement.invalidate("Scene");
             render_children(dom, anchor, &props.children, "Scene");
-            anchor
+            (anchor, placement)
         });
         let mounted = Mounted {
             owner,
@@ -87,6 +83,27 @@ impl Scene {
             placement,
         };
         Self { mounted }
+    }
+}
+
+/// The root node's placement, the scene's hits answered on `surface`
+/// from now on: watched before any child mounts, so each child's
+/// `hits_moved` finds the watch.
+fn root_placement(
+    dom: &Rc<RefCell<dyn Dom>>,
+    anchor: ElementId,
+    scene: Rc<RefCell<Store>>,
+    surface: SurfaceHandle,
+) -> Placement {
+    let hits = SceneHits::new(dom, anchor);
+    let source = hit_source(Rc::clone(&scene), Rc::clone(&hits));
+    dom.borrow_mut().watch_hits(anchor, surface.name(), source);
+    let node = scene.borrow().root();
+    Placement {
+        scene,
+        node,
+        surface,
+        hits,
     }
 }
 

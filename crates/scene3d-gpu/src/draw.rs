@@ -3,12 +3,15 @@
 use crate::FrameError;
 use crate::geometry::Uploaded;
 use vapors_app::WorkCounter;
-use vapors_scene3d::{Colour, GeometryId, Meshes, NodeId, NodeKind, Scene};
+use vapors_scene3d::{Colour, GeometryHandle, GeometryId, Meshes, NodeId, NodeKind, Scene};
 
 /// A mesh node to draw.
 pub(crate) struct MeshNode {
     pub(crate) node: NodeId,
     pub(crate) geometry: GeometryId,
+    /// The node's claim, through which its triangles are read, as
+    /// `pick` reads them: one answer to which triangles a node has.
+    pub(crate) handle: GeometryHandle,
     pub(crate) colour: Colour,
     /// Drawn (`Scene::visible`); a hidden mesh keeps its slot.
     pub(crate) visible: bool,
@@ -31,13 +34,15 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
     let NodeKind::Mesh { geometry, colour } = scene.kind(node)? else {
         return Ok(None);
     };
-    let (geometry, colour) = (geometry.id(), *colour);
+    let (handle, colour) = (geometry.clone(), *colour);
+    let geometry = handle.id();
     if !meshes.issued(geometry) {
         return Err(FrameError::ForeignGeometry { node, geometry });
     }
     Ok(Some(MeshNode {
         node,
         geometry,
+        handle,
         colour,
         visible: scene.visible(node)?,
     }))

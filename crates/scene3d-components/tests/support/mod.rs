@@ -5,6 +5,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod hits;
 pub mod keyed;
 pub mod rows;
 

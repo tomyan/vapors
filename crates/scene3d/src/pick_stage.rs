@@ -64,7 +64,7 @@ impl Stage {
             point,
             size: self.size,
         };
-        pick(&mut self.scene, &self.meshes, at, |_| false)
+        pick(&mut self.scene, at, |_| false)
     }
 
     pub(crate) fn pick(
@@ -76,7 +76,7 @@ impl Stage {
             point,
             size: self.size,
         };
-        pick(&mut self.scene, &self.meshes, at, skip).expect("picks")
+        pick(&mut self.scene, at, skip).expect("picks")
     }
 }
 

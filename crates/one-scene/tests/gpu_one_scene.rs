@@ -11,7 +11,7 @@ use vapors_app::GpuWork;
 use vapors_gpu_harness::Gpu;
 use vapors_one_scene::OneScene;
 use vapors_one_scene::confirm::confirm;
-use vapors_one_scene::schedule::{CUBES, expected, time_of};
+use vapors_one_scene::schedule::{CUBES, GROUP_HOVER, expected, time_of};
 use vapors_one_scene::script::drive;
 use vapors_platform::{App, Frame, Instant, Next};
 use vapors_renderer::clear;
@@ -29,13 +29,18 @@ const GEOMETRY_BYTES: u64 = 24 * 16 + 36 * 4 + 4 * 16 + 6 * 4;
 /// 2026-11-14; not derived): 1112 in all.
 const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 64 + 112;
 
+/// The target's size: at 320x200 the HUD covers the middle of the
+/// scene, where the script rests the pointer, and the script refuses.
+const SIZE: [u32; 2] = [640, 400];
+
 /// The surface's own draw in the composition, beside the meshes'.
 const COMPOSITION_DRAWS: u64 = 1;
 
-/// Frame `index` of the run at the frame clock's time, into a small
-/// target; what it asked for next and the scene's work.
+/// Frame `index` of the run at the frame clock's time; what it asked
+/// for next and the scene's work.
 fn frame(scene: &mut OneScene, gpu: &Gpu, start: Instant, index: usize) -> (Next, GpuWork) {
-    let texture = clear(&gpu.device, &gpu.queue, 320, 200, Color::default());
+    let [width, height] = SIZE;
+    let texture = clear(&gpu.device, &gpu.queue, width, height, Color::default());
     let next = scene.frame(&Frame {
         adapter: &gpu.adapter,
         device: &gpu.device,
@@ -105,4 +110,30 @@ fn gpu_a_limited_run_stops_its_clock_and_goes_idle_after_its_frames() {
     assert_eq!(&nexts[..4], &[Next::Continue; 4]);
     assert_eq!(nexts.last(), Some(&Next::Wait), "{nexts:?}");
     assert_eq!(idle.buffer_bytes, 0);
+}
+
+#[test]
+fn gpu_a_drive_that_starts_inside_the_pointer_window_rests_the_pointer_over_the_scene() {
+    // Given: one frame drawn, then a drive at frame 700 (11.2 s), inside
+    // the window, its opening at frame 625 never driven
+    let gpu = vapors_gpu_harness::gpu();
+    let mut scene = OneScene::new(None).expect("mounts");
+    let start = Instant::now();
+    frame(&mut scene, &gpu, start, 0);
+
+    // When
+    drive(&mut scene, 700).expect("driven");
+    frame(&mut scene, &gpu, start, 1);
+
+    // Then: the middle cube shows the group's hover
+    let document = scene.document().borrow();
+    let two = (document.elements().into_iter())
+        .find(|&node| {
+            document
+                .attribute(node, "class")
+                .is_some_and(|c| c.contains("two"))
+        })
+        .expect("the middle cube's anchor");
+    let colour = document.scene_used(two).expect("styled").colour.to_rgba8();
+    assert_eq!(colour[..3], GROUP_HOVER);
 }

@@ -5,7 +5,7 @@ use crate::MeshError;
 use glam::Vec3;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Weak;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::GeometryHandle;
@@ -83,11 +83,17 @@ pub struct Meshes {
     held: HashMap<u64, Held>,
 }
 
-/// A held piece and the claim its handles share.
+/// A held piece, shared with its handles.
 #[derive(Debug)]
 struct Held {
-    geometry: Geometry,
-    claim: Weak<GeometryId>,
+    geometry: Rc<Geometry>,
+}
+
+/// Whether a handle still holds `geometry`: the `Meshes` holds one
+/// reference, and each [`GeometryHandle`] (the application's, a mesh
+/// node's) one more.
+fn held_by_a_handle(geometry: &Rc<Geometry>) -> bool {
+    Rc::strong_count(geometry) > 1
 }
 
 impl Meshes {
@@ -125,7 +131,6 @@ impl Meshes {
             index: self.issued,
         };
         self.issued += 1;
-        let (handle, claim) = GeometryHandle::claim(id);
         let bounds = (positions.iter())
             .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(low, high), p| {
                 (low.min(*p), high.max(*p))
@@ -136,7 +141,9 @@ impl Meshes {
             shades,
             bounds,
         };
-        self.held.insert(id.index, Held { geometry, claim });
+        let geometry = Rc::new(geometry);
+        let handle = GeometryHandle::claim(id, &geometry);
+        self.held.insert(id.index, Held { geometry });
         Ok(handle)
     }
 
@@ -153,7 +160,7 @@ impl Meshes {
         if id.meshes != self.id {
             return None;
         }
-        self.held.get(&id.index).map(|held| &held.geometry)
+        self.held.get(&id.index).map(|held| &*held.geometry)
     }
 
     /// Whether this store holds `id`'s piece: issued here and not
@@ -169,7 +176,7 @@ impl Meshes {
         let meshes = self.id;
         let mut released = Vec::new();
         self.held.retain(|&index, held| {
-            let claimed = held.claim.strong_count() > 0;
+            let claimed = held_by_a_handle(&held.geometry);
             if !claimed {
                 released.push(GeometryId { meshes, index });
             }

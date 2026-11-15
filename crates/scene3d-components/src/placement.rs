@@ -21,6 +21,8 @@ pub(crate) struct Placement {
     pub(crate) scene: Rc<RefCell<Scene>>,
     pub(crate) node: NodeId,
     pub(crate) surface: SurfaceHandle,
+    /// The scene's mesh anchors, for its hits (`hits.rs`).
+    pub(crate) hits: Rc<crate::hits::SceneHits>,
 }
 
 thread_local! {

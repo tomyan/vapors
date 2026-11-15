@@ -7,7 +7,7 @@
 mod support;
 
 use support::pointer::quad_colours;
-use support::scene_hits_page::{Answer, OVER_A, OVER_SIDE, Page, page};
+use support::scene_hits_page::{Answer, OVER_A, OVER_B, OVER_SIDE, Page, page};
 use vapors_dom::Dom;
 use vapors_elements::Document;
 
@@ -163,4 +163,22 @@ fn a_hovered_anchor_that_stops_taking_the_pointer_loses_the_hover_at_the_next_up
         // Then: the scene passes over a, so the hover left it
         assert_eq!(page.a_red(), 0.0, "{rule}");
     }
+}
+
+#[test]
+fn a_hovered_anchor_removed_from_the_scene_loses_the_hover_at_the_next_update() {
+    // Given: the pointer rests over b; the group's hover shows on a
+    let page = page(".a { color: #000000; } .craft:hover .a { color: #ff0000; }");
+    Document::pointer_moved(&page.doc, OVER_B);
+    page.update();
+    let hovered = page.a_red();
+
+    // When: b is removed, and the scene answers nothing there now
+    page.answer.set(Answer::Nothing);
+    page.doc.borrow_mut().remove(page.b);
+    page.update();
+    page.update();
+
+    // Then
+    assert_eq!((hovered, page.a_red()), (1.0, 0.0));
 }
