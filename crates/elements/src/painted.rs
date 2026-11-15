@@ -233,7 +233,9 @@ impl Painted {
     }
 
     /// The cursor over `point`: the one of the element it hits, the
-    /// default arrow where it hits none.
+    /// default arrow where it hits none. Boxes only: over a `gpu-surface`
+    /// with a watched scene this is the surface's cursor, and
+    /// `Document::cursor` gives the mesh's.
     #[must_use]
     pub fn cursor(&self, point: [f32; 2]) -> Cursor {
         self.hit(point)
@@ -243,7 +245,9 @@ impl Painted {
 
     /// The topmost element under `point` (CSS pixels) that takes the
     /// pointer: the last one painted whose border box holds it. A box
-    /// holds its left and top edges, not its right and bottom.
+    /// holds its left and top edges, not its right and bottom. Boxes
+    /// only: a watched scene's meshes are hit through `Document::hit`;
+    /// scrolling starts here, at the box under the pointer.
     #[must_use]
     pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
         self.kept_hits().hit([x, y], &self.frames)

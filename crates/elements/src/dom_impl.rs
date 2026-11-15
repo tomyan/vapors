@@ -138,6 +138,7 @@ impl Dom for Document {
         }
         self.drop_focus_within(node);
         self.drop_sinks(node);
+        self.drop_scene_hits(node);
         self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
@@ -149,6 +150,14 @@ impl Dom for Document {
 
     fn watch_appearance(&mut self, anchor: NodeId, sink: vapors_dom::AppearanceSink) {
         self.watch(anchor, sink);
+    }
+
+    fn watch_hits(&mut self, anchor: NodeId, surface: &str, source: vapors_dom::HitSource) {
+        self.watch_scene_hits(anchor, surface, source);
+    }
+
+    fn hits_moved(&mut self, anchor: NodeId) {
+        self.scene_hits_moved(anchor);
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {

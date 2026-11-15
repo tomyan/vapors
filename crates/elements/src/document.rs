@@ -67,6 +67,8 @@ pub struct Document {
     pub(crate) ax: crate::a11y_mirror_state::AxMirror,
     /// Each watched mesh anchor's appearance sink (`scene_sinks`).
     pub(crate) sinks: crate::node_map::NodeMap<vapors_dom::AppearanceSink>,
+    /// Each watched scene anchor's hit source (`scene_hits`).
+    pub(crate) scene_hits: crate::scene_hits::SceneHits,
     /// The run-time shapes its items name and which elements use them
     /// (one-scene S4a), shared with each `Painted` so the painter takes
     /// the slots that changed. Per document: S5b's process registry
@@ -113,6 +115,7 @@ impl Document {
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
             sinks: crate::node_map::NodeMap::default(),
+            scene_hits: crate::scene_hits::SceneHits::default(),
             shapes: std::rc::Rc::new(std::cell::RefCell::new(
                 crate::document_shapes::DocumentShapes::new(),
             )),
@@ -124,7 +127,8 @@ impl Document {
     /// pointer's hover and active state, or a scroll. An app that redraws on change
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
-        std::mem::replace(&mut self.changes.since_asked, false)
+        // a refused scene hit is due in the next update (`scene_hit`)
+        std::mem::replace(&mut self.changes.since_asked, false) || self.hit_refusals_pending()
     }
 
     /// The `html` element.

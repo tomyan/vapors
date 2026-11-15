@@ -23,6 +23,7 @@ mod listener_result;
 mod modifiers;
 pub mod recording;
 mod roots;
+mod scene_hits;
 mod snippet;
 mod style_key;
 mod style_key_refusals;
@@ -36,6 +37,7 @@ pub use listener::{Handler, Listener};
 pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
 pub use modifiers::Modifiers;
 pub use roots::{BlockNodes, Root, current_nodes};
+pub use scene_hits::{HitAsk, HitSource};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
 pub use style_key::{MAX_TOGGLES, StyleKey};
 pub use style_key_refusals::PRESENTATION as PRESENTATION_ATTRIBUTES;
@@ -133,6 +135,16 @@ pub trait Dom: Listeners {
     /// the next update reports the appearance again. Refused on any node
     /// but a `mesh`, and on a mesh already watched.
     fn watch_appearance(&mut self, anchor: NodeId, sink: AppearanceSink);
+    /// Asks `source` for the anchor under the pointer whenever a hit
+    /// test lands on the `gpu-surface` named `surface`, until `anchor`,
+    /// a 3D scene component's `scene` anchor, leaves the tree
+    /// ([`HitSource`]). Refused on any node but a `scene`, on a scene
+    /// already watched, and for a surface another scene is watched on.
+    fn watch_hits(&mut self, anchor: NodeId, surface: &str, source: HitSource);
+    /// Says what `anchor`'s scene draws under its surface may have
+    /// changed (a node moved, hid or changed geometry), so the next update
+    /// tests the hover again when the pointer is over that surface.
+    fn hits_moved(&mut self, anchor: NodeId);
     /// A text node's text; `None` for an element. The `_if_changed`
     /// setters read this: `None` means absent or the wrong kind, and
     /// they then call the plain setter, which refuses the wrong kind

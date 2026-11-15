@@ -25,6 +25,7 @@ pub mod random_css;
 pub mod range_page;
 pub mod roles_page;
 pub mod rows_page;
+pub mod scene_hits_page;
 pub mod scroll_list;
 pub mod splice_page;
 pub mod svg_page;

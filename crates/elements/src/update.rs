@@ -58,6 +58,10 @@ impl Document {
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let mut last = self.painted.take();
+        let refused = self.take_hit_refusals();
+        if !refused.is_empty() {
+            return Err(refused);
+        }
         self.counts = crate::UpdateCounts::default();
         // tessellations made outside this update are not its own: an
         // acquire between updates, or the shape checks of an update that
