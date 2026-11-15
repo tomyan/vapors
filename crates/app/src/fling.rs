@@ -56,6 +56,11 @@ impl Fling {
         }
     }
 
+    /// The container it moves.
+    pub(crate) fn container(&self) -> NodeId {
+        self.container
+    }
+
     /// The fling moved on to `now`; whether it is still running.
     pub(crate) fn advance(&mut self, document: &mut Document, now: Instant) -> bool {
         if self.last_sent.is_none() && now >= self.start + LATE_FIRST_FRAME {

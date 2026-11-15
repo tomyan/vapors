@@ -69,7 +69,7 @@ impl DocumentInput {
         }
         document
             .borrow_mut()
-            .set_thumbs_shown(self.touch.thumbs_shown());
+            .set_thumb_opacity(self.touch.thumb_opacity(vapors_platform::Instant::now()));
     }
 }
 
@@ -78,7 +78,11 @@ impl DocumentInput {
     /// which holds the RELAXED ownership rule and cancels the touches).
     fn pan(&mut self, document: &Rc<RefCell<Document>>, delta: [f32; 2]) {
         if Document::touch_panned(document) {
-            self.touch.pan(&mut document.borrow_mut(), delta);
+            self.touch.pan(
+                &mut document.borrow_mut(),
+                delta,
+                vapors_platform::Instant::now(),
+            );
         }
     }
 }

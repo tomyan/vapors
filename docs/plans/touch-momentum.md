@@ -177,6 +177,29 @@ flings the container the gesture scrolled.
   off-axis velocity of a mostly straight fling; the recorded flings are
   vertical lists, where it changes nothing.
 
+## Thumbs on touch (Tom, 2026-11-15)
+
+Tom on the first page: the thumb vanished at once when a scroll ended,
+and at once when a scroll met the top or bottom. The cause: on touch the
+thumbs were an on/off flag, "a gesture is scrolling or a fling runs";
+a fling meeting the edge ends that frame, so the flag went off and the
+thumb vanished, as at a fling's natural end or a lift with no fling.
+
+`crates/app/src/thumb_fade.rs` now draws them as Chrome on Android does
+(cc's `ANDROID_OVERLAY` animator, `cc/input/
+scrollbar_animation_controller.cc`): each scroll update, the drag's or
+the fling's, shows them at full opacity at once (there is no fade in),
+and 300 ms after the last update they fade out linearly over 300 ms
+(`scrollbar_fade_delay` and `scrollbar_fade_duration`,
+`InitializeScrollbarFadeAndDelay` in `third_party/blink/renderer/
+platform/widget/compositing/layer_tree_settings.cc`). A fling stopped by
+the edge last scrolled on the frame that met it, so the fade follows
+300 ms later, as everywhere else. The app waits for the fade's start
+(`Next::WaitUntil`), draws each fade frame, then asks for none. The
+document draws thumbs at an alpha (`Document::set_thumb_opacity`, 256
+steps). Every scroll container's thumbs share the one fade, as they
+shared the flag; Chrome fades each container's own.
+
 ## What the Pixel recorded (2026-11-15)
 
 27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device

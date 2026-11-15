@@ -62,12 +62,25 @@ impl Document {
     }
 
     /// Shows or hides every scroll container's thumbs from the next
-    /// update: a touch app shows them only while a gesture scrolls.
+    /// update.
     pub fn set_thumbs_shown(&mut self, shown: bool) {
-        if self.thumbs_shown != shown {
+        self.set_thumb_opacity(if shown { 1.0 } else { 0.0 });
+    }
+
+    /// Draws every scroll container's thumbs at `opacity` (0 hidden, 1
+    /// as styled; clamped, quantised to 256 steps) from the next update:
+    /// a touch app shows them while scrolling and fades them after.
+    pub fn set_thumb_opacity(&mut self, opacity: f32) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "clamped to 0..=1 first, so 0..=255"
+        )]
+        let alpha = (opacity.clamp(0.0, 1.0) * f32::from(u8::MAX)).round() as u8;
+        if self.thumb_alpha != alpha {
             self.note_change();
         }
-        self.thumbs_shown = shown;
+        self.thumb_alpha = alpha;
     }
 
     /// The scroll offset of `element` (CSS pixels, unrounded) as of the
