@@ -234,3 +234,18 @@ fn a_fling_with_no_touch_between_is_not_boosted() {
     // Then: no window was opened (Chromium's "CutoffTimeUnset")
     assert_eq!(stream.fling([0.0, 2000.0]), [0.0, 2000.0]);
 }
+
+#[test]
+fn a_chain_of_boosts_past_the_curves_limit_runs_at_the_limit() {
+    // Given a start of 95 000 px/s (a long chain at the maximum)
+    let mut stream = Stream::new();
+    stream.fling([0.0, 95_000.0]);
+    stream.boosting_scroll();
+
+    // When the next boosts it by 8000 more
+    let started = stream.fling([0.0, 8000.0]);
+
+    // Then: capped along its direction, not refused (a deviation from
+    // Chromium, declared at the cap)
+    assert_eq!(started, [0.0, crate::document_input::CURVE_SPEED_LIMIT]);
+}

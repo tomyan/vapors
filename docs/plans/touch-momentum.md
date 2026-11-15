@@ -257,6 +257,11 @@ the recordings exceeds AOSP's 8000 before the boost.
 
 - **Not ported:** `prevent_boosting` on a fling cancel, and the source
   device and modifier checks (every boosted fling here is a touch's).
+- **Deviation:** a boosted sum faster than `CURVE_SPEED_LIMIT`
+  (100 000 px/s) runs at that speed along its direction. Chromium does
+  not cap it; its curve keeps its precision at any speed, and this
+  curve's 0.1 px steps are lost past about 124 000 px/s. Only a chain of
+  a dozen boosts at the maximum reaches it.
 - **RELAXED, times:** the window is judged on the times events are
   handled (winit gives none), as the release velocity is.
 

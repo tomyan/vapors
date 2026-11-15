@@ -16,6 +16,8 @@ use std::time::Duration;
 
 use vapors_platform::Instant;
 
+use crate::document_input::CURVE_SPEED_LIMIT;
+
 /// `kMinBoostFlingSpeedSquare`'s root, CSS px/s.
 const MIN_BOOST_FLING_SPEED: f32 = 350.0;
 /// `kMinBoostTouchScrollSpeedSquare`'s root, CSS px/s.
@@ -58,7 +60,7 @@ impl FlingBooster {
     /// (`GetVelocityForFlingStart`), and the booster set for the next.
     pub(crate) fn start(&mut self, velocity: [f32; 2], now: Instant) -> [f32; 2] {
         let start = if self.boosts(velocity, now) {
-            add(velocity, self.previous_start)
+            capped(add(velocity, self.previous_start))
         } else {
             velocity
         };
@@ -146,6 +148,20 @@ impl FlingBooster {
             && fast(self.current)
             && fast(velocity)
     }
+}
+
+/// `velocity` scaled along its direction down to [`CURVE_SPEED_LIMIT`]
+/// when faster. A deviation from Chromium, whose boosted sums are not
+/// capped (its curve keeps its precision at any speed): a chain of a
+/// dozen boosts at the maximum would pass the speed past which this
+/// curve loses its 0.1 px steps, so the chain's fling runs at the limit
+/// rather than being refused.
+fn capped(velocity: [f32; 2]) -> [f32; 2] {
+    let speed = velocity[0].hypot(velocity[1]);
+    if speed <= CURVE_SPEED_LIMIT {
+        return velocity;
+    }
+    velocity.map(|v| v * CURVE_SPEED_LIMIT / speed)
 }
 
 fn add(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
