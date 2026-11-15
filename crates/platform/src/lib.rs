@@ -62,6 +62,7 @@ mod ime_window;
 mod input;
 mod input_keys;
 mod key_event;
+mod least_squares;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
 mod navigate;
@@ -86,6 +87,7 @@ mod text_keys;
 #[cfg(target_family = "wasm")]
 mod timer_web;
 mod uncaptured;
+mod velocity_tracker;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;

@@ -132,6 +132,51 @@ bound rounded up, until #400 reads the Pixel's real value.
    content edge stopping it.
 4. **ORDER.md:** put momentum back on the F2d row in the same PR.
 
+## The release velocity (PR 2)
+
+`crates/platform/src/velocity_tracker.rs` ports LSQ2 as above, with the
+history as Chromium keeps it (a ring of 20 that holds 19 samples after a
+clear until it wraps), `least_squares.rs` ports `SolveLeastSquares`, and
+the tests include Chromium's own `Basic`, `MaxVelocity`,
+`VaryingVelocity` and `DelayedActionUp` on the same synthetic samples.
+`Gestures` feeds the tracker the gesture's finger and, when that finger
+lifts past the tap slop, sends `Event::Fling` at its velocity.
+`DocumentInput` clamps each axis to the maximum, flings when either
+axis is above the minimum (`GestureDetector`'s `Action::UP` path), and
+flings the container the gesture scrolled.
+
+- **Minimum 50 CSS px/s:** AOSP's `ViewConfiguration` default; nothing in
+  the recordings contradicts it.
+- **Maximum 16 000 CSS px/s:** AOSP's default is 8000 dp/s, but 010 and
+  016 started at 13 214 and 15 502, so the Pixel's maximum is higher and
+  unknown. 16 000 is that lower bound rounded up; a recording of the
+  fastest flick Tom can make would bound it from the other side.
+- **RELAXED, two fingers:** a gesture that had a second finger does not
+  fling. Chromium's `GestureDetector` flings at `UP` at the last
+  finger's own velocity (its history kept through the second finger's
+  down), unless a finger lifted moving against another, which clears
+  the tracker (`POINTER_UP`'s dot product). Retired when a two-finger
+  fixture is recorded.
+- **RELAXED, times:** touches are stamped when winit hands them over;
+  winit 0.30 gives touches no time on any platform. (On the web, real
+  times would take a pointer listener of our own reading `timeStamp`
+  and matching winit's coalesced touches by id and position; natively
+  there is nothing to read.) The tracker's 40 ms and 80 ms stop rules
+  then also fire when the page did not handle input for that long, and
+  moves handled together share a time. The tracker answers in three
+  states: moving at a velocity, stopped, or unresolvable, when a 40 ms
+  gap is followed by moves handled together (a stall) or the samples'
+  times leave the fit no solution. An unresolvable lift does not fling;
+  it is counted (`Gestures::unmeasured_lifts`) and named in a debug
+  build. An up handled 80 ms late after a stall alone cannot be told
+  from a finger held still, and answers stopped. The fling starts at
+  the lift's handling time, on the clock frames are drawn on, where
+  Chromium starts it at the last scroll update's. Retired by #403 (real
+  touch times; upstream rust-windowing/winit#1194).
+- **Not ported:** scroll rails (`SnapScrollController`), which zero the
+  off-axis velocity of a mostly straight fling; the recorded flings are
+  vertical lists, where it changes nothing.
+
 ## What the Pixel recorded (2026-11-15)
 
 27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device

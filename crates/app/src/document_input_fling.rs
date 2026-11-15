@@ -1,5 +1,6 @@
-//! Flinging a scroll container: started at a velocity, moved on at each
-//! frame (`DocumentInput::advance_fling`), and stopped by the next
+//! Flinging a scroll container: started at a velocity, or by a touch
+//! gesture's finger lifting while it moves (`Event::Fling`), moved on at
+//! each frame (`DocumentInput::advance_fling`), and stopped by the next
 //! finger down, a wheel scroll or a button press (`touch_scroll.rs`,
 //! `document_input_act.rs`). Losing the window's focus does not stop it,
 //! as Chromium does not stop a fling on blur.
@@ -8,7 +9,7 @@ use std::fmt;
 
 use vapors_dom::NodeId;
 use vapors_elements::Document;
-use vapors_platform::Instant;
+use vapors_platform::{Instant, report_error};
 
 use super::DocumentInput;
 use crate::fling::Fling;
@@ -56,8 +57,33 @@ impl std::error::Error for FlingError {}
 /// the measured lower bound, rounded up. Provisional until #400 reads
 /// the Pixel's real maximum.
 pub const MAX_FLING_SPEED: f32 = 16_000.0;
+/// Below this speed on both axes a lifted finger does not fling, CSS
+/// px/s: Chromium's `GestureDetector` takes Android's
+/// `ViewConfiguration` minimum, 50 dp/s in AOSP.
+const MIN_FLING_SPEED: f32 = 50.0;
 
 impl DocumentInput {
+    /// The gesture's finger lifted at `at` moving at `velocity` (CSS
+    /// px/s, the scroll's way): the container the gesture scrolled
+    /// flings from then, as Chromium's `GestureDetector` decides on
+    /// `Action::UP`. The thumbs, hidden at the lift, show again for the
+    /// fling: that change asks the host for the frame that moves it on.
+    /// Its time is the platform's handling time (`velocity_tracker.rs`
+    /// says why), where Chromium starts at the last scroll update's.
+    pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2], at: Instant) {
+        // `fling` clamps to the maximum; the minimum is checked first, on
+        // values the clamp leaves alone
+        if velocity.iter().all(|v| v.abs() <= MIN_FLING_SPEED) {
+            return;
+        }
+        let Some(container) = self.touch.take_released() else {
+            return;
+        };
+        if let Err(refused) = self.fling(document, container, velocity, at) {
+            report_error(&format!("a touch fling did not start: {refused}"));
+        }
+    }
+
     /// `container` flung at `velocity` (CSS px/s, the way its scroll
     /// offset moves; each axis clamped to [`MAX_FLING_SPEED`]) from
     /// `at`, replacing a fling under way; a zero velocity starts none.
@@ -108,3 +134,7 @@ impl DocumentInput {
 #[cfg(test)]
 #[path = "document_input_fling_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "document_input_release_tests.rs"]
+mod release_tests;
