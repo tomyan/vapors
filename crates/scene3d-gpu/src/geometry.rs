@@ -33,43 +33,20 @@ impl GpuGeometry {
     }
 
     /// Uploads each piece `nodes` name that this renderer has not,
-    /// reading it through `find`.
-    ///
-    /// # Errors
-    ///
-    /// [`FrameError::GeometryMissing`] when `find` has no data for a
-    /// piece not yet uploaded; nothing is uploaded then.
-    pub(crate) fn upload_missing<'a>(
-        &mut self,
-        frame: &SurfaceFrame<'_>,
-        nodes: &[MeshNode],
-        find: impl Fn(GeometryId) -> Option<&'a Geometry>,
-    ) -> Result<(), FrameError> {
-        for (id, geometry) in self.missing(nodes, find)? {
+    /// reading it through each node's handle.
+    pub(crate) fn upload_missing(&mut self, frame: &SurfaceFrame<'_>, nodes: &[MeshNode]) {
+        for (id, geometry) in self.missing(nodes) {
             let uploaded = Tracked::new(upload(frame, geometry), &self.log, Resource::Geometry);
             self.uploaded.insert(id, uploaded);
         }
-        Ok(())
     }
 
     /// The pieces `nodes` name that are not uploaded, with their data.
-    fn missing<'a>(
-        &self,
-        nodes: &[MeshNode],
-        find: impl Fn(GeometryId) -> Option<&'a Geometry>,
-    ) -> Result<HashMap<GeometryId, &'a Geometry>, FrameError> {
-        let mut missing = HashMap::new();
-        for mesh in nodes
-            .iter()
+    fn missing<'a>(&self, nodes: &'a [MeshNode]) -> HashMap<GeometryId, &'a Geometry> {
+        (nodes.iter())
             .filter(|mesh| !self.uploaded.contains_key(&mesh.geometry))
-        {
-            let geometry = find(mesh.geometry).ok_or(FrameError::GeometryMissing {
-                node: mesh.node,
-                geometry: mesh.geometry,
-            })?;
-            missing.insert(mesh.geometry, geometry);
-        }
-        Ok(missing)
+            .map(|mesh| (mesh.geometry, mesh.handle.geometry()))
+            .collect()
     }
 
     /// Drops the buffers of each piece `held` says its `Meshes` released,

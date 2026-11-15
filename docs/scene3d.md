@@ -114,8 +114,17 @@ refused at the surface's aspect, a camera whose view-projection or its
 inverse is not finite, and a visible mesh whose world matrix has no
 finite inverse.
 
-It runs once per pointer move, not per frame. Cost grows linearly with
-mesh count. Figures from `cargo run --release -p vapors-scene3d
+How often it runs: once per pointer move over the surface (twice with
+`Document::cursor`, which asks again), and once per update while the
+pointer rests over a scene in which a node moved, since each transform
+write calls `Dom::hits_moved` and that update tests the hover again.
+A scene animated every frame under a resting pointer is picked once a
+frame: in the one-scene example (4 meshes) that is under 2.2 µs a frame
+(the 10-mesh row below, every triangle tested); at 10,000 meshes, up
+to 2.1 ms a frame (the p95 of the last row). Each moving node also
+borrows the document once a frame for `hits_moved`, which returns
+after checking the hovered element. A still scene, or a pointer away
+from it, picks nothing. Cost grows linearly with mesh count. Figures from `cargo run --release -p vapors-scene3d
 --example pick_cost`, on an i5-10500T at load average 1.0, 2026-11-14:
 the lowest median and lowest 95th percentile per row over six runs of
 200 picks each, unit cubes of 12 triangles in a column:

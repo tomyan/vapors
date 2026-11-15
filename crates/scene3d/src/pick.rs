@@ -2,7 +2,8 @@
 //! C4): a ray from the active camera through the point, tested against
 //! each mesh's bounds in its own space, then against the triangles of
 //! the meshes whose bounds it enters; the nearest hit wins. It runs per
-//! pointer move, not per frame. Cost: one bounds test per mesh, and a
+//! pointer move, and per update while a node moves under a resting
+//! pointer (docs/scene3d.md, Picking). Cost: one bounds test per mesh, and a
 //! triangle test per triangle of each mesh the ray's bounds test lets
 //! through (measured by `examples/pick_cost.rs`; the figures are in
 //! docs/scene3d.md).

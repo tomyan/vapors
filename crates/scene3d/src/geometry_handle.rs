@@ -52,9 +52,12 @@ impl Eq for GeometryHandle {}
 
 impl fmt::Debug for GeometryHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // its Meshes holds one reference while it holds the piece
-        let holders = Rc::strong_count(&self.geometry);
-        write!(f, "GeometryHandle({}, {holders} holders)", self.id)
+        let references = Rc::strong_count(&self.geometry);
+        write!(
+            f,
+            "GeometryHandle({}, {references} references: each handle's, and its Meshes' while it holds the piece)",
+            self.id
+        )
     }
 }
 

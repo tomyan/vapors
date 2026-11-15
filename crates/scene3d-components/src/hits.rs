@@ -53,17 +53,18 @@ impl SceneHits {
 }
 
 /// The source a `<Scene>` gives the document: the mesh `pick` finds
-/// through the camera, as its anchor. A node no `<Mesh>` mounted (added
-/// to the scene by the application) is passed over, as is one whose
-/// anchor does not take the pointer. A refused pick is the source's
-/// error, naming why.
+/// through the camera, as its anchor. A mesh whose anchor does not take
+/// the pointer is passed over. A mesh no `<Mesh>` mounted (added to the
+/// scene by the application) has no anchor: it blocks the pointer as it
+/// is drawn, and a pick of it is answered as nothing, so the surface is
+/// the target. A refused pick is the source's error, naming why.
 pub(crate) fn hit_source(scene: Rc<RefCell<Scene>>, hits: Rc<SceneHits>) -> HitSource {
     Box::new(move |ask: HitAsk<'_>| {
         let at = PickAt {
             point: ask.point,
             size: ask.size,
         };
-        let skip = |node| hits.anchor(node).is_none_or(|anchor| !(ask.takes)(anchor));
+        let skip = |node| hits.anchor(node).is_some_and(|anchor| !(ask.takes)(anchor));
         let picked = pick(&mut scene.borrow_mut(), at, skip);
         let picked = picked.map_err(|error| format!("<Scene>: {error}"))?;
         Ok(picked.and_then(|node| hits.anchor(node)))

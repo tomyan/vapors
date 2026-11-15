@@ -63,24 +63,52 @@ fn the_group_turns_with_the_clock() {
 
 #[test]
 fn the_pointer_rests_over_the_cubes_in_every_other_ten_seconds() {
+    // Given
+    let at = |millis| pointing(Duration::from_millis(millis));
+
+    // When
+    let (before, opened, closed, again) = (at(9_999), at(10_000), at(20_000), at(30_000));
+
     // Then
-    assert!(!pointing(Duration::from_millis(9_999)) && pointing(Duration::from_secs(10)));
-    assert!(!pointing(Duration::from_secs(20)) && pointing(Duration::from_secs(30)));
+    assert_eq!((before, opened, closed, again), (false, true, false, true));
 }
 
 #[test]
-fn the_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
+fn the_hovered_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
     // Given: frame 1100 (17.6 s) is in the pointer's window, light 2
     // lit by the click at frame 1000
     let now = expected(1100);
 
+    // When
+    let middle = now.cube(HOVER_CUBE);
+
     // Then
-    assert!(now.hovered && now.lit[1]);
-    assert_eq!(now.cube(1), (CRAFT_HOVER, true));
-    assert_eq!(
-        now.cube(0).0,
-        LIT,
-        "light 1, lit at frame 875, is not hovered"
-    );
-    assert_eq!(expected(500).cube(1).0, LIT);
+    assert!(now.hovered && now.lit[HOVER_CUBE]);
+    assert_eq!(middle, (GROUP_HOVER, true));
+}
+
+#[test]
+fn a_lit_cube_the_hover_does_not_colour_keeps_its_lit_colour() {
+    // Given: light 1, lit at frame 875, in the window at frame 1100
+    let now = expected(1100);
+
+    // When
+    let first = now.cube(0);
+
+    // Then
+    assert!(now.hovered && now.lit[0]);
+    assert_eq!(first.0, LIT);
+}
+
+#[test]
+fn outside_the_window_the_lit_middle_cube_is_lit() {
+    // Given: frame 500 (8 s), light 2 lit at frame 250
+    let now = expected(500);
+
+    // When
+    let middle = now.cube(HOVER_CUBE);
+
+    // Then
+    assert!(!now.hovered);
+    assert_eq!(middle.0, LIT);
 }

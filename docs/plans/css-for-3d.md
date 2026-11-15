@@ -631,11 +631,19 @@ target and are refused by the next update (once per message), which
 `SceneUsed` cursor. `Dom::hits_moved(scene anchor)` makes the next
 update test the hover again when the pointer is over that surface or
 one of the scene's anchors, and does nothing otherwise; a still scene
-under a still pointer tests nothing. C4c: `<Scene>` watches its hits
-on its surface before its children mount; its source runs `pick` with
-a skip of every node no `<Mesh>` mounted and every mesh whose anchor
-does not take the pointer, and answers the picked node's anchor; a
-refused pick is its error. Each transform write calls `hits_moved`.
+under a still pointer tests nothing. The document does the same itself
+when a watched scene, or a part of one holding the hovered anchor, is
+removed, and when a restyle changes whether one of its anchors takes
+the pointer, since an anchor has no box for the changed hits to name.
+`Document::cursor` and the hover each ask the source, so a pointer move
+over a scene asks twice.
+
+C4c: `<Scene>` watches its hits on its surface before its children
+mount. Its source runs `pick`, skipping every mesh whose anchor does
+not take the pointer, and answers the picked node's anchor; a mesh the
+application added to the scene (no anchor) blocks the pointer and is
+answered as nothing, so the surface is the target. A refused pick is
+its error. Each transform write calls `hits_moved`.
 `<Scene>` takes no `meshes` prop (lead decision, 2026-11-15): a
 `GeometryHandle` shares its piece's `Geometry` with the `Meshes`
 (`Rc`), which holds it while `held_by_a_handle` (a strong count above
@@ -644,11 +652,9 @@ its handle and no prop can be forgotten. The other required props,
 still `Option`s refused at mount, are issue #392. The one-scene
 example's group is `.spin`, and `.spin:hover .two` colours the middle
 cube while its script rests the pointer over the middle of the surface
-(every other 10 s); `confirm` and a pixel test hold it. The document does the same itself
-when a watched scene is removed, and when a restyle changes whether one
-of its anchors takes the pointer, since an anchor has no box for the
-changed hits to name. `Document::cursor` and the hover
-each ask the source, so a pointer move over a scene asks twice.
+(every other 10 s); `confirm` and a pixel test hold it. The renderer
+uploads each piece through the node's handle too, so `pick` and the
+frame read the same triangles.
 
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a

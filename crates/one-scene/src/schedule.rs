@@ -44,9 +44,12 @@ pub const CUBE_COLOURS: [[u8; 3]; CUBES] =
 /// A lit cube's `color` (`.lit`).
 pub const LIT: [u8; 3] = [0xf1, 0xc4, 0x0f];
 
-/// The middle cube's `color` while the group is hovered
+/// The cube the group's hover colours (`.spin:hover .two`): the middle.
+pub const HOVER_CUBE: usize = 1;
+
+/// [`HOVER_CUBE`]'s `color` while the group is hovered
 /// (`.spin:hover .two`), which wins over `.lit`.
-pub const CRAFT_HOVER: [u8; 3] = [0xe6, 0x7e, 0x22];
+pub const GROUP_HOVER: [u8; 3] = [0xe6, 0x7e, 0x22];
 
 /// The ground's `color`, the `--tint` token by day and by night.
 pub const GROUND: [u8; 3] = [0x3b, 0x4a, 0x3f];
@@ -135,10 +138,10 @@ impl Expected {
     /// Cube `cube`'s colour and whether it is shown.
     #[must_use]
     pub fn cube(&self, cube: usize) -> ([u8; 3], bool) {
-        let colour = match (cube, self.hovered, self.lit[cube]) {
-            (1, true, _) => CRAFT_HOVER,
-            (_, _, true) => LIT,
-            _ => CUBE_COLOURS[cube],
+        let colour = match (cube == HOVER_CUBE && self.hovered, self.lit[cube]) {
+            (true, _) => GROUP_HOVER,
+            (false, true) => LIT,
+            (false, false) => CUBE_COLOURS[cube],
         };
         (colour, !(cube == CUBES - 1 && self.gone))
     }

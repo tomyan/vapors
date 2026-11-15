@@ -91,6 +91,19 @@ impl Document {
         }
     }
 
+    /// Before `node` is removed: when it holds the hovered node and is in
+    /// a watched scene (a mesh's `{if}` dropping it), the scene's hits
+    /// moved; the anchor has no box, so no changed hit says so.
+    fn part_removed(&mut self, node: NodeId) {
+        let hovered = self
+            .pointer
+            .hovered
+            .filter(|hovered| self.contains(*hovered));
+        if hovered.is_some_and(|hovered| self.chain(hovered).contains(&node)) {
+            self.takes_changed(node);
+        }
+    }
+
     /// After a restyle changed whether `node` takes the pointer: its
     /// scene's hits moved, when it is in a watched scene the pointer is
     /// over (a scene anchor has no box, so no changed hit says so).
@@ -121,6 +134,7 @@ impl Document {
         if self.scene_hits.sources.is_empty() {
             return;
         }
+        self.part_removed(node);
         for node in nodes(&self.arena, node) {
             if let Some((surface, _)) = self.scene_hits.sources.remove(&node) {
                 // the pointer resting on the scene is now on the surface
