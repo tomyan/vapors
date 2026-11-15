@@ -965,6 +965,48 @@ Lane frames are lighter than scroll frames:
   reach), so a frame that is never read costs nothing and an update
   adds no per-row work for frames that do not change: an insert above
   a row stores nothing new for the scroll frames in later rows.
+- **Batching across lane frames** (4f). Today a batch holds items of
+  one frame, and the painter moves the whole batch by that frame's
+  shift, a uniform per draw (`painter_runs.rs`, `view.shift` in each
+  pipeline's shader). Every framed row is a frame, so the rows page's
+  idle frame draws each row's label and button text apart: 51 text
+  draws for 17 rows in view where one frame drew 35 (`gpu_rows_draws`,
+  relaxed in 4e until this). From 4f:
+  - A run of consecutive steps whose frames are lane frames of one lane
+    batches together, as it would in one frame. The batch names the
+    lane's base frame (the frame the container's content is in, whose
+    shift and clip the painter applies as today), and each item keeps
+    its row's offset in the lane apart from its positions.
+  - Each instance of a batch carries a small index into a table of the
+    batch's row offsets, device pixels, whole; the shader adds
+    `view.shift + offsets[index]`. The instances are retained as today
+    (their positions are in the row's frame, which an insert does not
+    move); an insert above changes only the tables of the batches
+    drawn, O(rows shown), never a retained instance.
+  - Items still batch only under one clip (a row's own clip inside its
+    frame breaks the batch, as a clip change does today), and each is
+    culled in its own row's view, as now.
+  - Every pipeline with positions takes the index: quads, shadows,
+    texts, images and icons. Surfaces keep one frame a batch.
+  - Accepted when `gpu_rows_draws` is back at 35 text draws (the pin
+    4e relaxed), `draw` within 2% across sizes for `--scaling Insert`
+    and `FlexInsert`, the kept-batches check (`kept_batches_check.rs`)
+    and the Chromium paint comparisons unchanged.
+- **The a11y touch of started rows** (4f, or 4g if it is large). An
+  insert starts every later row of its lane elsewhere, and
+  `AxMirror::touch_slots` expands each started lane into its rows and
+  puts each row's node in the touched set, about 100 instructions a
+  row in the `update` phase, outside the accessibility phase that
+  holds the a11y ceiling. The take then reads those rows (their
+  records' bounds are from the parent node, section 5.3). From 4f the
+  touch keeps each started lane as its container and first row, and
+  the take walks those rows itself when it reads (the walk
+  `prime_started` already does), so the update adds no per-row work.
+  Accepted when `update` and `layout` hold no per-row term from the
+  touch for `--scaling Insert` and `FlexInsert`, and `accessibility`
+  stays within its ceiling and no more per row than the base; measured
+  before it lands, since the take's own walk moves cost into the
+  accessibility phase, where FlexInsert has about 1.3% of headroom.
 - **Hits** (4d): the kept hits are by frame; a hit test asks the
   frames that can show at its point (`Frames::meeting`, which finds a
   lane's rows through `between`) and tests their hits alone, the last
@@ -986,6 +1028,7 @@ Lane frames are lighter than scroll frames:
 | 4c | Layout leaves starts out of later children's layouts; the layout check derives them | the layout check derives every start |
 | 4d | Culling and hits through `between`; the lane's extents entry | hits through `between` match the scan |
 | 4e | Scroll frames under a lane frame composed on read; the `LaneFrameScroller` decline goes | the rows page's list framed (`lanes_framed` above 0 for `--scaling Insert`); for `--scaling Insert`, `layout` and `paint` within 2% across sizes (the 3000- and 10000-row totals each within 2% of the 1000-row total), and `accessibility` within `INSERT_A11Y_PER_ROW` (9600) and no more per row than the base; the Chromium paint comparisons, the frames, placement and kept-paint checks unchanged with a scroller in a framed row; the scroll test above |
+| 4f | Batching across lane frames (a row offset table per batch); the a11y touch keeps started lanes, not their rows | `gpu_rows_draws` at 35 text draws again; `draw` within 2% across sizes and `update` with no per-row term from the touch, for `--scaling Insert` and `FlexInsert`; `accessibility` within its ceiling and no more per row than the base; the kept-batches check and the Chromium paint comparisons unchanged |
 
 4b, 4c and 4d are separate stacked pull requests, each reviewed alone,
 then folded into 4d and gated once, so main never carries 4b's added
