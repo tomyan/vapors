@@ -1,9 +1,13 @@
 //! What a hit test that lands on a watched scene's `gpu-surface` asks
 //! the scene (docs/plans/css-for-3d.md C4): the point from the surface's
-//! content box, its size, and which anchors take the pointer. The anchor
-//! answered is the target; nothing answered leaves the surface the
-//! target; an error, or an anchor outside the scene, leaves the surface
-//! the target and is refused by the next update.
+//! content box, its size, and which anchors take the pointer
+//! (`scene_takes`). The anchor answered is the target. The surface is
+//! the target over its border (not asked), where the scene answers
+//! nothing, and while an anchor of the scene is not yet styled (the
+//! update that styles it tests the hover again). A source's error, an
+//! answer outside the scene or one that does not take the pointer, and a
+//! surface whose box cannot be read leave the surface the target and are
+//! refused by the next update.
 
 use vapors_dom::{HitAsk, NodeId};
 
@@ -11,6 +15,7 @@ use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::painted::Painted;
+use crate::scene_takes::Takes;
 
 impl Document {
     /// The anchor `point` hits through the scene watched on `element`,
@@ -23,38 +28,46 @@ impl Document {
     ) -> Option<NodeId> {
         let name = crate::surfaces::name(&self.arena, element)?;
         let &scene = self.scene_hits.surfaces.get(name)?;
-        let (origin, size) = self.content_box(painted, element)?;
-        let takes = |anchor: NodeId| self.scene_takes_pointer(anchor);
-        let ask = HitAsk {
-            point: [point[0] - origin[0], point[1] - origin[1]],
-            size,
-            takes: &takes,
+        let Some((origin, size)) = self.content_box(painted, element) else {
+            return self.refuse_hit(scene, "its surface's box could not be read from the last update, so the point could not be placed on it");
         };
-        let (_, source) = &self.scene_hits.sources[&scene];
-        match source(ask) {
-            Ok(answer) => answer.filter(|&anchor| self.in_scene(scene, anchor)),
+        let local = [point[0] - origin[0], point[1] - origin[1]];
+        if !(0.0..=size[0]).contains(&local[0]) || !(0.0..=size[1]).contains(&local[1]) {
+            return None; // over the surface's border: the surface's hit
+        }
+        self.ask_scene(scene, local, size)
+    }
+
+    /// `scene`'s answer at `point` on a content box of `size`, checked.
+    fn ask_scene(&self, scene: NodeId, point: [f32; 2], size: [f32; 2]) -> Option<NodeId> {
+        let takes = Takes::new(self, scene);
+        let ask = HitAsk {
+            point,
+            size,
+            takes: &|anchor| takes.ask(anchor),
+        };
+        let target = match self.scene_hits.source(scene)(ask) {
+            Ok(answer) => answer.filter(|&anchor| takes.answered(anchor)),
             Err(error) => self.refuse_hit(scene, &format!("its hit source failed: {error}")),
+        };
+        // an answer reached by passing over an unstyled anchor is not
+        // trusted; the update that styles it tests the hover again
+        // (`restyle_scene`, `takes_changed`)
+        if takes.unresolved() {
+            return None;
         }
+        target
     }
 
-    /// Whether `anchor` is in `scene`'s subtree; refused for the next
-    /// update when it is not.
-    fn in_scene(&self, scene: NodeId, anchor: NodeId) -> bool {
-        if self.contains(anchor) && self.chain(anchor).contains(&scene) {
-            return true;
-        }
-        let why = format!(
-            "its hit source answered {anchor:?}, which is not in its scene: answer an anchor under the scene anchor, or None"
-        );
-        self.refuse_hit(scene, &why);
-        false
-    }
-
-    /// Keeps a refusal of `scene`'s hit for the next update; `None`.
-    fn refuse_hit(&self, scene: NodeId, why: &str) -> Option<NodeId> {
+    /// Keeps a refusal of `scene`'s hit for the next update, once per
+    /// message however often the pointer meets it; `None`.
+    pub(crate) fn refuse_hit(&self, scene: NodeId, why: &str) -> Option<NodeId> {
         let element = describe(&self.arena, scene);
         let error = ElementError::Refused(format!("{element}: {why}; the surface was the target"));
-        self.scene_hits.refused.borrow_mut().push(error);
+        let mut refused = self.scene_hits.refused.borrow_mut();
+        if !refused.contains(&error) {
+            refused.push(error);
+        }
         None
     }
 
@@ -71,15 +84,8 @@ impl Document {
         ))
     }
 
-    /// Whether scene anchor `anchor` takes the pointer: `pointer-events:
-    /// auto` and `visibility: visible`.
-    fn scene_takes_pointer(&self, anchor: NodeId) -> bool {
-        let kept = self.kept.as_ref().and_then(|kept| kept.scene.get(&anchor));
-        kept.is_some_and(|used| used.takes_pointer && used.visible)
-    }
-
-    /// The cursor of what `point` hits: a scene anchor's, else the
-    /// element's as painted.
+    /// The cursor of `node`: a scene anchor's, else the element's as
+    /// painted.
     pub(crate) fn cursor_of(&self, painted: &Painted, node: NodeId) -> crate::Cursor {
         let scene = self.kept.as_ref().and_then(|kept| kept.scene.get(&node));
         scene
@@ -88,3 +94,7 @@ impl Document {
             .unwrap_or(crate::Cursor::Default)
     }
 }
+
+#[cfg(test)]
+#[path = "scene_hit_tests.rs"]
+mod tests;

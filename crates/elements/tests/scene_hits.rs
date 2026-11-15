@@ -105,6 +105,7 @@ fn a_click_on_a_mesh_reaches_its_anchor_and_bubbles_to_the_scene_and_body() {
         (page.craft, "craft"),
         (page.scene, "scene"),
         (body, "body"),
+        (page.surface, "surface"),
     ] {
         record(&page.doc, node, "click", label, &log);
     }
@@ -112,7 +113,7 @@ fn a_click_on_a_mesh_reaches_its_anchor_and_bubbles_to_the_scene_and_body() {
     // When
     Document::tapped(&page.doc, OVER_A);
 
-    // Then
+    // Then: the surface, the scene anchor's sibling, is not on the path
     assert_eq!(
         *log.borrow(),
         ["a click", "craft click", "scene click", "body click"]
@@ -128,4 +129,14 @@ fn the_cursor_over_a_mesh_is_its_anchors() {
     let doc = page.doc.borrow();
     assert_eq!(doc.cursor(OVER_A), Cursor::Pointer);
     assert_eq!(doc.cursor(OVER_B), Cursor::Default);
+}
+
+#[test]
+fn a_point_on_the_surfaces_border_is_the_surfaces_hit_and_does_not_ask() {
+    // Given: the border runs from x 20 to 22
+    let page = page("");
+
+    // Then
+    assert_eq!(page.hit([21.0, 52.0]), Some(page.surface));
+    assert!(page.asks.borrow().is_empty());
 }

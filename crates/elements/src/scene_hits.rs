@@ -3,7 +3,7 @@
 //! surface name, dropped when the anchor is removed. What a hit test
 //! asks of them is in `scene_hit`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 use vapors_dom::{HitSource, NodeId};
@@ -24,7 +24,17 @@ pub(crate) struct SceneHits {
     pub(crate) refused: RefCell<Vec<ElementError>>,
     /// Whether a watched scene's hits moved under the pointer since the
     /// last update, so its hover is tested again.
-    pub(crate) moved: bool,
+    pub(crate) moved: Cell<bool>,
+}
+
+impl SceneHits {
+    /// The source of watched scene `scene`, which `surfaces` named.
+    pub(crate) fn source(&self, scene: NodeId) -> &HitSource {
+        let (_, source) = self.sources.get(&scene).expect(
+            "`surfaces` named a scene `sources` does not hold: the two are inserted and removed together in scene_hits.rs, so this is a defect there; reproduce with `cargo test -p vapors-elements --test scene_hits`",
+        );
+        source
+    }
 }
 
 impl Document {
@@ -40,7 +50,7 @@ impl Document {
         let hits = &mut self.scene_hits;
         hits.surfaces.insert(surface.to_owned(), anchor);
         hits.sources.insert(anchor, (surface.to_owned(), source));
-        hits.moved = true;
+        hits.moved.set(true);
         self.note_change();
     }
 
@@ -69,9 +79,29 @@ impl Document {
             return self.refuse(anchor, format!("hits_moved on {element}: {why}"));
         };
         let surface = surface.clone();
-        if self.pointer_over_scene(anchor, &surface) {
-            self.scene_hits.moved = true;
+        self.moved_if_pointed(anchor, &surface);
+    }
+
+    /// Marks the hits moved, and an update due, when the pointer is over
+    /// `anchor`'s scene on `surface`.
+    fn moved_if_pointed(&mut self, anchor: NodeId, surface: &str) {
+        if self.pointer_over_scene(anchor, surface) {
+            self.scene_hits.moved.set(true);
             self.note_change();
+        }
+    }
+
+    /// After a restyle changed whether `node` takes the pointer: its
+    /// scene's hits moved, when it is in a watched scene the pointer is
+    /// over (a scene anchor has no box, so no changed hit says so).
+    pub(crate) fn takes_changed(&mut self, node: NodeId) {
+        let chain = self.chain(node);
+        let watched = chain.iter().find_map(|anchor| {
+            let (surface, _) = self.scene_hits.sources.get(anchor)?;
+            Some((*anchor, surface.clone()))
+        });
+        if let Some((anchor, surface)) = watched {
+            self.moved_if_pointed(anchor, &surface);
         }
     }
 
@@ -93,6 +123,8 @@ impl Document {
         }
         for node in nodes(&self.arena, node) {
             if let Some((surface, _)) = self.scene_hits.sources.remove(&node) {
+                // the pointer resting on the scene is now on the surface
+                self.moved_if_pointed(node, &surface);
                 self.scene_hits.surfaces.remove(&surface);
             }
         }

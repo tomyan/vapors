@@ -40,7 +40,7 @@ impl Document {
     pub(crate) fn rehover_in(&mut self, painted: &crate::painted::Painted) {
         // a watched scene's hits moved under the pointer (`hits_moved`);
         // taken first, so a flag set while the pointer was away is spent
-        let moved = std::mem::take(&mut self.scene_hits.moved);
+        let moved = self.scene_hits.moved.take();
         let Some(point) = self.pointer.position else {
             return;
         };

@@ -26,7 +26,8 @@ pub const OVER_SIDE: [f32; 2] = [50.0, 120.0];
 
 pub const SHEET: &str = "body { margin: 0; } \
     gpu-surface { display: block; margin: 10px 0 0 20px; width: 200px; height: 100px; border: 2px solid #000000; } \
-    .side { height: 20px; }";
+    .side { height: 20px; } \
+    .holder { position: absolute; left: 300px; top: 250px; width: 10px; height: 10px; }";
 
 /// Each ask's point and size.
 pub type Asks = Rc<RefCell<Vec<([f32; 2], [f32; 2])>>>;
@@ -44,6 +45,8 @@ pub enum Answer {
     Node(NodeId),
     /// An error.
     Fails,
+    /// The second, after asking `takes` about the first.
+    AsksAbout(NodeId, Option<NodeId>),
 }
 
 pub struct Page {
@@ -67,7 +70,8 @@ pub fn page(css: &str) -> Page {
     let body = doc.body();
     let surface = element(&mut doc, body, "gpu-surface", "");
     doc.set_attribute(surface, "name", "view");
-    let scene = element(&mut doc, body, "scene", "");
+    let holder = element(&mut doc, body, "div", "holder");
+    let scene = element(&mut doc, holder, "scene", "");
     let craft = element(&mut doc, scene, "group", "craft");
     let a = element(&mut doc, craft, "mesh", "a");
     let b = element(&mut doc, craft, "mesh", "b");
@@ -119,6 +123,10 @@ impl Page {
                 Answer::Nothing => Ok(None),
                 Answer::Node(node) => Ok(Some(node)),
                 Answer::Fails => Err("the camera is gone".to_owned()),
+                Answer::AsksAbout(node, then) => {
+                    (ask.takes)(node);
+                    Ok(then)
+                }
             }
         };
         self.doc

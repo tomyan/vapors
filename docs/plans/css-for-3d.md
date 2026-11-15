@@ -621,13 +621,20 @@ the mesh anchor, its group anchors, the scene anchor, then the scene
 anchor's HTML ancestors (in the example, `.stage` and `body`); the
 surface element is not on that path, as the scene anchor is its sibling,
 not its child. Where the source answers no node, the surface is the
-target. A source's error, or an answer outside its scene, leaves the
-surface the target and is refused by the next update, which
+target, as it is over the surface's border (the source is not asked
+there) and while the source asks about an anchor added since the last
+update. A source's error, an answer outside its scene or one that does
+not take the pointer, a question about a node that is no anchor of the
+scene, and a surface whose box cannot be read leave the surface the
+target and are refused by the next update (once per message), which
 `take_changed` makes due. `cursor` over a scene anchor is its
 `SceneUsed` cursor. `Dom::hits_moved(scene anchor)` makes the next
 update test the hover again when the pointer is over that surface or
 one of the scene's anchors, and does nothing otherwise; a still scene
-under a still pointer tests nothing. `Document::cursor` and the hover
+under a still pointer tests nothing. The document does the same itself
+when a watched scene is removed, and when a restyle changes whether one
+of its anchors takes the pointer, since an anchor has no box for the
+changed hits to name. `Document::cursor` and the hover
 each ask the source, so a pointer move over a scene asks twice.
 
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull

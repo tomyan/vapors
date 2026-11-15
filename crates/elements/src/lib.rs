@@ -143,6 +143,7 @@ mod run_bits;
 mod scene_hit;
 mod scene_hits;
 mod scene_sinks;
+mod scene_takes;
 mod scene_view;
 mod scroll;
 mod scroll_chains;

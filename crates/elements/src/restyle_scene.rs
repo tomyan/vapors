@@ -22,6 +22,9 @@ impl Document {
             return true;
         }
         let old = self.scene_used(node);
+        if takes(old) != found.as_ref().ok().and_then(|used| takes(Some(*used))) {
+            self.takes_changed(node);
+        }
         let refused = match &found {
             Ok(used) => self.report_appearance(node, old, used),
             Err(refusals) => self.unhonoured(node, refusals.clone()).collect(),
@@ -61,4 +64,9 @@ impl Document {
     pub fn scene_used(&self, node: NodeId) -> Option<SceneUsed> {
         self.kept.as_ref()?.scene.get(&node).copied()
     }
+}
+
+/// Whether a kept `SceneUsed` takes the pointer; `None` when none is kept.
+fn takes(used: Option<SceneUsed>) -> Option<bool> {
+    used.map(|used| used.takes_pointer && used.visible)
 }
