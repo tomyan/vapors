@@ -873,6 +873,19 @@ Lane frames are lighter than scroll frames:
   above it makes stale. From 4e a scroll frame whose outer frame is a
   lane frame, or a scroll frame under one, keeps only what is its own
   (section 11.2, "Scroll frames under a lane frame").
+- A lane whose child is itself a scroll container is not framed: a
+  counted decline (`LaneFrameScrollingChild`) of that lane alone, its
+  children keeping today's placement (correct, O(rows after)). Frames
+  are named by slot, so that child's lane frame (its own box) and its
+  scroll frame (its content) would share a name, and composing the
+  scroll frame would read itself (the gpu nested-scrollers page, whose
+  rows are scrollers, overflowed the stack). A scroller inside a child
+  is framed. Follow-up, which retires the decline: lane frames named
+  in a key space of their own (a lane frame's name the child's slot
+  with a tag that no scroll container's slot carries), everywhere a
+  frame is named: a part's frame (`BoxFrom::frame`), the hits and the
+  extents index by frame, `Frames`' maps and the placement's framed
+  slots.
 
 ### 11.2 What each side does
 
