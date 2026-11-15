@@ -191,3 +191,44 @@ fn a_negative_coordinate_is_taken() {
     assert_eq!(reasons("rect", &rect), Vec::<String>::new());
     assert_eq!(outline_of("rect", &rect), path("M-1 -2.5H3V0.5H-1Z"));
 }
+
+#[test]
+fn a_pill_rect_an_ulp_short_of_its_radii_is_a_closed_form_through_the_clamp() {
+    // Given: <rect x=1 y=0.05 width=10 height=1 rx=0.5>, whose height
+    // is 1.05 - 0.05 = 0.99999994 in f32 (#387 review, H1)
+    let pill = attributes(&[
+        ("x", "1"),
+        ("y", "0.05"),
+        ("width", "10"),
+        ("height", "1"),
+        ("rx", "0.5"),
+    ]);
+    let Ok(Outline::Path(data)) = outline_of("rect", &pill) else {
+        panic!("the pill has an outline");
+    };
+
+    // When
+    let path = crate::path::IconPath::parse(&data).expect("an outline parses");
+    let found = crate::classify::classify(
+        &path,
+        crate::canonical::Paint::Fill(crate::canonical::FillRule::NonZero),
+    );
+
+    // Then: a rect, its radii fitted by the check's own clamp
+    let crate::classify::Classified::Rect {
+        origin,
+        size,
+        radius,
+    } = found
+    else {
+        panic!("{data} is {found:?}");
+    };
+    let geometry = crate::geometry::Geometry::Rect {
+        origin,
+        size,
+        radius,
+    };
+    assert_eq!(crate::geometry::check_geometry(&geometry), Ok(()), "{data}");
+    assert_eq!(radius[1], size[1] / 2.0, "{data}");
+    assert!(size[1] < 1.0, "{size:?}: the case is an ulp short");
+}

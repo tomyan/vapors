@@ -139,3 +139,25 @@ fn a_rect_whose_width_becomes_zero_draws_nothing_and_is_not_refused() {
     assert_eq!(at_zero, []);
     assert_eq!(drawn(&mut doc).len(), 1);
 }
+
+#[test]
+fn a_pill_rect_an_ulp_short_of_its_radii_is_a_closed_form() {
+    // Given: <rect x=1 y=0.05 width=10 height=1 rx=0.5>, whose height in
+    // f32 is an ulp under 2 ry, clamped by fitted_radii (#387 review, H1)
+    let pill = [
+        ("x", "1"),
+        ("y", "0.05"),
+        ("width", "10"),
+        ("height", "1"),
+        ("rx", "0.5"),
+        ("fill", "red"),
+    ];
+    let (mut doc, _) = page(&[&[("rect", &pill)]]);
+
+    // When
+    let kinds: Vec<_> = drawn(&mut doc).iter().map(|(kind, _)| *kind).collect();
+
+    // Then
+    assert_eq!(kinds, [ShapeKind::ClosedForm]);
+    assert_eq!(doc.update_counts().shapes_tessellated, 0);
+}
