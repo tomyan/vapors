@@ -104,3 +104,63 @@ unverified until the transcripts show them.
    (`Next::Wait` otherwise), a new touch stopping the fling, and the
    content edge stopping it.
 4. **ORDER.md:** put momentum back on the F2d row in the same PR.
+
+## What the Pixel recorded (2026-11-15)
+
+27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device
+pixel ratio 2.75 (`~/.cache/fling-recordings`, made with the recorder
+above). `scripts/fling-recorder/fit.py` fits the curve above to each
+coast: the start frame, its time to the half millisecond, and the
+starting velocity, chosen so the curve ends at the recorded resting
+offset (a fling that ran to rest) or best fits the first 12 coast
+frames (one cut short by the next touch or the list's end).
+
+**The curve is MobileScroller's.** Every fling that ran to rest away
+from the list's ends fits it:
+
+| recording | starting velocity | curve | recorded coast | worst frame |
+|---|---|---|---|---|
+| 023 | 3015 DIP/s | 1251 ms over 1320 px | 1233 ms | 7.3 px |
+| 003 | 3226 DIP/s | 1315 ms over 1485 px | 1250 ms | 8.5 px |
+| 021 | 3131 DIP/s | 1286 ms over 1410 px | 1266 ms | 7.8 px |
+| 005 | 2848 DIP/s | 1200 ms over 1196 px | 1066 ms | 6.3 px |
+
+Over the first 12 coast frames every fling fits within 3 to 5 px. The
+worst frames over a whole coast are where the recorded offset is
+quantised to device pixels (1/2.75 CSS px) and the fit's start time is
+a frame's.
+
+**The content edge stops a fling.** 010 and 016 run to the list's
+ends (18 901.5 and 0) and 019 to its top: their coasts end there, cut
+short of the curve.
+
+**Boost is there.** A fling started in the same direction while one is
+still running starts faster than its own drag explains: 008 started at
+4125 DIP/s, then 009, flung during it, at 8825; 013, 014 and 015 at
+2525, 7450 and 10 950. That is Chrome's `FlingBooster`
+(`ui/events/blink/fling_booster.cc`): the new fling's velocity plus the
+previous fling's starting velocity, when both are at least 350 DIP/s
+(`kMinBoostFlingSpeedSquare`), they point the same way, and the new
+fling comes within its cutoff of the last scroll. A new touch with no
+fling (a tap, or a drag that stops) cancels the running fling.
+
+**Taps:** 001, 011, 012, 017 and 020 have no coast.
+
+**What the page saw of the finger.** Chrome delivers only the first
+few touchmoves to a passive listener once it scrolls (five touch
+events per fling here: a touchstart, three moves, the touchend), so the
+recordings do not hold the samples Chrome's velocity tracker used. The
+drag shows instead in `scrollTop`, which follows the finger frame by
+frame once past the touch slop. The replay therefore feeds vapors the
+finger reconstructed from `scrollTop` at each frame of the drag, with
+the recorded touchstart and touchend.
+
+**Fixtures for the replay:** coasts to rest, 023, and 003, 005, 006,
+021 and 022 (each cut by the next touch below 350 px/s, so no boost
+and almost no distance lost); edges, 010, 016 and 019. Boost, 008 to
+009 and 013 to 015, goes with the slice that builds it.
+
+**First PR or later:** the first PR builds the curve, the release
+velocity, the frame loop, a new touch stopping the fling and the edge
+stopping it, held to the coast and edge fixtures. Boost is the next
+PR, held to the boost chains, so each stays near 400 lines.
