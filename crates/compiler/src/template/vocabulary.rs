@@ -103,4 +103,12 @@ mod tests {
         // Then
         assert!(HTML_TAGS.windows(2).all(|pair| pair[0] < pair[1]));
     }
+
+    #[test]
+    fn the_template_takes_every_svg_element_the_cascade_paints() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        for tag in vapors_css::cascade::SVG_TAGS {
+            assert!(HTML_TAGS.contains(&tag), "{tag}");
+        }
+    }
 }

@@ -1,12 +1,20 @@
 //! `<rect>` and `<circle>` attributes refused at build time, naming the
 //! file and line (one-scene S4b; #376 decided the same for presentation
-//! attributes). The refused cases are an attribute the shape does not
-//! take (`transform`, `class`), a literal geometry value the runtime
-//! would refuse (a unit, a percentage, a size not above zero), and a
-//! required one that is absent. A bound value is checked at update
-//! time by the element tree, through the same `vapors_shapes::refusal`.
+//! attributes). Refused:
+//! - an attribute the shape does not take (`transform`, `class`);
+//! - a `class:` directive, which would write `class` at run time;
+//! - a binding or a listener: a shape has no value to bind and no box to
+//!   hit (it is drawn as part of its svg), so a listener would never run;
+//! - a literal geometry value the runtime would refuse (a unit, a
+//!   percentage, a negative size or radius);
+//! - a required size that is absent.
+//!
+//! `bind:this` is taken: it hands the node to the script and sets
+//! nothing. A bound geometry value is checked at update time by the
+//! element tree, through the same `vapors_shapes::refusal`. A size of 0
+//! draws nothing, as in SVG, and is not refused.
 
-use vapors_shapes::{allowed, geometry_names, refusal};
+use vapors_shapes::{allowed, geometry_names, not_taken, refusal};
 
 use super::attribute_kind::{AttributeKind, kind};
 use crate::CompileError;
@@ -17,11 +25,12 @@ use crate::source::Source;
 /// is a basic shape.
 pub(super) fn refuse_basic_shape(source: &Source, element: &Element) -> Result<(), CompileError> {
     let tag = element.tag.as_str();
-    let (Some(allowed), Some(geometry)) = (allowed(tag), geometry_names(tag)) else {
+    let Some(geometry) = geometry_names(tag) else {
         return Ok(());
     };
     for attribute in element.attributes.iter() {
-        refuse_attribute(source, (tag, allowed, geometry), attribute)?;
+        refuse_kind(source, tag, attribute)?;
+        refuse_literal(source, (tag, geometry), attribute)?;
     }
     let missing = (geometry.iter())
         .filter(|name| element.attributes.get(name).is_none())
@@ -32,34 +41,40 @@ pub(super) fn refuse_basic_shape(source: &Source, element: &Element) -> Result<(
     }
 }
 
-/// Refuses `attribute` when the shape does not take it, or when it is a
-/// literal geometry value the runtime would refuse.
-fn refuse_attribute(
+/// Refuses `attribute` when the shape does not take it: a plain
+/// attribute outside [`allowed`], a `class:` directive, a binding or a
+/// listener.
+fn refuse_kind(source: &Source, tag: &str, attribute: &Attribute) -> Result<(), CompileError> {
+    let name = attribute.name.as_str();
+    let takes = allowed(tag).expect("a basic shape").contains(&name);
+    let refused = match kind(attribute) {
+        AttributeKind::Literal(_)
+        | AttributeKind::Expression(_)
+        | AttributeKind::Class
+        | AttributeKind::Style => !takes,
+        AttributeKind::ClassDirective(_)
+        | AttributeKind::Binding(_)
+        | AttributeKind::Listener(_) => true,
+        AttributeKind::BindThis | AttributeKind::Scope => false,
+    };
+    if refused {
+        return Err(source.error(attribute.offset, not_taken(tag, name)));
+    }
+    Ok(())
+}
+
+/// Refuses `attribute` when it is a literal geometry value the runtime
+/// would refuse.
+fn refuse_literal(
     source: &Source,
-    (tag, allowed, geometry): (&str, &[&str], &[&str]),
+    (tag, geometry): (&str, &[&str]),
     attribute: &Attribute,
 ) -> Result<(), CompileError> {
-    let name = attribute.name.as_str();
-    let kind = kind(attribute);
-    let plain = matches!(
-        kind,
-        AttributeKind::Literal(_)
-            | AttributeKind::Expression(_)
-            | AttributeKind::Class
-            | AttributeKind::Style
-    );
-    if plain && !allowed.contains(&name) {
-        let message = format!(
-            "`{name}` is not an attribute of <{tag}>, which takes {}; remove it",
-            allowed.join(", ")
-        );
-        return Err(source.error(attribute.offset, message));
-    }
-    let literal = match kind {
-        AttributeKind::Literal(value) if geometry.contains(&name) => value,
+    let literal = match kind(attribute) {
+        AttributeKind::Literal(value) if geometry.contains(&attribute.name.as_str()) => value,
         _ => return Ok(()),
     };
-    match refusal(name, Some(literal)) {
+    match refusal(&attribute.name, Some(literal)) {
         Some(reason) => Err(source.error(attribute.offset, format!("<{tag}>: {reason}"))),
         None => Ok(()),
     }

@@ -1,94 +1,139 @@
 //! `<rect>` and `<circle>` (one-scene S4b): the attributes each takes,
-//! how each attribute's value is read, and the path SVG 2 gives each
-//! (10.2, 10.3). The classifier reads that path back as its closed
-//! form: a rect with square or round corners, or a circle. The
-//! compiler refuses a literal value from here at build time, naming its
-//! line. The element tree refuses the rest at update time: a bound
-//! value, or one set by `set_attribute`. Both read through
-//! [`refusal`], so the two give one answer.
+//! how each value is read (`basic_shape_read`), and an outline
+//! equivalent to SVG 2's (10.2, 10.3). For a rect it is SVG's path. For
+//! a circle it is two half arcs where SVG has four quarter arcs, which
+//! fill and stroke alike until dashes or markers are built. The
+//! classifier reads the outline back as its closed form. The compiler
+//! refuses a literal value from here at build time, naming its line.
+//! The element tree refuses the rest at update time: a bound value, or
+//! one set by `set_attribute`. Both read through [`refusal`] and
+//! [`not_taken`], so the two give one answer. A size of exactly 0
+//! draws nothing, as in SVG and Chromium: [`Outline::Nothing`], not a
+//! refusal.
 
-/// The geometry attributes of a `tag` element; `None` for a tag that
-/// is not a basic shape.
-#[must_use]
-pub fn geometry_names(tag: &str) -> Option<&'static [&'static str]> {
-    match tag {
-        "rect" => Some(&["x", "y", "width", "height", "rx", "ry"]),
-        "circle" => Some(&["cx", "cy", "r"]),
-        _ => None,
-    }
+use crate::basic_shape_read::{read, read_all};
+
+/// The paint attributes a basic shape takes, as the cascade's
+/// `PRESENTATION_ATTRIBUTES` (a test in vapors-elements holds the two
+/// equal; this crate does not depend on vapors-css).
+pub const PAINT_ATTRIBUTES: [&str; 3] = ["fill", "stroke", "stroke-width"];
+
+const RECT: [&str; 9] = [
+    "x",
+    "y",
+    "width",
+    "height",
+    "rx",
+    "ry",
+    "fill",
+    "stroke",
+    "stroke-width",
+];
+const CIRCLE: [&str; 6] = ["cx", "cy", "r", "fill", "stroke", "stroke-width"];
+
+/// What a basic shape draws.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outline {
+    /// The outline, as path data.
+    Path(String),
+    /// Nothing: a width, height or radius of exactly 0.
+    Nothing,
 }
 
-/// Every attribute a `tag` element takes: its geometry and its paint.
+/// Every attribute a `tag` element takes: its geometry, then its paint
+/// ([`PAINT_ATTRIBUTES`]); `None` for a tag that is not a basic shape.
 #[must_use]
 pub fn allowed(tag: &str) -> Option<&'static [&'static str]> {
     match tag {
-        "rect" => Some(&[
-            "x",
-            "y",
-            "width",
-            "height",
-            "rx",
-            "ry",
-            "fill",
-            "stroke",
-            "stroke-width",
-        ]),
-        "circle" => Some(&["cx", "cy", "r", "fill", "stroke", "stroke-width"]),
+        "rect" => Some(&RECT),
+        "circle" => Some(&CIRCLE),
         _ => None,
     }
 }
 
+/// The geometry attributes of a `tag` element: [`allowed`] less its
+/// paint.
+#[must_use]
+pub fn geometry_names(tag: &str) -> Option<&'static [&'static str]> {
+    allowed(tag).map(|all| &all[..all.len() - PAINT_ATTRIBUTES.len()])
+}
+
 /// Why the geometry attribute `name` with `value` (`None`: absent) is
-/// refused: not a bare number, out of range, or a required one absent.
+/// refused: not a bare number, negative, or a required size absent.
 #[must_use]
 pub fn refusal(name: &str, value: Option<&str>) -> Option<String> {
     read(name, value).err()
 }
 
-/// The path data of the outline a `tag` element draws, `attribute`
-/// giving each attribute's value; `None` when one is refused.
-pub fn outline<'a>(tag: &str, attribute: impl Fn(&str) -> Option<&'a str>) -> Option<String> {
+/// Why `name` is refused on a `tag` element, which does not take it.
+///
+/// # Panics
+/// When `tag` is not a basic shape: the caller asks [`allowed`] first.
+#[must_use]
+pub fn not_taken(tag: &str, name: &str) -> String {
+    let takes = allowed(tag).unwrap_or_else(|| panic!("<{tag}> is not a basic shape"));
+    format!(
+        "`{name}` is not an attribute of <{tag}>, which takes {}; remove it",
+        takes.join(", ")
+    )
+}
+
+/// What a `tag` element draws, `attribute` giving each attribute's
+/// value.
+///
+/// # Errors
+/// The first value [`refusal`] refuses, or a `tag` that is not a basic
+/// shape.
+pub fn outline<'a>(
+    tag: &str,
+    attribute: impl Fn(&str) -> Option<&'a str>,
+) -> Result<Outline, String> {
     match tag {
-        "rect" => rect(&attribute).ok(),
-        "circle" => circle(&attribute).ok(),
-        _ => None,
+        "rect" => rect(&attribute),
+        "circle" => circle(&attribute),
+        _ => Err(format!("<{tag}> is not a basic shape")),
     }
 }
 
 /// SVG 2's rect outline: square corners unless both radii are above
-/// zero (one radius of 0 draws square corners, as SVG does), then from
-/// (x + rx, y) clockwise, a quarter arc at each corner.
-fn rect<'a>(attribute: &impl Fn(&str) -> Option<&'a str>) -> Result<String, String> {
+/// zero (one radius of 0 draws square corners, as SVG does).
+fn rect<'a>(attribute: &impl Fn(&str) -> Option<&'a str>) -> Result<Outline, String> {
     let [x, y, w, h] = read_all(attribute, ["x", "y", "width", "height"])?;
     let [rx, ry] = corner_radii(attribute, [w, h])?;
-    if rx <= 0.0 || ry <= 0.0 {
-        return Ok(format!("M{x} {y}H{}V{}H{x}Z", x + w, y + h));
+    // read refuses a negative size, so <= 0 is exactly 0
+    if w <= 0.0 || h <= 0.0 {
+        return Ok(Outline::Nothing);
     }
+    if rx <= 0.0 || ry <= 0.0 {
+        return Ok(Outline::Path(format!("M{x} {y}H{}V{}H{x}Z", x + w, y + h)));
+    }
+    Ok(Outline::Path(rounded([x, y, w, h], [rx, ry])))
+}
+
+/// From (x + rx, y) clockwise, a quarter arc at each corner.
+fn rounded([x, y, w, h]: [f32; 4], [rx, ry]: [f32; 2]) -> String {
     let arc = |to_x: f32, to_y: f32| format!("A{rx} {ry} 0 0 1 {to_x} {to_y}");
     let (right, bottom) = (x + w, y + h);
-    Ok(format!(
-        "M{} {y}H{}{}V{}{}H{}{}V{}{}Z",
-        x + rx,
-        right - rx,
-        arc(right, y + ry),
-        bottom - ry,
-        arc(right - rx, bottom),
-        x + rx,
-        arc(x, bottom - ry),
+    let top = format!("M{} {y}H{}{}", x + rx, right - rx, arc(right, y + ry));
+    let right_side = format!("V{}{}", bottom - ry, arc(right - rx, bottom));
+    let bottom_side = format!("H{}{}", x + rx, arc(x, bottom - ry));
+    format!(
+        "{top}{right_side}{bottom_side}V{}{}Z",
         y + ry,
-        arc(x + rx, y),
-    ))
+        arc(x + rx, y)
+    )
 }
 
 /// A circle as two half arcs from its leftmost point.
-fn circle<'a>(attribute: &impl Fn(&str) -> Option<&'a str>) -> Result<String, String> {
+fn circle<'a>(attribute: &impl Fn(&str) -> Option<&'a str>) -> Result<Outline, String> {
     let [cx, cy, r] = read_all(attribute, ["cx", "cy", "r"])?;
-    Ok(format!(
-        "M{} {cy}A{r} {r} 0 1 0 {} {cy}A{r} {r} 0 1 0 {} {cy}Z",
-        cx - r,
-        cx + r,
-        cx - r
-    ))
+    if r <= 0.0 {
+        return Ok(Outline::Nothing);
+    }
+    let (left, right) = (cx - r, cx + r);
+    Ok(Outline::Path(format!(
+        "M{left} {cy}A{r} {r} 0 1 0 {right} {cy}A{r} {r} 0 1 0 {left} {cy}Z"
+    )))
 }
 
 /// The radii SVG 2 uses (10.2, auto): one given stands for both, and
@@ -104,69 +149,6 @@ fn corner_radii<'a>(
         (None, None) => (0.0, 0.0),
     };
     Ok([rx.min(w / 2.0), ry.min(h / 2.0)])
-}
-
-/// `name`'s value: a coordinate, 0 when absent; a size, required and
-/// above zero; a corner radius, not negative.
-fn read(name: &str, text: Option<&str>) -> Result<f32, String> {
-    let value = text.map(crate::css_number::css_number);
-    match (Kind::of(name), text, value) {
-        (Kind::Coordinate | Kind::Radius, None, _) => Ok(0.0),
-        (Kind::Size, None, _) => Err(format!(
-            "its {name} attribute is required: SVG draws nothing without it; give it in viewBox units, such as {name}=\"4\""
-        )),
-        (kind, Some(_), Some(Some(value))) if kind.takes(value) => Ok(value),
-        (kind, Some(text), _) => Err(format!(
-            "its {name} {text:?} is not {} with no unit; give viewBox units as a bare number, such as {name}=\"4\"",
-            kind.wanted()
-        )),
-    }
-}
-
-/// What an attribute holds, for its range and its message.
-#[derive(Clone, Copy)]
-enum Kind {
-    Coordinate,
-    Size,
-    Radius,
-}
-
-impl Kind {
-    fn of(name: &str) -> Self {
-        match name {
-            "width" | "height" | "r" => Self::Size,
-            "rx" | "ry" => Self::Radius,
-            _ => Self::Coordinate,
-        }
-    }
-
-    fn takes(self, value: f32) -> bool {
-        match self {
-            Self::Coordinate => true,
-            Self::Size => value > 0.0,
-            Self::Radius => value >= 0.0,
-        }
-    }
-
-    fn wanted(self) -> &'static str {
-        match self {
-            Self::Coordinate => "a number",
-            Self::Size => "a number above 0",
-            Self::Radius => "a number of 0 or more",
-        }
-    }
-}
-
-/// Each of `names` read, or the first refusal.
-fn read_all<'a, const N: usize>(
-    attribute: &impl Fn(&str) -> Option<&'a str>,
-    names: [&str; N],
-) -> Result<[f32; N], String> {
-    let mut values = [0.0; N];
-    for (value, name) in values.iter_mut().zip(names) {
-        *value = read(name, attribute(name))?;
-    }
-    Ok(values)
 }
 
 #[cfg(test)]

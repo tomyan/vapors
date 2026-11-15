@@ -11,35 +11,36 @@ use std::rc::Rc;
 
 use vapors_dom::NodeId;
 use vapors_scene::{Color, Item, Rect, RuntimeRef, Shape, ShapeKind, ShapeRef};
-use vapors_shapes::{FillRule, IconPath, Paint, transformed_box};
+use vapors_shapes::{FillRule, IconPath, Outline, Paint, transformed_box};
 
 use crate::document_shapes::DocumentShapes;
 
 use crate::arena::Arena;
 use crate::style::{Used, UsedMap};
-use crate::svg_route::{Route, paths, route, shape_site};
+use crate::svg_route::{Route, route, shape_site, shapes};
 
-/// An svg drawn as shapes: its view box and each path, its data parsed
-/// once with its box, and the description that names it in messages.
+/// An svg drawn as shapes: its view box and each part that draws (a
+/// path, rect or circle), its data parsed once, and the site that names
+/// it in messages.
 #[derive(Debug, PartialEq)]
 pub(crate) struct SvgShapes {
     pub(crate) view_box: [f32; 4],
-    pub(crate) paths: Vec<SvgPath>,
+    pub(crate) parts: Vec<SvgShape>,
 }
 
-/// One path of an svg drawn as shapes.
+/// One part of an svg drawn as shapes.
 #[derive(Debug, PartialEq)]
-pub(crate) struct SvgPath {
+pub(crate) struct SvgShape {
     pub(crate) node: NodeId,
     pub(crate) site: String,
     pub(crate) data: IconPath,
 }
 
-/// One shape a path paints: its entry, its stroke width (`None` for a
+/// One shape a part paints: its entry, its stroke width (`None` for a
 /// fill) and its colour.
-pub(crate) struct PathShape {
-    /// Which of the svg's paths paints it.
-    pub(crate) path: usize,
+pub(crate) struct PaintedShape {
+    /// Which of the svg's parts paints it.
+    pub(crate) part: usize,
     pub(crate) at: RuntimeRef,
     pub(crate) stroke: Option<f32>,
     pub(crate) colour: Color,
@@ -47,36 +48,52 @@ pub(crate) struct PathShape {
 
 /// What `svg` draws as shapes, when it takes that route; `None` for any
 /// other element, an svg on the icon route, or one the checks refuse.
+/// A rect or circle of size 0 draws nothing and is left out.
 pub(crate) fn of(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Rc<SvgShapes>> {
     let element = arena.get(svg, "svg_shapes").element()?;
     if element.tag != "svg" || route(arena, used, svg)? != Route::Shapes {
         return None;
     }
     let view_box = crate::svg::view_box(element.attributes.get("viewBox")?)?;
-    let paths = paths(arena, svg)
-        .into_iter()
-        .enumerate()
-        .map(|(index, node)| {
-            let data = parsed(arena, node)?;
-            Some(SvgPath {
-                node,
-                site: shape_site(arena, node, index),
-                data,
-            })
-        })
-        .collect::<Option<_>>()?;
-    Some(Rc::new(SvgShapes { view_box, paths }))
+    let mut parts = Vec::new();
+    for (index, node) in shapes(arena, svg).into_iter().enumerate() {
+        if let Part::Drawn(data) = parsed(arena, node)? {
+            let site = shape_site(arena, node, index);
+            parts.push(SvgShape { node, site, data });
+        }
+    }
+    Some(Rc::new(SvgShapes { view_box, parts }))
 }
 
-/// The path a shape draws: a path's `d`, or a basic shape's outline.
-fn parsed(arena: &Arena, shape: NodeId) -> Option<IconPath> {
+/// What a part of an svg draws.
+enum Part {
+    Drawn(IconPath),
+    /// A basic shape of size 0.
+    Nothing,
+}
+
+/// The path a part draws: a path's `d`, or a basic shape's outline.
+///
+/// # Panics
+/// When a basic shape's outline is refused: its checks ran first and
+/// passed it (`svg_basic_shape_checks`), so a refusal here is a fault in
+/// this crate.
+fn parsed(arena: &Arena, shape: NodeId) -> Option<Part> {
     let element = arena.get(shape, "svg_shapes").element()?;
     if element.tag == "path" {
-        return IconPath::parse(element.attributes.get("d")?).ok();
+        return IconPath::parse(element.attributes.get("d")?)
+            .ok()
+            .map(Part::Drawn);
     }
     let attribute = |name: &str| element.attributes.get(name).map(String::as_str);
-    let outline = vapors_shapes::outline(&element.tag, attribute)?;
-    IconPath::parse(&outline).ok()
+    let outline = vapors_shapes::outline(&element.tag, attribute)
+        .unwrap_or_else(|reason| panic!("the svg checks passed this shape: {reason}"));
+    match outline {
+        Outline::Path(data) => Some(Part::Drawn(
+            IconPath::parse(&data).expect("an outline vapors_shapes wrote parses"),
+        )),
+        Outline::Nothing => Some(Part::Nothing),
+    }
 }
 
 /// The device pixels per view box unit an svg with `view_box` draws at
@@ -87,32 +104,32 @@ pub(crate) fn per_unit(view_box: [f32; 4], content: crate::layout::BoxRect, scal
     (content.width / view_box[2]).min(content.height / view_box[3]) * scale
 }
 
-/// One path to paint: where it was written, its data, its used style.
-pub(crate) type PathToPaint<'a> = (&'a str, &'a IconPath, &'a Used);
+/// One part to paint: where it was written, its data, its used style.
+pub(crate) type PartToPaint<'a> = (&'a str, &'a IconPath, &'a Used);
 
-/// The shapes `svg` paints, each path's fill then its stroke, acquired
+/// The shapes `svg` paints, each part's fill then its stroke, acquired
 /// for `svg` from its document's shapes (releasing what it painted
 /// before), drawn at `px_per_unit` device pixels per view box unit.
 ///
 /// # Errors
-/// What the cache refuses for a path, naming its site; `svg` keeps the
+/// What the cache refuses for a part, naming its site; `svg` keeps the
 /// shapes it had.
 pub(crate) fn acquired(
     shapes: &RefCell<DocumentShapes>,
     svg: NodeId,
-    paths: &[PathToPaint<'_>],
+    parts: &[PartToPaint<'_>],
     px_per_unit: f32,
-) -> Result<Vec<PathShape>, String> {
-    let painted = painted(paths);
+) -> Result<Vec<PaintedShape>, String> {
+    let painted = painted(parts);
     let specs: Vec<_> = (painted.iter())
-        .map(|&(path, paint, _)| (paths[path].0, paths[path].1, paint, px_per_unit))
+        .map(|&(part, paint, _)| (parts[part].0, parts[part].1, paint, px_per_unit))
         .collect();
     let refs = shapes.borrow_mut().use_for(svg, &specs)?;
     Ok(refs
         .into_iter()
         .zip(painted)
-        .map(|(at, (path, paint, colour))| PathShape {
-            path,
+        .map(|(at, (part, paint, colour))| PaintedShape {
+            part,
             at,
             stroke: stroke_of(paint),
             colour,
@@ -120,12 +137,12 @@ pub(crate) fn acquired(
         .collect())
 }
 
-/// Each shape `paths` paint, in order: its path's index, paint and
+/// Each shape `parts` paint, in order: its part's index, paint and
 /// colour.
-fn painted(paths: &[PathToPaint<'_>]) -> Vec<(usize, Paint, Color)> {
-    (paths.iter().enumerate())
-        .flat_map(|(path, &(_, _, own))| {
-            paints(own).map(move |(paint, colour)| (path, paint, colour))
+fn painted(parts: &[PartToPaint<'_>]) -> Vec<(usize, Paint, Color)> {
+    (parts.iter().enumerate())
+        .flat_map(|(part, &(_, _, own))| {
+            paints(own).map(move |(paint, colour)| (part, paint, colour))
         })
         .collect()
 }
@@ -152,7 +169,7 @@ fn stroke_of(paint: Paint) -> Option<f32> {
 
 /// The box `shape` draws in view box units: a closed form's grown by
 /// half its stroke, a mesh's holding its stroke.
-pub(crate) fn local_box(shapes: &RefCell<DocumentShapes>, shape: &PathShape) -> [[f32; 2]; 2] {
+pub(crate) fn local_box(shapes: &RefCell<DocumentShapes>, shape: &PaintedShape) -> [[f32; 2]; 2] {
     let shapes = shapes.borrow();
     let geometry = shapes.get(shape.at).expect("acquired, so live").geometry();
     let by = if geometry.is_closed_form() {
@@ -176,7 +193,7 @@ pub(crate) fn kind_of(geometry: &vapors_shapes::Geometry<'_>) -> ShapeKind {
 /// pixels), its bounds what it draws there.
 pub(crate) fn item(
     shapes: &RefCell<DocumentShapes>,
-    shape: &PathShape,
+    shape: &PaintedShape,
     transform: [f32; 6],
 ) -> Item {
     let [lo, hi] = transformed_box(local_box(shapes, shape), transform);

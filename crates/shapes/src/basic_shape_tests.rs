@@ -15,8 +15,14 @@ fn attributes(pairs: &[(&str, &str)]) -> Attributes {
 }
 
 /// The outline of a `tag` element with `given`.
-fn outline_of(tag: &str, given: &Attributes) -> Option<String> {
+fn outline_of(tag: &str, given: &Attributes) -> Result<Outline, String> {
     outline(tag, |name| given.get(name).map(String::as_str))
+}
+
+/// `outline`'s answer for path `data`, to compare its `Result` with.
+#[allow(clippy::unnecessary_wraps)] // it stands for outline's Result
+fn path(data: &str) -> Result<Outline, String> {
+    Ok(Outline::Path(data.to_owned()))
 }
 
 /// Each geometry attribute's refusal for a `tag` element with `given`.
@@ -55,11 +61,7 @@ fn a_rect_draws_svgs_outline_with_its_corner_radii() {
 
     // When, Then
     for (given, expected) in cases {
-        assert_eq!(
-            outline_of("rect", &given).as_deref(),
-            Some(expected),
-            "{given:?}"
-        );
+        assert_eq!(outline_of("rect", &given), path(expected), "{given:?}");
     }
 }
 
@@ -70,24 +72,24 @@ fn a_circle_draws_two_half_arcs_from_its_leftmost_point() {
 
     // When, Then
     assert_eq!(
-        outline_of("circle", &circle).as_deref(),
-        Some("M5 7A3 3 0 1 0 11 7A3 3 0 1 0 5 7Z")
+        outline_of("circle", &circle),
+        path("M5 7A3 3 0 1 0 11 7A3 3 0 1 0 5 7Z")
     );
 }
 
 #[test]
-fn a_number_svg_would_read_otherwise_or_a_size_that_draws_nothing_is_refused() {
+fn a_number_svg_would_read_otherwise_a_negative_size_or_an_absent_one_is_refused() {
     // Given
     let cases = [
         (
             "rect",
             vec![("width", "10px"), ("height", "6")],
-            "its width \"10px\" is not a number above 0 with no unit",
+            "its width \"10px\" is not a bare number",
         ),
         (
             "rect",
             vec![("width", "50%"), ("height", "6")],
-            "its width \"50%\" is not a number above 0 with no unit",
+            "its width \"50%\" is not a bare number",
         ),
         (
             "rect",
@@ -96,23 +98,18 @@ fn a_number_svg_would_read_otherwise_or_a_size_that_draws_nothing_is_refused() {
         ),
         (
             "rect",
-            vec![("width", "0"), ("height", "6")],
-            "its width \"0\" is not a number above 0",
-        ),
-        (
-            "rect",
             vec![("width", "4"), ("height", "6"), ("rx", "-1")],
-            "its rx \"-1\" is not a number of 0 or more",
+            "its rx \"-1\" is negative; give 0 (square corners) or more",
         ),
         (
             "rect",
             vec![("width", "4"), ("height", "6"), ("x", "1em")],
-            "its x \"1em\" is not a number with no unit",
+            "its x \"1em\" is not a bare number",
         ),
         (
             "circle",
             vec![("r", "-2")],
-            "its r \"-2\" is not a number above 0",
+            "its r \"-2\" is negative; give 0 (draws nothing) or more",
         ),
         ("circle", vec![("cx", "8")], "its r attribute is required"),
     ];
@@ -125,8 +122,64 @@ fn a_number_svg_would_read_otherwise_or_a_size_that_draws_nothing_is_refused() {
             found.len() == 1 && found[0].starts_with(expected),
             "{tag} {pairs:?}: {found:?}"
         );
-        assert_eq!(outline_of(tag, &given), None, "{tag} {pairs:?}");
+        assert_eq!(
+            outline_of(tag, &given),
+            Err(found[0].clone()),
+            "{tag} {pairs:?}"
+        );
     }
+}
+
+#[test]
+fn a_size_of_zero_draws_nothing_and_is_not_refused() {
+    // Given: as SVG 2 says and Chromium draws (#391 review, M1)
+    let cases = [
+        ("rect", vec![("width", "0"), ("height", "6")]),
+        ("rect", vec![("width", "4"), ("height", "0"), ("rx", "1")]),
+        ("circle", vec![("cx", "8"), ("r", "0")]),
+    ];
+
+    // When, Then
+    for (tag, pairs) in cases {
+        let given = attributes(&pairs);
+        assert_eq!(
+            reasons(tag, &given),
+            Vec::<String>::new(),
+            "{tag} {pairs:?}"
+        );
+        assert_eq!(
+            outline_of(tag, &given),
+            Ok(Outline::Nothing),
+            "{tag} {pairs:?}"
+        );
+    }
+}
+
+#[test]
+fn a_tag_that_is_not_a_basic_shape_is_refused_not_drawn_as_nothing() {
+    // When, Then
+    assert_eq!(
+        outline_of("path", &attributes(&[])),
+        Err("<path> is not a basic shape".to_owned())
+    );
+}
+
+#[test]
+fn the_geometry_is_what_a_shape_takes_less_its_paint() {
+    // When, Then
+    assert_eq!(
+        geometry_names("rect"),
+        Some(&["x", "y", "width", "height", "rx", "ry"][..])
+    );
+    assert_eq!(geometry_names("circle"), Some(&["cx", "cy", "r"][..]));
+    assert_eq!(
+        allowed("circle").map(|all| &all[3..]),
+        Some(&PAINT_ATTRIBUTES[..])
+    );
+    assert_eq!(
+        not_taken("circle", "transform"),
+        "`transform` is not an attribute of <circle>, which takes cx, cy, r, fill, stroke, stroke-width; remove it"
+    );
 }
 
 #[test]
@@ -136,8 +189,5 @@ fn a_negative_coordinate_is_taken() {
 
     // When, Then
     assert_eq!(reasons("rect", &rect), Vec::<String>::new());
-    assert_eq!(
-        outline_of("rect", &rect).as_deref(),
-        Some("M-1 -2.5H3V0.5H-1Z")
-    );
+    assert_eq!(outline_of("rect", &rect), path("M-1 -2.5H3V0.5H-1Z"));
 }

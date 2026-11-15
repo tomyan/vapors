@@ -33,6 +33,15 @@ pub const BOXES_ID: &str = "vapors-boxes";
 /// Chromium measures a shape's geometry. Both lists leave them out.
 pub const NOT_BOXES: [&str; 3] = ["path", "rect", "circle"];
 
+#[cfg(test)]
+mod not_boxes_tests {
+    #[test]
+    fn the_left_out_tags_are_the_svg_shapes() {
+        // Then: dom's list, held equal to the cascade's (#391 review, L3)
+        assert_eq!(super::NOT_BOXES[..], vapors_dom::SVG_TAGS[1..]);
+    }
+}
+
 /// Splits a fixture file.
 ///
 /// # Errors

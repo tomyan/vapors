@@ -6,6 +6,7 @@
 //! check rasterises. No GPU and no text dependency.
 
 mod basic_shape;
+mod basic_shape_read;
 mod canonical;
 mod classify;
 mod classify_near;
@@ -31,7 +32,9 @@ mod table_error;
 mod tessellate;
 mod tessellate_path;
 
-pub use basic_shape::{allowed, geometry_names, outline, refusal};
+pub use basic_shape::{
+    Outline, PAINT_ATTRIBUTES, allowed, geometry_names, not_taken, outline, refusal,
+};
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
 pub use classify::{Classified, classify};
 pub use css_number::css_number;

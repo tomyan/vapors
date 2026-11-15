@@ -28,8 +28,8 @@ pub(crate) enum Route {
 /// element a used style, as paint relies on.
 pub(crate) fn route(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Route> {
     let own = used.get(&svg)?;
-    let mut shapes = paths(arena, svg).into_iter();
-    let icon = shapes.all(|shape| {
+    let mut members = shapes(arena, svg).into_iter();
+    let icon = members.all(|shape| {
         let styled = used.get(&shape).unwrap_or_else(|| {
             panic!("a shape of a styled svg has no used style; styling gives every element one")
         });
@@ -59,7 +59,7 @@ pub(crate) fn paints_nothing(own: &Used) -> bool {
 pub(crate) fn why_shapes(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<String> {
     let own = used.get(&svg)?;
     let is_path = |shape| crate::svg::is(arena, shape, "path");
-    let (index, shape) = (paths(arena, svg).into_iter().enumerate()).find(|&(_, shape)| {
+    let (index, shape) = (shapes(arena, svg).into_iter().enumerate()).find(|&(_, shape)| {
         !(is_path(shape) && used.get(&shape).is_some_and(|path| icon_draws(path, own)))
     })?;
     let has = match used.get(&shape) {
@@ -98,7 +98,7 @@ pub(crate) fn shape_site(arena: &Arena, node: NodeId, index: usize) -> String {
 
 /// The shapes of `svg` (`path`, `rect` and `circle` children), in
 /// order.
-pub(crate) fn paths(arena: &Arena, svg: NodeId) -> Vec<NodeId> {
+pub(crate) fn shapes(arena: &Arena, svg: NodeId) -> Vec<NodeId> {
     arena
         .children(svg)
         .into_iter()

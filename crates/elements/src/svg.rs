@@ -89,6 +89,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_shapes_are_the_svg_elements_the_cascade_paints_less_svg() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        assert_eq!(SHAPE_TAGS[..], vapors_css::cascade::SVG_TAGS[1..]);
+    }
+
+    #[test]
+    fn a_basic_shape_takes_the_paint_the_cascade_reads() {
+        // Then
+        assert_eq!(
+            vapors_shapes::PAINT_ATTRIBUTES,
+            vapors_css::cascade::PRESENTATION_ATTRIBUTES
+        );
+        for tag in ["rect", "circle"] {
+            let all = vapors_shapes::allowed(tag).expect("a basic shape");
+            assert_eq!(
+                all[all.len() - 3..],
+                vapors_css::cascade::PRESENTATION_ATTRIBUTES,
+                "{tag}"
+            );
+        }
+    }
+
+    #[test]
     fn a_view_box_takes_whitespace_and_single_commas() {
         for (text, expected) in [
             ("0 0 16 16", Some([0.0, 0.0, 16.0, 16.0])),

@@ -111,22 +111,34 @@ code sets it.
 
 `<rect>` and `<circle>` (one-scene S4b):
 
-- `<rect>`: `x`, `y` (0 when absent), `width`, `height` (required, above
-  0), `rx`, `ry` (0 or more; one given stands for both, and each is
-  clamped to half its side, as SVG 2 says). `<circle>`: `cx`, `cy` (0
-  when absent) and `r` (required, above 0). Each number is a bare
-  number in viewBox units; a unit or a percentage is refused. `fill`,
-  `stroke` and `stroke-width` as on `<path>`; anything else,
-  `transform` among them, is refused. What the template writes
-  literally is refused at build time, naming the file and line; a
-  bound value, or one set by `set_attribute`, at update time. Both
-  read through `vapors_shapes::refusal`.
-- Each is drawn as the path SVG 2 gives it, on the shapes route only:
-  an svg holding one is drawn as shapes. The shape classifier reads
-  that path back as a closed form (a rect with square, round or
-  elliptical corners, or a circle), so it is never tessellated. One
-  cache slot is held for each distinct shape, at every scale. A
-  `<path>` written as exactly that outline is the same closed form.
+- `<rect>`: `x` and `y` (0 when absent), `width` and `height`
+  (required, 0 or more), `rx` and `ry` (0 or more; one given stands
+  for both, and each is clamped to half its side, as SVG 2 says).
+  `<circle>`: `cx` and `cy` (0 when absent), and `r` (required, 0 or
+  more). A width, height or r of exactly 0 draws nothing, as in SVG 2
+  and Chromium. That is not a refusal, so a bound size can reach 0
+  (an empty progress bar).
+- Each number is a bare number in viewBox units. A unit, a percentage
+  or a negative size or radius is refused. `fill`, `stroke` and
+  `stroke-width` work as on `<path>`. Anything else is refused:
+  `transform`, `class`, a `class:` directive, a binding, or a listener
+  (a shape has no box to hit). `bind:this` is taken.
+- What the template writes literally is refused at build time, naming
+  the file and line. A bound value, or one set by `set_attribute`, is
+  refused at update time. Both read through `vapors_shapes::refusal`
+  and `not_taken`.
+- Each is drawn on the shapes route only, so an svg holding one is
+  drawn as shapes.
+  - A rect is written as the path SVG 2 gives it. A circle is written
+    as two half arcs, where SVG has four quarter arcs; these fill and
+    stroke alike until dashes or markers are built.
+  - The shape classifier reads the path back as a closed form (a rect
+    with square, round or elliptical corners, or a circle), so it is
+    never tessellated. A pill and a full ellipse, whose sides are 0
+    long, are closed forms too.
+  - One cache slot is held for each distinct shape, at every scale.
+  - A `<path>` written as exactly a rect's outline is the same closed
+    form.
 - Messages name a shape by its tag and its index among the svg's
   shapes, counting from 1: "rect 2" is the second shape, a rect.
 

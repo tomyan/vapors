@@ -21,8 +21,8 @@ pub(crate) fn paint(
     out: &mut Painting,
 ) {
     let transform = transform(shapes.view_box, content, input.scale);
-    let paths: Vec<_> = shapes
-        .paths
+    let parts: Vec<_> = shapes
+        .parts
         .iter()
         .map(|path| (path.site.as_str(), &path.data, &*input.used[&path.node]))
         .collect();
@@ -37,8 +37,8 @@ pub(crate) fn paint(
         Some(transform[0]),
         "the svg's shapes were checked at another scale than paint draws them at; svg_shape_refusals must run after layout on every svg on the shapes route"
     );
-    let made = acquired(input.shapes, svg, &paths, transform[0])
-        .unwrap_or_else(|e| panic!("the svg checks passed these paths: {e}"));
+    let made = acquired(input.shapes, svg, &parts, transform[0])
+        .unwrap_or_else(|e| panic!("the svg checks passed these parts: {e}"));
     for shape in &made {
         out.scene.push(item(input.shapes, shape, transform));
     }
