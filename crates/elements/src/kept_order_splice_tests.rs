@@ -116,3 +116,25 @@ fn a_splice_of_two_runs_counts_only_the_kept_labels_its_relabel_moved() {
         "{labels:?}"
     );
 }
+
+#[test]
+fn a_relabel_of_every_label_resets_the_spacing_to_theirs() {
+    // Given: a relabel tries levels up to 3 (ranges of 8 labels), and
+    // 7 labels packed from 1 with a run between the first two, too dense
+    // for any range under its threshold
+    crate::paint_labels::TEST_TOP_LEVEL.with(|top| top.set(Some(3)));
+    let spliced = vec![1, 0, 2, 3, 4, 5, 6, 7];
+    let steps = boxes(&[0, 9, 1, 2, 3, 4, 5, 6]);
+    let mut spacing = 1;
+
+    // When
+    let done = super::Labelled::of(
+        (&steps, spliced),
+        std::slice::from_ref(&(1..2)),
+        (&mut spacing, &[]),
+    );
+
+    // Then
+    assert!(done.edits.all, "every label relabelled");
+    assert_eq!(spacing, crate::paint_labels::spacing(8));
+}

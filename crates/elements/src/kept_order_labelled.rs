@@ -53,9 +53,7 @@ impl Labelled {
             note(&mut edits, (steps, &labels, runs), done);
         }
         if edits.all {
-            // every label laid out afresh, at the spacing for their count.
-            // No test reaches this: a relabel of every label takes about
-            // 7.4e7 labels, (4/3)^63, too many for a unit test's memory.
+            // every label laid out afresh, at the spacing for their count
             *spacing = crate::paint_labels::spacing(labels.len());
         }
         for run in runs {

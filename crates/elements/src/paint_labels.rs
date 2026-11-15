@@ -5,8 +5,8 @@
 //! `u64`, `ROOM` spacings free at each end; an append or a prepend steps
 //! by that spacing from the end label; an insert between two takes the
 //! midpoint, or leans on the run put in last when it touches it
-//! (`Lean`). When a gap runs out, the smallest aligned label range around it whose density is under its
-//! threshold is relabelled evenly (Bender et al., "Two simplified
+//! (`Lean`). When a gap runs out, the smallest aligned label range
+//! around it whose density is under its threshold is relabelled evenly (Bender et al., "Two simplified
 //! algorithms for maintaining order in a list", with T = 1.5, which
 //! leaves room for 10^8 labels in `u64`): amortized O(log n) labels a
 //! step put in. A relabel that finds no such range relabels every label,
@@ -35,6 +35,27 @@ pub(crate) enum Relabelled {
     Range(std::ops::Range<usize>, Vec<Label>),
     /// Every label changed.
     All,
+}
+
+/// The highest level a relabel tries before it relabels every label:
+/// a range of `2^63` labels, half of `u64`.
+const TOP_LEVEL: u32 = 63;
+
+#[cfg(test)]
+thread_local! {
+    /// A lower top level for a test, so a relabel of every label is
+    /// reached with a few labels where `TOP_LEVEL` needs about 7.4e7.
+    pub(crate) static TEST_TOP_LEVEL: std::cell::Cell<Option<u32>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// The highest level a relabel tries: `TOP_LEVEL`, or a test's.
+fn top_level() -> u32 {
+    #[cfg(test)]
+    if let Some(level) = TEST_TOP_LEVEL.with(std::cell::Cell::get) {
+        return level;
+    }
+    TOP_LEVEL
 }
 
 /// The spacings a walk leaves free at each end of its labels, for the
@@ -161,7 +182,7 @@ fn relabel_around(
     pending: &[std::ops::Range<usize>],
 ) -> Relabelled {
     let anchor = new.start.checked_sub(1).map_or(0, |i| labels[i]);
-    for level in 1..64u32 {
+    for level in 1..=top_level() {
         let size = 1u64 << level;
         let low = anchor & !(size - 1);
         let high = low.saturating_add(size - 1);
