@@ -88,7 +88,8 @@ fn methods(
     ]
 }
 
-/// The closed-form kind: two circles and two rects, by the closed-form
+/// The closed-form kind: two circles and four rects (two with elliptical
+/// corners), by the closed-form
 /// pipeline and, from their paths, by MSAA and the mesh pipeline.
 fn closed_forms(
     gpu: &vapors_gpu_harness::Gpu,
@@ -101,25 +102,11 @@ fn closed_forms(
     for placement in placements() {
         let theirs = chromium_page::drawn(&shapes, &placement, INK, work);
         let ours = closed::drawn(gpu, &cases, &placement, INK);
-        report::row(
-            &placement,
-            "closed form",
-            &shapes,
-            Some(&ours),
-            &theirs,
-            out,
-        );
+        report::closed_row(&placement, "closed form", &shapes, &ours, &theirs, out);
         let msaa = msaa::drawn(gpu, &shapes, &placement, INK, TOLERANCE_PX);
-        report::row(&placement, "MSAA 4x", &shapes, Some(&msaa), &theirs, out);
+        report::closed_row(&placement, "MSAA 4x", &shapes, &msaa, &theirs, out);
         let meshed = pipeline::drawn(gpu, &shapes, &placement, INK, TOLERANCE_PX);
-        report::row(
-            &placement,
-            "mesh pipeline",
-            &shapes,
-            Some(&meshed),
-            &theirs,
-            out,
-        );
+        report::closed_row(&placement, "mesh pipeline", &shapes, &meshed, &theirs, out);
     }
 }
 

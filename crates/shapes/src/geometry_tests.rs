@@ -29,6 +29,7 @@ fn drawable_geometries_pass() {
     let drawable = [
         rect([2.0, 3.0], [0.0, 0.0]),
         rect([2.0, 3.0], [1.0, 1.0]),
+        rect([2.0, 3.0], [0.5, 1.0]),
         ellipse([8.0, 8.0], [3.0, 3.0]),
     ];
 
@@ -103,8 +104,8 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
             "a corner radius of [3.0, 3.0] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
         ),
         (
-            rect([2.0, 3.0], [0.5, 1.0]),
-            "corner radii [0.5, 1.0] differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>",
+            rect([2.0, 3.0], [0.0, 1.0]),
+            "corner radii [0.0, 1.0] have one zero; SVG draws square corners when either is zero, so the emitter writes both zero",
         ),
     ];
 

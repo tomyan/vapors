@@ -1,4 +1,4 @@
-// Closed-form shapes: a rect with circular corners or an ellipse, in
+// Closed-form shapes: a rect with round corners or an ellipse, in
 // its own units, under an affine transform to device pixels; filled, or
 // stroked centred on the outline. Coverage is 0.5 minus the signed
 // distance to the outline in device pixels, clamped: 0.5 on the
@@ -20,17 +20,19 @@ struct Instance {
     @location(0) linear: vec4<f32>,  // a, b, c, d of matrix(a, b, c, d, e, f)
     @location(1) shift: vec4<f32>,   // e, f, kind (0 rect, 1 ellipse), stroke width
     @location(2) form: vec4<f32>,    // rect: origin, size; ellipse: centre, radii
-    @location(3) radius: vec4<f32>,  // the rect's corner radius, stroked (1) or filled (0)
+    @location(3) radius: vec4<f32>,  // the rect's corner rx, stroked (1) or filled (0), its ry
     @location(4) colour: vec4<f32>,
 }
 
 struct Out {
     @builtin(position) position: vec4<f32>,
     @location(0) local: vec2<f32>,
-    // kind, stroke width, stroked, the rect's corner radius
-    @location(1) @interpolate(flat) params: vec4<f32>,
+    // kind, stroke width, stroked
+    @location(1) @interpolate(flat) params: vec3<f32>,
     @location(2) @interpolate(flat) form: vec4<f32>,
     @location(3) @interpolate(flat) colour: vec4<f32>,
+    // the rect's corner radii, rx and ry
+    @location(4) @interpolate(flat) radii: vec2<f32>,
 }
 
 // The target's size, and the shift of the scroll frame the instances
@@ -84,20 +86,34 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     var out: Out;
     out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
     out.local = local;
-    out.params = vec4(instance.shift.z, instance.shift.w, instance.radius.y, instance.radius.x);
+    out.params = vec3(instance.shift.z, instance.shift.w, instance.radius.y);
+    out.radii = instance.radius.xz;
     out.form = instance.form;
     out.colour = instance.colour;
     return out;
 }
 
-// The distance from `p` to a rect at `origin` of `size` with circular
-// corners of `radius` (within half each side: the shapes crate's check
-// refuses more), negative inside, and its gradient: a unit vector.
-fn rect_distance(p: vec2<f32>, origin: vec2<f32>, size: vec2<f32>, radius: f32) -> vec3<f32> {
+// The distance from `p` to a rect at `origin` of `size` with corners
+// of `radii` (within half each side, both zero or both above: the
+// shapes crate's check refuses the rest), negative inside, and its
+// gradient's direction.
+fn rect_distance(p: vec2<f32>, origin: vec2<f32>, size: vec2<f32>, radii: vec2<f32>) -> vec3<f32> {
     let half = size / 2.0;
     let from_centre = p - origin - half;
     let side = select(vec2(-1.0), vec2(1.0), from_centre >= vec2(0.0));
-    let q = abs(from_centre) - half + radius;
+    let folded = abs(from_centre);
+    if (radii.x == radii.y) {
+        return round_corners(folded, half, radii.x, side);
+    }
+    return elliptical_corners(folded, half, radii, side);
+}
+
+// The distance from `folded` (the position from the rect's centre, in
+// the corner's quadrant) to a rect of `half` its size with circular
+// corners of `radius`, exact, and its gradient back in the `side`
+// quadrant: a unit vector.
+fn round_corners(folded: vec2<f32>, half: vec2<f32>, radius: f32, side: vec2<f32>) -> vec3<f32> {
+    let q = folded - half + radius;
     let outer = max(q, vec2(0.0));
     let in_corner = q.x > 0.0 && q.y > 0.0;
     let d = length(outer) + min(max(q.x, q.y), 0.0) - radius;
@@ -105,6 +121,20 @@ fn rect_distance(p: vec2<f32>, origin: vec2<f32>, size: vec2<f32>, radius: f32) 
     let axis = select(vec2(0.0, side.y), vec2(side.x, 0.0), nearer_x);
     let gradient = select(axis, side * normalize(outer), in_corner);
     return vec3(d, gradient);
+}
+
+// As `round_corners`, with elliptical corners of `radii`: past the
+// corner's centre on both axes, the distance to that quarter ellipse
+// (to first order, as `ellipse_distance`); elsewhere the nearer edge's.
+fn elliptical_corners(folded: vec2<f32>, half: vec2<f32>, radii: vec2<f32>, side: vec2<f32>) -> vec3<f32> {
+    let corner = half - radii;
+    if (all(folded > corner)) {
+        let dg = ellipse_distance(folded, corner, radii);
+        return vec3(dg.x, side * dg.yz);
+    }
+    let edge = folded - half;
+    let axis = select(vec2(0.0, side.y), vec2(side.x, 0.0), edge.x > edge.y);
+    return vec3(max(edge.x, edge.y), axis);
 }
 
 // The distance from `p` to an ellipse about `centre` with `radii`,
@@ -125,7 +155,7 @@ fn ellipse_distance(p: vec2<f32>, centre: vec2<f32>, radii: vec2<f32>) -> vec3<f
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
     let across_x = dpdx(in.local);
     let across_y = dpdy(in.local);
-    var dg = rect_distance(in.local, in.form.xy, in.form.zw, in.params.w);
+    var dg = rect_distance(in.local, in.form.xy, in.form.zw, in.radii);
     if (in.params.x != 0.0) {
         dg = ellipse_distance(in.local, in.form.xy, in.form.zw);
     }

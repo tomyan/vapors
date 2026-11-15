@@ -20,8 +20,9 @@ pub enum Geometry<'a> {
         size: [f32; 2],
         /// Corner radii `rx`, `ry`: zero or more, at most half the
         /// width and the height (SVG clamps them there; the emitter
-        /// clamps before the table), and equal until the shader draws
-        /// elliptical corners (S4b, with `<rect rx ry>`).
+        /// clamps before the table), both zero or both above it (SVG
+        /// draws square corners when either is zero; the emitter writes
+        /// both zero).
         radius: [f32; 2],
     },
     /// An ellipse; a circle when the radii are equal.
@@ -54,8 +55,8 @@ impl Geometry<'_> {
 
 /// Why `geometry` cannot be drawn, if it cannot: a value that is not a
 /// finite number, a size or radius that is not above zero, a corner
-/// radius that is negative, over half the rect's side, or not equal to
-/// the other, or a mesh [`check_mesh`] refuses.
+/// radius that is negative, over half the rect's side, or zero while the
+/// other is not, or a mesh [`check_mesh`] refuses.
 ///
 /// # Errors
 /// The reason, without the crate and site [`ShapeTable::check`] adds.
@@ -79,10 +80,9 @@ pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
 }
 
 /// The corner radii the closed-form shader draws: finite, not negative,
-/// within half the side (`rect_distance` clamps nothing), and circular:
-/// the emitter writes equal radii, so the comparison is exact, not
-/// within a margin.
-#[allow(clippy::float_cmp)]
+/// within half the side (`rect_distance` clamps nothing), and both zero
+/// or both above zero: an elliptical corner with one radius zero has
+/// no curve for the shader's ellipse distance to follow.
 fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
     finite("radius", radius)?;
     if radius.iter().any(|r| *r < 0.0) {
@@ -93,9 +93,9 @@ fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
             "a corner radius of {radius:?} is over half the size {size:?}; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does"
         ));
     }
-    if radius[0] != radius[1] {
+    if (radius[0] > 0.0) != (radius[1] > 0.0) {
         return Err(format!(
-            "corner radii {radius:?} differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>"
+            "corner radii {radius:?} have one zero; SVG draws square corners when either is zero, so the emitter writes both zero"
         ));
     }
     Ok(())

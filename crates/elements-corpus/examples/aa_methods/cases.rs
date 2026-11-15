@@ -19,54 +19,56 @@ pub struct ClosedCase {
     pub geometry: vapors_shapes::Geometry<'static>,
 }
 
-pub fn closed_cases() -> [ClosedCase; 4] {
+/// The closed-form kind's cases: two circles, a rect and a round rect,
+/// then the two with elliptical corners.
+pub fn closed_cases() -> Vec<ClosedCase> {
     use vapors_shapes::Geometry::{Ellipse, Rect};
     let circle = Ellipse {
         centre: [8.0, 8.0],
         radii: [6.0, 6.0],
     };
-    let case = |name, path, stroke, geometry| ClosedCase {
+    let rect = |radius| Rect {
+        origin: [3.0, 4.0],
+        size: [10.0, 8.0],
+        radius,
+    };
+    let disc = "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0z";
+    let round = "M5 4h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z";
+    let mut cases = vec![
+        closed_case("circle fill", disc, 0.0, circle),
+        closed_case("circle stroke", disc, 1.5, circle),
+        closed_case("rect fill", "M3 4h10v8h-10z", 0.0, rect([0.0, 0.0])),
+        closed_case("round rect stroke", round, 1.5, rect([2.0, 2.0])),
+    ];
+    cases.extend(elliptical_cases());
+    cases
+}
+
+/// A 10 x 8 rect with rx 3 and ry 1.5 (S4b), filled and stroked.
+fn elliptical_cases() -> [ClosedCase; 2] {
+    let path =
+        "M6 4h4a3 1.5 0 0 1 3 1.5v5a3 1.5 0 0 1-3 1.5h-4a3 1.5 0 0 1-3-1.5v-5a3 1.5 0 0 1 3-1.5z";
+    let rect = vapors_shapes::Geometry::Rect {
+        origin: [3.0, 4.0],
+        size: [10.0, 8.0],
+        radius: [3.0, 1.5],
+    };
+    [
+        closed_case("elliptical rect fill", path, 0.0, rect),
+        closed_case("elliptical rect stroke", path, 1.5, rect),
+    ]
+}
+
+fn closed_case(
+    name: &'static str,
+    path: &'static str,
+    stroke: f32,
+    geometry: vapors_shapes::Geometry<'static>,
+) -> ClosedCase {
+    ClosedCase {
         shape: Icon { name, path, stroke },
         geometry,
-    };
-    let round = "M5 4h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z";
-    [
-        case(
-            "circle fill",
-            "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0z",
-            0.0,
-            circle,
-        ),
-        case(
-            "circle stroke",
-            "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0z",
-            1.5,
-            Ellipse {
-                centre: [8.0, 8.0],
-                radii: [6.0, 6.0],
-            },
-        ),
-        case(
-            "rect fill",
-            "M3 4h10v8h-10z",
-            0.0,
-            Rect {
-                origin: [3.0, 4.0],
-                size: [10.0, 8.0],
-                radius: [0.0, 0.0],
-            },
-        ),
-        case(
-            "round rect stroke",
-            round,
-            1.5,
-            Rect {
-                origin: [3.0, 4.0],
-                size: [10.0, 8.0],
-                radius: [2.0, 2.0],
-            },
-        ),
-    ]
+    }
 }
 
 /// The closed forms at a quarter-pixel stroke (#345 review, M4): a

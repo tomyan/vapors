@@ -26,8 +26,7 @@ pub fn identity(gpu: &vapors_gpu_harness::Gpu) -> String {
 }
 
 pub const HEADER: &str = "| placement | method | pass | failing icons (pixels over rules 1-2 / strongly off / max difference) |\n|---|---|---|---|";
-pub const CLOSED_HEADER: &str =
-    "\n| placement | method (closed forms) | pass | failing shapes |\n|---|---|---|---|";
+pub const CLOSED_HEADER: &str = "\n| placement | method (closed forms) | pass | each shape (pixels over rules 1-2 / strongly off / max difference) |\n|---|---|---|---|";
 pub const LIMITS_HEADER: &str = "\n| case | method | pass | detail |\n|---|---|---|---|";
 pub const TOLERANCE_HEADER: &str =
     "\n| placement | tolerance (px) | undo | redo |\n|---|---|---|---|";
@@ -39,6 +38,30 @@ pub fn row(
     ours: Option<&[u8]>,
     theirs: &Rgba,
     out: Option<&Path>,
+) {
+    described_row(placement, method, icons, ours, theirs, out, failing);
+}
+
+/// As [`row`], with every shape's numbers rather than the failing ones'.
+pub fn closed_row(
+    placement: &Placement,
+    method: &str,
+    icons: &[&Icon],
+    ours: &[u8],
+    theirs: &Rgba,
+    out: Option<&Path>,
+) {
+    described_row(placement, method, icons, Some(ours), theirs, out, every);
+}
+
+fn described_row(
+    placement: &Placement,
+    method: &str,
+    icons: &[&Icon],
+    ours: Option<&[u8]>,
+    theirs: &Rgba,
+    out: Option<&Path>,
+    describe: fn(&[&Icon], &[Found]) -> String,
 ) {
     let Some(ours) = ours else {
         println!(
@@ -59,7 +82,7 @@ pub fn row(
         "| {} | {method} | {passed}/{} | {} |",
         placement.name,
         icons.len(),
-        failing(icons, &found)
+        describe(icons, &found)
     );
 }
 
@@ -132,6 +155,15 @@ fn failing(icons: &[&Icon], found: &[Found]) -> String {
         .map(|(icon, found)| format!("{} ({})", icon.name, summary(found)))
         .collect();
     failed.join("; ")
+}
+
+fn every(icons: &[&Icon], found: &[Found]) -> String {
+    let each: Vec<String> = icons
+        .iter()
+        .zip(found)
+        .map(|(icon, found)| format!("{} ({})", icon.name, summary(found)))
+        .collect();
+    each.join("; ")
 }
 
 fn summary(found: &Found) -> String {
