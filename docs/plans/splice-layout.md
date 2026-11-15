@@ -935,6 +935,23 @@ Lane frames are lighter than scroll frames:
   not resolve a lane frame. The scroller sets in `FrameFacts`, the
   isolated owners' noting of them (`note_scrollers`) and the
   `LaneFrameScroller` decline go.
+- **The memo across a scroll** (4e): a scroll is an update for the
+  frames. `Document::scroll_by`, `scroll_node_by` and `scroll_to`
+  change the offsets and note a change, nothing else; the frames move
+  only at the next update, in `paint_frames::updated`, which works the
+  scrolled frame and the frames nested in it out again
+  (`kept_updated`) and then sets the lanes (`Frames::set_lanes`), which
+  drops every memoised frame, lane frames and composed scroll frames
+  alike. No frame is read between a scroll and that update except
+  through the last update's frames, which show the last update's
+  offsets, as the scene does. Tested: scroll a container inside a
+  framed row, update, and every frame read, the nested one included
+  (its clip and its shift), equals the same frame made afresh.
+- **Cost** (4e): composing is done on read, once a frame an update,
+  for the frames read (those culling, the draw, hits and the a11y take
+  reach), so a frame that is never read costs nothing and an update
+  adds no per-row work for frames that do not change: an insert above
+  a row stores nothing new for the scroll frames in later rows.
 - **Hits** (4d): the kept hits are by frame; a hit test asks the
   frames that can show at its point (`Frames::meeting`, which finds a
   lane's rows through `between`) and tests their hits alone, the last
@@ -955,7 +972,7 @@ Lane frames are lighter than scroll frames:
 | 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged |
 | 4c | Layout leaves starts out of later children's layouts; the layout check derives them | the layout check derives every start |
 | 4d | Culling and hits through `between`; the lane's extents entry | hits through `between` match the scan |
-| 4e | Scroll frames under a lane frame composed on read; the `LaneFrameScroller` decline goes | the rows page's list framed (`lanes_framed` above 0 for `--scaling Insert`); the Chromium paint comparisons, the frames, placement and kept-paint checks unchanged with a scroller in a framed row |
+| 4e | Scroll frames under a lane frame composed on read; the `LaneFrameScroller` decline goes | the rows page's list framed (`lanes_framed` above 0 for `--scaling Insert`); for `--scaling Insert`, `layout` and `paint` within 2% across sizes (the 3000- and 10000-row totals each within 2% of the 1000-row total), and `accessibility` within `INSERT_A11Y_PER_ROW` (9600) and no more per row than the base; the Chromium paint comparisons, the frames, placement and kept-paint checks unchanged with a scroller in a framed row; the scroll test above |
 
 4b, 4c and 4d are separate stacked pull requests, each reviewed alone,
 then folded into 4d and gated once, so main never carries 4b's added
