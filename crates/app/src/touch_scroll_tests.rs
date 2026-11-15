@@ -110,3 +110,42 @@ fn a_finger_lifted_twice_or_never_down_ends_nothing() {
     // Then
     assert_eq!(offset(&doc, inner), 20.0);
 }
+
+#[test]
+fn a_finger_down_stops_a_fling() {
+    // Given a fling running on the outer list
+    let (doc, outer, _) = nested();
+    let start = vapors_platform::Instant::now();
+    let curve = crate::fling_curve::FlingCurve::new([0.0, 500.0]).expect("moving");
+    let mut touch = TouchScroll::default();
+    touch.fling(Fling::new(outer, curve, start));
+
+    // When
+    touch.down(1, [10.0, 10.0]);
+
+    // Then: it no longer runs or moves the list
+    let running = touch.advance(
+        &mut doc.borrow_mut(),
+        start + std::time::Duration::from_millis(50),
+    );
+    assert!(!running);
+    assert!(!touch.flinging());
+    assert_eq!(offset(&doc, outer), 0.0);
+}
+
+#[test]
+fn thumbs_show_on_touch_while_a_fling_runs() {
+    // Given a finger that tapped, so thumbs hid
+    let (_, outer, _) = nested();
+    let mut touch = TouchScroll::default();
+    touch.down(1, [10.0, 10.0]);
+    touch.up(1);
+    assert!(!touch.thumbs_shown());
+    let curve = crate::fling_curve::FlingCurve::new([0.0, 500.0]).expect("moving");
+
+    // When
+    touch.fling(Fling::new(outer, curve, vapors_platform::Instant::now()));
+
+    // Then
+    assert!(touch.thumbs_shown());
+}

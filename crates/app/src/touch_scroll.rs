@@ -3,10 +3,14 @@
 //! where the finger went down, takes every later pan, and a pan past
 //! its end goes nowhere rather than out to the next one (F2c S9). It
 //! also keeps the input mode for scroll thumbs: shown while a mouse is
-//! in use, and on touch only while a gesture scrolls.
+//! in use, and on touch only while a gesture or its fling scrolls. A
+//! fling (`fling.rs`) runs until it ends or a finger goes down.
 
 use vapors_dom::NodeId;
 use vapors_elements::{Document, Point};
+use vapors_platform::Instant;
+
+use crate::fling::Fling;
 
 /// The gesture under way.
 #[derive(Debug, Default)]
@@ -17,11 +21,13 @@ pub(crate) struct TouchScroll {
     latched: Option<NodeId>,
     /// A finger touched since the mouse was last used.
     touching: bool,
+    /// The fling under way.
+    fling: Option<Fling>,
 }
 
 impl TouchScroll {
     /// Finger `id` went down at `at` (CSS pixels); the first finger
-    /// starts a gesture there.
+    /// stops a fling and starts a gesture there.
     pub(crate) fn down(&mut self, id: u64, at: Point) {
         if self.fingers.is_empty() {
             *self = Self {
@@ -54,17 +60,21 @@ impl TouchScroll {
         };
         self.fingers.remove(at);
         if self.fingers.is_empty() {
-            *self = Self {
-                touching: self.touching,
-                ..Self::default()
-            };
+            self.end_gesture();
         }
     }
 
-    /// Every finger was taken away at once (the window lost focus).
+    /// Every finger was taken away at once (the window lost focus); a
+    /// fling runs on.
     pub(crate) fn forget(&mut self) {
+        self.end_gesture();
+    }
+
+    /// No gesture: the input mode and a fling are kept.
+    fn end_gesture(&mut self) {
         *self = Self {
             touching: self.touching,
+            fling: self.fling.take(),
             ..Self::default()
         };
     }
@@ -76,7 +86,39 @@ impl TouchScroll {
 
     /// Whether scroll thumbs are drawn now.
     pub(crate) fn thumbs_shown(&self) -> bool {
-        !self.touching || self.latched.is_some()
+        !self.touching || self.latched.is_some() || self.fling.is_some()
+    }
+
+    /// `fling` replaces the one under way.
+    pub(crate) fn fling(&mut self, fling: Fling) {
+        self.fling = Some(fling);
+    }
+
+    /// Whether a finger is down.
+    pub(crate) fn finger_down(&self) -> bool {
+        !self.fingers.is_empty()
+    }
+
+    /// The wheel scrolled or a button went down: the fling stops.
+    pub(crate) fn stop_fling(&mut self) {
+        self.fling = None;
+    }
+
+    /// Whether a fling is running.
+    pub(crate) fn flinging(&self) -> bool {
+        self.fling.is_some()
+    }
+
+    /// The fling moved on to `now`; whether one is still running.
+    pub(crate) fn advance(&mut self, document: &mut Document, now: Instant) -> bool {
+        let running = self
+            .fling
+            .as_mut()
+            .is_some_and(|f| f.advance(document, now));
+        if !running {
+            self.fling = None;
+        }
+        running
     }
 }
 
