@@ -40,7 +40,7 @@ pub(crate) struct Frames {
     lanes: LaneFrames,
     /// By framed lane container, how far its children's ink reaches
     /// past their border boxes above and below, CSS pixels: the most
-    /// seen since the frames were made, which culling widens by
+    /// seen since paint order was walked, which culling widens by
     /// (`frames_lane.rs`).
     lane_ink: LaneInk,
 }

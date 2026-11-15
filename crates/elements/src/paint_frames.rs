@@ -49,7 +49,8 @@ pub(crate) fn updated(
         shift: &shift,
     };
     let moved = if reshaped {
-        made_afresh(painted, &order.thumbs, &inputs, input.scale)
+        let spliced = kept && order.walks.order == 0;
+        made_afresh(painted, &order.thumbs, &inputs, (input.scale, spliced))
     } else {
         kept_updated(painted, (order, changed), &inputs, input)
     };
@@ -102,10 +103,15 @@ fn made_afresh(
     painted: &mut Painted,
     thumbs: &[usize],
     inputs: &FrameInputs<'_>,
-    scale: f32,
+    (scale, spliced): (f32, bool),
 ) -> bool {
     painted.frames_worked = thumbs.len();
-    let made = Frames::of(thumbs, inputs, scale);
+    let mut made = Frames::of(thumbs, inputs, scale);
+    // a splice notes ink only for the lane frames it painted
+    // (`paint_lane_ink.rs`); the kept rows' ink is carried
+    if spliced {
+        made.take_lane_ink(&mut painted.frames);
+    }
     !std::mem::replace(&mut painted.frames, made).same_frames(&painted.frames)
 }
 
