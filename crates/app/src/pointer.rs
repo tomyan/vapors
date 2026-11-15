@@ -35,8 +35,8 @@ pub(crate) enum Action {
     /// The fingers moved: scroll by this delta (CSS pixels).
     Pan([f32; 2]),
     /// The gesture's finger lifted moving: fling at this velocity (CSS
-    /// pixels per second, the way the scroll moves).
-    Fling([f32; 2]),
+    /// pixels per second, the way the scroll moves) from this time.
+    Fling([f32; 2], vapors_platform::Instant),
     /// A finger (by id) lifted at a point; the last ends the gesture.
     TouchUp(u64, Point),
     /// The platform took a finger (by id) at a point.
@@ -66,7 +66,7 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
-        Event::Fling { vx, vy } => Some(Action::Fling([-vx / scale, -vy / scale])),
+        Event::Fling { vx, vy, at } => Some(Action::Fling([-vx / scale, -vy / scale], *at)),
         Event::Touch { id, phase, x, y } => Some(touch(*id, *phase, css(*x, *y))),
         _ => None,
     }

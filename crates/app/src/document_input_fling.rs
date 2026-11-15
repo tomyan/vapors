@@ -63,26 +63,23 @@ pub const MAX_FLING_SPEED: f32 = 16_000.0;
 const MIN_FLING_SPEED: f32 = 50.0;
 
 impl DocumentInput {
-    /// The gesture's finger lifted moving at `velocity` (CSS px/s, the
-    /// scroll's way): the container the gesture scrolled flings, as
-    /// Chromium's `GestureDetector` decides on `Action::UP`. The thumbs,
-    /// hidden at the lift, show again for the fling: that change asks
-    /// the host for the frame that moves it on.
-    ///
-    /// RELAXED: the fling starts when the event is handled, where
-    /// Chromium starts it at the fling event's time; winit gives touches
-    /// no timestamp (as `Input::counted` says for clicks). Retired when
-    /// winit exposes event times.
-    pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2]) {
+    /// The gesture's finger lifted at `at` moving at `velocity` (CSS
+    /// px/s, the scroll's way): the container the gesture scrolled
+    /// flings from then, as Chromium's `GestureDetector` decides on
+    /// `Action::UP`. The thumbs, hidden at the lift, show again for the
+    /// fling: that change asks the host for the frame that moves it on.
+    /// Its time is the platform's handling time (`velocity_tracker.rs`
+    /// says why), where Chromium starts at the last scroll update's.
+    pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2], at: Instant) {
         // `fling` clamps to the maximum; the minimum is checked first, on
         // values the clamp leaves alone
         if velocity.iter().all(|v| v.abs() <= MIN_FLING_SPEED) {
             return;
         }
-        let Some(container) = self.touch.released() else {
+        let Some(container) = self.touch.take_released() else {
             return;
         };
-        if let Err(refused) = self.fling(document, container, velocity, Instant::now()) {
+        if let Err(refused) = self.fling(document, container, velocity, at) {
             report_error(&format!("a touch fling did not start: {refused}"));
         }
     }

@@ -152,12 +152,27 @@ flings the container the gesture scrolled.
   unknown. 16 000 is that lower bound rounded up; a recording of the
   fastest flick Tom can make would bound it from the other side.
 - **RELAXED, two fingers:** a gesture that had a second finger does not
-  fling. Chromium flings at the fingers' mean velocity unless they moved
-  apart (`POINTER_UP`'s dot product). Retired when a two-finger fixture
-  is recorded.
-- **RELAXED, times:** touches are stamped when winit hands them over (it
-  gives no event time), and the fling starts when its event is handled.
-  Retired when winit exposes event times.
+  fling. Chromium's `GestureDetector` flings at `UP` at the last
+  finger's own velocity (its history kept through the second finger's
+  down), unless a finger lifted moving against another, which clears
+  the tracker (`POINTER_UP`'s dot product). Retired when a two-finger
+  fixture is recorded.
+- **RELAXED, times:** touches are stamped when winit hands them over;
+  winit 0.30 gives touches no time on any platform. (On the web, real
+  times would take a pointer listener of our own reading `timeStamp`
+  and matching winit's coalesced touches by id and position; natively
+  there is nothing to read.) The tracker's 40 ms and 80 ms stop rules
+  then also fire when the page did not handle input for that long, and
+  moves handled together share a time. The tracker answers in three
+  states: moving at a velocity, stopped, or unresolvable, when a 40 ms
+  gap is followed by moves handled together (a stall) or the samples'
+  times leave the fit no solution. An unresolvable lift does not fling;
+  it is counted (`Gestures::unmeasured_lifts`) and named in a debug
+  build. An up handled 80 ms late after a stall alone cannot be told
+  from a finger held still, and answers stopped. The fling starts at
+  the lift's handling time, on the clock frames are drawn on, where
+  Chromium starts it at the last scroll update's. Retired when winit
+  exposes event times.
 - **Not ported:** scroll rails (`SnapScrollController`), which zero the
   off-axis velocity of a mostly straight fling; the recorded flings are
   vertical lists, where it changes nothing.

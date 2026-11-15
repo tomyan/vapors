@@ -25,16 +25,24 @@ fn solve(times: &[f32], values: &[f32], count: usize) -> Option<[f32; MAX_COEFFI
         .map(|i| times.iter().map(|&t| power(t, i)).collect())
         .collect();
     let (basis, upper) = decompose(&powers)?;
-    // solve upper × coefficients = basisᵀ × values, bottom row first
+    Some(back_substitute(&basis, &upper, values))
+}
+
+/// Solves upper × coefficients = basisᵀ × values, bottom row first.
+fn back_substitute(
+    basis: &[Vec<f32>],
+    upper: &[Vec<f32>],
+    values: &[f32],
+) -> [f32; MAX_COEFFICIENTS] {
     let mut coefficients = [0.0; MAX_COEFFICIENTS];
-    for i in (0..count).rev() {
+    for i in (0..basis.len()).rev() {
         let mut value = dot(&basis[i], values);
-        for j in (i + 1..count).rev() {
+        for j in (i + 1..basis.len()).rev() {
             value -= upper[i][j] * coefficients[j];
         }
         coefficients[i] = value / upper[i][i];
     }
-    Some(coefficients)
+    coefficients
 }
 
 /// The QR decomposition of `columns`: orthonormal columns and the upper
@@ -44,27 +52,31 @@ fn decompose(columns: &[Vec<f32>]) -> Option<(Columns, Columns)> {
     let mut basis: Columns = Vec::with_capacity(count);
     let mut upper = vec![vec![0.0; count]; count];
     for j in 0..count {
-        let mut column = columns[j].clone();
-        for earlier in &basis {
-            let projection = dot(earlier, &column);
-            for (cell, along) in column.iter_mut().zip(earlier) {
-                *cell -= projection * along;
-            }
-        }
-        let norm = dot(&column, &column).sqrt();
-        if norm < 0.000_001 {
-            return None;
-        }
-        let inverse = 1.0 / norm;
-        for cell in &mut column {
-            *cell *= inverse;
-        }
+        let column = orthonormal(&columns[j], &basis)?;
         for (i, cell) in upper[j].iter_mut().enumerate().skip(j) {
             *cell = dot(&column, &columns[i]);
         }
         basis.push(column);
     }
     Some((basis, upper))
+}
+
+/// `column` less its projections on `basis`, at unit length (modified
+/// Gram-Schmidt); `None` when what is left is under 1e-6 long.
+fn orthonormal(column: &[f32], basis: &[Vec<f32>]) -> Option<Vec<f32>> {
+    let mut column = column.to_vec();
+    for earlier in basis {
+        let projection = dot(earlier, &column);
+        for (cell, along) in column.iter_mut().zip(earlier) {
+            *cell -= projection * along;
+        }
+    }
+    let norm = dot(&column, &column).sqrt();
+    if norm < 0.000_001 {
+        return None;
+    }
+    let inverse = 1.0 / norm;
+    Some(column.into_iter().map(|cell| cell * inverse).collect())
 }
 
 fn power(value: f32, exponent: usize) -> f32 {

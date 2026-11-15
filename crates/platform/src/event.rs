@@ -124,6 +124,8 @@ pub enum Event {
         vx: f32,
         /// Y velocity in pixels per second.
         vy: f32,
+        /// When the finger lifted, on the clock frames are drawn on.
+        at: crate::clock::Instant,
     },
     /// A finger went down and up within 300 ms without moving 20 px.
     Tap {

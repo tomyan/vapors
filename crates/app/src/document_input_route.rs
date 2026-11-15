@@ -129,7 +129,7 @@ impl DocumentInput {
             Action::TouchUp(id, p) | Action::TouchCancel(id, p) => {
                 self.held.touches.remove(&id).unwrap_or_else(|| by_hit(p))
             }
-            Action::Pan(_) | Action::Fling(_) => self.held.gesture.unwrap_or(Route::Host),
+            Action::Pan(_) | Action::Fling(..) => self.held.gesture.unwrap_or(Route::Host),
         })
     }
 }

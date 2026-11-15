@@ -35,11 +35,12 @@ pub struct Input {
 impl Input {
     /// No fingers down, no pointer position and no size yet.
     pub fn new() -> Self {
+        let started = Instant::now();
         Self {
             pointer: None,
             size: None,
-            gestures: Gestures::new(),
-            started: Instant::now(),
+            gestures: Gestures::starting(started),
+            started,
             scale: 1.0,
             modifiers: ModifiersState::empty(),
             clicks: crate::clicks::Clicks::default(),

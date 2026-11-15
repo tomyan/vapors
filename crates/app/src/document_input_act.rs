@@ -57,7 +57,7 @@ impl DocumentInput {
             }
             Action::TouchMove(id, point) => Document::touch_moved(document, id, point),
             Action::Pan(delta) => self.pan(document, delta),
-            Action::Fling(velocity) => self.released(&document.borrow(), velocity),
+            Action::Fling(velocity, at) => self.released(&document.borrow(), velocity, at),
             Action::TouchUp(id, point) => {
                 self.touch.up(id);
                 Document::touch_released(document, id, point);

@@ -96,7 +96,9 @@ fn started(gpu: &Gpu, doc: &Rc<RefCell<Document>>, at: Instant) -> ElementsApp {
 fn gpu_a_flicked_list_coasts_after_the_finger_lifts_and_then_rests() {
     // Given a started app and a finger dragging up at 1000 px/s
     let (gpu, (doc, list)) = (gpu(), page());
-    let (platform, mut gestures, base) = (Platform::detached(), Gestures::new(), Instant::now());
+    // the fling is timed on the gestures' clock, the frames' clock
+    let (platform, base) = (Platform::detached(), Instant::now());
+    let mut gestures = Gestures::starting(base);
     let mut app = started(&gpu, &doc, base);
     deliver(
         &mut app,

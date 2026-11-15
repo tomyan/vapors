@@ -22,8 +22,9 @@ fn touch(phase: TouchPhase, y: f32) -> Event {
 }
 
 /// A finger down at `y` on the nested lists (scale 1) dragging 25 px
-/// up, lifted, then the platform's fling at `vy` (the finger's way).
-fn flick(y: f32, vy: f32) -> (Rc<RefCell<Document>>, NodeId, DocumentInput) {
+/// up, lifted at `at`, then the platform's fling at `vy` (the finger's
+/// way).
+fn flick(y: f32, vy: f32, at: Instant) -> (Rc<RefCell<Document>>, NodeId, DocumentInput) {
     let (doc, outer, _) = nested();
     let (mut input, platform) = (DocumentInput::new(), Platform::detached());
     let events = [
@@ -31,7 +32,7 @@ fn flick(y: f32, vy: f32) -> (Rc<RefCell<Document>>, NodeId, DocumentInput) {
         touch(TouchPhase::Moved, y - 25.0),
         Event::Pan { dx: 0.0, dy: -25.0 },
         touch(TouchPhase::Ended, y - 25.0),
-        Event::Fling { vx: 0.0, vy },
+        Event::Fling { vx: 0.0, vy, at },
     ];
     for event in &events {
         input.give(&doc, event, &platform).expect("placed");
@@ -42,14 +43,13 @@ fn flick(y: f32, vy: f32) -> (Rc<RefCell<Document>>, NodeId, DocumentInput) {
 #[test]
 fn a_flicked_list_coasts_on_after_the_finger_lifts() {
     // Given the outer list, dragged 25 px and flicked up at 600 px/s
-    let (doc, outer, mut input) = flick(80.0, -600.0);
+    let lift = Instant::now();
+    let (doc, outer, mut input) = flick(80.0, -600.0, lift);
     assert!(input.flinging());
 
     // When
-    input.advance_fling(
-        &mut doc.borrow_mut(),
-        Instant::now() + Duration::from_millis(100),
-    );
+    input.advance_fling(&mut doc.borrow_mut(), lift + Duration::from_millis(16));
+    input.advance_fling(&mut doc.borrow_mut(), lift + Duration::from_millis(100));
 
     // Then
     assert!(offset(&doc, outer) > 30.0, "{}", offset(&doc, outer));
@@ -58,7 +58,7 @@ fn a_flicked_list_coasts_on_after_the_finger_lifts() {
 #[test]
 fn a_finger_lifted_at_50_px_a_second_or_slower_does_not_fling() {
     // Given, When
-    let (_, _, input) = flick(80.0, -50.0);
+    let (_, _, input) = flick(80.0, -50.0, Instant::now());
 
     // Then
     assert!(!input.flinging());
@@ -67,7 +67,7 @@ fn a_finger_lifted_at_50_px_a_second_or_slower_does_not_fling() {
 #[test]
 fn a_fling_after_a_gesture_that_scrolled_nothing_starts_nothing() {
     // Given a flick, then a tap, which stops its fling
-    let (doc, _, mut input) = flick(80.0, -600.0);
+    let (doc, _, mut input) = flick(80.0, -600.0, Instant::now());
     let platform = Platform::detached();
     for event in [
         touch(TouchPhase::Started, 80.0),
@@ -83,6 +83,7 @@ fn a_fling_after_a_gesture_that_scrolled_nothing_starts_nothing() {
             &Event::Fling {
                 vx: 0.0,
                 vy: -600.0,
+                at: Instant::now(),
             },
             &platform,
         )
@@ -94,21 +95,43 @@ fn a_fling_after_a_gesture_that_scrolled_nothing_starts_nothing() {
 
 #[test]
 fn a_fling_faster_than_16000_px_a_second_coasts_as_16000_does() {
-    // Given three flicks, at and over the maximum
-    let at = |vy: f32| {
-        let (doc, outer, mut input) = flick(80.0, vy);
+    // Given three flicks lifted at one instant, at, over and under the
+    // maximum, each drawn 3 ms after the lift
+    let lift = Instant::now();
+    let moved = |vy: f32| {
+        let (doc, outer, mut input) = flick(80.0, vy, lift);
         let start = offset(&doc, outer);
-        input.advance_fling(
-            &mut doc.borrow_mut(),
-            Instant::now() + Duration::from_millis(3),
-        );
+        input.advance_fling(&mut doc.borrow_mut(), lift + Duration::from_millis(3));
         offset(&doc, outer) - start
     };
 
     // When
-    let (max, over, under) = (at(-16_000.0), at(-50_000.0), at(-15_000.0));
+    let (max, over, under) = (moved(-16_000.0), moved(-50_000.0), moved(-15_000.0));
 
-    // Then: Instant::now() differs by microseconds between flicks
-    assert!((over - max).abs() < 1.0, "{over} vs {max}");
-    assert!(max - under > 1.0, "{max} vs {under}");
+    // Then: on one clock the clamped fling moves exactly as the maximum
+    // does; 1000 px/s slower moves at least half of 1000 px/s × 3 ms less
+    assert_eq!(over, max);
+    assert!(max - under > 1.5, "{max} vs {under}");
+}
+
+#[test]
+fn a_second_fling_for_one_gesture_starts_nothing() {
+    // Given a flick whose fling the wheel stopped
+    let (doc, _, mut input) = flick(80.0, -600.0, Instant::now());
+    let platform = Platform::detached();
+    input
+        .give(&doc, &Event::Scroll { dx: 0.0, dy: 1.0 }, &platform)
+        .expect("placed");
+    assert!(!input.flinging());
+
+    // When another fling arrives with no gesture between
+    let again = Event::Fling {
+        vx: 0.0,
+        vy: -600.0,
+        at: Instant::now(),
+    };
+    input.give(&doc, &again, &platform).expect("placed");
+
+    // Then
+    assert!(!input.flinging());
 }

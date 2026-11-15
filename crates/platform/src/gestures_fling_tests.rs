@@ -10,7 +10,7 @@ fn flings(steps: &[Step]) -> Vec<[f32; 2]> {
     play(steps)
         .into_iter()
         .filter_map(|event| match event {
-            Event::Fling { vx, vy } => Some([vx, vy]),
+            Event::Fling { vx, vy, .. } => Some([vx, vy]),
             _ => None,
         })
         .collect()
@@ -91,4 +91,66 @@ fn a_cancelled_finger_does_not_fling() {
 
     // Then
     assert_eq!(flings(&steps), Vec::<[f32; 2]>::new());
+}
+
+#[test]
+fn a_fling_is_timed_when_the_finger_lifted_on_the_gestures_clock() {
+    // Given recognisers counting from a known epoch
+    let epoch = crate::clock::Instant::now();
+    let mut gestures = super::Gestures::starting(epoch);
+    let mut steps = drag_down();
+    steps.push((0, Ended, 100.0, 80.0, 88));
+
+    // When
+    let events: Vec<Event> = steps
+        .iter()
+        .flat_map(|&(id, phase, x, y, ms)| {
+            gestures.touch(id, phase, x, y, std::time::Duration::from_millis(ms))
+        })
+        .collect();
+
+    // Then
+    let at = events.iter().find_map(|e| match e {
+        Event::Fling { at, .. } => Some(*at),
+        _ => None,
+    });
+    assert_eq!(at, Some(epoch + std::time::Duration::from_millis(88)));
+}
+
+#[test]
+fn a_lift_whose_velocity_cannot_be_measured_is_counted_not_flung() {
+    // Given a drag, a 45 ms stall, then three moves handled at one time
+    let mut gestures = super::Gestures::new();
+    let mut steps = drag_down();
+    for y in [100.0, 110.0, 120.0] {
+        steps.push((0, Moved, 100.0, y, 125));
+    }
+    steps.push((0, Ended, 100.0, 120.0, 140));
+
+    // When
+    let flung = steps
+        .iter()
+        .flat_map(|&(id, phase, x, y, ms)| {
+            gestures.touch(id, phase, x, y, std::time::Duration::from_millis(ms))
+        })
+        .any(|e| matches!(e, Event::Fling { .. }));
+
+    // Then
+    assert!(!flung);
+    assert_eq!(gestures.unmeasured_lifts(), 1);
+}
+
+#[test]
+fn a_cancelled_finger_leaves_no_lone_finger_behind() {
+    // Given a drag cancelled, then a stray move of that finger
+    let mut gestures = super::Gestures::new();
+    let mut steps = drag_down();
+    steps.push((0, Cancelled, 100.0, 80.0, 88));
+    steps.push((0, Moved, 100.0, 90.0, 96));
+    for &(id, phase, x, y, ms) in &steps {
+        gestures.touch(id, phase, x, y, std::time::Duration::from_millis(ms));
+    }
+
+    // Then
+    assert_eq!(gestures.alone, None);
 }

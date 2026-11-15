@@ -94,9 +94,10 @@ impl TouchScroll {
         !self.touching || self.latched.is_some() || self.fling.is_some()
     }
 
-    /// The container the gesture that just ended scrolled, if any.
-    pub(crate) fn released(&self) -> Option<NodeId> {
-        self.released
+    /// The container the gesture that just ended scrolled, if any, for
+    /// its one fling.
+    pub(crate) fn take_released(&mut self) -> Option<NodeId> {
+        self.released.take()
     }
 
     /// `fling` replaces the one under way.
