@@ -8,6 +8,7 @@
 mod canonical;
 mod classify;
 mod classify_near;
+mod classify_round;
 mod geometry;
 mod geometry_box;
 mod mesh;
@@ -30,7 +31,7 @@ mod tessellate_path;
 
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
 pub use classify::{Classified, classify};
-pub use geometry::{Geometry, MIN_RADIUS, check_geometry};
+pub use geometry::{Geometry, MIN_RADIUS, check_geometry, fitted_radii};
 pub use geometry_box::transformed_box;
 pub use mesh::{CONVEX, INSIDE, MeshCorner, MeshTriangle, REFLEX};
 pub use mesh_check::check_mesh;

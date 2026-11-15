@@ -7,7 +7,7 @@
 use std::fmt;
 
 use vapors_scene::Color;
-use vapors_shapes::{Geometry, check_geometry};
+use vapors_shapes::{Geometry, check_geometry, fitted_radii};
 
 /// A rect or ellipse to draw, filled or stroked, under a transform.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -95,7 +95,11 @@ fn form(geometry: &Geometry) -> Result<(f32, [f32; 4], [f32; 2]), ClosedFormErro
             origin,
             size,
             radius,
-        } => Ok((0.0, [origin[0], origin[1], size[0], size[1]], radius)),
+        } => {
+            // check_geometry passed it, so the clamp holds
+            let radius = fitted_radii(origin, size, radius).expect("check_geometry fits the radii");
+            Ok((0.0, [origin[0], origin[1], size[0], size[1]], radius))
+        }
         Geometry::Ellipse { centre, radii } => {
             Ok((1.0, [centre[0], centre[1], radii[0], radii[1]], [0.0; 2]))
         }

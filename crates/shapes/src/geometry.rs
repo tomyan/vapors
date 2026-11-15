@@ -70,7 +70,7 @@ pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
         } => {
             finite("origin", *origin)?;
             positive("size", *size)?;
-            check_corners(*size, *radius)
+            check_corners(*origin, *size, *radius)
         }
         Geometry::Ellipse { centre, radii } => {
             finite("centre", *centre)?;
@@ -82,19 +82,15 @@ pub fn check_geometry(geometry: &Geometry<'_>) -> Result<(), String> {
 }
 
 /// The corner radii the closed-form shader draws: finite, not negative,
-/// within half the side (`rect_distance` clamps nothing), and both zero
+/// within half the side once [`fitted_radii`] clamps them, and both zero
 /// or both above zero: an elliptical corner with one radius zero has
 /// no curve for the shader's ellipse distance to follow.
-fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
+fn check_corners(origin: [f32; 2], size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
     finite("radius", radius)?;
     if radius.iter().any(|r| *r < 0.0) {
         return Err(format!("a corner radius of {radius:?} is negative"));
     }
-    if radius[0] > size[0] / 2.0 || radius[1] > size[1] / 2.0 {
-        return Err(format!(
-            "a corner radius of {radius:?} is over half the size {size:?}; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does"
-        ));
-    }
+    fitted_radii(origin, size, radius)?;
     if (radius[0] > 0.0) != (radius[1] > 0.0) {
         return Err(format!(
             "corner radii {radius:?} have one zero; SVG draws square corners when either is zero, so the emitter writes both zero"
@@ -104,6 +100,41 @@ fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
         not_tiny("corner radii", radius)?;
     }
     Ok(())
+}
+
+/// `radius` fitted to a rect at `origin` of `size`: each radius at most
+/// half its side, and one over half by no more than the classifier's
+/// tolerance clamped to half, as SVG clamps. The tolerance is
+/// `classify_near`'s, of the rect's largest coordinate (1 at least). It
+/// is "the same position" there, so f32 rounding of a pill's corners
+/// (#387 review, H1: `y=0.05 height=1 rx=0.5` gives a height of
+/// 0.99999994) does not refuse what the classifier read as exact. It is
+/// the one answer that the classifier, this check and the renderer read.
+///
+/// # Errors
+/// A radius over half its side by more than the tolerance.
+pub fn fitted_radii(
+    origin: [f32; 2],
+    size: [f32; 2],
+    radius: [f32; 2],
+) -> Result<[f32; 2], String> {
+    let ends = [
+        origin[0],
+        origin[1],
+        origin[0] + size[0],
+        origin[1] + size[1],
+    ];
+    let scale = ends.iter().fold(1.0, |most: f32, v| most.max(v.abs()));
+    let mut fitted = radius;
+    for (r, side) in fitted.iter_mut().zip(size) {
+        if *r > side / 2.0 && !crate::classify_near::near_value(*r, side / 2.0, scale) {
+            return Err(format!(
+                "a corner radius of {radius:?} is over half the size {size:?}; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does"
+            ));
+        }
+        *r = r.min(side / 2.0);
+    }
+    Ok(fitted)
 }
 
 /// The smallest radius the closed-form shader takes, viewBox units. It

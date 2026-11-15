@@ -16,6 +16,7 @@ fn classified(data: &str, paint: Paint) -> Classified {
 const RECT: Classified = Classified::Rect {
     origin: [1.0, 1.0],
     size: [4.0, 3.0],
+    radius: [0.0, 0.0],
 };
 
 #[test]

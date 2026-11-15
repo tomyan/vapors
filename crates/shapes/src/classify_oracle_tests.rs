@@ -31,14 +31,27 @@ fn rasterised(data: &str) -> Vec<u8> {
 /// Whether the viewBox point is inside the closed form.
 fn inside(form: Classified, x: f32, y: f32) -> bool {
     match form {
-        Classified::Rect { origin, size } => {
-            x >= origin[0] && x <= origin[0] + size[0] && y >= origin[1] && y <= origin[1] + size[1]
-        }
+        Classified::Rect {
+            origin,
+            size,
+            radius,
+        } => inside_rect(origin, size, radius, [x, y]),
         Classified::Ellipse { centre, radii } => {
             ((x - centre[0]) / radii[0]).powi(2) + ((y - centre[1]) / radii[1]).powi(2) <= 1.0
         }
         Classified::Path => panic!("a path has no closed form"),
     }
+}
+
+/// Whether `p` is inside the rect at `origin` of `size` with corners
+/// of `radius`: inside the box, and, past a corner's centre on both
+/// axes, inside that corner's ellipse.
+fn inside_rect(origin: [f32; 2], size: [f32; 2], radius: [f32; 2], p: [f32; 2]) -> bool {
+    let from_centre = [0, 1].map(|i| (p[i] - origin[i] - size[i] / 2.0).abs());
+    let past = [0, 1].map(|i| from_centre[i] - (size[i] / 2.0 - radius[i]));
+    let in_box = (0..2).all(|i| from_centre[i] <= size[i] / 2.0);
+    let in_corner = past.iter().all(|v| *v > 0.0);
+    in_box && (!in_corner || (past[0] / radius[0]).powi(2) + (past[1] / radius[1]).powi(2) <= 1.0)
 }
 
 /// The largest difference, in coverage bytes, between the path
@@ -92,6 +105,8 @@ fn each_accepted_closed_form_covers_what_its_path_covers() {
         "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0z",
         "M14 8a6 6 0 0 1-12 0a6 6 0 0 1 12 0z",
         "M8 2a6 4 0 1 0 0 8a6 4 0 1 0 0-8z",
+        "M3 1H9A2 2 0 0 1 11 3V5A2 2 0 0 1 9 7H3A2 2 0 0 1 1 5V3A2 2 0 0 1 3 1Z",
+        "M4 1h4a3 1.5 0 0 1 3 1.5v3a3 1.5 0 0 1-3 1.5h-4a3 1.5 0 0 1-3-1.5v-3a3 1.5 0 0 1 3-1.5z",
     ];
 
     // When, Then
