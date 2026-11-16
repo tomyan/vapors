@@ -20,6 +20,7 @@ use scene_meshes::{cpu_mesh_coverage, mesh_coverage_3d};
 
 #[path = "support/mesh_oracle.rs"]
 mod oracle;
+use oracle::BAND_TOLERANCE;
 
 /// The notched rect of `gpu_mesh_insides.rs`, whose corner lines reach
 /// past their edges' ends into the fill, and two of touche's strokes, one
@@ -98,12 +99,32 @@ fn camera(degrees: f32, distance: f32, behind: bool) -> (Mat4, Mat4) {
     (lens, world)
 }
 
-/// The poses the band and insides rules are held at: 60 degrees, and the
-/// same seen from behind (the Jacobian's determinant negative).
-fn poses() -> [(&'static str, (Mat4, Mat4)); 2] {
+/// The poses the band and insides rules are held at, each with its band
+/// bounds (distance, box-filtered): 60 degrees, the same seen from behind
+/// (the Jacobian's determinant positive there, negative from the front),
+/// 70 and 75.
+///
+/// RELAXED (decal D2b): the distances are taken through the Jacobian at
+/// the fragment, and near edge-on the scale changes across the band, so
+/// the bounds grow with the angle (measured on 2026-11-16 at 3 units,
+/// distance: 0.0103 at 60 degrees, 0.0141 at 70, 0.0305 at 75; box:
+/// within 0.11 to 70, 0.136 at 75; each bound that and the readback's 8
+/// bits, rounded up), and past 75 degrees the ramp is not judged at all
+/// (at 85 the notched rect leaves a pixel 0.61 px outside at 0.29). D2b
+/// takes each wedge's distances on the screen, exact at any angle, and
+/// retires this: one bound for every pose, and poses to 85 degrees.
+fn poses() -> [(&'static str, (Mat4, Mat4), f32, f32); 4] {
+    let (scene, boxed) = (SCENE_DISTANCE, BAND_TOLERANCE);
     [
-        ("60 degrees", camera(60.0, 3.0, false)),
-        ("60 degrees from behind", camera(60.0, 3.0, true)),
+        ("60 degrees", camera(60.0, 3.0, false), scene, boxed),
+        (
+            "60 degrees from behind",
+            camera(60.0, 3.0, true),
+            scene,
+            boxed,
+        ),
+        ("70 degrees", camera(70.0, 3.0, false), 0.018, boxed),
+        ("75 degrees", camera(75.0, 3.0, false), 0.033, 0.14),
     ]
 }
 
@@ -138,7 +159,7 @@ fn placed(plane: [f32; 6], camera: (Mat4, Mat4), q: [f32; 2]) -> [f32; 2] {
 
 #[test]
 fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
-    for ((data, stroke), (pose, camera)) in shapes()
+    for ((data, stroke), (pose, camera, bound, box_bound)) in shapes()
         .into_iter()
         .flat_map(|s| poses().map(move |p| (s, p)))
     {
@@ -157,7 +178,7 @@ fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
         oracle::assert_band_matches(
             &drawn,
             &triangles,
-            (&project, SCENE_DISTANCE),
+            (&project, bound, box_bound),
             &oracle,
             &what,
         );
@@ -166,7 +187,7 @@ fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
 
 #[test]
 fn gpu_meshes_on_turned_planes_are_full_inside_and_empty_outside() {
-    for ((data, stroke), (pose, camera)) in shapes()
+    for ((data, stroke), (pose, camera, _, _)) in shapes()
         .into_iter()
         .flat_map(|s| poses().map(move |p| (s, p)))
     {
@@ -225,4 +246,22 @@ fn gpu_a_mesh_reaching_behind_or_to_the_camera_draws_the_part_in_front() {
             );
         }
     }
+}
+
+#[test]
+fn gpu_a_plane_seen_edge_on_draws_nothing() {
+    // Given a filled rect on a plane turned 90 degrees, edge-on to the
+    // eye, where the Jacobian's columns are parallel: the vertex stage
+    // moves no corner and the fragment stage's singular map draws nothing
+    let (triangles, plane) = on_plane("M0 0H1V1H2V0H3V3H2.1H0Z", None);
+
+    // When
+    let drawn = mesh_coverage_3d(SIDE, &[white(triangles, plane)], camera(90.0, 3.0, false));
+
+    // Then: at most a sliver's coverage, under one 8-bit step
+    let most = drawn.iter().fold(0.0, |most: f32, c| most.max(*c));
+    assert!(
+        most <= 1.0 / 255.0,
+        "an edge-on plane drew a pixel at {most}"
+    );
 }

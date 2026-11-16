@@ -82,7 +82,11 @@ pub fn assert_band_matches_cpu(
     assert_band_matches(
         coverage,
         mesh,
-        (&|q| to_device(transform, q), DISTANCE_TOLERANCE),
+        (
+            &|q| to_device(transform, q),
+            DISTANCE_TOLERANCE,
+            BAND_TOLERANCE,
+        ),
         &drawing,
         what,
     );
@@ -90,11 +94,12 @@ pub fn assert_band_matches_cpu(
 
 /// [`assert_band_matches_cpu`] with the corners placed by `place` (a map
 /// that keeps lines straight), a pixel's distance judged within
-/// `tolerance`, and `drawing` the CPU drawing under `place`.
+/// `tolerance` and its box-filtered value within `box_tolerance`, and
+/// `drawing` the CPU drawing under `place`.
 pub fn assert_band_matches(
     coverage: &[f32],
     mesh: &[MeshTriangle],
-    (place, tolerance): (Place<'_>, f32),
+    (place, tolerance, box_tolerance): (Place<'_>, f32, f32),
     drawing: &[f32],
     what: &str,
 ) {
@@ -102,6 +107,7 @@ pub fn assert_band_matches(
         mesh,
         place,
         tolerance,
+        box_tolerance,
         corners: Corners::of(mesh, place),
         drawing,
     };
@@ -124,6 +130,7 @@ struct Band<'a> {
     mesh: &'a [MeshTriangle],
     place: Place<'a>,
     tolerance: f32,
+    box_tolerance: f32,
     corners: Corners,
     drawing: &'a [f32],
 }
@@ -154,15 +161,15 @@ impl Band<'_> {
         // A triangle without the near corner over-covers by up to the
         // corner's distance (it reads a farther edge of its own; #421), so
         // an inside pixel it may cover is held from below only, within
-        // UNDER_TOLERANCE
-        if !own_edges && drawn < by_distance - UNDER_TOLERANCE {
+        // UNDER_TOLERANCE, or the caller's bound where that is wider
+        if !own_edges && drawn < by_distance - UNDER_TOLERANCE.max(self.tolerance) {
             return Some(format!(
                 "under 0.5 minus its distance to the outline, {by_distance}"
             ));
         }
         let boxed = self.drawing[at];
         let near_sharp = self.corners.near_sharp(centre);
-        (!near_sharp && (drawn - boxed).abs() > BAND_TOLERANCE)
+        (!near_sharp && (drawn - boxed).abs() > self.box_tolerance)
             .then(|| format!("the CPU drawing has {boxed}"))
     }
 

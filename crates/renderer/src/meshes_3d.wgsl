@@ -34,7 +34,12 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
     let det = l.x * l.w - l.y * l.z;
     // A fragment exists only in front of the eye (the rasteriser clips the
     // rest), so the Jacobian is zero or singular only edge-on, where the
-    // plane is a line on the screen: nothing is drawn there.
+    // plane is a line on the screen: coverage 0, which is what an edge-on
+    // plane shows, not an approximation. It keeps 1 / det finite; a
+    // fragment needs area on the screen, which an edge-on plane has none
+    // of, so no test reaches it (`gpu_a_plane_seen_edge_on_draws_nothing`
+    // passes with it removed, the vertex stage's guard being the one that
+    // case needs).
     if (det == 0.0) {
         return vec4(in.colour.rgb, 0.0);
     }
