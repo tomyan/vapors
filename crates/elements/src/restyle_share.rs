@@ -117,13 +117,20 @@ impl Document {
         let decided = match key.winners.compiled() {
             Some(winners) => {
                 let compiled = self.sheets.compiled_shareable(key, winners);
-                let compiled = compiled.map_err(ElementError::Refused)?;
-                if compiled != runtime {
-                    let why = self.sheets.shareable_disagreement(key, winners, compiled);
-                    self.refuse_key(key, &why);
-                    return Err(ElementError::Refused(why));
+                let compiled = compiled.and_then(|compiled| {
+                    let agree = compiled == runtime;
+                    let why = || self.sheets.shareable_disagreement(key, winners, compiled);
+                    if agree { Ok(compiled) } else { Err(why()) }
+                });
+                // a forged index and a disagreement alike refuse every
+                // element of the key for the rest of the `Kept`
+                match compiled {
+                    Ok(compiled) => compiled,
+                    Err(why) => {
+                        self.refuse_key(key, &why);
+                        return Err(ElementError::Refused(why));
+                    }
                 }
-                compiled
             }
             None => runtime,
         };

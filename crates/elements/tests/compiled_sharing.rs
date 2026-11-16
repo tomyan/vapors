@@ -20,6 +20,11 @@ const VIEWPORT: Viewport = Viewport {
 /// A key of `span.card` whose winners say `OTHER`, read as `other`,
 /// blocks sharing; every rule is left to run time.
 fn key(other: &'static str) -> &'static StyleKey {
+    key_blocked_by(other, &[2])
+}
+
+/// [`key`], naming `blocked_by` as its blocking sheets.
+fn key_blocked_by(other: &'static str, blocked_by: &'static [u8]) -> &'static StyleKey {
     let sheets = vec![
         (
             SheetRef::UserAgent,
@@ -40,7 +45,7 @@ fn key(other: &'static str) -> &'static StyleKey {
         sheets: sheets.leak(),
         base: &[],
         conditional: conditional.leak(),
-        blocked_by: &[2],
+        blocked_by,
         own: Some(1),
     }));
     Box::leak(Box::new(StyleKey {
@@ -136,4 +141,17 @@ fn a_key_shares_while_the_sheet_its_winners_name_as_blocking_is_not_in_the_casca
     // Then: (shared, unshareable)
     assert_eq!(shared(false), (1, 0));
     assert_eq!(shared(true), (0, 2));
+}
+
+#[test]
+fn a_blocking_sheet_index_past_the_sheets_refuses_the_key_naming_its_site() {
+    // When: the winners name a fourth sheet of three
+    let refused = updated(key_blocked_by(SIBLINGS, &[3]), SIBLINGS).expect_err("refused");
+
+    // Then
+    assert!(refused.contains("cards/card.wisp:3:1"), "{refused}");
+    assert!(
+        refused.contains("name sheet 3 of 3 as blocking sharing"),
+        "{refused}"
+    );
 }
