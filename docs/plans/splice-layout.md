@@ -1179,7 +1179,8 @@ slice below measures its cause again before its code.
 | Lane batches cut at rows that paint shapes (fold option (b)) | unmeasured (no perf scenario holds shapes): a batch or more a row in view, as each such row's steps split the lane's run; a row with a background, an svg icon and text draws about four batches | `framed_batches.rs` `resolved`: a step that paints a shape is batched in its row's own frame, as the shape and mesh pipelines take no table of row offsets, and batches keep paint order | F2 (the flat scene's transform table, `docs/plans/flat-scene.md`) |
 | Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
 | Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
-| Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
+| Insert box build | about 37; after 4h (A) (#439) Insert layout is 17.2 / 18.7 a row (judged, 1k to 3k / 3k to 10k), from 50.9 / 53.4 | `layout`, the box rebuild: lending started at the edited owner (`Lender::lend_from`), cloning its children list, visiting every child and comparing the lists; now only the inserted children's subtrees are lent. What is left, about 17 a row, is not yet placed | 4h (A); the rest under investigation |
+| Resize, after the lane work (2026-11-16) | accessibility 2461, layout 14, update 16 (judged, 1k to 10k, at #434's head); a layout figure of about 33k a row from an earlier count is stale | accessibility: one bounds write per moved row (4i's options); layout and update small | recorded, not a target this iteration |
 | Insert accessibility | about 4720 (FlexInsert about 1800); after 4i about 1230 (FlexInsert about 230), judged | `accessibility`: the take made its index afresh on every insert and remove (`AxIndex::of`, 71% of Insert's take; now patched, 4i (1), #432), and read every started row again in full (now each row's bounds alone, 4i (2)). What is left is one bounds write a moved row: the a11y tree carries every node's bounds, each from its parent node | 4i; then the options below |
 | Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
 | Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
@@ -1197,12 +1198,18 @@ The slices:
   `--scaling Scroll`'s and `Insert`'s `layout` hold no per-row term from
   placement, and the placement check (`placement_check.rs`) and the
   scroll tests are unchanged.
-- **4h. An owner's children edited, not walked.** An insert or removal
-  under an owner rebuilds the owner's box with its children list made
-  again from every child; the child edits (`child_edits.rs`) already
-  name the one inserted or removed, so the list is edited at that
-  place and the other children's slots are not looked up. Accepted
-  when `Insert`'s and `FlexInsert`'s box build holds no per-row term.
+- **4h. An owner's children edited, not walked.** Measured first (10k
+  rows, a cycles profile of `Document::update`): lending from the edited
+  owner, the order splice's copy, and the a11y row touch. (A), #439: an
+  owner edited in place lends only to its inserted children, O(edits);
+  Insert layout 50.9 to 17.2 a row, FlexInsert 50.5 to 17.0. (B), the
+  order splice made in place, was measured and dropped: the copy is a
+  vectorised memcpy, cheap in instructions (judged layout unchanged,
+  50.6 against 50.9) and in layout's median time (about 371 µs either
+  way); its weight in the cycles profile was allocation and page faults.
+  It is not an instruction term. The a11y row touch was outside the
+  layout span (4f-3, removed by 4i (2)). About 17 a row remains in
+  Insert's layout, not yet placed.
 - **4i. The a11y take after an insert.** Measured first: 71% of
   Insert's take was the index made afresh on every insert and remove,
   26% every started row's record read again in full. (1), #432: the
