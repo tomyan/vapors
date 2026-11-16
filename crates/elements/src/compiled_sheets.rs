@@ -44,8 +44,8 @@ impl Document {
             SheetHash::Registered(hash) => Some(format!(
                 "its compiled winners read {sheet:?} with hash {}, but the sheet in the cascade \
                  under that name hashes {}, so their rule indices name other rules; fix: rebuild \
-                 the crate that registered the sheet, with the same vapors-css; reproduce: mount \
-                 the component after a clean build",
+                 the crate that registered the sheet, with the same vapors-css; reproduce: \
+                 `cargo clean -p <that crate> && cargo build`, then mount the component",
                 hex(compiled),
                 hex(hash)
             )),

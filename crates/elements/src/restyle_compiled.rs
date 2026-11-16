@@ -6,6 +6,14 @@
 //! attributes a sheet selects: the share key's inputs but its parent) is
 //! also computed by the full cascade, and a difference refuses that key
 //! for the rest of the `Kept`; debug builds compare every element.
+//!
+//! The gap a release build leaves: the state holds nothing of the
+//! element's ancestors or siblings, so a winner that depends on them (a
+//! descendant selector such as `.wrap .card`, a sibling one such as
+//! `.a + .card`, or `:has()`) wrongly entered as always winning is
+//! caught only when the first element of its state is one it does not
+//! hold for; a later element of an already verified state is compared
+//! in debug builds only. The plan's B3a row states the same.
 
 use std::rc::Rc;
 
