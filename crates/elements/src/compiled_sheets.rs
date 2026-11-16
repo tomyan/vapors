@@ -10,8 +10,7 @@ use vapors_dom::{SheetRef, StyleKey};
 use crate::{Document, SheetHash};
 
 impl Document {
-    /// What the cascade holds as `sheet`: its text's hash, nothing, or
-    /// a reason it cannot tell.
+    /// What the cascade holds as `sheet`: its text's hash, or nothing.
     #[must_use]
     pub fn sheet_hash(&self, sheet: SheetRef) -> SheetHash {
         self.sheets.hash_of(sheet)
@@ -23,23 +22,23 @@ impl Document {
     /// own; a key without winners has nothing to check.
     ///
     /// # Errors
-    /// The first sheet that hashes otherwise, is absent though it is the
-    /// key's own, or cannot be told apart, naming the key's site, the
-    /// sheet and the fix.
+    /// The first sheet that hashes otherwise, or is absent though it is
+    /// the key's own, naming the key's site, the sheet and the fix.
     pub fn check_compiled_sheets(&self, key: &StyleKey) -> Result<(), String> {
         let Some(winners) = key.winners.compiled() else {
             return Ok(());
         };
-        let refusal = winners
-            .sheets
-            .iter()
-            .find_map(|&(sheet, compiled)| self.refusal(key, sheet, compiled));
+        let own = |index: usize| {
+            index == 0 && winners.sheets[0].0 == SheetRef::UserAgent
+                || winners.own.is_some_and(|own| usize::from(own) == index)
+        };
+        let mut sheets = winners.sheets.iter().enumerate();
+        let refusal = sheets
+            .find_map(|(index, &(sheet, compiled))| self.refusal(sheet, compiled, own(index)));
         refusal.map_or(Ok(()), |why| Err(format!("{}: {why}", key.site)))
     }
 
-    fn refusal(&self, key: &StyleKey, sheet: SheetRef, compiled: u64) -> Option<String> {
-        let own = sheet == SheetRef::UserAgent
-            || matches!(sheet, SheetRef::Scope(s) if Some(s) == key.scope);
+    fn refusal(&self, sheet: SheetRef, compiled: u64, own: bool) -> Option<String> {
         match self.sheet_hash(sheet) {
             SheetHash::Registered(hash) if hash == compiled => None,
             SheetHash::Registered(hash) => Some(format!(
@@ -53,15 +52,11 @@ impl Document {
             SheetHash::Absent if own => Some(format!(
                 "its compiled winners name its own sheet {sheet:?}, which the cascade does not \
                  hold, though a component adds its sheet before its elements: the compiler and \
-                 the runtime name the sheet differently (codegen's SCOPE and the key's SheetRef); \
+                 the runtime name the sheet differently (codegen's SCOPE or SHEET and the key's SheetRef); \
                  fix: give both one name; reproduce: cargo nextest run -p vapors-perf \
                  every_compiled_row"
             )),
             SheetHash::Absent => None,
-            SheetHash::Unresolvable(why) => Some(format!(
-                "its compiled winners name {sheet:?}, which cannot be checked: {why}; fix: build \
-                 after R1a, or build the component with scoped styles"
-            )),
         }
     }
 }

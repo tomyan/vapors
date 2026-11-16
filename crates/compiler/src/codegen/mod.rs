@@ -160,7 +160,8 @@ fn generated(
     })?;
     let hashes = others.hashes_for(component);
     let own = component.style.as_ref().and(component.scope.as_deref());
-    let winners = key_winners::Winners::new(&analysis, &hashes, own);
+    let styled = component.style.is_some();
+    let winners = key_winners::Winners::new(&analysis, &hashes, (own, styled));
     let mut emitter = emit_template(component, &source, &info, (1, index), Some(&winners))?;
     let width = digits(emitter.names_made().saturating_sub(1));
     if width > 1 {

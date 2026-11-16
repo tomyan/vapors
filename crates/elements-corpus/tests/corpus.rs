@@ -85,9 +85,7 @@ fn read_box(row: &Value) -> (String, BoxRect) {
 
 fn our_boxes(fixture: &Fixture, viewport: Viewport) -> Vec<(String, BoxRect)> {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
-    doc.borrow_mut()
-        .add_stylesheet(fixture.name, fixture.style)
-        .expect("the fixture's style parses");
+    // the mount registers the fixture's sheet itself
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
     images::register_fixture_images(&mut doc.borrow_mut());

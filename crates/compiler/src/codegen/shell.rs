@@ -24,10 +24,19 @@ pub(crate) fn assemble(
     if let Some(scope) = scope {
         file.push_str(&scope_constant(scope));
     }
+    let global = component.style.is_some() && scope.is_none();
+    if global {
+        file.push_str(&sheet_constant(component.global_sheet_name()));
+    }
     file.push_str(&super::style_key::key_statics(keys));
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body, scope.is_some()));
+    let registration = match (scope, global) {
+        (Some(_), _) => "        dom.borrow_mut().add_style(SCOPE, STYLE);\n",
+        (None, true) => "        dom.borrow_mut().add_global_style(SHEET, STYLE);\n",
+        (None, false) => "",
+    };
+    file.push_str(&mount_methods(name, info, body, registration));
     let uses: Vec<&String> = info
         .statements
         .iter()
@@ -68,6 +77,18 @@ pub const SCOPE: &str = {};
 
 ",
         in_crate(scope)
+    )
+}
+
+/// A global component's sheet name: its crate and file, as compiled
+/// winners name it (`codegen::key_winners`).
+fn sheet_constant(path: &str) -> String {
+    format!(
+        "/// The name [`STYLE`] is added under, unscoped, by each mount.
+pub const SHEET: &str = {};
+
+",
+        in_crate(path)
     )
 }
 
@@ -154,16 +175,13 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> String {
+/// The mount methods; `add_style` is the line that registers the
+/// component's sheet, or empty.
+fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> String {
     let (returned, built) = field_lists(info);
     let allowances = mount_allowances(info, body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
-    let add_style = if styled {
-        "        dom.borrow_mut().add_style(SCOPE, STYLE);\n"
-    } else {
-        ""
-    };
     let mut statements = String::new();
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");

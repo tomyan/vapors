@@ -14,9 +14,9 @@ use std::collections::{HashMap, HashSet};
 use vapors_css::Position;
 use vapors_css::cascade::{ComputedStyle, INLINE_SHEET, PRESENTATION_SHEET};
 use vapors_css::property::PropertyId;
-use vapors_dom::{DeclarationRef, KeyWinners, PropertyRef, SheetRef, StyleKey};
+use vapors_dom::{DeclarationRef, KeyWinners, PropertyRef, StyleKey};
 
-use super::{Sheets, USER_AGENT_SHEET};
+use super::Sheets;
 
 /// Where the cascade's sheets hold a declaration: (sheet, position), or
 /// the inline or presentation sheet by itself.
@@ -24,17 +24,12 @@ type Place = (usize, Option<Position>);
 
 impl Sheets {
     /// Panics naming `element`, its key's site and the property when
-    /// `style` took a declaration `key`'s winners do not allow. A key
-    /// naming a global sheet is not checked: until R1a the cascade holds
-    /// global sheets by name, not by file (`SheetHash::Unresolvable`);
-    /// R1a retires that.
+    /// `style` took a declaration `key`'s winners do not allow.
     pub(crate) fn check_winners(&self, key: &StyleKey, element: &str, style: &ComputedStyle) {
         let Some(winners) = key.winners.compiled() else {
             return;
         };
-        let Some(sheets) = self.cascade_sheets(winners) else {
-            return;
-        };
+        let sheets = self.cascade_sheets(winners);
         let base = self.base_places(winners, &sheets);
         let conditional = self.conditional_places(winners, &sheets);
         let referenced: HashSet<usize> = sheets.iter().flatten().copied().collect();
@@ -54,14 +49,10 @@ impl Sheets {
         }
     }
 
-    /// Each of `winners.sheets` as its index in the cascade (`None`
-    /// when absent); `None` when one is a global sheet.
-    fn cascade_sheets(&self, winners: &KeyWinners) -> Option<Vec<Option<usize>>> {
-        let index = |sheet| match sheet {
-            SheetRef::UserAgent => Some(Some(USER_AGENT_SHEET)),
-            SheetRef::Scope(scope) => Some(self.names.iter().position(|name| name == scope)),
-            SheetRef::Global(_) => None,
-        };
+    /// Each of `winners.sheets` as its index in the cascade, `None` when
+    /// absent.
+    fn cascade_sheets(&self, winners: &KeyWinners) -> Vec<Option<usize>> {
+        let index = |sheet| self.held(sheet).map(|held| held.index);
         winners
             .sheets
             .iter()

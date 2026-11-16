@@ -35,9 +35,7 @@ pub fn paint_fixtures() -> Vec<Fixture> {
 /// The fixture laid out at `scale`.
 pub fn laid_out(fixture: &Fixture, scale: u32) -> Rc<RefCell<Document>> {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
-    doc.borrow_mut()
-        .add_stylesheet(fixture.name, fixture.style)
-        .expect("parses");
+    // the mount registers the fixture's sheet itself
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
     images::register_fixture_images(&mut doc.borrow_mut());

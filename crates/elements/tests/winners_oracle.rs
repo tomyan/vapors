@@ -22,6 +22,11 @@ const VIEWPORT: Viewport = Viewport {
 /// of `.card`, every user-agent rule left to run time (as conditional)
 /// so the test names no other winner.
 fn key(declaration: u32) -> &'static StyleKey {
+    key_in(SheetRef::Scope(OWN), declaration)
+}
+
+/// [`key`] of a component whose sheet is `sheet`, scoped or global.
+fn key_in(sheet: SheetRef, declaration: u32) -> &'static StyleKey {
     let color = PropertyId::from_name("color").expect("a longhand").index();
     let base = vec![BaseWinner {
         property: PropertyRef::Longhand(u16::try_from(color).expect("fits")),
@@ -31,14 +36,15 @@ fn key(declaration: u32) -> &'static StyleKey {
         },
     }];
     let winners = Box::leak(Box::new(KeyWinners {
-        sheets: &[(SheetRef::UserAgent, 0), (SheetRef::Scope(OWN), 0)],
+        sheets: vec![(SheetRef::UserAgent, 0), (sheet, 0)].leak(),
         base: base.leak(),
         conditional: user_agent_rules().leak(),
         shareable: true,
+        own: Some(1),
     }));
     Box::leak(Box::new(StyleKey {
         site: "cards/card.wisp:3:1",
-        scope: Some(OWN),
+        scope: matches!(sheet, SheetRef::Scope(_)).then_some(OWN),
         tag: "span",
         classes: &["card"],
         toggles: &[],
@@ -59,7 +65,11 @@ fn user_agent_rules() -> Vec<RuleRef> {
 
 fn updated(key: &'static StyleKey) {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(OWN, CARD);
+    if key.scope.is_some() {
+        doc.add_style(OWN, CARD);
+    } else {
+        doc.add_global_style(OWN, CARD);
+    }
     let body = doc.body();
     let node = doc.create_keyed_element(key);
     doc.insert_before(body, node, None);
@@ -81,4 +91,18 @@ fn winners_that_name_the_cascades_declaration_pass() {
 fn winners_that_name_a_declaration_the_cascade_did_not_take_panic_naming_the_property() {
     // `.card` has no declaration 1
     updated(key(1));
+}
+
+#[test]
+fn a_global_keys_winners_that_name_the_cascades_declaration_pass() {
+    updated(key_in(SheetRef::Global(OWN), 0));
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    should_panic(expected = "for `color`, but the cascade's winner is")
+)]
+fn a_global_keys_winners_that_name_a_declaration_the_cascade_did_not_take_panic() {
+    updated(key_in(SheetRef::Global(OWN), 1));
 }

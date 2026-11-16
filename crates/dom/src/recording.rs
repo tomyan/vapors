@@ -84,6 +84,10 @@ pub enum Call {
         scope: String,
         css: String,
     },
+    AddGlobalStyle {
+        sheet: String,
+        css: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

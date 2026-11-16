@@ -52,6 +52,14 @@ impl Dom for Document {
         }
     }
 
+    /// As [`Dom::add_style`], unscoped.
+    fn add_global_style(&mut self, sheet: &str, css: &str) {
+        if self.sheets.add_global(sheet, css) {
+            self.note_change();
+            self.dirty.everything();
+        }
+    }
+
     fn create_text(&mut self, text: &str) -> NodeId {
         self.arena.insert(Node::new(Kind::Text(text.to_owned())))
     }

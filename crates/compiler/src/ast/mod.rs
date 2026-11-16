@@ -35,6 +35,16 @@ pub struct Component {
     pub template: Document,
 }
 
+impl Component {
+    /// The name a global sheet is held under after the crate's name:
+    /// [`Component::global_sheet`], or the path as named. One answer for
+    /// the generated `SHEET` and the analysis' `SheetId::Global`.
+    #[must_use]
+    pub fn global_sheet_name(&self) -> &str {
+        self.global_sheet.as_deref().unwrap_or(&self.path)
+    }
+}
+
 /// The text of a section and where it starts in the file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
