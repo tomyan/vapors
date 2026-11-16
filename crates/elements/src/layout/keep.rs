@@ -118,6 +118,7 @@ impl KeptBoxes {
             may_keep,
             located: &located,
             lent: 0,
+            visited: 0,
         };
         lender.lend_from(&mut placed.boxes, 0);
         lender.lent
@@ -133,6 +134,8 @@ pub(super) struct Lender<'a> {
     /// Where a lent layout in a slot puts its box.
     pub(super) located: &'a dyn Fn(usize, &Layout) -> Point<f32>,
     pub(super) lent: usize,
+    /// The boxes lending visited, lent or not.
+    pub(super) visited: usize,
 }
 
 impl Lender<'_> {
@@ -143,6 +146,7 @@ impl Lender<'_> {
     /// A kept box, which a shallow owner kept in its slot, keeps its
     /// cache and layout.
     pub(super) fn lend_from(&mut self, boxes: &mut [LayoutBox], at: usize) -> bool {
+        self.visited += 1;
         if boxes[at].kept {
             return true;
         }
