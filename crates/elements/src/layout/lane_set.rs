@@ -66,11 +66,12 @@ impl Lanes {
     /// add them: a container built again and lent its cache is not laid
     /// out again (section 11.2).
     pub(crate) fn remove(&mut self, slot: usize, boxes: &mut [LayoutBox]) {
-        self.changes += 1;
         if let Some(lane) = self.block.remove(&slot) {
+            self.changes += 1;
             lane.restore_starts(slot, boxes);
         }
         if let Some(lane) = self.flex.remove(&slot) {
+            self.changes += 1;
             lane.restore_starts(slot, boxes);
         }
     }
@@ -79,9 +80,8 @@ impl Lanes {
     /// nothing: its children are freed or built again elsewhere, and
     /// their slots may hold other boxes now.
     pub(crate) fn forget(&mut self, slot: usize) {
-        self.changes += 1;
-        self.block.remove(&slot);
-        self.flex.remove(&slot);
+        let dropped = self.block.remove(&slot).is_some() | self.flex.remove(&slot).is_some();
+        self.changes += u64::from(dropped);
     }
 
     /// Where the child in `child` starts in the border box of the lane
@@ -181,18 +181,18 @@ impl Lanes {
     /// Tells the lane of the container in `owner`, if it has one, of
     /// the child put in at `slot` after `after` (`Lane::child_inserted`).
     pub(crate) fn child_inserted(&mut self, owner: usize, slot: usize, after: Option<usize>) {
-        self.changes += 1;
         if let Some(lane) = self.lane_mut(owner) {
             lane.child_inserted(slot, after);
+            self.changes += 1;
         }
     }
 
     /// Tells the lane of the container in `owner`, if it has one, of
     /// the child taken out of `slot` (`Lane::child_removed`).
     pub(crate) fn child_removed(&mut self, owner: usize, slot: usize, next: Option<usize>) {
-        self.changes += 1;
         if let Some(lane) = self.lane_mut(owner) {
             lane.child_removed(slot, next);
+            self.changes += 1;
         }
     }
 }

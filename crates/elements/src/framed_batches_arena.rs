@@ -10,8 +10,9 @@
 pub struct RowsOfBatches {
     frames: Vec<usize>,
     items: Vec<u32>,
-    /// By part: its table's place in `frames`.
+    /// By part: its table's place in `frames`, and its first batch.
     parts: Vec<(usize, usize)>,
+    firsts: Vec<usize>,
     /// By batch: its part, if it is a lane batch, and where its items'
     /// slots start in `items`; each runs to the next batch's start.
     batches: Vec<(Option<usize>, usize)>,
@@ -76,6 +77,13 @@ impl RowsOfBatches {
         self.batches.get(at).and_then(|&(part, _)| part)
     }
 
+    /// The first batch of lane part `part`: whose key names the part's
+    /// table, whichever of its batches is drawn first.
+    #[must_use]
+    pub fn first_of_part(&self, part: usize) -> Option<usize> {
+        self.firsts.get(part).copied()
+    }
+
     /// Each batch's rows, in order.
     pub fn iter(&self) -> impl Iterator<Item = BatchRows<'_>> {
         (0..self.len()).filter_map(|at| self.get(at))
@@ -84,6 +92,7 @@ impl RowsOfBatches {
     /// A lane part opened, its table to come (`close_part`): its index.
     pub(crate) fn open_part(&mut self) -> usize {
         self.parts.push((self.frames.len(), self.frames.len()));
+        self.firsts.push(self.batches.len());
         self.parts.len() - 1
     }
 
@@ -116,6 +125,9 @@ impl RowsOfBatches {
         let (frames, items, parts) = (self.frames.len(), self.items.len(), self.parts.len());
         let moved = other.parts.iter().map(|&(s, e)| (s + frames, e + frames));
         self.parts.extend(moved);
+        let batches_before = self.batches.len();
+        self.firsts
+            .extend(other.firsts.iter().map(|&first| first + batches_before));
         let batches = other
             .batches
             .iter()

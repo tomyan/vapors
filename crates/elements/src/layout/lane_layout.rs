@@ -133,9 +133,9 @@ impl BoxTree<'_> {
         c: &K::Container,
     ) -> Result<LayoutOutput, LaneDecline> {
         let slot = usize::from(id);
-        let mut lane = K::lanes(self.lanes)
-            .remove(&slot)
-            .unwrap_or_else(|| Lane::new(K::gap(c)));
+        let held = K::lanes(self.lanes).remove(&slot);
+        let existed = held.is_some();
+        let mut lane = held.unwrap_or_else(|| Lane::new(K::gap(c)));
         let aside = self.answers_aside(c, &lane);
         let run = if aside {
             self.fill_aside::<K>(slot, c)
@@ -148,8 +148,9 @@ impl BoxTree<'_> {
         if run.is_ok() || aside {
             self.lane_kept(slot, lane);
         } else {
-            // dropped: a change, which a frames' memo built on it must see
-            self.lanes.changes += 1;
+            // a lane held, dropped: a change, which a frames' memo built on
+            // it must see (one made for this ask and declined changes none)
+            self.lanes.changes += u64::from(existed);
             lane.restore_starts(slot, &mut self.boxes);
         }
         K::answer(c, &run?)

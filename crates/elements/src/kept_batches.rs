@@ -154,7 +154,14 @@ impl KeptBatches {
     pub(crate) fn batches(&mut self, sources: Sources<'_>) -> &KeptBatched {
         if self.current().is_none() {
             let (shown, boxes) = (&self.shown, (sources.boxes, sources.frames));
-            self.slots.keep_only(shown.iter().map(|shown| shown.frame));
+            let mut lane = crate::framed_batches::LastSeen::default();
+            let rows = shown.iter().filter_map(|shown| {
+                let container = lane.get(shown.frame, || {
+                    sources.frames.lane_container_of(shown.frame)
+                });
+                Some((shown.frame, container?))
+            });
+            self.slots.keep_only(rows);
             let slots = (self.view, &mut self.slots);
             let mut framed = framed_batches(shown, |shown| shown.step, boxes, slots);
             self.shown_culled = framed.batched.culled;

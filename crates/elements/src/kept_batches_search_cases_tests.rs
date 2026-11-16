@@ -165,3 +165,32 @@ fn an_end_row_taken_out_as_a_row_is_put_in_sorts_the_steps_again() {
     assert_eq!(doc.update_counts().batch_steps_sorted_again, 1);
     drawn(&mut doc);
 }
+
+#[test]
+fn slots_are_given_back_as_rows_scroll_past_through_real_draws() {
+    // Given: a list of 200 rows, 11 in view at a time
+    let (mut doc, _) = list("", |_, _| (), 10.0);
+
+    // When: scrolled through 150 rows, 10 at a time, drawn each time
+    for _ in 0..15 {
+        assert!(
+            doc.scroll_node_by(doc.body(), [0.0, 200.0]),
+            "the body scrolls"
+        );
+        drawn(&mut doc);
+    }
+
+    // Then: the slots held are the rows in view's, and no lane handed out
+    // more than about two views' worth: each row left gave its slot back
+    let painted = doc.painted.as_ref().expect("painted");
+    let kept = painted.kept_batches.borrow();
+    let (held, most) = kept.as_ref().expect("kept batches").slots().held();
+    assert!(
+        held <= 13,
+        "{held} rows hold slots, 11 or 12 rows are in view"
+    );
+    assert!(
+        most <= 26,
+        "slots up to {most} handed out for at most 12 rows shown at once"
+    );
+}

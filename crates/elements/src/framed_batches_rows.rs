@@ -105,6 +105,13 @@ impl Parts {
         if self.table.len() <= entry {
             self.table.resize(entry + 1, NO_ROW);
         }
+        let held = self.table[entry];
+        assert!(
+            held == NO_ROW || held == frame,
+            "rows {held} and {frame} are both in entry {entry} of a lane part's table: one slot \
+             given to two rows (framed_batches_slots.rs `LaneSlots::slot`); the debug check \
+             batching afresh shares the slots and cannot see it; reproduce with `cargo xtask test`"
+        );
         self.table[entry] = frame;
     }
 

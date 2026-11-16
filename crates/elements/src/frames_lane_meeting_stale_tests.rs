@@ -135,3 +135,89 @@ fn a_gap_that_is_whole_only_after_rounding_is_not_framed() {
         "{counts:?}"
     );
 }
+
+/// A list of 300 rows styled by `css`, its lane written by a row put in
+/// at the top, updated; and the list.
+fn written_list(css: &str) -> (Document, vapors_dom::NodeId) {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet(
+        "p.css",
+        &format!("body {{ margin: 0; }} .row {{ height: 20px; }} {css}"),
+    )
+    .expect("parses");
+    let list = doc.create_element("div");
+    doc.append(doc.body(), list);
+    let row = |doc: &mut Document| {
+        let row = doc.create_element("div");
+        doc.set_attribute(row, "class", "row");
+        row
+    };
+    for _ in 0..300 {
+        let new = row(&mut doc);
+        doc.append(list, new);
+    }
+    doc.update(VIEWPORT).expect("updates");
+    let new = row(&mut doc);
+    let first = doc.children(list)[0];
+    doc.insert_before(list, new, Some(first));
+    doc.update(VIEWPORT).expect("updates");
+    (doc, list)
+}
+
+/// How many times `doc`'s lanes have changed (`Lanes::changes`).
+fn changes(doc: &Document) -> u64 {
+    let frames = &doc.painted.as_ref().expect("painted").frames;
+    frames
+        .lanes
+        .shared
+        .as_ref()
+        .expect("lanes")
+        .borrow()
+        .changes()
+}
+
+#[test]
+fn a_held_lane_declining_a_later_ask_counts_as_a_change() {
+    // Given: a framed list
+    let (mut doc, list) = written_list(".out { position: absolute; }");
+    let before = changes(&doc);
+
+    // When: a row taken out of flow, so the lane declines its next ask
+    // and is dropped
+    let row = doc.children(list)[5];
+    doc.set_attribute(row, "class", "row out");
+    doc.update(VIEWPORT).expect("updates");
+
+    // Then
+    assert!(
+        doc.update_counts().lanes_declined > 0,
+        "{:?}",
+        doc.update_counts()
+    );
+    assert!(changes(&doc) > before, "{before} -> {}", changes(&doc));
+}
+
+#[test]
+fn a_lane_made_for_an_ask_and_declined_counts_no_change() {
+    // Given / When: a list whose first row is out of flow from the start,
+    // so every ask declines and no lane is ever held
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let css = "body { margin: 0; } .row { height: 20px; } .out { position: absolute; }";
+    doc.add_stylesheet("p.css", css).expect("parses");
+    let list = doc.create_element("div");
+    doc.append(doc.body(), list);
+    for at in 0..300 {
+        let row = doc.create_element("div");
+        doc.set_attribute(row, "class", if at == 0 { "row out" } else { "row" });
+        doc.append(list, row);
+    }
+    doc.update(VIEWPORT).expect("updates");
+
+    // Then
+    assert!(
+        doc.update_counts().lanes_declined > 0,
+        "{:?}",
+        doc.update_counts()
+    );
+    assert_eq!(changes(&doc), 0);
+}

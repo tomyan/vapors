@@ -110,8 +110,15 @@ impl BatchPlaces {
     ) -> Rows {
         let rows = kept.rows.get(at).unwrap_or_default();
         let offsets = painted.row_offsets(kept.frames[at], rows);
+        // keyed by the part's first batch, drawn or not, so the part keeps
+        // one table however its batches are clipped
+        let first = kept
+            .rows
+            .part(at)
+            .and_then(|part| kept.rows.first_of_part(part));
+        let key = kept.keys[first.unwrap_or(at)];
         let table = (!offsets.is_empty()).then(|| {
-            self.tables.push(tables.table(kept.keys[at], &offsets));
+            self.tables.push(tables.table(key, &offsets));
             self.tables.len() - 1
         });
         let start = self.offsets.len();

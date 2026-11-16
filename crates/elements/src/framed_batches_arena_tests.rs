@@ -46,3 +46,23 @@ fn appended_batches_keep_their_parts_tables() {
     };
     assert_eq!(rows.get(1), Some(second));
 }
+
+#[test]
+fn each_part_knows_its_first_batch_after_an_append() {
+    // Given: a part of two batches, then one more part appended
+    let mut rows = RowsOfBatches::default();
+    let part = rows.open_part();
+    rows.start_batch(part);
+    rows.push_item(0);
+    rows.start_batch(part);
+    rows.push_item(1);
+    rows.close_part(part, &[7, 8]);
+    rows.append(&RowsOfBatches::one(&[9], &[0]));
+
+    // When / Then
+    assert_eq!(
+        (rows.first_of_part(0), rows.first_of_part(1)),
+        (Some(0), Some(2))
+    );
+    assert_eq!((rows.part(1), rows.part(2)), (Some(0), Some(1)));
+}

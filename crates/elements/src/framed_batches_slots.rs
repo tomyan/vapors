@@ -29,14 +29,30 @@ impl RowSlots {
         self.lanes.entry(container).or_default()
     }
 
-    /// Every slot held by a row not among `shown` (the frames of the
-    /// steps shown) given back, and lanes with none held dropped.
-    pub(crate) fn keep_only(&mut self, shown: impl Iterator<Item = usize>) {
-        let shown: FxHashSet<usize> = shown.collect();
-        for lane in self.lanes.values_mut() {
-            lane.keep_only(&shown);
+    /// Every slot held by a row not among `shown` (each lane row of a
+    /// step shown, with its lane's container) given back, so each lane
+    /// holds slots for its own rows shown alone; lanes with none held
+    /// dropped.
+    pub(crate) fn keep_only(&mut self, shown: impl Iterator<Item = (usize, usize)>) {
+        let mut by_lane: FxHashMap<usize, FxHashSet<usize>> = FxHashMap::default();
+        for (row, container) in shown {
+            by_lane.entry(container).or_default().insert(row);
+        }
+        let none = FxHashSet::default();
+        for (container, lane) in &mut self.lanes {
+            lane.keep_only(by_lane.get(container).unwrap_or(&none));
         }
         self.lanes.retain(|_, lane| !lane.of.is_empty());
+    }
+
+    /// How many rows hold slots, over every lane, and the most slots any
+    /// lane has handed out: bounded by the rows shown when slots are given
+    /// back.
+    #[cfg(test)]
+    pub(crate) fn held(&self) -> (usize, u32) {
+        let rows = self.lanes.values().map(|lane| lane.of.len()).sum();
+        let most = self.lanes.values().map(|lane| lane.next).max().unwrap_or(0);
+        (rows, most)
     }
 }
 
