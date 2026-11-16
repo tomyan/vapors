@@ -89,8 +89,14 @@ impl ThumbFades {
     /// the controller's inputs are scrolls, the mouse and `DidRequestShow`
     /// (`scrollbar_animation_controller.cc:190-301`), called from
     /// `LayerTreeHostImpl::WillScrollContent`, `DidScrollContent` and the
-    /// mouse handlers (`cc/trees/layer_tree_host_impl.cc:4754-4796`,
-    /// `:4970-5006`), so in Chrome a finger landing changes no thumb.
+    /// mouse handlers (`cc/trees/layer_tree_host_impl.cc:622-626`,
+    /// `:4754-4796`, `:4970-5006`), so in Chrome a finger landing changes
+    /// no thumb. The floor is the whole document's, so a scroll container
+    /// added during this fade first draws its thumbs at the floor's
+    /// opacity, as one added under the mouse draws them fully; in Chrome
+    /// on Android a new scroller shows none until it scrolls. Kept so, as
+    /// the mouse floor's behaviour; the event that calls this asks for the
+    /// fade's first frame (`DocumentInput::handle`).
     pub(crate) fn touch_after_mouse(&mut self, now: Instant) {
         let mut floor = ThumbFade::default();
         floor.scrolled(now);

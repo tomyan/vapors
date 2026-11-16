@@ -126,6 +126,11 @@ fn a_touch_after_the_mouse_draws_the_shared_thumbs_fading_from_full() {
     assert!(!changed_at(at), "not hidden at the touch");
     assert!(!changed_at(at + 299 * MS));
     assert!(changed_at(at + 450 * MS));
+    assert!(
+        (doc.borrow().thumb_opacity() - 0.5).abs() < 0.01,
+        "half faded at 450 ms"
+    );
     assert!(changed_at(at + FADE_DELAY + FADE_DURATION));
+    assert_eq!(doc.borrow().thumb_opacity(), 0.0);
     assert_eq!(fades.phase(at + FADE_DELAY + FADE_DURATION), Phase::Hidden);
 }

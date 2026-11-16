@@ -176,6 +176,12 @@ impl DocumentInput {
         running
     }
 
+    /// Whether the touch thumbs are shown or fading now: a fade that has
+    /// frames to come.
+    pub(crate) fn touch_thumbs_fading(&self) -> bool {
+        self.touch.thumb_phase(vapors_platform::Instant::now()) != crate::thumb_fade::Phase::Hidden
+    }
+
     /// Where the touch thumbs' fade was at the last `advance_fling`: the
     /// host draws a frame at once while they fade, and at the fade's
     /// start while shown.

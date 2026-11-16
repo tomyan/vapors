@@ -131,7 +131,7 @@ impl DocumentInput {
         platform: &Platform,
     ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
-        let flinging = self.flinging();
+        let (flinging, fading) = (self.flinging(), self.touch_thumbs_fading());
         if let Some(action) = action {
             self.act(document, action);
         }
@@ -147,8 +147,10 @@ impl DocumentInput {
         }
         self.paste_if(document, event, platform);
         self.tooltip_event(&document.borrow(), event, action, Instant::now());
-        // a fling the event started needs a frame to move on
-        let changed = document.borrow_mut().take_changed() || (!flinging && self.flinging());
+        // a fling or a thumb fade the event started needs a frame to move
+        // on: a first touch on nothing painted changes nothing else (#413)
+        let started = (!flinging && self.flinging()) || (!fading && self.touch_thumbs_fading());
+        let changed = document.borrow_mut().take_changed() || started;
         let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);
