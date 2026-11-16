@@ -1,0 +1,36 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Adapter type: IntegratedGpu
+Timestamp queries: true
+Revision: 8bd8995b789c
+Profile: judged (release, codegen-units 1, no override the build could see)
+Shader cache: /home/tom/.cache/w-f0/attr/out/p2-pre-r1a/cache, 1 entries at the start (warm)
+Load average at the start: 23.28
+
+First frame, 10000 rows: mount 65518.8 µs, App::start to idle 1031708.9 µs, frame 0 to idle 4798.3 µs (to submit 3256.1 µs); mount to frame 0 idle 1102026.0 µs.
+
+| part | phase | µs | instructions |
+|---|---|---|---|
+| mount | all | 65518.8 | 307499240 |
+| start | all | 1031708.9 | none |
+| start | layout | 732632.3 | 2290691526 |
+| start | paint | 168422.4 | 326630290 |
+| start | style | 107730.5 | 429746406 |
+| start | write | 1072.6 | 111868 |
+| frame | all | 3256.1 | 7424893 |
+| frame | to idle | 4798.3 | none |
+| frame | accessibility | 0.4 | 1345 |
+| frame | batches | 93.6 | 156144 |
+| frame | draw | 3185.3 | 7376522 |
+| frame | encode | 454.0 | 690397 |
+| frame | input | 7.0 | 1337 |
+| frame | layout | 12.3 | 4184 |
+| frame | paint | 0.6 | 1936 |
+| frame | record | 0.2 | 1325 |
+| frame | style | 5.6 | 2007 |
+| frame | submit | 256.3 | 64782 |
+| frame | tasks | 0.1 | 1325 |
+| frame | tick | 0.1 | 1325 |
+| frame | update | 31.7 | 19759 |
+| frame | write | 807.8 | 1156721 |
+
+Load average at the end: 21.57
