@@ -15,7 +15,6 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::Command;
 
 /// Agreement on lines the command refuses under, in tenths of a percent.
 pub const FLOOR_LINES_PER_MILLE: usize = 999;
@@ -44,7 +43,11 @@ pub fn collect_clippy(root: &Path) -> Result<ClippyCounts, String> {
         "too-many-lines-threshold = 1\ncognitive-complexity-threshold = 1\n",
     )
     .map_err(|e| format!("{}: {e}", conf.display()))?;
-    let output = Command::new("cargo")
+    // as every build xtask starts: niced, the job cap, the cache and the
+    // build directory's cap
+    let mut cargo = crate::priority::command("cargo")?;
+    crate::sccache::apply(&mut cargo)?;
+    let output = cargo
         .args([
             "clippy",
             "--workspace",

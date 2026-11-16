@@ -1,52 +1,67 @@
 //! The cap on a worktree's build directory: every build xtask starts
 //! (each step, as with the compilation cache, `sccache.rs`) is refused
-//! while `target/` holds more than `[targets] max_gb` in
-//! `.config/factory.toml`, naming the size and the command that empties
-//! it. On 2026-11-15 one worktree's target passed 80 GB twice and the
-//! disk reached 95%.
+//! while the directory cargo builds into holds more than
+//! `[targets] max_gb` in `.config/factory.toml`, naming the size, how
+//! to see it, and the command that empties it. The limit's source is
+//! CLAUDE.md's Builds section.
 //!
-//! The size is measured cheaply: the files directly in each
-//! `target/<profile>/deps` and `target/<triple>/<profile>/deps`, one
-//! directory listing each with no walk below, summed as allocated
-//! blocks (as `du` counts). Measured 2026-11-16 on six of the dev box's
-//! targets, `deps` held 82% to 96% of what `du -sb` counted, 89% and
-//! up on those over a gigabyte (98.3 of 111.0 GB, 84.3 of 90.0, 47.1 of
-//! 50.8, 31.5 of 32.7, 1.3 of 1.4, 0.7 of 0.9), read in 2 to 34 ms where `du` took 9 to 400 ms warm and
-//! more cold. So the cap fires at `max_gb` of build products, with the
-//! whole directory then, at sizes near the cap, at most about an eighth
-//! larger.
+//! The directory is `CARGO_TARGET_DIR` when set, else the workspace's
+//! `target/`; the workspace is the nearest directory at or above the
+//! current one holding `.config/factory.toml`, so a run from a
+//! subdirectory is capped too. A `target-dir` in `.cargo/config.toml`
+//! is refused, as it is not read here.
+//!
+//! The size is measured cheaply, without walking the whole tree: in each
+//! `target/<profile>` and `target/<triple>/<profile>`, the files directly
+//! in `deps` and `examples` (one listing each), and `incremental` to the
+//! depth cargo writes it (crate, session, file), summed as allocated
+//! blocks (as `du` counts). `incremental` is empty for xtask's builds
+//! and `.cargo/config.toml`'s; a plain build with `CARGO_INCREMENTAL=1`
+//! fills it. Measured 2026-11-16 on six of the dev box's targets, `deps`
+//! alone held 82% to 96% of what `du -sb` counted and `examples` most of
+//! the rest (10.1 GB beside 97.5 in the largest), read in 2 to 34 ms
+//! where `du` took 9 to 400 ms warm and more cold. What is left out
+//! (`build/` script outputs, `.fingerprint/`, `tmp/`) is not bounded by
+//! this measure.
+//!
+//! The size is checked when each step starts, not during one: a step
+//! started under the cap can end over it, and the next step is refused.
 
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const GB: u64 = 1_000_000_000;
+const SETTINGS: &str = ".config/factory.toml";
+/// The subdirectories of a profile directory counted, and how deep
+/// below each its files are: `incremental/<crate>/<session>/<file>`.
+const COUNTED: [(&str, usize); 3] = [("deps", 1), ("examples", 1), ("incremental", 3)];
 
-/// Refuse when the workspace's `target/` holds more than the configured
-/// cap; a repository that sets none, or a directory with no settings
-/// file, is not capped, said once per run.
+/// Refuse when the build directory holds more than the configured cap;
+/// a repository that sets none is not capped, said once per run.
 ///
 /// # Errors
-/// Over the cap, the cap not a whole number, or a `deps` directory that
-/// could not be read, each naming the fix.
+/// Over the cap; no settings file at or above the current directory;
+/// the cap not a number above 0; a `target-dir` in `.cargo/config.toml`;
+/// or a directory or file that could not be read, each naming the fix.
 pub fn check() -> Result<(), String> {
-    // xtask's own unit tests run steps from the xtask crate, which has
-    // no settings file; a workspace always does
-    if !Path::new(".config/factory.toml").exists() {
-        uncapped_once("no .config/factory.toml in the current directory");
-        return Ok(());
-    }
-    let config = crate::config::Config::load().map_err(|e| e.to_string())?;
+    let here = std::env::current_dir().map_err(|e| format!("the current directory: {e}"))?;
+    let root = workspace_root(&here)?;
+    let config = crate::config::Config::load_from(&root).map_err(|e| e.to_string())?;
     let Some(max_gb) = cap(config.get("targets.max_gb"))? else {
-        uncapped_once("no [targets] max_gb in .config/factory.toml");
+        uncapped_once();
         return Ok(());
     };
-    let target = crate::gate::floor::target_dir(Path::new("."))?;
-    if target == Path::new(".") {
-        return Ok(()); // no target/ yet: nothing built
-    }
-    let held = deps_bytes(&target)?;
-    over(&target, held, max_gb)
+    let Some(target) = target_dir(&root, std::env::var_os("CARGO_TARGET_DIR").as_deref())? else {
+        return Ok(()); // nothing built yet
+    };
+    over(&target, measure(&target)?, max_gb)
 }
+
+#[path = "target_cap_find.rs"]
+mod find;
+#[path = "target_cap_measure.rs"]
+mod measure;
+pub use find::{target_dir, workspace_root};
+pub use measure::measure;
 
 /// `[targets] max_gb` as a number of GB; `None` when unset.
 ///
@@ -59,68 +74,13 @@ pub fn cap(value: Option<&str>) -> Result<Option<f64>, String> {
     match text.parse::<f64>() {
         Ok(gb) if gb.is_finite() && gb > 0.0 => Ok(Some(gb)),
         _ => Err(format!(
-            ".config/factory.toml: [targets] max_gb = \"{text}\" is not a number of GB above 0; fix: set it so, such as \"80\""
+            "{SETTINGS}: [targets] max_gb = \"{text}\" is not a number of GB above 0; fix: set it so, such as \"80\""
         )),
     }
 }
 
-/// Bytes allocated to the files directly in `target`'s `deps`
-/// directories, one and two levels down.
-///
-/// # Errors
-/// A directory that exists but could not be listed, or an entry whose
-/// size could not be read for a reason other than its removal meanwhile.
-pub fn deps_bytes(target: &Path) -> Result<u64, String> {
-    let mut total = 0;
-    for deps in deps_dirs(target)? {
-        total += listed_bytes(&deps)?;
-    }
-    Ok(total)
-}
-
-/// `target/*/deps` and `target/*/*/deps` that exist.
-fn deps_dirs(target: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut found = Vec::new();
-    for level_one in subdirs(target)? {
-        found.push(level_one.join("deps"));
-        found.extend(subdirs(&level_one)?.into_iter().map(|dir| dir.join("deps")));
-    }
-    found.retain(|dir| dir.is_dir());
-    Ok(found)
-}
-
-fn subdirs(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = std::fs::read_dir(dir).map_err(|e| unreadable(dir, &e))?;
-    Ok(entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir() && !path.is_symlink())
-        .collect())
-}
-
-/// The allocated bytes of the entries directly in `dir`.
-fn listed_bytes(dir: &Path) -> Result<u64, String> {
-    let mut total = 0;
-    for entry in std::fs::read_dir(dir).map_err(|e| unreadable(dir, &e))? {
-        let entry = entry.map_err(|e| unreadable(dir, &e))?;
-        match entry.metadata() {
-            Ok(meta) => total += meta.blocks() * 512,
-            // a build removed it meanwhile: it holds nothing now
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(unreadable(&entry.path(), &e)),
-        }
-    }
-    Ok(total)
-}
-
-fn unreadable(path: &Path, error: &std::io::Error) -> String {
-    format!(
-        "{}: {error}, so the build directory's size could not be measured; fix: check its permissions, or empty it",
-        path.display()
-    )
-}
-
-/// Refuse when `held` bytes pass `max_gb`, naming the exact command.
+/// Refuse when `held` bytes pass `max_gb`, naming how to see the size
+/// and the exact command that empties the directory.
 ///
 /// # Errors
 /// Over the cap.
@@ -132,24 +92,38 @@ pub fn over(target: &Path, held: u64, max_gb: f64) -> Result<(), String> {
     if held as f64 <= max_gb * GB as f64 {
         return Ok(());
     }
-    let real = target
-        .canonicalize()
-        .unwrap_or_else(|_| target.to_path_buf());
+    let real = quoted(
+        &target
+            .canonicalize()
+            .unwrap_or_else(|_| target.to_path_buf()),
+    );
     Err(format!(
-        "{} holds {} GB of build products (target/*/deps), over [targets] max_gb = {max_gb} in .config/factory.toml; \
-         fix: `find {} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} +` (empties it and keeps the directory, so the \
-         worktree's target link stays valid), then rerun",
+        "{} holds {:.1} GB of build products (deps, examples and incremental under each profile), \
+         over [targets] max_gb = {max_gb} in {SETTINGS}; see it with `du -sh {real}`; \
+         fix: `find {real} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} +` (empties it and keeps the \
+         directory, so the worktree's target link stays valid; if another worktree's target links \
+         there too, stop its build first), then rerun the xtask command",
         target.display(),
-        held / GB,
-        real.display()
+        held as f64 / GB as f64,
     ))
 }
 
-fn uncapped_once(why: &str) {
+/// `path` in single quotes for a shell, any quote in it escaped.
+fn quoted(path: &Path) -> String {
+    format!("'{}'", path.display().to_string().replace('\'', r"'\''"))
+}
+
+fn uncapped_once() {
     static SAID: std::sync::Once = std::sync::Once::new();
-    SAID.call_once(|| println!("targets: {why}; the build directory is not capped"));
+    SAID.call_once(|| {
+        println!("targets: no [targets] max_gb in {SETTINGS}; the build directory is not capped");
+    });
 }
 
 #[cfg(test)]
 #[path = "target_cap_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "target_cap_bypass_tests.rs"]
+mod bypass_tests;

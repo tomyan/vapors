@@ -50,11 +50,13 @@ https = "8446"
 # deadline_minutes = "10"
 
 [targets]
-# The most a worktree's build directory may hold before every build
-# xtask starts is refused (xtask/src/target_cap.rs, which says how it is
-# measured), naming the command that empties it. CLAUDE.md's budget per
-# target is 80 GB; on 2026-11-15 one passed it twice and the disk
-# reached 95%.
+# The most a worktree's build directory may hold, in GB, before every
+# build xtask starts is refused, naming the command that empties it
+# (xtask/src/target_cap.rs). Counted: the files in deps/ and examples/,
+# and incremental/ to cargo's depth, under each target/<profile> and
+# target/<triple>/<profile>; build/, .fingerprint/ and tmp/ are not, so
+# the whole directory can be larger. The 80 is CLAUDE.md's (Builds): the
+# lead's per-target limit, set after the disk filled on 2026-11-09.
 max_gb = "80"
 
 [files]

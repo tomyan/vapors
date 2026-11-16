@@ -50,12 +50,19 @@ fn script(path: &Path, text: &str) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).expect("mode");
 }
 
-/// The xtask binary run in `dir` with an empty environment but for four
-/// variables: `HOME` (`dir`), `TMPDIR` (`tmp`), `PATH` (`bin`, then the
+/// The xtask binary run in `dir` (given an empty `.config/factory.toml`
+/// when it has none) with an empty environment but for four variables: `HOME` (`dir`), `TMPDIR` (`tmp`), `PATH` (`bin`, then the
 /// system's directories) and `GIT_CEILING_DIRECTORIES` (so git cannot
 /// look above `dir`). A test adds what its case needs with `env`.
 pub fn xtask(dir: &Path, bin: &Path, tmp: &Path) -> Command {
     let parent = dir.parent().expect("a scratch dir has a parent");
+    // a workspace always has a settings file, which the build
+    // directory's cap finds the workspace by; an empty one sets nothing
+    let settings = dir.join(".config/factory.toml");
+    if !settings.exists() {
+        std::fs::create_dir_all(dir.join(".config")).expect("settings dir");
+        std::fs::write(&settings, "").expect("settings");
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_xtask"));
     child
         .current_dir(dir)

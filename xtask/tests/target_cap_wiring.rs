@@ -71,11 +71,25 @@ fn ci_test_and_web_refuse_to_build_over_the_cap_naming_the_command() {
         let text = said(&output);
         let real = dir.join("target").canonicalize().expect("real");
         let command = format!(
-            "find {} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} +",
+            "find '{}' -mindepth 1 -maxdepth 1 -exec rm -rf {{}} +",
             real.display()
         );
         assert!(!output.status.success(), "{args:?} passed: {text}");
         assert!(text.contains("over [targets] max_gb"), "{args:?}: {text}");
         assert!(text.contains(&command), "{args:?}: {text}");
     }
+}
+
+#[test]
+fn a_run_from_a_subdirectory_of_the_workspace_is_capped_too() {
+    // Given a target over its cap, and a run from inside src/
+    let dir = scratch("cap-over-subdir", 200_000);
+
+    // When
+    let output = xtask(&dir.join("src"), &["test"]);
+
+    // Then
+    let text = said(&output);
+    assert!(!output.status.success(), "passed: {text}");
+    assert!(text.contains("over [targets] max_gb"), "{text}");
 }
