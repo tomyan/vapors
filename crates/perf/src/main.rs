@@ -65,8 +65,15 @@ fn run() -> Result<(), String> {
     }
     if mount {
         let gpu = gpu_with(FEATURES);
-        print_setup(&gpu, settings);
-        return mount_run::run(&gpu, settings);
+        println!("Revision: {}", scene_run::REVISION);
+        print_adapter(&gpu);
+        print_counts(
+            &build_profile::shipped_header(build_profile::BUILT),
+            settings,
+        );
+        mount_run::run(&gpu, settings)?;
+        println!("Load average at the end: {}", load());
+        return Ok(());
     }
     if let Some(changes) = scaling {
         let gpu = gpu_with(FEATURES);
@@ -112,11 +119,14 @@ fn run() -> Result<(), String> {
 
 fn print_setup(gpu: &vapors_gpu_harness::Gpu, settings: Settings) {
     print_adapter(gpu);
+    print_counts(&build_profile::header(), settings);
+}
+
+/// The profile as `profile` states it, the counts and the load.
+fn print_counts(profile: &str, settings: Settings) {
     println!(
-        "Profile: {}; scale 1; warmup {}; runs {}",
-        build_profile::header(),
-        settings.warmup,
-        settings.runs
+        "Profile: {profile}; scale 1; warmup {}; runs {}",
+        settings.warmup, settings.runs
     );
     println!("Load average at the start: {}\n", load());
 }
@@ -127,6 +137,7 @@ fn print_adapter(gpu: &vapors_gpu_harness::Gpu) {
         "Adapter: {} ({:?}, {} {})",
         info.name, info.backend, info.driver, info.driver_info
     );
+    println!("Adapter type: {:?}", info.device_type);
     println!(
         "Timestamp queries: {}",
         gpu.device.features().contains(FEATURES)

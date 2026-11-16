@@ -481,6 +481,20 @@ phase, in instructions and times. What is missing:
   is about 10 minutes with the wait for the load to fall. Property 7
   holds when its row in the finish-line table shows the times from
   such a run.
+  The harness (lead, 2026-11-16: built before B1b, as the baseline B1b
+  to B3b are each measured against): `cargo xtask quiet 20 --
+  scripts/first-frame-runs.sh <dir>` builds release, the shipped
+  profile, on a clean tree, waits for the load, and keeps three runs'
+  outputs verbatim with a log; `scripts/first-frame-table.sh` makes the
+  tables (median of the runs' medians per size: mount, first frame and
+  its phases in µs; median instructions per phase) and refuses a run of
+  a dirty tree or another revision, another profile, a software
+  adapter, or a 1-minute load of 1.5 or more at its start or end. The
+  Mount workload never calls `App::start` (`sampler_start.rs`,
+  `Apps::NewEachFrame`), so its first frame holds what a start would
+  do before frame 0: the painter, its pipelines and the first update.
+  "Mount and first frame" is therefore the wait from the mount to the
+  first frame's submit.
 - **The build-time part shown by the harness.** The Mount report gains
   `winners: compiled N, runtime N, foreign N` beside #240's styles
   line, with `winners_runtime` 0 asserted in `gpu_mount_frames` and
@@ -542,7 +556,7 @@ fail, and restored, stated in the commit.
 | B3a | Runtime takes compiled winners | Checks 1 and 2 per key per `Kept`, check 1 refusing; on a miss, winners from `base` at their runtime standing plus matching conditional and other-sheet rules; the debug winners oracle and the every-build first-miss verification over longhands and custom properties; `winners_compiled`, `winners_runtime`, `winners_foreign` | Racer and one demo page mounted in two orders give equal styles; in a release-profile test, a forged `base` entry and a sheet registered with other text under the key's scope each refuse the element naming the site (not a wrong render); the debug oracle proven by breaking; Chromium comparisons and `incremental_*` unchanged | B2, R1b |
 | B3b | Shareability from the key; the report | `shareable` from the key (false when an other-sheet rule blocks sharing), with its debug oracle; the Mount report's winners line | `winners_runtime` 0 asserted on Mount at every size, the racer and one demo page; shareability oracle proven by breaking | B3a |
 | S1 | Splice mark | Section 4: the mark per `{for}` from B1's classification and splice.md (d)'s rules, passed through `keyed(..)`, kept on the owner while no other sheet reaches the row keys with a rule that matters; the debug panic, `splice_mark_contradicted`, `splice_marks_dropped`; `wisp-check` lists unmarked lists with reasons | Mount's list marked; a list whose row holds a positioned element, one with `:nth-child`, one with an inline top-level node each unmarked with its reason; a `Styles::Global` sheet with `:global(.row) { position: relative }` drops the mark at run time without a panic; the contradiction check proven by breaking (a forged mark on a positioned row panics) | B3a; splice PR B (merged) |
-| M1 | Property 7 published | Mount run per the finish-line method in a quiet window (section 5) after U2 and B3b; `docs/perf/mount-<date>.md`; the finish-line row for property 7 | Times and instructions at 1,000, 3,000, 10,000 rows, three runs, medians, load under 1.5 recorded; table row cites the file | U2, B3b |
+| M1 | Property 7 published | Mount run per the finish-line method in a quiet window (section 5): the harness and a baseline first (lead, 2026-11-16), then again after B3b; `docs/perf/first-frame-<date>.md`; the finish-line row for property 7 | Times and instructions at 1,000, 3,000, 10,000 rows, three runs, medians, load under 1.5 recorded; table row cites the file | U2, B3b |
 | M2 | Property 8 attributed and judged | Counting allocator in `vapors-perf`; drop attribution; `malloc_trim` cross-check; the bound of decision 5 judged by `--mount` | The per-owner split recorded in `docs/perf/`; the cross-check within 10% at each size; the bound passes at all three sizes after U2 or fails naming the owners, proven by breaking (`Used` unshared) | U2; decision 5 |
 
 Order of work: U2, U1, M2, T1, R1a, R1b, B0, B1, B2, B3a, B3b, S1, M1

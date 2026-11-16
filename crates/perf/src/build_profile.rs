@@ -36,6 +36,19 @@ pub fn scene_header(built: &str) -> String {
     }
 }
 
+/// The profile a Mount run states. Its times are property 7's, the first
+/// frame a user waits for, so they are taken on release, the shipped
+/// profile, as scene runs are; `scripts/first-frame-table.sh` refuses a
+/// run whose header says otherwise.
+#[must_use]
+pub fn shipped_header(built: &str) -> String {
+    if built == "release" {
+        "release (the shipped profile)".to_owned()
+    } else {
+        format!("{built} (not release, the shipped profile)")
+    }
+}
+
 /// Refuse a judged run unless built with [`JUDGED`].
 ///
 /// # Errors
