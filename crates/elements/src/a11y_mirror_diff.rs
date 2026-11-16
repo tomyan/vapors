@@ -136,8 +136,14 @@ impl Document {
             .flatten();
         if let Some(changed) = patched {
             self.ax.counts.index_entries = nodes.len();
+            // Debug builds only, a relaxed guard: the comparison is a scan of
+            // every element, the cost the patch removes (4i). Release
+            // builds rely on `ax_index_nodes` naming every element whose
+            // entry can change; a miss there leaves a stale name until the
+            // next scan, reported nowhere. Retired when a release-side
+            // check costs no more than the patch (none is designed yet).
             #[cfg(debug_assertions)]
-            kept.assert_scanned(&AxIndex::of(self));
+            kept.assert_scanned(self, &AxIndex::of(self));
             let renamed = kept.referrers_of(&changed);
             return (kept, renamed);
         }
@@ -150,19 +156,25 @@ impl Document {
 
     /// The elements whose index entries may differ since the last take:
     /// those whose `id` or a referring attribute was written, those freed
-    /// with a removed subtree, and every element of each inserted
-    /// subtree, hidden ones included (no box touches those); and the
-    /// inserted ones apart. Not the boxes moved or started, whose
-    /// entries cannot change. O(those elements), not a scan.
+    /// with a removed subtree, and every element of each subtree inserted
+    /// or moved, hidden ones included (no box touches those); and those
+    /// in the document after the take apart. A subtree moved into a
+    /// parent outside the document is walked too: its entries are
+    /// dropped, as a removal's are (`AxIndex::patch` keeps entries only
+    /// for elements under the root). Not the boxes moved or started,
+    /// whose entries cannot change. O(those elements), not a scan.
     fn ax_index_nodes(&self, touched: &Touched) -> (NodeSet, Vec<NodeId>) {
-        let mut inserted = Vec::new();
-        let roots = touched.replaced.iter().filter(|&&node| self.attached(node));
-        for &root in roots {
-            inserted.extend(crate::check::elements(&self.arena, root));
-        }
         let mut nodes = touched.indexed.clone();
         nodes.extend(touched.freed.iter().copied());
-        nodes.extend(inserted.iter().copied());
+        let mut inserted = Vec::new();
+        let roots = touched.replaced.iter().filter(|&&node| self.contains(node));
+        for &root in roots {
+            let elements = crate::check::elements(&self.arena, root);
+            nodes.extend(elements.iter().copied());
+            if self.attached(root) {
+                inserted.extend(elements);
+            }
+        }
         (nodes, inserted)
     }
 

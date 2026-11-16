@@ -127,31 +127,48 @@ impl AxIndex {
         !old_shared && !new_shared
     }
 
-    /// Panics, naming what differs, when this patched index is not
-    /// `scanned`, a scan of the same document: a patch missed an element
-    /// whose entry changed, such as one in an inserted or removed
-    /// subtree (`ax_index_nodes`). Referrers compare as sets, as a patch
-    /// appends where a scan goes in document order.
+    /// Panics, naming the first id or element that differs, when this
+    /// patched index is not `scanned`, a scan of the same document: a
+    /// patch missed an element whose entry changed, such as one in an
+    /// inserted, moved or removed subtree (`ax_index_nodes`). Referrers
+    /// compare as sets, as a patch appends where a scan goes in document
+    /// order.
     #[cfg(debug_assertions)]
-    pub(crate) fn assert_scanned(&self, scanned: &Self) {
-        let differs = if self.ids != scanned.ids {
-            Some("the element of an id")
-        } else if self.holders != scanned.holders {
-            Some("the holders of an id")
-        } else if self.by_node != scanned.by_node {
-            Some("an element's entry")
-        } else if referrer_sets(&self.referrers) != referrer_sets(&scanned.referrers) {
-            Some("the referrers of an id")
-        } else {
-            None
-        };
-        if let Some(what) = differs {
+    pub(crate) fn assert_scanned(&self, doc: &Document, scanned: &Self) {
+        if let Some(what) = self.first_differing(doc, scanned) {
             panic!(
-                "the patched a11y index differs from a scan in {what}: a take patched it \
+                "the patched a11y index differs from a scan: {what}; a take patched it \
                  without an element whose entry changed (a11y_mirror_diff.rs \
-                 `ax_index_nodes`); reproduce with `cargo xtask test`"
+                 `ax_index_nodes`); reproduce with the failing test alone"
             );
         }
+    }
+
+    /// The first id or element whose entry differs from `scanned`'s,
+    /// described.
+    #[cfg(debug_assertions)]
+    fn first_differing(&self, doc: &Document, scanned: &Self) -> Option<String> {
+        let tag = |node: &NodeId| doc.tag(*node).unwrap_or("not an element in the document");
+        let ids = self.ids.keys().chain(scanned.ids.keys());
+        if let Some(id) = ids
+            .into_iter()
+            .find(|id| self.ids.get(*id) != scanned.ids.get(*id))
+        {
+            let (kept, fresh) = (self.ids.get(id), scanned.ids.get(id));
+            return Some(format!("id {id:?} names {kept:?}, a scan finds {fresh:?}"));
+        }
+        let nodes = self.by_node.keys().chain(scanned.by_node.keys());
+        let entry = nodes
+            .into_iter()
+            .find(|n| self.by_node.get(*n) != scanned.by_node.get(*n));
+        if let Some(node) = entry {
+            return Some(format!("the entry of {node:?} (<{}>)", tag(node)));
+        }
+        if self.holders != scanned.holders {
+            return Some("the holders of an id".to_owned());
+        }
+        (referrer_sets(&self.referrers) != referrer_sets(&scanned.referrers))
+            .then(|| "the referrers of an id".to_owned())
     }
 
     /// Whether any of `moved`, elements put elsewhere in the document,
