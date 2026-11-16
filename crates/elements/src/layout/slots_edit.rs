@@ -135,7 +135,9 @@ pub(super) fn previous_box(source: &Source<'_>, child: NodeId) -> Option<NodeId>
 /// The edited owner's old children, from its box taken at `slot`: moved
 /// out when its edits insert or remove a box (debug builds keep a copy,
 /// `Taken::old_children`), copied when they change nothing, as lending
-/// then compares the old box's children (`Lender::lend_from`).
+/// then compares the old box's children (`Lender::lend_from`). Moved
+/// out, the old box's children read empty: lending finds them changed,
+/// as the edits changed them, and `reshaped` refuses the slot.
 fn old_children(taken: &mut Taken, slot: usize, boxed: bool) -> Vec<usize> {
     let (_, old) = taken
         .boxes
@@ -145,6 +147,7 @@ fn old_children(taken: &mut Taken, slot: usize, boxed: bool) -> Vec<usize> {
         return old.children.clone();
     }
     let children = std::mem::take(&mut old.children);
+    taken.moved_out.insert(slot);
     #[cfg(debug_assertions)]
     taken.old_children.insert(slot, children.clone());
     children

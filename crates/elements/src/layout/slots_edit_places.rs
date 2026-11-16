@@ -14,17 +14,18 @@ use super::{Placed, Taken, position, previous_box};
 impl Placed {
     /// The index of the child in `child` among `children`, the owner's
     /// in `owner`: through the owner's lane when it holds every child,
-    /// else by a search. Debug builds check the two agree.
+    /// else by a search. Every build checks the lane's index holds the
+    /// child, in O(1): slots are unique among the children, so that
+    /// index is the one the search would find.
     pub(super) fn child_position(&self, owner: usize, children: &[usize], child: usize) -> usize {
         let Some(at) = self.lanes.borrow().index_of(owner, (child, children.len())) else {
             let at = position(children, child);
             self.note_scanned(at + 1);
             return at;
         };
-        #[cfg(debug_assertions)]
         assert_eq!(
-            at,
-            position(children, child),
+            children.get(at),
+            Some(&child),
             "the lane of slot {owner} puts child {child} at {at}, its box's children elsewhere: \
              the lane and the box's children are out of step (layout/slots_edit.rs); \
              reproduce with `cargo xtask test`"

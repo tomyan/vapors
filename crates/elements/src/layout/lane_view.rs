@@ -26,8 +26,9 @@ pub(super) trait LaneView {
     /// The child in `slot`'s index among the lane's children; `None`
     /// when the lane does not hold it. O(log n) (`LaneTree::rank`).
     fn index_of(&self, slot: usize) -> Option<usize>;
-    /// How many children the lane holds: a lane over a run of its
-    /// container's children holds fewer than the container.
+    /// How many children the lane holds: fewer than its container
+    /// while children put in this update wait for the next layout
+    /// (`Lane::inserted`).
     fn len(&self) -> usize;
     /// Calls `each` with the children from the one in `slot` on, in
     /// order, each with its `frame_offset`: one fold to reach it, then

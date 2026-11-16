@@ -3,7 +3,7 @@
 //! any taken subtree, and the taken slots no new box takes become
 //! vacant. Slots outside the taken subtrees are not touched.
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::super::owners::KeptChildren;
 use super::{Key, LayoutBox, Placed, keys, misplaced};
@@ -18,6 +18,9 @@ pub(crate) struct Taken {
     /// edits changed, derived from their places (`put_edited`): its old
     /// children are moved into its new box, not kept to compare.
     pub(crate) reshaped: FxHashMap<usize, super::super::reshaped::Reshaped>,
+    /// Those owners' slots, whose taken boxes' children were moved out
+    /// and read empty: `reshaped` refuses to compare them.
+    pub(crate) moved_out: FxHashSet<usize>,
     /// Debug builds: those owners' old children, to check the derived run
     /// against the compared one (`Rebuilt::subtrees`).
     #[cfg(debug_assertions)]

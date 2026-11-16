@@ -144,8 +144,8 @@ impl Lanes {
 
     /// The index of the child in `child` among the `children` children
     /// of `container`, from its lane; `None` when it has no lane holding
-    /// every one of its children (a lane over a run of them counts from
-    /// the run's start) or holding the child.
+    /// every one of its children (one with a child put in this update
+    /// waiting ranks the children after it short) or holding the child.
     pub(crate) fn index_of(
         &self,
         container: usize,

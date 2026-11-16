@@ -74,7 +74,8 @@ pub(crate) struct LaneTree<S> {
     /// children's sizes summed in an inner node (`refold`, `split`), so a
     /// child's place in the lane is found in O(log n) (`rank`). Kept
     /// apart from `Node`, whose size the hot walks over it are
-    /// compiled for.
+    /// compiled for. As long as `nodes`: a node is sized when it is
+    /// made (`alloc`), so none is ever read unsized.
     pub(super) sizes: Vec<usize>,
 }
 
@@ -92,7 +93,7 @@ impl<S: Summary> LaneTree<S> {
             leaf_of: Vec::new(),
             free_handles: Vec::new(),
             gap,
-            sizes: Vec::new(),
+            sizes: vec![0],
         }
     }
 
@@ -188,16 +189,12 @@ impl<S: Summary> LaneTree<S> {
 
     /// The handles under `node`, as last worked out.
     pub(super) fn size(&self, node: usize) -> usize {
-        self.sizes.get(node).copied().unwrap_or(0)
+        self.sizes[node]
     }
 
     /// Notes `node`'s size from its children.
     pub(super) fn resize(&mut self, node: usize) {
-        let size = self.size_of(node);
-        if self.sizes.len() <= node {
-            self.sizes.resize(node + 1, 0);
-        }
-        self.sizes[node] = size;
+        self.sizes[node] = self.size_of(node);
     }
 
     /// The children before `handle`'s, folded.

@@ -22,8 +22,17 @@ pub(crate) struct Reshaped {
 /// `None` when they are the same or the slot is newly taken. A kept key
 /// keeps its slot, so equal children are the same boxes in the same
 /// order.
+///
+/// # Panics
+/// The slot's old children were moved out for a derived run (`put_edited`).
 pub(super) fn reshaped(boxes: &[LayoutBox], slot: usize, taken: &Taken) -> Option<Reshaped> {
     let (_, old) = taken.boxes.get(&slot)?;
+    assert!(
+        !taken.moved_out.contains(&slot),
+        "the owner in slot {slot} had its old children moved out, so comparing would read \
+         them empty: its run is the one derived from its edits, read once from \
+         `Taken::reshaped` (layout/rebuilt.rs `run_of`); reproduce with `cargo xtask test`"
+    );
     let (old, new) = (&old.children, &boxes[slot].children);
     let shared = Shared::of(old, new);
     if shared.head == old.len() && old.len() == new.len() {
