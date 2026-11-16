@@ -22,6 +22,7 @@ mod scene_appearance;
 mod scene_used;
 mod scrollbar;
 mod share;
+mod sheet_hashes;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;

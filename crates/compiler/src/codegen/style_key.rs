@@ -80,7 +80,8 @@ impl Emitter<'_> {
     /// returns that name.
     pub(super) fn key_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
         let name = format!("KEY_{}", var.to_ascii_uppercase());
-        let mut key = self.style_key(keyed)?;
+        let winners = self.winners_static(keyed, var)?;
+        let mut key = self.style_key(keyed, &winners)?;
         if keyed.reads_uses {
             key = format!("{{ {} {key} }}", self.script_uses());
         }
@@ -100,7 +101,32 @@ impl Emitter<'_> {
         })
     }
 
-    fn style_key(&self, keyed: &Keyed) -> Result<String, CompileError> {
+    /// `Some(&WINNERS_{VAR})` for an element, after adding that static;
+    /// `None` for a component tag, whose key's tag its props type
+    /// decides, so the analysis does not see it, and when the emitter
+    /// has no analysis (`generate` without styles).
+    fn winners_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
+        let Some(winners) = self.winners.filter(|_| keyed.carries_attributes) else {
+            return Ok("None".to_owned());
+        };
+        let (line, column) = self.source.position(keyed.offset);
+        let literal = winners.literal(line, column).ok_or_else(|| {
+            self.source.error(
+                keyed.offset,
+                "the styles analysis holds no element here, so its winners cannot be emitted; \
+                 a defect in vapors-compiler (styles::walk and codegen disagree on the elements): \
+                 report it with this file",
+            )
+        })?;
+        let literal = literal.map_err(|why| self.source.error(keyed.offset, why))?;
+        let name = format!("WINNERS_{}", var.to_ascii_uppercase());
+        self.keys.push(format!(
+            "static {name}: vapors_dom::KeyWinners = {literal};"
+        ));
+        Ok(format!("Some(&{name})"))
+    }
+
+    fn style_key(&self, keyed: &Keyed, winners: &str) -> Result<String, CompileError> {
         let (line, column) = self.source.position(keyed.offset);
         // the package, as `SCOPE` names it, so two crates' `src/card.wisp` differ
         let place = format!("{}:{line}:{column}", self.source.path);
@@ -111,7 +137,7 @@ impl Emitter<'_> {
             .map(|(name, value)| format!("({name:?}, {value:?})"))
             .collect();
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}] }}",
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
             keyed.tag,
             quoted(&parts.classes),
             quoted(&parts.toggles),

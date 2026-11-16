@@ -42,6 +42,7 @@ mod checkbox;
 mod checkbox_paint;
 mod clip;
 mod clip_tree;
+mod compiled_sheets;
 mod corners;
 mod css_element;
 mod document;

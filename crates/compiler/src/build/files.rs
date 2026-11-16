@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
 use crate::ast::Component;
+use crate::styles::CrateSheets;
 use crate::{CompileError, PropsIndex, generate_checked, parse_file_global, parse_file_under};
 
 /// Whether each component's `<style>` is scoped to its own elements,
@@ -120,8 +121,10 @@ fn generate_all(
     errors: &mut Vec<CompileError>,
 ) -> (Vec<Output>, Vec<String>) {
     let (mut outputs, mut unchecked) = (Vec::new(), Vec::new());
+    let sheets = CrateSheets::of(indexed.iter().map(|file| &file.component));
     for file in indexed {
-        match generate_checked(&file.component, index) {
+        let others = sheets.others_for(&file.component);
+        match generate_checked(&file.component, index, &others) {
             Ok(generated) => {
                 outputs.push((file.target.clone(), generated.code));
                 unchecked.extend(generated.unchecked);

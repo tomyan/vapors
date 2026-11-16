@@ -16,6 +16,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[("title", "a row"), ("aria-hidden", "true")],
     style: Some("height: 24px"),
+    winners: None,
 };
 
 static PLAIN: StyleKey = StyleKey {
@@ -26,6 +27,7 @@ static PLAIN: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    winners: None,
 };
 
 /// The refusals recorded on `node`, read from the calls; they are

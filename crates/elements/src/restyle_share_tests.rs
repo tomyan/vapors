@@ -17,6 +17,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    winners: None,
 };
 
 fn viewport() -> Viewport {

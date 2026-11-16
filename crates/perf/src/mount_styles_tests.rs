@@ -45,3 +45,39 @@ fn rows_compute_one_style_and_one_used_style_per_share_key_at_any_count() {
         assert_eq!(counts.used_shared, rows * 4 - 4, "{rows} rows");
     }
 }
+
+#[test]
+fn every_compiled_row_element_has_winners_whose_sheets_hash_as_registered() {
+    // Given
+    let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+    let body = doc.borrow().body();
+    let _rows = MountRows::mount(
+        &doc,
+        body,
+        MountRowsProps {
+            rows: Signal::new(row_data(2)),
+        },
+    );
+    let doc = doc.borrow();
+
+    // When: every element under the body
+    let mut pending = doc.children(body);
+    let mut checked = 0;
+    while let Some(node) = pending.pop() {
+        pending.extend(doc.children(node));
+        let Some(key) = vapors_dom::Dom::style_key(&*doc, node) else {
+            continue;
+        };
+
+        // Then
+        assert!(
+            key.winners.is_some(),
+            "{} has no compiled winners",
+            key.site
+        );
+        doc.check_compiled_sheets(key)
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        checked += 1;
+    }
+    assert_eq!(checked, 8, "two rows of a div, two spans and a button");
+}
