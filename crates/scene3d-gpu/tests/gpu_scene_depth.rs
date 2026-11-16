@@ -20,11 +20,11 @@ fn gpu_a_nearer_mesh_drawn_first_hides_a_farther_one_drawn_after_it() {
     let (small, large) = (fixture.square(0.3), fixture.square(0.8));
     fixture.mesh(
         root,
-        small,
+        &small,
         GREEN,
         Transform::from_translation(Vec3::Z).unwrap(),
     );
-    fixture.mesh(root, large, RED, Transform::IDENTITY);
+    fixture.mesh(root, &large, RED, Transform::IDENTITY);
     let mut renderer = fixture.renderer(&gpu);
 
     // When

@@ -4,11 +4,15 @@
 //! (`layout/written.rs`), built again or scrolled, and the boxes placed
 //! in a box whose content moved (`placement_walk.rs`).
 
-use crate::layout::{BoxRect, LayoutBox, containing_blocks};
+use rustc_hash::FxHashMap;
+
+use crate::lane_decline::LaneDecline;
+use crate::layout::{BoxRect, Lanes, LayoutBox, containing_blocks};
 pub(crate) use crate::placement_changes::{Changes, Placed};
 use crate::placement_marks::Marked;
 use crate::placement_walk::{Mark, Walk};
 use crate::scroll::Offsets;
+use crate::slot_list::SlotList;
 
 /// No slot: the root's `up`, and a new or freed slot's before it is placed.
 pub(crate) const NO_SLOT: usize = usize::MAX;
@@ -28,24 +32,30 @@ const NO_RECT: BoxRect = BoxRect {
 /// (`frames.rs`).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Placement {
-    pub(crate) rects: Vec<BoxRect>,
+    pub(crate) rects: SlotList<BoxRect>,
     /// Each slot's padding widths: a `%` padding follows its containing
     /// block's width, which can change with its border box unchanged.
-    pub(crate) paddings: Vec<taffy::Rect<f32>>,
+    pub(crate) paddings: SlotList<taffy::Rect<f32>>,
     /// Each slot's scroll offset as applied, in CSS pixels.
-    pub(crate) offsets: Vec<[f32; 2]>,
+    pub(crate) offsets: SlotList<[f32; 2]>,
     /// The slot whose content each slot is placed in.
-    pub(crate) up: Vec<usize>,
+    pub(crate) up: SlotList<usize>,
     /// Each out-of-flow slot's containing block (`containing_blocks`).
-    pub(crate) containing: Vec<Option<usize>>,
+    pub(crate) containing: SlotList<Option<usize>>,
     /// Marks for the walk, all `Mark::None` between updates.
-    pub(crate) marks: Vec<Mark>,
+    pub(crate) marks: SlotList<Mark>,
+    /// Whether each slot is a lane child placed in a frame of its own
+    /// (`placement_frames.rs`): its rect leaves out the lane's start.
+    pub(crate) framed: SlotList<bool>,
+    /// Each lane container's last framing decision.
+    pub(crate) framing: FxHashMap<usize, Result<(), LaneDecline>>,
 }
 
-/// The laid-out boxes, which of them scroll, and the scale.
+/// The laid-out boxes, which of them scroll, their lanes and the scale.
 pub(crate) struct LaidOut<'a> {
     pub(crate) boxes: &'a [LayoutBox],
     pub(crate) scrolls: &'a dyn Fn(usize) -> bool,
+    pub(crate) lanes: &'a Lanes,
     pub(crate) scale: f32,
 }
 
@@ -53,17 +63,34 @@ impl<'a> LaidOut<'a> {
     pub(crate) fn new(
         boxes: &'a [LayoutBox],
         scrolls: &'a dyn Fn(usize) -> bool,
+        lanes: &'a Lanes,
         scale: f32,
     ) -> Self {
         Self {
             boxes,
             scrolls,
+            lanes,
             scale,
         }
     }
 }
 
 impl Placement {
+    /// Each per-slot list it keeps: name, length, capacity (the growth
+    /// test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.rects.named("placement.rects"),
+            self.paddings.named("placement.paddings"),
+            self.offsets.named("placement.offsets"),
+            self.up.named("placement.up"),
+            self.containing.named("placement.containing"),
+            self.marks.named("placement.marks"),
+            self.framed.named("placement.framed"),
+        ]
+    }
+
     /// Places the boxes `changes` names, and those placed in a box
     /// whose content moved, settling `scroll` for them.
     pub(crate) fn place(
@@ -80,7 +107,7 @@ impl Placement {
         let marked = if changes.every {
             Marked::default()
         } else {
-            self.mark(changes)
+            self.mark(changes, boxes)
         };
         let mut walk = Walk::new(self, boxes, scroll, changes.every, &marked.under);
         walk.place_from_root();
@@ -108,12 +135,14 @@ impl Placement {
     fn every(boxes: &[LayoutBox]) -> Self {
         let len = boxes.len();
         Self {
-            rects: vec![NO_RECT; len],
-            paddings: vec![taffy::Rect::zero(); len],
-            offsets: vec![[0.0; 2]; len],
-            up: vec![NO_SLOT; len],
-            containing: containing_blocks(boxes),
-            marks: vec![Mark::None; len],
+            rects: vec![NO_RECT; len].into(),
+            paddings: vec![taffy::Rect::zero(); len].into(),
+            offsets: vec![[0.0; 2]; len].into(),
+            up: vec![NO_SLOT; len].into(),
+            containing: containing_blocks(boxes).into(),
+            marks: vec![Mark::None; len].into(),
+            framed: vec![false; len].into(),
+            framing: FxHashMap::default(),
         }
     }
 
@@ -128,6 +157,8 @@ impl Placement {
         self.resize(boxes.len());
         for &(slot, _) in changes.freed {
             self.up[slot] = NO_SLOT;
+            self.framed[slot] = false;
+            self.framing.remove(&slot);
         }
         self.patch_containing(boxes, changes);
         self.chain_children(boxes, changes)
@@ -138,7 +169,12 @@ impl Placement {
     /// more than once); how many children. A slot changes the slot it is
     /// placed in only when its box is built again under another parent,
     /// or its parent is laid out with it newly in flow. A hoisted box is
-    /// chained by `patch_containing`.
+    /// chained by `patch_containing`. An owner edited in place chains only
+    /// what the rebuild lists for it (`Changes::to_chain`): the children it
+    /// inserted, and the owners rebuilt directly under it, such as a row
+    /// restyled in the same update, which is an owner of its own and may
+    /// have come into flow. Its kept children keep their slots and it
+    /// keeps its own, so their chain stands (4h).
     fn chain_children(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) -> usize {
         let mut slots: Vec<usize> = changes.rebuilt.to_vec();
         slots.extend_from_slice(&changes.written.laid_out);
@@ -146,7 +182,8 @@ impl Placement {
         slots.dedup();
         let mut chained = 0;
         for slot in slots {
-            for &child in &boxes[slot].children {
+            let children = changes.to_chain.get(&slot).unwrap_or(&boxes[slot].children);
+            for &child in children {
                 if self.containing[child].is_none() {
                     self.up[child] = slot;
                     chained += 1;
@@ -164,6 +201,7 @@ impl Placement {
         self.up.resize(len, NO_SLOT);
         self.containing.resize(len, None);
         self.marks.resize(len, Mark::None);
+        self.framed.resize(len, false);
     }
 
     /// Clears the containing block of each slot built again or freed,

@@ -2,6 +2,8 @@
 //! tests hold (restyled, laid out, text built) and the structural work
 //! of each phase.
 
+use crate::edit_decline::EditDecline;
+use crate::lane_decline::LaneDecline;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
@@ -43,6 +45,20 @@ pub struct UpdateCounts {
     /// its elements can match reads siblings or descendants, or sits
     /// under `@container`.
     pub styles_unshareable: usize,
+    /// Restyled keyed elements whose style was computed from their
+    /// key's compiled winners (`restyle_compiled`); 0 when the restyle
+    /// failed, as the counts above.
+    pub winners_compiled: usize,
+    /// Restyled elements of a hand-written key (`Winners::Unanalysed`),
+    /// computed by the full cascade: generated code that stops emitting
+    /// winners shows here.
+    pub winners_runtime: usize,
+    /// Restyled elements of a component tag's key
+    /// (`Winners::ComponentTag`), computed by the full cascade.
+    pub winners_component_tag: usize,
+    /// Of `winners_compiled`, those another crate's sheet reaches,
+    /// whose rules were matched on the element as well.
+    pub winners_foreign: usize,
     /// Computed style allocations alive after the update: the share
     /// table's entries and every element styled for itself.
     pub styles_live: usize,
@@ -66,12 +82,50 @@ pub struct UpdateCounts {
     /// subtree and inline elements, whose text is part of a run, have
     /// none.
     pub boxes_built: usize,
+    /// Elements whose box children an insert or remove edited in place
+    /// (`layout/child_edits.rs`): the inserted children built and put
+    /// in after their previous sibling's box, the removed taken out,
+    /// no other child built or walked in the DOM. The edit still copies
+    /// and searches the box's child list, O(children).
+    pub children_edited: usize,
+    /// Elements whose inserts and removes were not made as an edit:
+    /// built shallow instead, or, making no box of their own, built by
+    /// an ancestor (`EditDecline::OwnerHasNoBox`).
+    pub children_edits_declined: usize,
+    /// The condition that declined the first of those (the owners by
+    /// slot, then the elements with no box), when
+    /// `children_edits_declined` is above 0, else `None`.
+    pub children_edit_decline: Option<EditDecline>,
     /// Times Taffy asked a box for its layout, a cache hit included. A
     /// box can be asked more than once in an update (measured, then
     /// laid out), and a box under a cache hit is not asked at all.
     pub layout_calls: usize,
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
+    /// Times a block container was laid out by its lane
+    /// (`layout/lane_layout.rs`, `docs/plans/splice-layout.md`): its
+    /// children put in or changed since laid out and their starts
+    /// summed in the lane's tree, the rest neither asked nor placed by
+    /// the lane.
+    pub lanes: usize,
+    /// Times a block or flex container was laid out by Taffy because
+    /// its style, place or a child kept it out of a lane.
+    pub lanes_declined: usize,
+    /// The condition that declined the first of those, when
+    /// `lanes_declined` is above 0, else `None`.
+    pub lane_decline: Option<LaneDecline>,
+    /// Lane containers whose children are frames of their own after this
+    /// update (`docs/plans/splice-layout.md`, section 11): those placed
+    /// framed and those kept framed.
+    pub lanes_framed: usize,
+    /// Lane containers placed this update whose children could not be
+    /// frames of their own (`LaneFramePixel`, `LaneFrameScrollingChild`): their
+    /// children keep the placement from before lane frames
+    /// (`docs/plans/splice-layout.md`, section 11).
+    pub lanes_unframed: usize,
+    /// The reason for the first of those, when `lanes_unframed` is above
+    /// 0, else `None`.
+    pub lane_unframed: Option<LaneDecline>,
     /// Rebuilt boxes whose subtree changed and that layout laid out in
     /// isolation (`layout/isolated.rs`): asked what their parent asked
     /// the box they replaced, they answered the same, so their
@@ -104,6 +158,18 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// Boxes the narrowed rebuild's lending visited, comparing each
+    /// rebuilt box with the box taken from its slot (`Lender::lend_from`);
+    /// 0 when every box was built.
+    pub boxes_lend_visited: usize,
+    /// Child entries the narrowed rebuild searched or compared one by one:
+    /// where an owner's lane holds every child, its edits are found
+    /// through it in O(log n) and none is counted (4h).
+    pub children_scanned: usize,
+    /// Scroll containers whose range the placement walk measured from
+    /// their content (4g): those laid out or built again; a container
+    /// that only scrolled is clamped to the range it kept.
+    pub scroll_ranges_measured: usize,
     /// In-flow children chained to the slot they are placed in before
     /// the placement walk (M10b, `placement.rs`): those of each slot
     /// built again or laid out, each such slot once. 0 when nothing is
@@ -129,6 +195,11 @@ pub struct UpdateCounts {
     /// whole device pixels before and after, its edges snapping as
     /// they did, moved.
     pub boxes_shifted: usize,
+    /// Scroll frames this update worked out (`paint_frames.rs`): every
+    /// one when they were made afresh, else those whose container
+    /// scrolled or whose clips were redone and the frames nested in them,
+    /// stopping at a frame kept by its own part (`frames_relative.rs`).
+    pub scroll_frames_worked: usize,
     /// Boxes whose kept paint paint read and kept rather than drew:
     /// those moved or whose clip was worked out again, but whose paint
     /// was made from the same rect, clip and padding (IU3 3c-3d2). The
@@ -174,6 +245,10 @@ pub struct UpdateCounts {
     /// spliced for inserted and removed in-flow boxes in place of being
     /// walked (`order_splice.rs`, `docs/plans/splice.md` (c)): 1 or 0.
     pub order_splices: usize,
+    /// Of those, the splices whose drawing steps, extents index and hits
+    /// were patched by the splice's edits, not made afresh
+    /// (`paint_partial_drawn.rs` `many`): 1 or 0.
+    pub order_splices_patched: usize,
     /// Times a shape change could not be spliced and the whole tree was
     /// walked instead: a changed slot's children reordered, a box with
     /// a stacking other than the default inserted or removed, or a
@@ -182,6 +257,19 @@ pub struct UpdateCounts {
     /// The condition that declined the splice when `splices_declined`
     /// is 1, else `None`.
     pub splice_decline: Option<SpliceDecline>,
+    /// Paint-order labels the splice relabelled to make room for the
+    /// steps it put in (`paint_labels.rs`), every label when it found no
+    /// range with room: each relabelled step's entries are patched.
+    pub paint_relabelled: usize,
+    /// Times the splice relabelled every label (counted in
+    /// `paint_relabelled` too), so a page that hits it shows.
+    pub paint_relabel_all: usize,
+    /// 1 when the update left the kept batches' steps to be sorted again
+    /// at the next draw, every frame searched afresh: a frame moved, paint
+    /// order was walked, every label relabelled, or the patch at a lane's
+    /// ends fell back (`KeptBatches::lanes_moved`); else 0. Insert and
+    /// `FlexInsert` take the patch when this stays 0.
+    pub batch_steps_sorted_again: usize,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.
@@ -193,4 +281,14 @@ pub struct UpdateCounts {
     /// hover stands, as it does while an element holds the mouse
     /// capture (M11).
     pub hovers_tested: usize,
+    /// Paths the document's shape cache tessellated: each distinct
+    /// path a `<path>` paints, once for the scale it is drawn at (one
+    /// -scene S4a); 0 on an update that paints no new path.
+    pub shapes_tessellated: usize,
+    /// The run-time shapes live after the update (one or more elements
+    /// paint each), and the slots the cache holds: live ones and free
+    /// ones for reuse. Both stay flat while elements come and go.
+    pub shapes_live: usize,
+    /// See [`UpdateCounts::shapes_live`].
+    pub shape_slots: usize,
 }

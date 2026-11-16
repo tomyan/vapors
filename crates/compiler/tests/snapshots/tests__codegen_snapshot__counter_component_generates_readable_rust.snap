@@ -1,0 +1,450 @@
+---
+source: crates/compiler/tests/codegen_snapshot.rs
+expression: code
+---
+// Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+#[allow(unused_imports)]
+use vapors_dom::{
+    Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
+};
+#[allow(unused_imports)]
+use vapors_signals::{Effect, Memo, Owner, Signal};
+/// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
+pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
+/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
+pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
+static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
+    sheets: &[
+        (vapors_dom::SheetRef::UserAgent, 0xe774_afd0_8061_102b),
+        (vapors_dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
+    ],
+    base: &[
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(12),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 5,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(13),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(14),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(15),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(16),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(17),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(18),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(19),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(20),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(21),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(22),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(23),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(24),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(25),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(26),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(27),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(28),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(31),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 1,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(32),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 6,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(37),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(82),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(83),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(84),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(85),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+    ],
+    conditional: &[
+        vapors_dom::RuleRef {
+            sheet: 0,
+            rule: 68,
+        },
+        vapors_dom::RuleRef {
+            sheet: 0,
+            rule: 69,
+        },
+    ],
+    blocked_by: &[],
+    own: Some(1),
+};
+static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
+    site: concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp:10:1"),
+    scope: Some(SCOPE),
+    tag: "button",
+    classes: &[],
+    toggles: &[],
+    style: None,
+    attributes: &[],
+    winners: vapors_dom::Winners::Compiled(&WINNERS_BUTTON0),
+};
+/// What a parent passes to [`Counter::mount`]; each prop has a default.
+#[derive(Default)]
+pub struct CounterProps {}
+/// `Counter`: its signals, and what `unmount` removes. Dropping it
+/// disposes its signals and effects, unless the component that mounted
+/// it as a child owns it (`owned_by_parent`).
+#[must_use = "dropping a top-level component disposes its effects; keep it or call unmount"]
+pub struct Counter {
+    /// `count`, declared in `<script>`.
+    pub count: Signal<i32>,
+    owner: Owner,
+    roots: Vec<Root>,
+    /// False once its parent's generated code took it as its child
+    /// (`owned_by_parent`): its owner then goes with the parent's.
+    disposes_on_drop: bool,
+}
+impl Counter {
+    /// Mounts the component at the end of `parent`.
+    pub fn mount<D: Dom + ?Sized + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        props: CounterProps,
+    ) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {
+        Self::mount_before(dom, parent, None, props)
+    }
+    /// Mounts the component in `parent` before `before` (at the end when `None`).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "mount_before builds the whole template, so its length follows the template's size"
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
+    )]
+    pub fn mount_before<D: Dom + ?Sized + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        before: Option<NodeId>,
+        props: CounterProps,
+    ) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {
+        let CounterProps {} = props;
+        dom.borrow_mut()
+            .add_style(
+                vapors_dom::CompiledSheet::__compiled(
+                    SCOPE,
+                    STYLE,
+                    0x20a6_deea_d601_c3e4,
+                ),
+            );
+        dom.borrow_mut().declare_events(&Self::events());
+        let disposes_on_drop = true;
+        let owner = Owner::new();
+        let (count, roots) = owner
+            .with(|| {
+                let count: Signal<i32> = Signal::named("count", 0);
+                let increment = move || count.update(|n| *n += 1);
+                let mut roots = Vec::new();
+                let button0 = dom.borrow_mut().create_keyed_element(&KEY_BUTTON0);
+                dom.borrow_mut().insert_before(parent, button0, before);
+                roots.push(Root::Node(button0));
+                {
+                    #[allow(
+                        clippy::clone_on_copy,
+                        reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
+                    )]
+                    let increment = increment.clone();
+                    dom.borrow_mut()
+                        .listen(
+                            button0,
+                            "click",
+                            Box::new(move |_event: &mut Event| vapors_dom::handle_without_event(
+                                &increment,
+                            )),
+                        );
+                }
+                let text1 = dom.borrow_mut().create_text("Clicked ");
+                dom.borrow_mut().append(button0, text1);
+                let count_text2 = dom.borrow_mut().create_text("");
+                dom.borrow_mut().append(button0, count_text2);
+                {
+                    let dom = Rc::clone(dom);
+                    Effect::new(move || {
+                        let shown = &(count.get());
+                        #[allow(
+                            clippy::implicit_clone,
+                            reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
+                        )]
+                        let value = shown.to_string();
+                        dom.borrow_mut().set_text_if_changed(count_text2, &value);
+                    });
+                }
+                let text3 = dom.borrow_mut().create_text(" times");
+                dom.borrow_mut().append(button0, text3);
+                (count, roots)
+            });
+        Counter {
+            count,
+            owner,
+            roots,
+            disposes_on_drop,
+        }
+    }
+    /// The events this component type dispatches itself, its child
+    /// components' included, which `mount` declares to the tree.
+    #[must_use]
+    pub fn events() -> Vec<&'static str> {
+        let mut events = Vec::new();
+        Self::events_into(&mut std::collections::BTreeSet::new(), &mut events);
+        events
+    }
+    /// [`Self::events`] onto `events`, unless this type is in `seen`
+    /// already: a component that uses itself is listed once.
+    pub fn events_into(
+        seen: &mut std::collections::BTreeSet<&'static str>,
+        _events: &mut Vec<&'static str>,
+    ) {
+        seen.insert(std::any::type_name::<Self>());
+    }
+    /// The top-level nodes now, in order, including those of a block
+    /// or child component at the top level.
+    #[must_use]
+    pub fn roots(&self) -> Vec<NodeId> {
+        vapors_dom::current_nodes(&self.roots)
+    }
+    /// The top-level entries, for a parent that mounts this component
+    /// at its own top level.
+    #[must_use]
+    pub fn root_entries(&self) -> &[Root] {
+        &self.roots
+    }
+    /// Reads the top-level nodes, disposes the signals and effects, and
+    /// removes the nodes.
+    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
+        let nodes = self.roots();
+        self.owner.dispose();
+        for node in nodes {
+            dom.borrow_mut().remove(node);
+        }
+    }
+}
+impl Counter {
+    /// Marks this component as its parent's child: its owner is a child
+    /// of the parent's and is disposed with it, so dropping this struct
+    /// disposes nothing. Called by the parent's generated code.
+    pub fn owned_by_parent(mut self) -> Self {
+        self.disposes_on_drop = false;
+        self
+    }
+}
+impl Drop for Counter {
+    fn drop(&mut self) {
+        if self.disposes_on_drop && !std::thread::panicking() {
+            self.owner.dispose();
+        }
+    }
+}

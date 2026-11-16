@@ -11,7 +11,9 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 #[test]

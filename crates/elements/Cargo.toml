@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
+autotests = false
 
 # `complex-script-breaks` (default): vapors-text's, forwarded so an app
 # can turn it off (crates/text/Cargo.toml).
@@ -17,6 +18,10 @@ publish = false
 default = ["complex-script-breaks", "grid"]
 complex-script-breaks = ["vapors-text/complex-script-breaks"]
 grid = ["taffy/grid"]
+# `test_items`: items a test has an element paint, for painters' tests
+# of kinds no element paints yet (S3a1's shapes until S4a). Enabled only
+# by dev-dependencies.
+test-support = []
 
 [dependencies]
 vapors-dom.workspace = true
@@ -34,7 +39,13 @@ tracing.workspace = true
 [dev-dependencies]
 vapors-signals.workspace = true
 vapors-compiler-examples.workspace = true
+vapors-dom = { workspace = true, features = ["test-support"] }
 serde_json.workspace = true
 
 [lints]
 workspace = true
+
+# The integration tests as one binary (scripts/one-test-binary.sh)
+[[test]]
+name = "tests"
+path = "tests/main.rs"

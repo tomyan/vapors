@@ -4,10 +4,10 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed, Shift};
+use vapors_renderer::{KeptRange, Placed, RowOffsets, Shift};
 use vapors_scene::Size;
 
-use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline, VERTEX_SIZE};
+use crate::pipeline::{self, BlendParams, PARAMS_HEAD, TextPipeline};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -74,7 +74,8 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let Some(params) = self.prepare(target, atlas, (params, Shift::NONE)) else {
+        let Some(params) = self.prepare(target, atlas, (params, (Shift::NONE, &RowOffsets::NONE)))
+        else {
             return;
         };
         self.draw_quads(target, quads, params);
@@ -91,13 +92,14 @@ impl TextPipeline {
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        (params, shift): (BlendParams, Shift),
+        (params, moved): (BlendParams, (Shift, &RowOffsets)),
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
-        let params = params_bytes(params, target.viewport, shift);
+        let (shift, rows) = moved;
+        let head = params_head(params, target.viewport, shift);
         self.params
-            .slot(target.encoder, target.queue, &self.work, params)
+            .slot_with_rows(target.encoder, (target.queue, &self.work), (head, rows))
     }
 
     /// Draws `quads` with the params slot at `params`.
@@ -160,10 +162,11 @@ pub(crate) enum Vertices<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The params uniform's bytes: gamma, contrast, the viewport's width
-/// and height and `shift`, in device pixels.
+/// The params uniform's first 32 bytes, before the rows' offsets: gamma,
+/// contrast, the viewport's width and height and `shift`, in device
+/// pixels.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_SIZE] {
+fn params_head(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_HEAD] {
     let [dx, dy] = shift.pixels();
     let floats = [
         params.gamma,
@@ -173,24 +176,13 @@ fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAM
         dx,
         dy,
     ];
-    let mut bytes = [0; PARAMS_SIZE];
+    let mut bytes = [0; PARAMS_HEAD];
     for (at, float) in floats.into_iter().enumerate() {
         bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
     }
     bytes
 }
 
-/// Little-endian bytes of vertex floats.
-pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
-    floats.iter().flat_map(|f| f.to_le_bytes()).collect()
-}
-
-/// How many vertices `bytes` bytes hold.
-pub(crate) fn vertex_count(bytes: u64) -> u32 {
-    u32::try_from(bytes / VERTEX_SIZE).unwrap_or_else(|_| {
-        panic!(
-            "{bytes} bytes of text vertices in one draw, more vertices than fit u32: split the \
-             run into smaller batches (draw.rs); reproduce with `cargo xtask test`"
-        )
-    })
-}
+#[path = "draw_vertices.rs"]
+mod vertices;
+pub(crate) use vertices::{rowed_vertex_bytes, vertex_bytes, vertex_count};

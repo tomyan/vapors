@@ -5,7 +5,10 @@
 
 use super::boxes::{Content, LayoutBox};
 use super::isolated::Changed;
+use super::owners::Build;
+use super::reshaped::{Reshaped, reshaped};
 use super::slots::{Key, Taken};
+use crate::edit_decline::EditDecline;
 
 /// The slots `KeptBoxes::rebuild` placed and freed.
 #[derive(Debug)]
@@ -22,10 +25,64 @@ pub(crate) struct Rebuilt {
     /// The slots whose box has other children than the box taken from
     /// it, each with the children it had: what the order splice reads
     /// (`order_splice.rs`).
-    pub(crate) reshaped: Vec<(usize, Vec<usize>)>,
+    pub(crate) reshaped: Vec<Reshaped>,
     /// The owners whose rebuilt subtree changed, for layout to settle
     /// (`isolated.rs`); none when every box was built.
     pub(crate) changed: Vec<Changed>,
+    /// Owners whose box children were edited in place
+    /// (`child_edits.rs`), and those whose edits were declined.
+    pub(crate) edits: EditCounts,
+    /// The boxes lending the taken caches visited (`Lender::lend_from`).
+    pub(crate) lend_visits: usize,
+    /// Each owner edited in place, by slot, with the slots placement must
+    /// chain to it (`Placement::chain_children`): the children it
+    /// inserted, and each other owner rebuilt directly under it (a row
+    /// restyled in the same update is an owner of its own, and may have
+    /// come into flow while the edited owner kept it). Its kept children
+    /// keep their slots and their parent, so these alone.
+    pub(crate) to_chain: rustc_hash::FxHashMap<usize, Vec<usize>>,
+    /// The child entries the rebuild searched or compared one by one:
+    /// those `Placed::note_scanned` counted, and each old children list a
+    /// reshaped slot compared (`reshaped`); 0 when the lanes answered.
+    pub(crate) children_scanned: usize,
+}
+
+/// How many elements with recorded edits were edited, how many
+/// declined, and the first decline: the owners' by slot, then the
+/// elements that are no owner.
+#[derive(Debug, Default)]
+pub(crate) struct EditCounts {
+    pub(crate) edited: usize,
+    pub(crate) declined: usize,
+    pub(crate) decline: Option<EditDecline>,
+}
+
+impl EditCounts {
+    /// The counts of `builds`, in slot order.
+    pub(crate) fn of<'a>(builds: impl Iterator<Item = &'a Build>) -> Self {
+        let mut counts = Self::default();
+        for build in builds {
+            match build {
+                Build::Edited(_) => counts.edited += 1,
+                Build::Shallow(_, Some(decline)) => counts.count_decline(*decline),
+                Build::Shallow(_, None) | Build::Full => {}
+            }
+        }
+        counts
+    }
+
+    /// Counts the declines of the elements that are no owner, after
+    /// the owners'.
+    pub(crate) fn count_unowned(&mut self, declines: &[EditDecline]) {
+        for &decline in declines {
+            self.count_decline(decline);
+        }
+    }
+
+    fn count_decline(&mut self, decline: EditDecline) {
+        self.declined += 1;
+        self.decline = self.decline.or(Some(decline));
+    }
 }
 
 impl Rebuilt {
@@ -41,17 +98,27 @@ impl Rebuilt {
             shape_changed: true,
             reshaped: Vec::new(),
             changed: Vec::new(),
+            edits: EditCounts::default(),
+            lend_visits: 0,
+            to_chain: rustc_hash::FxHashMap::default(),
+            children_scanned: 0,
         }
     }
 
     /// The boxes put at `slots` in `boxes` in place of those `taken`
-    /// out, once every subtree is put.
-    pub(crate) fn subtrees(boxes: &[LayoutBox], slots: Vec<usize>, taken: &Taken) -> Self {
+    /// out, once every subtree is put; an owner edited in place with the
+    /// run its edits changed, `derived` from their places, not compared.
+    pub(crate) fn subtrees(
+        boxes: &[LayoutBox],
+        slots: Vec<usize>,
+        (taken, mut derived): (&Taken, rustc_hash::FxHashMap<usize, Reshaped>),
+    ) -> Self {
         let freed = taken.unclaimed();
         let newly_taken = slots.iter().any(|slot| !taken.boxes.contains_key(slot));
-        let reshaped: Vec<(usize, Vec<usize>)> = slots
+        let mut compared = 0;
+        let reshaped: Vec<Reshaped> = slots
             .iter()
-            .filter_map(|&slot| reshaped(boxes, slot, taken).map(|old| (slot, old.to_vec())))
+            .filter_map(|&slot| run_of(boxes, slot, (taken, &mut derived), &mut compared))
             .collect();
         Self {
             every: false,
@@ -60,6 +127,10 @@ impl Rebuilt {
             freed,
             reshaped,
             changed: Vec::new(),
+            edits: EditCounts::default(),
+            lend_visits: 0,
+            to_chain: rustc_hash::FxHashMap::default(),
+            children_scanned: compared,
         }
     }
 
@@ -69,11 +140,23 @@ impl Rebuilt {
     }
 }
 
-/// The children the box taken from `slot` had, when the box at `slot`
-/// has other children; `None` when they are the same or the slot is
-/// newly taken. A kept key keeps its slot, so equal children are the
-/// same boxes in the same order.
-fn reshaped<'a>(boxes: &[LayoutBox], slot: usize, taken: &'a Taken) -> Option<&'a [usize]> {
-    let (_, old) = taken.boxes.get(&slot)?;
-    (old.children != boxes[slot].children).then_some(old.children.as_slice())
+/// The run of `slot`'s children that changed: `derived` from an edited
+/// owner's edits (checked against a compare in debug builds), else
+/// compared, its old children counted in `compared`.
+fn run_of(
+    boxes: &[LayoutBox],
+    slot: usize,
+    (taken, derived): (&Taken, &mut rustc_hash::FxHashMap<usize, Reshaped>),
+    compared: &mut usize,
+) -> Option<Reshaped> {
+    if let Some(run) = derived.remove(&slot) {
+        #[cfg(debug_assertions)]
+        super::reshaped::assert_derived(boxes, &run, taken);
+        return Some(run);
+    }
+    *compared += taken
+        .boxes
+        .get(&slot)
+        .map_or(0, |(_, old)| old.children.len());
+    reshaped(boxes, slot, taken)
 }

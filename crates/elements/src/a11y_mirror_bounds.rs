@@ -83,7 +83,7 @@ impl Document {
 
     /// Where `node`'s content starts: its border box's corner, less its
     /// scroll offset as applied.
-    fn ax_content_origin(&self, node: NodeId) -> [f32; 2] {
+    pub(crate) fn ax_content_origin(&self, node: NodeId) -> [f32; 2] {
         let painted = self.painted.as_ref().expect("read from the last update");
         // the node above is in the tree, so it has a box (a11y_mirror_record.rs)
         let rect = painted.border_box(node).expect("a node above has a box");

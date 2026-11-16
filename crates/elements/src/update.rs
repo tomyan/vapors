@@ -58,7 +58,16 @@ impl Document {
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let mut last = self.painted.take();
+        let refused = self.take_hit_refusals();
+        if !refused.is_empty() {
+            return Err(refused);
+        }
         self.counts = crate::UpdateCounts::default();
+        // tessellations made outside this update are not its own: an
+        // acquire between updates, or the shape checks of an update that
+        // was refused after layout (which tessellate before refusing), so
+        // a refused update's tessellations are not counted anywhere
+        self.shapes.borrow_mut().cache.take_tessellated();
         self.texts.begin(
             last.as_ref()
                 .map_or(0, |painted| painted.slabs.texts.live()),
@@ -72,14 +81,27 @@ impl Document {
         let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), patched);
         let laid = (&slotted, &stackings);
         let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
+        self.svg_shape_refusals(&slotted, &from.placement.rects, viewport.scale)?;
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);
+        let source = (&from, &slotted.lanes);
+        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), source, &changed);
         drop(paint_span);
         self.ax.touch_slots(&changed, &slotted.slots);
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
         (painted.from, painted.stackings) = (from, stackings);
+        self.keep_runtime_shapes(&mut painted);
         Ok(self.shown(painted))
+    }
+
+    /// Shares the document's shapes with `painted`, and counts the
+    /// paths tessellated this update.
+    fn keep_runtime_shapes(&mut self, painted: &mut Painted) {
+        let mut shapes = self.shapes.borrow_mut();
+        self.counts.shapes_tessellated = shapes.cache.take_tessellated();
+        (self.counts.shapes_live, self.counts.shape_slots) = shapes.cache.counts();
+        drop(shapes);
+        painted.shapes = Some(std::rc::Rc::clone(&self.shapes));
     }
 
     /// Keeps `painted` as the last update's result, and moves the hover

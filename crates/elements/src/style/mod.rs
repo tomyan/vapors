@@ -12,6 +12,7 @@ mod grid_gate;
 mod grid_style;
 
 pub(crate) use grid_gate::is_container;
+mod globals;
 mod honoured;
 mod honoured_check;
 mod inline;
@@ -19,14 +20,22 @@ pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
+mod rust_sheets;
+mod scene_appearance;
+mod scene_used;
 mod scrollbar;
 mod share;
+mod sheet_hashes;
+pub use sheet_hashes::SheetHash;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
+mod compiled_rules;
+mod compiled_shareable;
 mod sizes;
 mod styles;
 mod surface;
+mod svg_paint_style;
 mod text_style;
 mod used;
 mod used_share;
@@ -45,9 +54,13 @@ pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
 pub(crate) use overflow::to_viewport;
 pub(crate) use parts::Parts;
+pub(crate) use scene_appearance::refuse_translucent;
+pub use scene_used::SceneUsed;
+pub(crate) use scene_used::{SceneContext, scene_used};
 pub(crate) use scrollbar::Scrollbar;
 pub(crate) use share::{ShareKey, Shared};
 pub(crate) use styles::{Counted, Styles};
+pub(crate) use svg_paint_style::SvgPaint;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
@@ -66,17 +79,28 @@ pub(crate) struct Sheets {
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
     scopes: std::collections::HashMap<String, String>,
+    /// Each global component sheet added, by name, with its text.
+    globals: std::collections::HashMap<String, String>,
+    /// Rust-added sheets against analysed elements (`rust_sheets`).
+    rust: rust_sheets::RustSheets,
+    /// Each component sheet in the cascade, by kind and name: its place
+    /// and its text's hash (`sheet_hashes`).
+    components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
     refused: Vec<ElementError>,
 }
 
 impl Sheets {
     pub(crate) fn new() -> Self {
         let ua = vapors_css::user_agent::sheet();
+        // first, at USER_AGENT_SHEET
         Self {
             features: features::Features::default().with(&ua),
             cascade: Cascade::new().user_agent(ua),
-            names: vec!["ua.css".to_owned()],
+            names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
+            globals: std::collections::HashMap::new(),
+            rust: rust_sheets::RustSheets::default(),
+            components: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
@@ -132,6 +156,7 @@ impl Sheets {
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());
+        self.note_sheet(sheet_hashes::SheetKind::Scope, scope, text);
     }
 
     /// Which elements a flip of `flag` restyles, as the sheets use it.
@@ -180,12 +205,23 @@ impl Sheets {
     }
 }
 
+/// The user-agent sheet's index in the cascade: `Sheets::new` adds it
+/// first.
+pub(crate) const USER_AGENT_SHEET: usize = 0;
+
+/// The user-agent sheet's name, which `restyle_scene` checks is the one
+/// at [`USER_AGENT_SHEET`].
+pub(crate) const USER_AGENT_NAME: &str = "ua.css";
+
 impl Sheets {
     /// The name a sheet was added under, by its cascade order (0 is the
     /// user-agent sheet).
     pub(crate) fn name(&self, index: usize) -> &str {
         if index == vapors_css::cascade::INLINE_SHEET {
             return "style attribute";
+        }
+        if index == vapors_css::cascade::PRESENTATION_SHEET {
+            return "presentation attribute";
         }
         self.names
             .get(index)

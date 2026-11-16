@@ -13,12 +13,13 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_platform::Instant;
-use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Shift, Target, WorkCounter};
-use vapors_scene::{Item, Rect, Run};
+use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Target, WorkCounter};
+use vapors_scene::{Item, Run};
 
 use super::errors::{MountError, PaintError};
+use super::rows::Moved;
 use super::{ScenePainter, SurfaceState};
-use crate::surface::{SurfaceRenderer, SurfaceSize};
+use crate::surface::SurfaceRenderer;
 
 #[path = "painter_surface_backing.rs"]
 mod backing;
@@ -31,6 +32,9 @@ mod scope;
 #[cfg(test)]
 pub(crate) use scope::DEADLINE as SCOPE_DEADLINE;
 use scope::{LoopWaker, Turn};
+#[path = "painter_surface_items.rs"]
+mod items;
+use items::surfaces;
 #[path = "painter_surface_texture.rs"]
 mod texture;
 #[path = "painter_surface_wake.rs"]
@@ -48,7 +52,8 @@ pub(super) struct Surfaces {
 
 impl ScenePainter {
     /// Mounts `renderer` for the `gpu-surface` named `name`; its `mount`
-    /// is called on the first frame that paints the surface.
+    /// is called by [`ScenePainter::start`], or on the first frame that
+    /// paints the surface when that comes first.
     ///
     /// # Errors
     ///
@@ -110,6 +115,15 @@ impl Surfaces {
         named.map(|(name, mounted)| mounted.state(name)).collect()
     }
 
+    /// Calls `mount` on each renderer not yet mounted (`ScenePainter::start`).
+    pub(super) fn start(&mut self, device: &wgpu::Device) -> Result<(), PaintError> {
+        for (name, mounted) in &mut self.mounted {
+            let started = mounted.start(device, turn(&self.waker));
+            started.map_err(|refusal| refusal.named(name))?;
+        }
+        Ok(())
+    }
+
     /// Marks every surface unpainted, before a frame.
     pub(super) fn begin_frame(&mut self) {
         self.mounted.values_mut().for_each(Mounted::begin_frame);
@@ -130,9 +144,10 @@ impl Surfaces {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, shift): (&[Item], &KeptRange, Shift),
+        (items, kept, moved): (&[Item], &KeptRange, &Moved<'_>),
     ) -> Result<(), PaintError> {
         for (place, (name, size, _)) in (0..).zip(surfaces(painted, items)) {
+            let shift = moved.item_shift(place as usize);
             let mounted = unmounted_refused(&mut self.mounted, name)?;
             let turn = turn(&self.waker);
             let bound = mounted.prepare(target, pipeline, size, turn, &self.work);
@@ -190,30 +205,5 @@ fn turn(waker: &LoopWaker) -> Turn<'_> {
     Turn {
         waker,
         now: Instant::now(),
-    }
-}
-
-/// Each surface item of `items`: its name, backing size and rect.
-fn surfaces<'a>(
-    painted: &'a Painted,
-    items: &'a [Item],
-) -> impl Iterator<Item = (&'a str, SurfaceSize, Rect)> + 'a {
-    items.iter().filter_map(|item| match item {
-        Item::Surface { surface, rect } => Some((
-            painted.surface(*surface),
-            backing_size(*rect, painted.scale()),
-            *rect,
-        )),
-        _ => None,
-    })
-}
-
-/// The device-pixel size of a surface's snapped `rect` at `scale`.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // a painted rect is non-empty
-fn backing_size(rect: Rect, scale: f32) -> SurfaceSize {
-    SurfaceSize {
-        width: rect.width().round() as u32,
-        height: rect.height().round() as u32,
-        scale,
     }
 }

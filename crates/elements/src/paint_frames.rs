@@ -1,0 +1,159 @@
+//! The scroll frames an update paints in (`frames.rs`): made afresh
+//! when paint order was walked or spliced, or nothing was kept, which
+//! can change the scroll containers; else kept, and worked out again
+//! for the scroll containers whose offset moved or whose clips were
+//! redone, and the frames nested in them. A debug build compares the
+//! kept frames with frames made afresh after every update.
+
+use crate::changed_slots::ChangedSlots;
+use rustc_hash::FxHashMap;
+
+use crate::frames::{FrameInputs, Frames, LaneBase};
+use crate::kept_clips::Clips;
+use crate::kept_order::KeptOrder;
+use crate::layout::LayoutBox;
+use crate::paint::PaintInput;
+use crate::painted::Painted;
+
+/// `painted`'s frames for `order`'s scroll containers, each shifted by
+/// its offset in `input` as `scroll::frame_shift` gives it, after an
+/// update that changed `changed`, from a kept paint when `kept`, with
+/// how many were worked out; whether any frame's shift or clip changed.
+pub(crate) fn updated(
+    painted: &mut Painted,
+    order: &KeptOrder,
+    (boxes, input): (&[LayoutBox], &PaintInput<'_>),
+    (changed, kept): (&ChangedSlots, bool),
+) -> bool {
+    // a lane that started or stopped framing moved the scroll containers
+    // in its rows to other frames, which a kept update cannot follow
+    let reshaped = !kept || order.walks.reshaped() || changed.reframed;
+    let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
+    // Relaxed in a release build: the scan runs only when the frames are
+    // made afresh. The scroll containers change only when paint order is
+    // walked or spliced (a box that starts or stops scrolling is
+    // restacked, kept_clips.rs `redo`); on a kept update `Frames::update`
+    // refuses a container the frames were not made for in its place.
+    if reshaped || cfg!(debug_assertions) {
+        let scrolls = |slot| input.stackings.scrolls(slot);
+        let named = (
+            &scrolls as &dyn Fn(usize) -> bool,
+            &lane_frame as &dyn Fn(usize) -> bool,
+        );
+        crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, named);
+    }
+    let depth = |slot| order.tree.depth(slot);
+    let shift =
+        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
+    let inputs = FrameInputs {
+        clips: &order.clips,
+        depth: &depth,
+        shift: &shift,
+        lane_frame: &lane_frame,
+    };
+    let moved = if reshaped {
+        let spliced = kept && order.walks.order == 0;
+        made_afresh(painted, &order.thumbs, &inputs, (input.scale, spliced))
+    } else {
+        kept_updated(painted, (order, changed), &inputs, input)
+    };
+    let bases = lane_bases(input, &order.clips);
+    let lanes = (bases, &changed.started[..]);
+    let rebased = painted
+        .frames
+        .set_lanes(std::rc::Rc::clone(input.lanes), lanes);
+    moved || rebased
+}
+
+/// Each framed lane's base (`frames_lane.rs`): the frame its
+/// container's content is in, the container's top there and the clip it
+/// gives its content, from the placement and clips painted from.
+/// O(framed lanes): a framed lane is one of many children
+/// (`placement_frames.rs`).
+fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBase> {
+    let framed = input
+        .placement
+        .framing
+        .iter()
+        .filter(|(_, framing)| framing.is_ok());
+    framed
+        .map(|(&container, _)| (container, lane_base(input, clips, container)))
+        .collect()
+}
+
+/// The base of the framed lane container `container`: its content is
+/// in its own scroll frame when it scrolls, clipped there already; else
+/// in the frame its box is in, under the clip it gives its content.
+fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBase {
+    let origin = input.placement.rects[container].y;
+    if input.stackings.scrolls(container) {
+        return LaneBase {
+            parent: container,
+            origin,
+            inner: None,
+        };
+    }
+    LaneBase {
+        parent: clips.frame(container),
+        origin,
+        inner: clips.inner(container),
+    }
+}
+
+/// `painted`'s frames made afresh for the scroll containers `thumbs`;
+/// whether they differ from the kept ones.
+fn made_afresh(
+    painted: &mut Painted,
+    thumbs: &[usize],
+    inputs: &FrameInputs<'_>,
+    (scale, spliced): (f32, bool),
+) -> bool {
+    painted.frames_worked = thumbs.len();
+    let mut made = Frames::of(thumbs, inputs, scale);
+    // a splice notes ink only for the lane frames it painted
+    // (`paint_lane_ink.rs`); the kept rows' ink is carried
+    if spliced {
+        made.take_lane_ink(&mut painted.frames);
+    }
+    made.keep_lane_bases(&painted.frames);
+    !std::mem::replace(&mut painted.frames, made).same_frames(&painted.frames)
+}
+
+/// `painted`'s kept frames worked out again for the scroll containers
+/// whose offset moved or whose clips were redone, and the frames nested
+/// in those that changed; whether any changed. A debug build compares
+/// them with frames made afresh.
+fn kept_updated(
+    painted: &mut Painted,
+    (order, changed): (&KeptOrder, &ChangedSlots),
+    inputs: &FrameInputs<'_>,
+    input: &PaintInput<'_>,
+) -> bool {
+    let starts = changed.offsets_moved.iter().chain(&order.redone).copied();
+    let starts: Vec<usize> = starts
+        .filter(|&slot| input.stackings.scrolls(slot))
+        .collect();
+    let moved;
+    (moved, painted.frames_worked) = painted.frames.update(&starts, inputs);
+    let fresh = || Frames::of(&order.thumbs, inputs, input.scale);
+    crate::frames_check::assert_kept_frames_fresh(&painted.frames, fresh);
+    moved
+}
+
+/// The scroll offset of the scroll container at `slot`, or a panic
+/// naming it: placement settles every scroll container's offset
+/// before paint.
+fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offsets) -> [f32; 2] {
+    let node = boxes[slot].element_in(slot);
+    node.and_then(|node| scroll.get(node)).unwrap_or_else(|| {
+        panic!(
+            "scroll container slot {slot} ({node:?}) has no settled offset: placement \
+             settles every scroll container's (placement_walk.rs `settled_offset`); \
+             reproduce with `cargo xtask test`"
+        )
+    })
+}
+
+#[cfg(test)]
+#[path = "paint_frames_tests.rs"]
+mod tests;

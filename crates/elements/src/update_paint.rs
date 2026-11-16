@@ -38,13 +38,14 @@ impl Document {
         &mut self,
         last: Option<Painted>,
         (boxes, stackings): (&[LayoutBox], &Stackings),
-        from: &PaintedFrom,
+        (from, lanes): (&PaintedFrom, &crate::layout::SharedLanes),
         changed: &ChangedSlots,
     ) -> Painted {
         let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let text = (&mut self.fonts, &mut self.texts);
-        let mut input = PaintInput::new((used, stackings), page, text, &self.scroll, from);
+        let places = (&self.scroll, lanes, &*self.shapes);
+        let mut input = PaintInput::new((used, stackings), page, text, places, from);
         let painted = match last {
             Some(kept) if kept.from.shows(from, changed) => {
                 keep(kept, boxes, &from.placement.rects, &mut input)
@@ -56,7 +57,12 @@ impl Document {
             }
         };
         let scrolls = |slot| stackings.scrolls(slot);
-        crate::frames_check::assert_frames_follow_placement(&painted.frames, from, &scrolls);
+        let lanes = lanes.borrow();
+        crate::frames_check::assert_frames_follow_placement(
+            &painted.frames,
+            from,
+            (&scrolls, &lanes),
+        );
         painted
     }
 }

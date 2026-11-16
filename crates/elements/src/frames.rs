@@ -7,11 +7,9 @@
 //! the scene's items, the hits, the border boxes and origins.
 
 use rustc_hash::FxHashMap;
-use vapors_scene::{Item, Rect};
+use vapors_scene::Rect;
 
-use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
-use crate::paint::snapped;
 
 /// The page's frame: the parts under no scroll container.
 pub(crate) const PAGE: usize = usize::MAX;
@@ -28,11 +26,28 @@ pub(crate) struct FrameAt {
     pub(crate) device_clip: Option<Rect>,
 }
 
-/// Each frame of a paint, by its scroll container's slot.
+/// Each frame of a paint, by its scroll container's slot; the scroll
+/// containers in each frame, listed and indexed by their clips
+/// (`frames_nested.rs`); and the clip each container was indexed with.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Frames {
     scale: f32,
     by_frame: FxHashMap<usize, FrameAt>,
+    /// The scroll frames under a lane frame, by their own part, composed
+    /// on read (`frames_relative.rs`); none of them is in `by_frame`.
+    relative: FxHashMap<usize, Relative>,
+    nested: FxHashMap<usize, Vec<usize>>,
+    /// The frame each scroll container was in when these were made.
+    outer: FxHashMap<usize, usize>,
+    index: FxHashMap<usize, NestedIndex>,
+    entered: FxHashMap<usize, Option<Rect>>,
+    /// The lane frames, resolved on read (`frames_lane.rs`).
+    lanes: LaneFrames,
+    /// By framed lane container, how far its children's ink reaches
+    /// past their border boxes above and below, CSS pixels: the most
+    /// seen since paint order was walked, which culling widens by
+    /// (`frames_lane.rs`).
+    lane_ink: LaneInk,
 }
 
 impl Default for Frames {
@@ -42,6 +57,11 @@ impl Default for Frames {
 }
 
 impl Frames {
+    /// Device pixels per CSS pixel.
+    pub(crate) fn scale(&self) -> f32 {
+        self.scale
+    }
+
     /// The page's frame alone, at `scale`.
     pub(crate) fn page(scale: f32) -> Self {
         let page = FrameAt {
@@ -52,59 +72,57 @@ impl Frames {
         Self {
             scale,
             by_frame: std::iter::once((PAGE, page)).collect(),
+            relative: FxHashMap::default(),
+            nested: FxHashMap::default(),
+            outer: FxHashMap::default(),
+            index: FxHashMap::default(),
+            entered: FxHashMap::default(),
+            lanes: LaneFrames::default(),
+            lane_ink: LaneInk::default(),
         }
     }
 
-    /// The frames of the scroll containers `scrollers`, each shifted by
-    /// `shift(slot)` from the frame it is in and clipped by the clip it
-    /// gives its content in that frame (`clips`), at `scale`. Shallower
-    /// scroll containers are worked out first.
-    pub(crate) fn of(
-        scrollers: &[usize],
-        (clips, depth): (&Clips, &dyn Fn(usize) -> usize),
-        shift: &dyn Fn(usize) -> [f32; 2],
-        scale: f32,
-    ) -> Self {
-        let mut frames = Self::page(scale);
-        let mut ordered = scrollers.to_vec();
-        ordered.sort_by_key(|&slot| depth(slot));
-        for slot in ordered {
-            let outer = *frames.at(clips.frame(slot));
-            let own = shift(slot);
-            let shift = [outer.shift[0] + own[0], outer.shift[1] + own[1]];
-            let inner = clips.inner(slot).map(|clip| frames.css_rect(outer, clip));
-            frames.insert(slot, shift, meet(inner, outer.clip));
-        }
-        frames
+    /// Frame `frame`, a scroll frame or a lane frame, if it is one.
+    pub(crate) fn get(&self, frame: usize) -> Option<FrameAt> {
+        self.primed_at(frame)
+            .or_else(|| self.by_frame.get(&frame).copied())
+            .or_else(|| self.relative_at(frame))
+            .or_else(|| self.lane_at(frame))
     }
 
-    /// Notes frame `slot` at `shift` under the page clip `clip`.
-    pub(crate) fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) {
-        let device_clip = clip.map(|clip| snapped(clip, self.scale));
-        let at = FrameAt {
-            shift,
-            clip,
-            device_clip,
-        };
-        self.by_frame.insert(slot, at);
-    }
-
-    /// Frame `frame`, or a panic naming it.
-    pub(crate) fn at(&self, frame: usize) -> &FrameAt {
-        self.by_frame.get(&frame).unwrap_or_else(|| {
+    /// Frame `frame`, a scroll frame or a lane frame, or a panic naming
+    /// it.
+    pub(crate) fn at(&self, frame: usize) -> FrameAt {
+        self.get(frame).unwrap_or_else(|| {
             panic!(
-                "a part names scroll frame {frame}, which this paint does not hold: the \
+                "a part names frame {frame}, which this paint does not hold: the scroll \
                  frames are made from the scroll containers in paint order (frames.rs, \
-                 paint_partial.rs) and a part's frame from its clip chain (kept_clips.rs); \
+                 paint_partial.rs), the lane frames from the framed lanes (frames_lane.rs, \
+                 paint_frames.rs), and a part's frame from its clip chain (kept_clips.rs); \
                  reproduce with `cargo xtask test`"
             )
         })
     }
 
-    /// Each frame but the page's, by its scroll container's slot.
-    pub(crate) fn scrollers(&self) -> impl Iterator<Item = (usize, &FrameAt)> {
+    /// Each scroll frame, by its scroll container's slot, those under a
+    /// lane frame composed afresh (for the debug checks).
+    pub(crate) fn scrollers(&self) -> impl Iterator<Item = (usize, FrameAt)> + '_ {
         let frames = self.by_frame.iter().filter(|&(&frame, _)| frame != PAGE);
-        frames.map(|(&frame, at)| (frame, at))
+        let relative = self.relative.keys().map(|&frame| {
+            let at = self.relative_afresh(frame).expect("a relative frame");
+            (frame, at)
+        });
+        frames.map(|(&frame, &at)| (frame, at)).chain(relative)
+    }
+
+    /// A frame at `shift` under the page clip `clip`, its device clip
+    /// snapped from it.
+    fn frame_at(&self, shift: [f32; 2], clip: Option<BoxRect>) -> FrameAt {
+        FrameAt {
+            shift,
+            clip,
+            device_clip: clip.map(|clip| crate::paint::snapped(clip, self.scale)),
+        }
     }
 
     /// Every frame but the page's shifted by `shift` more, device
@@ -118,69 +136,6 @@ impl Frames {
             }
         }
     }
-
-    /// `rect`, CSS pixels in frame `frame`, on the page.
-    pub(crate) fn rect(&self, frame: usize, rect: BoxRect) -> BoxRect {
-        self.css_rect(*self.at(frame), rect)
-    }
-
-    /// `point`, CSS pixels in frame `frame`, on the page.
-    pub(crate) fn point(&self, frame: usize, [x, y]: [f32; 2]) -> [f32; 2] {
-        let [dx, dy] = self.css_shift(*self.at(frame));
-        [x + dx, y + dy]
-    }
-
-    /// A hit `rect` in frame `frame` on the page, cut to the frame's
-    /// clip.
-    pub(crate) fn hit(&self, frame: usize, rect: BoxRect) -> BoxRect {
-        let at = *self.at(frame);
-        crate::clip::within(at.clip, self.css_rect(at, rect))
-    }
-
-    /// `item` under `clip`, device pixels in frame `frame`, on the page
-    /// and under the frame's clip too.
-    // Exact: a zero shift is exactly zero.
-    #[allow(clippy::float_cmp)]
-    pub(crate) fn item(
-        &self,
-        frame: usize,
-        item: &Item,
-        clip: Option<Rect>,
-    ) -> (Item, Option<Rect>) {
-        let at = self.at(frame);
-        // An unshifted frame keeps every coordinate's bits: adding 0.0
-        // turns -0.0 into 0.0, which the kept batches' keys tell apart
-        // (app tests/gpu_kept_batches.rs).
-        let unshifted = at.shift.iter().all(|&v| v == 0.0);
-        let (item, clip) = if unshifted {
-            (*item, clip)
-        } else {
-            (
-                shifted(*item, at.shift),
-                clip.map(|clip| clip.offset(at.shift)),
-            )
-        };
-        let clip = match (clip, at.device_clip) {
-            (Some(clip), Some(frame)) => Some(clip.intersection(frame)),
-            (clip, frame) => clip.or(frame),
-        };
-        (item, clip)
-    }
-
-    /// `rect` in a frame at `at`, on the page.
-    fn css_rect(&self, at: FrameAt, rect: BoxRect) -> BoxRect {
-        let [dx, dy] = self.css_shift(at);
-        BoxRect {
-            x: rect.x + dx,
-            y: rect.y + dy,
-            ..rect
-        }
-    }
-
-    /// A frame's shift in CSS pixels.
-    fn css_shift(&self, at: FrameAt) -> [f32; 2] {
-        at.shift.map(|v| v / self.scale)
-    }
 }
 
 /// `inner` cut to `outer`, either `None` for none.
@@ -191,26 +146,43 @@ fn meet(inner: Option<BoxRect>, outer: Option<BoxRect>) -> Option<BoxRect> {
     }
 }
 
-/// `item` moved by `delta`, device pixels.
-fn shifted(item: Item, delta: [f32; 2]) -> Item {
-    match item {
-        Item::Text { text, origin, ink } => Item::Text {
-            text,
-            origin: [origin[0] + delta[0], origin[1] + delta[1]],
-            ink: ink.offset(delta),
-        },
-        other => crate::kept_shift_items::shifted_item(other, delta),
-    }
-}
-
 /// `boxes`, every part on the page with no shift or clip, for tests.
 #[cfg(test)]
 pub(crate) fn on_page(
     boxes: &[Option<crate::kept_box::KeptBox>],
 ) -> (&[Option<crate::kept_box::KeptBox>], &'static Frames) {
-    static ON_PAGE: std::sync::LazyLock<Frames> = std::sync::LazyLock::new(|| Frames::page(1.0));
-    (boxes, &ON_PAGE)
+    thread_local! {
+        // Leaked once per test thread: `Frames` holds the lanes, which
+        // are not shared between threads.
+        static ON_PAGE: &'static Frames = Box::leak(Box::new(Frames::page(1.0)));
+    }
+    (boxes, ON_PAGE.with(|frames| *frames))
 }
+
+#[path = "frames_nested.rs"]
+mod nested;
+use nested::NestedIndex;
+
+#[path = "frames_update.rs"]
+mod update;
+
+#[path = "frames_compare.rs"]
+mod compare;
+
+#[path = "frames_relative.rs"]
+mod relative;
+use relative::Relative;
+
+#[path = "frames_lane.rs"]
+mod lane;
+#[path = "frames_read.rs"]
+mod read;
+pub(crate) use lane::LaneBase;
+pub(crate) use lane::LaneSeen;
+use lane::{LaneFrames, LaneInk};
+#[cfg(debug_assertions)]
+pub(crate) use read::shifted;
+pub(crate) use update::FrameInputs;
 
 #[cfg(test)]
 #[path = "frames_tests.rs"]

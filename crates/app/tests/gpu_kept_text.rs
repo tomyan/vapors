@@ -4,8 +4,7 @@
 //! colour, whose freed text id may be issued again to the new layout, is
 //! built again from the new layout.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, bare_document, update};
 use vapors_app::FrameCounts;
@@ -95,7 +94,7 @@ fn gpu_text_repainted_in_another_colour_is_built_again_from_its_new_layout() {
     );
     assert_eq!(
         counts.texts.buffer_bytes,
-        2 * 192,
-        "Ab's two glyphs: {counts:?}"
+        2 * 216,
+        "Ab's two glyphs, six 36-byte vertices each: {counts:?}"
     );
 }

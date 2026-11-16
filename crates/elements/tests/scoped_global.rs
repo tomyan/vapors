@@ -2,7 +2,7 @@
 //! left unscoped, so a component can style `body` or an ancestor it did
 //! not create. In a sheet that is not a component's it is refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::{Dom, SCOPE_ATTRIBUTE};
@@ -19,7 +19,10 @@ fn painted_canvas(doc: &mut Document) -> Color {
 fn a_global_compound_in_a_scoped_style_matches_outside_the_scope() {
     // Given: body belongs to no component
     let mut doc = document();
-    doc.add_style("a", ":global(body) { background-color: #0000ff; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ":global(body) { background-color: #0000ff; }",
+    ));
 
     // When
     let canvas = painted_canvas(&mut doc);
@@ -39,10 +42,10 @@ fn the_other_compounds_of_a_selector_with_a_global_one_stay_scoped() {
     doc.set_attribute(own, SCOPE_ATTRIBUTE, "a");
     let foreign = element(&mut doc, outer, "div", "t");
     doc.set_attribute(foreign, SCOPE_ATTRIBUTE, "b");
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         "a",
         ":global(.x) .t { height: 2px; background-color: #ff0000; }",
-    );
+    ));
 
     // When
     let painted = doc.update(viewport(100.0, 100.0)).expect("updates");
@@ -87,10 +90,10 @@ fn a_global_subject_gains_its_one_attribute_on_the_last_scoped_compound() {
     let card = element(&mut doc, body, "div", "card");
     doc.set_attribute(card, SCOPE_ATTRIBUTE, "a");
     element(&mut doc, card, "p", "");
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         "a",
         ".card :global(p) { height: 2px; background-color: #ff0000; }",
-    );
+    ));
     doc.add_stylesheet("app.css", ".card p { background-color: #0000ff; }")
         .expect("parses");
 
@@ -115,7 +118,10 @@ fn a_global_subject_gains_its_one_attribute_on_the_last_scoped_compound() {
 fn global_below_the_top_level_is_refused_in_a_scoped_style() {
     // Given
     let mut doc = document();
-    doc.add_style("a", "p {}\n.x:is(:global(.y)) { color: red; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        "p {}\n.x:is(:global(.y)) { color: red; }",
+    ));
 
     // When
     let errors = support::refusals(&mut doc);

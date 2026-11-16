@@ -58,7 +58,8 @@ pub fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
             | Item::Shadow(_)
             | Item::Image { .. }
             | Item::Icon { .. }
-            | Item::Surface { .. } => None,
+            | Item::Surface { .. }
+            | Item::Shape(_) => None,
         })
         .collect()
 }

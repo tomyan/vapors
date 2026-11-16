@@ -7,7 +7,7 @@ use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
-use crate::layout::{Content, LayoutBox};
+use crate::layout::{Content, Lanes, LayoutBox};
 
 /// The offsets, by scroll container, and the containers scrolled
 /// since the last update.
@@ -17,11 +17,17 @@ pub(crate) struct Offsets {
     scrolled: Vec<NodeId>,
 }
 
-/// One container's offset and how far it can go.
+/// One container's offset and how far it can go, and both as last
+/// settled: a scroll moves `at` before the update settles it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Offset {
     at: [f32; 2],
     max: [f32; 2],
+    settled: [[f32; 2]; 2],
+    /// How opaque its own thumbs are drawn, 0 to 255 (`thumb.rs`), and
+    /// as last settled.
+    alpha: u8,
+    settled_alpha: u8,
 }
 
 impl Offsets {
@@ -37,12 +43,29 @@ impl Offsets {
             .map(|offset| (offset.at, offset.max))
     }
 
+    /// How opaque `node`'s own thumbs are drawn, 0 (hidden) to 255.
+    pub(crate) fn alpha(&self, node: NodeId) -> u8 {
+        self.by_node.get(&node).map_or(0, |offset| offset.alpha)
+    }
+
+    /// Draws `node`'s own thumbs at `alpha` from the next update, which
+    /// settles and repaints them as a scroll does; whether it changed
+    /// (false when `node` is not a scroll container).
+    pub(crate) fn set_alpha(&mut self, node: NodeId, alpha: u8) -> bool {
+        let Some(offset) = self.by_node.get_mut(&node).filter(|o| o.alpha != alpha) else {
+            return false;
+        };
+        offset.alpha = alpha;
+        self.scrolled.push(node);
+        true
+    }
+
     /// Clamps the offsets to the laid-out `boxes`, where `scrolls` says
     /// which box is a scroll container, and returns each box's offset
     /// in CSS pixels rounded to whole device pixels at `scale`.
     pub(crate) fn settle(
         &mut self,
-        boxes: &[LayoutBox],
+        (boxes, lanes): (&[LayoutBox], &Lanes),
         scrolls: &dyn Fn(usize) -> bool,
         scale: f32,
     ) -> Vec<[f32; 2]> {
@@ -55,7 +78,7 @@ impl Offsets {
                 if !scrolls(index) {
                     return [0.0, 0.0];
                 }
-                let offset = self.clamped(node, boxes, index);
+                let offset = self.clamped(node, (boxes, lanes), index);
                 kept.insert(node, offset);
                 applied(offset.at, scale)
             })
@@ -66,16 +89,49 @@ impl Offsets {
     }
 
     /// Clamps the offset of `node`, the scroll container in box `index`
-    /// of `boxes`, and returns it as `settle` does.
+    /// of `boxes`, and returns it as `settle` does; and whether the
+    /// offset or the range, unrounded, or its thumbs' alpha differs from
+    /// when it was last settled (exact), which repaints its thumbs.
     pub(crate) fn settle_box(
         &mut self,
         node: NodeId,
-        (boxes, index): (&[LayoutBox], usize),
+        (boxes, lanes, index): (&[LayoutBox], &Lanes, usize),
         scale: f32,
-    ) -> [f32; 2] {
-        let offset = self.clamped(node, boxes, index);
-        self.by_node.insert(node, offset);
-        applied(offset.at, scale)
+    ) -> ([f32; 2], bool) {
+        let offset = self.clamped(node, (boxes, lanes), index);
+        self.settled_to(node, offset, scale)
+    }
+
+    /// As [`settle_box`](Self::settle_box) for `node`, a container that
+    /// only scrolled since it was last settled: clamped to the range it
+    /// kept, which only a new layout changes (4g), not measured again.
+    ///
+    /// # Panics
+    /// When `node` kept no offset: a container is scrolled only when it
+    /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
+    /// never settled.
+    pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
+        let max = self.by_node.get(&node).map(|kept| kept.max);
+        let max = max.unwrap_or_else(|| {
+            panic!(
+                "scroll container {node:?} is marked as only scrolled but kept no offset, so \
+                 no range to clamp to: a box marked Scrolled was never settled \
+                 (placement_marks.rs); reproduce with `cargo xtask test`"
+            )
+        });
+        let offset = self.clamped_to(node, max);
+        self.settled_to(node, offset, scale)
+    }
+
+    /// `offset` kept for `node`; it as applied at `scale`, and whether it
+    /// or its thumbs' alpha differs from when last settled (exact).
+    fn settled_to(&mut self, node: NodeId, offset: Offset, scale: f32) -> ([f32; 2], bool) {
+        let was = self
+            .by_node
+            .insert(node, offset)
+            .map(|o| (bits(o.settled), o.settled_alpha));
+        let now = (bits(offset.settled), offset.settled_alpha);
+        (applied(offset.at, scale), was != Some(now))
     }
 
     /// Drops the offset of `node`, which no longer scrolls.
@@ -98,12 +154,21 @@ impl Offsets {
         self.by_node == other.by_node
     }
 
-    fn clamped(&self, node: NodeId, boxes: &[LayoutBox], index: usize) -> Offset {
-        let max = range(boxes, index);
+    fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
+        self.clamped_to(node, range(laid, index))
+    }
+
+    /// `node`'s offset clamped to `max`, its range.
+    fn clamped_to(&self, node: NodeId, max: [f32; 2]) -> Offset {
         let at = self.get(node).unwrap_or_default();
+        let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
+        let alpha = self.alpha(node);
         Offset {
-            at: [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])],
+            at,
             max,
+            settled: [at, max],
+            alpha,
+            settled_alpha: alpha,
         }
     }
 
@@ -137,6 +202,11 @@ impl Offset {
     }
 }
 
+/// `pair`'s bits, for an exact comparison.
+fn bits(pair: [[f32; 2]; 2]) -> [[u32; 2]; 2] {
+    pair.map(|v| v.map(f32::to_bits))
+}
+
 /// The shift a scroll container's offset `at` gives the content of its
 /// frame at `scale`: device pixels, whole. The one answer to how far a
 /// scroll moves its frame: paint's frames (`paint_partial.rs`), the
@@ -156,10 +226,10 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its padding box. Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
 /// counts, so the larger of the two is taken.
-fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
     let (border, padding) = (layout.border, layout.padding);
-    let end = content_end(boxes, index);
+    let end = content_end((boxes, lanes), index);
     let inner = [
         layout.size.width - border.left - border.right,
         layout.size.height - border.top - border.bottom,
@@ -173,17 +243,26 @@ fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
 }
 
 /// How far box `index`'s in-flow children reach, margins included, from
-/// its padding box's corner.
-fn content_end(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+/// its padding box's corner, each where Taffy puts it.
+fn content_end((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let border = boxes[index].layout.border;
-    let in_flow = boxes[index].children.iter().map(|&child| &boxes[child]);
+    let in_flow = boxes[index].children.iter().copied();
     in_flow
-        .filter(|child| child.style.position != taffy::Position::Absolute)
-        .map(|child| child.layout)
-        .fold([0.0_f32, 0.0_f32], |end, at| {
+        .filter(|&child| boxes[child].style.position != taffy::Position::Absolute)
+        .map(|child| {
+            (
+                lanes.taffy_location(child, &boxes[child].layout),
+                boxes[child].layout,
+            )
+        })
+        .fold([0.0_f32, 0.0_f32], |end, (location, at)| {
             [
-                end[0].max(at.location.x + at.size.width + at.margin.right - border.left),
-                end[1].max(at.location.y + at.size.height + at.margin.bottom - border.top),
+                end[0].max(location.x + at.size.width + at.margin.right - border.left),
+                end[1].max(location.y + at.size.height + at.margin.bottom - border.top),
             ]
         })
 }
+
+#[cfg(test)]
+#[path = "scroll_tests.rs"]
+mod tests;

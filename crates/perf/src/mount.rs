@@ -1,9 +1,8 @@
 //! The Mount workload: a compiled `{for}` of row components mounted
-//! under the body of a fresh document, then the app's first frame. The
-//! sampler times that frame (its `update` and `style` spans are the
-//! first update's); the mount before it is timed and counted here, and
-//! the resident set is read before and after it. Every sample after the
-//! first mounts a fresh page, so each frame is a first frame.
+//! under the body of a fresh document, whose app is then started and
+//! draws its frame 0 (`Sampler::first_frame`, `--first-frame`). The
+//! mount is timed and counted here, and the resident set is read before
+//! and after it; a sample after the first mounts a fresh page.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -106,7 +105,7 @@ impl Mount {
 }
 
 /// The rows' data: an id, a label and a value each.
-fn row_data(count: usize) -> Vec<(u32, String, String)> {
+pub(crate) fn row_data(count: usize) -> Vec<(u32, String, String)> {
     (0..count)
         .map(|i| {
             (
@@ -192,11 +191,6 @@ impl Workload for Mount {
             page.app.frame_counts(),
             page.app.render_passes(),
         )
-    }
-
-    /// Each frame is a new app's first: no later frame reads a time back.
-    fn times_gpu(&self) -> bool {
-        false
     }
 
     fn timing(&self) -> FrameTiming {

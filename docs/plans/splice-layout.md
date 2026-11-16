@@ -411,7 +411,9 @@ answer by section 2.1; the 5b oracle compares `DOM.getBoxModel` per
 node, so a drift shows there. The touched set after an insert is the
 new row and its ancestors; `--scaling Insert` judges the
 `accessibility` phase as every other (`Judged::EveryPhase`) once this
-lands, in place of the per-row ceiling (`INSERT_A11Y_PER_ROW`).
+lands, in place of the per-row ceiling (`INSERT_A11Y_PER_ROW`), and
+`RESIZE_A11Y_PER_ROW` goes back to 13,000 from the 13,500 #289 relaxed
+it to (`crates/perf/src/scaling_judged.rs`).
 
 This is a change to `vapors-a11y`'s types and the mirror in
 `vapors-platform`, the R6 owner's area; PR 5 in section 7 is theirs
@@ -487,13 +489,13 @@ rows in `docs/perf/`, three runs, medians.
 | PR | Content | Accepted when | Owner, order |
 |---|---|---|---|
 | 0 | Measurement: `--scaling Insert` reports insert and remove frames apart (two medians per phase; the judge reads the worse); a `Remove` workload is not needed. Section 1.4 filled with the per-phase split and the counts | `docs/perf/splice-layout-<date>.md` with the split; no code change beyond the harness | this plan's author; first; #270 |
-| 1 | The splice follow-up (`docs/plans/splice.md` "As built"): `build_shallow` builds the owner's children from the kept box's children with the inserted slots put in after their previous element sibling's slot and the removed ones dropped (the children mark carries the nodes, `Marks::mark_child_inserted`), no walk over the DOM children; `Rebuilt::subtrees` keeps a count, not a clone; `plan` reads the old children by rank from the kept order; `spliced_steps` edits in place; drawn steps, hits and batches patched by the splice's edits instead of made afresh; `ClipTree::spliced` regroups the touched parents only | Insert at 3000 rows: `boxes_built` unchanged, build-phase and paint-phase instructions within an edit's except the shift (counted); `rebuild_check` and `kept_order_check` green | splice lane; before PR 3's acceptance number, not before its code |
+| 1 | Built as 1a (layout: an insert or remove edits the owner's box children in place, `layout/child_edits.rs`, `slots_edit.rs`) and 1b (paint: the rest of this row). The splice follow-up (`docs/plans/splice.md` "As built"): `build_shallow` builds the owner's children from the kept box's children with the inserted slots put in after their previous element sibling's slot and the removed ones dropped (the children mark carries the nodes, `Marks::mark_child_inserted`), no walk over the DOM children; `Rebuilt::subtrees` keeps a count, not a clone; `plan` reads the old children by rank from the kept order; `spliced_steps` edits in place; drawn steps, hits and batches patched by the splice's edits instead of made afresh; `ClipTree::spliced` regroups the touched parents only | Insert at 3000 rows: `boxes_built` unchanged, build-phase and paint-phase instructions within an edit's except the shift (counted); `rebuild_check` and `kept_order_check` green | splice lane; before PR 3's acceptance number, not before its code |
 | 2 | `layout/lane_tree.rs`: the sum tree (B-tree, fanout 16, handles, parent links): insert after, insert first, remove, set, `start`, `between`, `total`, in-order iteration; generic over a `Summary` with `combine(left, right, gap)` and `start_of` (section 10.1); `BlockSummary` (the fold of section 2.1) and `FlexSummary` (10.2), each with a property test over random edits against a sequential fold; the collapse-through join declined and tested | Unit tests; `cargo xtask lint`'s file sizes; no behaviour change | layout lane; with PR 0 |
 | 3 | The block lane in layout: `LaneDecline` from the used styles at build; `LayoutBox::lane: Option<Lane>` on the container, lent with its cache; `lane_block.rs`, the per-child layout mirroring taffy `block.rs`; `dispatch` routes a lane container to it; a lane child's `Layout.location` on the axis is zero and `BoxTree::location(slot)` derives it; `written.changed` not pushed for lane children whose summary is unchanged; `settle` updates a lane ancestor in place of clearing it; the layout check's tolerance; counts `lanes`, `lanes_declined`; a decline test per row of section 4; flex containers declined as `FlexLaneNotBuilt` (10.6) | Insert at 3000 rows: `layout_calls` the new row's plus a constant, `boxes_laid_out` the same; `--scaling Insert` `layout` phase within 2% across sizes; the Chromium layout fixtures unchanged; every decline reason tested | layout lane; after 2 |
 | 3f | The flex column lane (section 10): `lane_flex.rs`, the per-item layout mirroring taffy `flexbox.rs` (10.5); a decline test per row of 10.3; `FlexInsert` on `rows_list.rs` | FlexInsert at 3000 rows: `layout_calls` the new row's plus a constant; `--scaling FlexInsert` `layout` within 2% across sizes; the Chromium layout fixtures unchanged | layout lane; after 3, before 4 |
 | 3b | The collapse-through join in the fold, with its test; absolute children of a lane container from the tree | the two declines of section 4 become lanes, each with a Chromium fixture | layout lane; any time after 3 |
 | 4 | Derived positions: `Placement` leaves a lane child's axis coordinate unstored and `rect(slot)` adds the chain's starts; the walk does not enter a lane child whose summary is unchanged; `moved` empty for them; a `restacked` set reported to the a11y take until PR 5 (5.3); parts, entries and hits of a lane child in its frame (its slot), on #248's naming; `Frames::at` lazy and memoised (5.4); `between(view)` for culling and for hit tests inside a lane (5.2) | Insert at 3000 rows: `boxes_placed` the new row's boxes plus the chain to the root, `boxes_moved` 0, `boxes_shifted` 0; `--scaling Insert` every phase but `accessibility` within 2% across sizes; pixels unchanged (the Chromium paint comparisons, the kept-paint debug check with translations); hit tests on the rows page unchanged (`sparse_updates` hover) | layout lane with the paint lane for `paint*.rs`, `kept_*.rs`; after 3 and IU4 4-ii |
-| 5 | The mirror in flow for lane children (5.3): `AxBounds::Stacked`, the mirror's `position: static` elements, the touched set after an insert; `--scaling Insert` judged `EveryPhase` | `accessibility` within 2% across sizes for Insert; the 5b oracle's bounds unchanged; `a11y_mirror_scroll.rs`-style tests for an insert | R6 owner; after 4, or in parallel on `vapors-a11y` and `vapors-platform` with the elements side stubbed |
+| 5 | The mirror in flow for lane children (5.3): `AxBounds::Stacked`, the mirror's `position: static` elements, the touched set after an insert; `--scaling Insert` judged `EveryPhase` | `accessibility` within 2% across sizes for Insert; `RESIZE_A11Y_PER_ROW` back to 13,000 (#289); the 5b oracle's bounds unchanged; `a11y_mirror_scroll.rs`-style tests for an insert | R6 owner; after 4, or in parallel on `vapors-a11y` and `vapors-platform` with the elements side stubbed |
 | 6 | Flex rows (a horizontal list): 3f's summary and per-item code on the other axis; the stretched-height refusal or `lane_relaid` count of 10.6 | a horizontal-list insert's `layout` within 2% across sizes; `sparse_updates_flex` counts | layout lane; after 4 |
 | 7 | Acceptance: Insert, Remove and Resize at 1000, 3000 and 10,000 rows, instruction counts, wall clock, in `docs/perf/`; property 3 marked held or not in `perf-finish-line.md`; `splice.md` (e) and `iu4.md` 8.5 closed | `--scaling Insert` and `Resize` pass `EveryPhase`; update under 1 ms at every size | last |
 
@@ -502,6 +504,17 @@ layout/` only, no file #248, #243 or the splice follow-up change); 1 is
 the splice lane's; 4 waits for IU4 4-ii's frame coordinates; 5 waits
 for 4 on the elements side; 3f after 3 and before 4 (section 10.6); 6 after 4; 7 last. The estimates in
 section 6 assume PR 1 lands before PR 4's acceptance run.
+
+As built, PR 3 (3a-1 #315, 3a-2 #323): the lane is not lent with its
+container's cache. `put_box` drops it with the container's box, so any
+rebuild of the container's own box (a class toggle or hover style on the
+list itself, or a declined child edit) makes the next layout lay every
+child out again: O(rows) `lane_child` calls, each a cache hit, no worse
+than Taffy. The leaves' inputs are split in two (`lane_share.rs`): the
+height bases change between a flex parent's size query and its layout,
+and only the children whose styles read them (a percentage height,
+min-height or max-height, or a relative `top` or `bottom` percentage)
+are laid out again when they do.
 
 ## 8. Decisions for Tom
 
@@ -660,15 +673,17 @@ depend on the total. Taffy lays out every case the lane refuses.
 | `flex-direction: column`, `flex-wrap: nowrap` | lane | one line; positions are a sum |
 | Every item `flex-grow: 0` | lane | the default; with grow above 0, positive free space (a definite height, a `min-height`, an item's max below its basis) is shared by every item |
 | Any item `flex-grow` above 0 | declined | as above |
-| Container height auto with no `max-height` | lane, whatever `flex-shrink` is | Taffy sizes the column at the sum of its items' contributions, each at least the item's flex base size (`max(flex_basis, min_height)` with definite available height; `inner.max(flex_basis)` for a column under min- or max-content), so free space is not negative and shrink does nothing. The debug layout check compares with Taffy on every test update, and PR 3f has a test with a `flex-basis` above the content and the default shrink |
-| Container definite `height` or a `max-height`, every item `flex-shrink: 0` | lane | shrink is off, so overflow leaves sizes alone |
-| Container definite `height` or a `max-height`, any item `flex-shrink` above 0 | declined in the first slice | an item shrinks when the total exceeds the height: depends on the total. This includes the scrolling list `height: 400px; overflow: auto` with the default `flex-shrink: 1`; the follow-up is in 10.6 |
+| Any height, items no taller in total than the column's inner height | lane | no item shrinks, and with grow 0 nothing grows, so an item keeps its hypothetical height, except as the next row says |
+| An item that can shrink whose hypothetical height lies outside its own minimum and maximum (a floor from its aspect ratio or its padding and border above its `max-height`) | declined (`ClampedHeight`) | unless the column is exactly sized, Taffy leaves such an item unfrozen and clamps it to its resolved minimum and maximum (`resolve_flexible_lengths`, step d), so its height depends on the total (review of #342, H1) |
+| Items taller in total than the column's inner height, none that can shrink | lane | an item shrinks only when its `flex-shrink` is above 0, its basis is not below its hypothetical height and its minimum height is below it (`resolve_flexible_lengths`); auto-height rows of content have a minimum equal to their content. As built (3f-1): a leaf carries `shrinkable` (an OR fold), and the column's answer compares the sum with the inner height |
+| Items taller in total than the column's inner height, one that can shrink | declined at layout (`Shrinks`) | its height depends on the total. As first planned, an auto-height column could not reach this: it can, when an item's automatic minimum exceeds its basis share (`flex-basis` below its content), so the same check covers every height. This takes in PR 3s (10.6) |
 | `justify-content` `normal`, `flex-start`, `start`, `stretch` | lane | items packed from the start |
 | `justify-content` `flex-end`, `end`, `center`, `space-*` | declined | every item is moved by the free space |
-| `row-gap` (length or percentage) | lane | the gap is the container's; a percentage resolves against the container's inner height when definite, else to 0, as Taffy |
+| `row-gap`, a length, or a percentage with the column's height definite | lane | the gap is the container's |
+| `row-gap`, a percentage or a `calc()` with the column's height auto | declined (`RelativeGap`) | Taffy resolves it to 0 to size the column, then again against the height the items sum to (`compute_preliminary` 428-438), which depends on the total |
 | Main-axis `auto` margins on an item (`margin-top` or `margin-bottom: auto`) | declined | they take a share of the free space |
 | `align-items` or `align-self` `start`, `end`, `center`, `flex-start`, `flex-end`, `stretch`; cross-axis `auto` margins | lane | the cross position is per item, against the container's inner width |
-| `align-self: baseline` | declined | Taffy aligns participating items to the line's largest baseline (`calculate_children_base_lines`, 2046), which depends on every item |
+| `align-self: baseline` | lane | in a column an item aligned by baseline is placed by itself (Taffy reads line baselines only in rows, `calculate_children_base_lines` 2054-2056); in a row (PR 6) it depends on every item |
 | `flex-basis` (any), item `min-height`, `max-height`, `aspect-ratio`, `%` sizes | lane | per item; a `%` resolves against the container's inner size only when that size is definite and not derived from the container's content (taffy `generate_anonymous_flex_items`, 783-789), a property of the container |
 | `position: relative` on an item | lane | the inset moves that item only |
 | Container `padding`, `border`, `min-height`, `overflow: scroll` or `auto` (with height auto) | lane | the container's own answer |
@@ -676,9 +691,48 @@ depend on the total. Taffy lays out every case the lane refuses.
 | `flex-direction: column-reverse` | declined | positions run from the container's end, so every item moves when the total changes |
 | `flex-direction: row`, `row-reverse` | declined until PR 6 | 10.6 |
 | `flex-wrap: wrap`, `wrap-reverse` | declined | lines are formed from the running total |
-| Text or inline children, `display: contents` | declined | anonymous flex items, as for block (section 4) |
+| Text or inline children | lane | each is an item of its own in vapors' boxes, laid out as Taffy lays it out (a page with a loose text node and a `display: inline` div matched Taffy, review of #342) |
 | `position: absolute` children | declined, as block (section 4) | their static position is from the container's alignment |
 | `order` | n/a | not a property vapors reads (`crates/css/src/property/longhands.rs`); Taffy keeps tree order |
+
+As built, PR 3f is two PRs, as PR 3 was: 3f-1, the column mirror
+(`lane_flex*.rs`) compared with Taffy on pages of each case and its
+declines, with no change to layout; 3f-2, the flex lane live
+(`FlexLaneNotBuilt` retired) with `FlexInsert`. One input differs from
+Taffy's, declared where it is made (`lane_flex_child.rs`,
+`available_along`): for a column whose height is the items' total, an
+item is asked with its own hypothetical height as the space along the
+column, since one item does not read the total; its height is known in
+every ask that passes it, so neither Taffy's cache nor the item reads
+that space.
+
+As built, 3f-2: one `Lane<K>` serves both kinds (`lane_kind.rs`: the
+summary, the settled container, laying one child out, where starts are
+measured from, the answer), `Lanes` holding a map per kind. A column's
+leaves must serve every ask of it, and a parent's size queries ask it
+under max-content, min-content and definite space along in turn, so
+the kind of space is not part of a column's share: a leaf holds the
+item's share under definite space and under min- or max-content
+space, and an item's height is measured under both min- and
+max-content space, the column declined at layout
+(`SpaceDependentHeight`) where the two differ. Block and text items
+measure the same under both. As for blocks, the column's height inputs
+(its height, inner height and whether it is definite) are apart from
+its share, and only items whose styles read them are laid out again
+when they change. The in-crate comparisons (`lane_compare.rs`) lay
+their pages out with lanes off (`KeptBoxes::lanes_off`, test builds
+only), so a mirror is compared with Taffy's answers and not a lane's.
+
+Known O(rows) case (review of #343, M1; `tests/lane_flex_heights.rs`
+pins it at 366 calls for an insert at 50 rows and 3516 at 500):
+touche's shell one level deeper, a definite-height column that is an
+item of a flex column, its rows reading its height (`min-height: 10%`).
+The parent asks the column for its content size, an ask that drops its
+styled height, so its height inputs flip between that ask and the
+layout, and every reading row is laid out again on each. The fix is a
+leaf set per height inputs (two trees, edits applied to both, each
+filled from the stale slots it has not yet seen); after PR 4, as rows
+that read their column's height are the less common list.
 
 ### 10.4 Margins
 
@@ -715,9 +769,12 @@ Mirrored from taffy `compute/flexbox.rs` for one item, in the order
    (`determine_flex_base_size`, 947-1231), with the container's
    available space from `determine_available_space` (896-946),
    computed once per container layout.
-3. Its target main size: the hypothetical main size, since grow is 0
-   and shrink does not apply in the lane's cases
-   (`resolve_flexible_lengths`, 1747, does nothing else for them).
+3. Its target main size: the hypothetical main size. Grow is 0, a
+   column whose items would shrink is declined (`Shrinks`), and an item
+   that can shrink and whose hypothetical size lies outside its own
+   minimum and maximum is declined (`ClampedHeight`): otherwise Taffy's
+   `resolve_flexible_lengths` (step d, 1898-1915) clamps an unfrozen
+   item whenever the column is not exactly sized.
 4. Its hypothetical cross size (`determine_hypothetical_cross_size`,
    1945) and its used cross size, stretched to the container's inner
    width when `is_stretched` (`determine_used_cross_size`, 2228-2281).
@@ -764,3 +821,467 @@ name the functions and lines they mirror, as `lane_block.rs` does for
   layout to Taffy, counted as a runtime decline. Rows with `overflow:
   visible` and an auto height have a minimum equal to their content,
   so in the usual list nothing can shrink and the lane holds.
+
+## 11. Lane frames: PR 4's design
+
+PR 4 (section 7) makes a lane child's position derived: an insert
+moves no later child's stored position, and nothing below a later
+child is placed, painted, shifted or read for it again. This section is
+how, after reading the paint side as it is (`frames.rs`,
+`kept_clips.rs`, `frames_update.rs`, `kept_batches.rs`,
+`frame_extents.rs`, `placement_walk.rs`, `a11y_mirror_state.rs`).
+
+### 11.1 What a lane frame is
+
+Paint already draws every part in its frame's coordinates and adds the
+frame's shift on read: scene items (`Frames::item`), hits
+(`Frames::hit`), border boxes and origins (`Frames::rect`, `point`),
+batches (`frames_draw.rs`, the shift as a uniform). Today a frame is a
+scroll container's content (IU4). A **lane frame** is a lane child: its
+own box and everything placed below it are in its coordinates, and its
+shift is its scroll frame's shift plus its start along the axis from
+the lane's tree. An insert changes the later children's starts, so
+their frames' shifts, and nothing in them.
+
+Lane frames are lighter than scroll frames:
+- A lane frame clips nothing: its clip is its scroll frame's.
+- It is not in `Frames::of`'s list or the nested-scroller index
+  (`frames_nested.rs`): those are per scroll container and made per
+  paint, O(rows) if rows were in them. A lane frame is resolved on
+  first read and memoised for the paint (section 5.4's `Frames::at`):
+  O(frames read), the rows drawn and hit.
+- Its shift is whole device pixels, as a scroll frame's is (snapped
+  items keep their bits only under a whole shift). The shift past its
+  scroll frame's is the container's content origin in that frame, the
+  lane's top (the inset, less an escaping margin) and the child's
+  start, so a lane's children are frames only when the origin and every
+  start are whole at the scale. That is decided per lane, by the
+  placement walk when it places the container: the lane keeps the
+  children whose margin box or margins are fractional and those with a
+  scroll container below (sets, updated as leaves are put), and the
+  origin is the container's placed rect. A lane that is not framed
+  keeps today's placement for its children (correct, O(rows after)),
+  counted as a decline, `LaneFramePixel`; a lane whose framing flips
+  has its children placed and their clips redone, O(children), rare.
+- A lane with a scroll container inside one of its children is framed
+  too (4e; until 4e it was a counted decline, `LaneFrameScroller`).
+  Real pages put scrollers in rows: the touche shell does, and so does
+  the rows page `--scaling Insert` measures (each row's `.value` hides
+  its overflow). A scroll frame's shift was worked out from the frame
+  it is in when frames were made, and a lane frame is resolved later,
+  so a scroll frame inside a row would hold a shift that an insert
+  above it makes stale. From 4e a scroll frame whose outer frame is a
+  lane frame, or a scroll frame under one, keeps only what is its own
+  (section 11.2, "Scroll frames under a lane frame").
+- A lane whose child is itself a scroll container is not framed: a
+  counted decline (`LaneFrameScrollingChild`) of that lane alone, its
+  children keeping today's placement (correct, O(rows after)). Frames
+  are named by slot, so that child's lane frame (its own box) and its
+  scroll frame (its content) would share a name, and composing the
+  scroll frame would read itself (the gpu nested-scrollers page, whose
+  rows are scrollers, overflowed the stack). A scroller inside a child
+  is framed. Follow-up, which retires the decline: lane frames named
+  in a key space of their own (a lane frame's name the child's slot
+  with a tag that no scroll container's slot carries), everywhere a
+  frame is named: a part's frame (`BoxFrom::frame`), the hits and the
+  extents index by frame, `Frames`' maps and the placement's framed
+  slots.
+
+### 11.2 What each side does
+
+- **Layout** (4c): a lane child's `Layout.location` along the axis
+  holds its relative offset only; the lane writes a child's layout when
+  the child was laid out, not when its start moved
+  (`lane_layout.rs` `write_starts` goes). The debug layout check adds
+  the start to a lane child's location before comparing with Taffy.
+- **Clips** (4b): `Clips::frame_inside` names a lane child's slot as
+  the frame of its own box and of everything below it; a lane child's
+  own frame is itself (a scroll container's own box is in its parent's
+  frame; a row's moves with it).
+- **Placement** (4b): a lane child's rect is in its own frame, its
+  start left out, so after an insert the later children's rects are
+  unchanged and the walk does not enter them: `boxes_moved` and
+  `boxes_shifted` 0. Until 4c removes the writes, the walk still visits
+  them (their layouts were written) and finds nothing changed.
+- **Frames** (4b): a lane frame is resolved from the lane's
+  `start(handle)`, the container's placed origin and its scroll frame's
+  `FrameAt`, when it is read. Frames are read at draw too, after the
+  update (scene items, batches), so resolving lazily needs the lanes
+  then: each read of a frame takes a resolver holding the frames, the
+  lanes (`Placed::lanes`) and the placement, memoising per draw. Making
+  every lane frame when frames are made instead would be O(rows after)
+  again, since an insert changes every later row's shift.
+- **Draw** (4b): each lane frame drawn is a batch frame with its shift
+  in the uniform table (4-iii): O(rows drawn); batches already break per
+  row on the rows page.
+- **Culling** (4b, 4d): a framed lane's children are frames of their
+  own, so its scroll frame's extents index (`frame_extents.rs`) holds
+  the container's steps alone, not its rows'; the children that can
+  show come from `between(view)`, widened by the most ink seen past
+  them (`paint_lane_ink.rs`), and each child's steps are indexed in its
+  own frame. What 4d adds is the splice patch below: the per-row frame
+  indexes are not made afresh on an insert.
+- **Splice patch** (4d): an insert or remove of a lane child reshapes
+  paint order, and the drawing steps, the extents index and the hits
+  were made afresh after a splice (`paint_partial.rs` `drawn_updated`),
+  O(steps) whatever the lane. Each framed child is a frame of its own,
+  so its steps and entries move no other child's: the splice patches
+  the drawing steps, the extents index and the hits by its edits, the
+  new child's steps added and the removed child's taken out, O(that
+  child's steps).
+- **Scroll frames under a lane frame** (4e): a scroll frame whose
+  outer frame is a lane frame, or such a scroll frame, keeps its own
+  part only: its scroll shift and the clip it gives its content, in its
+  outer frame's coordinates (`Clips::inner`, which already is). Its
+  shift and clip on the page are composed when it is read: the outer
+  frame's, resolved (a lane frame's from its lane, section 11.1), plus
+  its own, memoised with the lane frames until the next update, as
+  `Frames::at` does for them. Made and updated as today
+  (`frames_update.rs`), only the stored part is relative, so an insert
+  above the row changes no stored frame, and a scroll inside the row
+  updates that frame and the ones nested in it alone. Each frame's
+  index of the scroll containers in it (`frames_nested.rs`) is in that
+  frame's coordinates, so a row's index is untouched by an insert and
+  culling finds a row's scrollers through the row's frame. The frames
+  are told which frames are lane frames when they are made
+  (`FrameInputs`), as placement decided them, so making a frame does
+  not resolve a lane frame. The scroller sets in `FrameFacts`, the
+  isolated owners' noting of them (`note_scrollers`) and the
+  `LaneFrameScroller` decline go.
+- **The memo across a scroll** (4e): a scroll is an update for the
+  frames. `Document::scroll_by`, `scroll_node_by` and `scroll_to`
+  change the offsets and note a change, nothing else; the frames move
+  only at the next update, in `paint_frames::updated`, which works the
+  scrolled frame and the frames nested in it out again
+  (`kept_updated`) and then sets the lanes (`Frames::set_lanes`), which
+  drops every memoised frame, lane frames and composed scroll frames
+  alike. No frame is read between a scroll and that update except
+  through the last update's frames, which show the last update's
+  offsets, as the scene does. Tested: scroll a container inside a
+  framed row, update, and every frame read, the nested one included
+  (its clip and its shift), equals the same frame made afresh.
+- **Cost** (4e): composing is done on read, once a frame an update,
+  for the frames read (those culling, the draw, hits and the a11y take
+  reach), so a frame that is never read costs nothing and an update
+  adds no per-row work for frames that do not change: an insert above
+  a row stores nothing new for the scroll frames in later rows.
+- **Batching across lane frames** (4f). Today a batch holds items of
+  one frame, and the painter moves the whole batch by that frame's
+  shift, a uniform per draw (`painter_runs.rs`, `view.shift` in each
+  pipeline's shader). Every framed row is a frame, so the rows page's
+  idle frame draws each row's label and button text apart: 51 text
+  draws for 17 rows in view where one frame drew 35 (`gpu_rows_draws`,
+  relaxed in 4e until this). From 4f:
+  - A run of consecutive steps whose frames are lane frames of one lane
+    batches together, as it would in one frame. The batch names the
+    lane's base frame (the frame the container's content is in, whose
+    shift and clip the painter applies as today), and each item keeps
+    its row's offset in the lane apart from its positions.
+  - Each instance of a batch carries a small index into a table of the
+    batch's row offsets, device pixels, whole; the shader adds
+    `view.shift + offsets[index]`. The instances are retained as today
+    (their positions are in the row's frame, which an insert does not
+    move); an insert above changes only the tables of the batches
+    drawn, O(rows shown), never a retained instance.
+  - Items still batch only under one clip, and each is culled in its
+    own row's view, as now. A clip inside a row is batched moved into
+    the lane template's coordinates (by the row's offset), so the
+    painter's scissor, the template's shift plus the batch's clip, is
+    the row's clip, and equal clips in different rows are different
+    batches (#407's review, H1).
+  - Every pipeline with positions takes the index: quads, shadows and
+    texts. Images and surfaces, drawn an item at a time, are batched
+    across rows too, each drawn at the batch's shift plus its row's
+    offset; a culled surface keeps its place and its row.
+  - **Index stability.** A batch's indexes are given when the batch is
+    made, in the order its rows first appear, and a kept batch keeps
+    them: its table's values change with its rows' offsets, its
+    instances never. A row inserted inside a batch's run changes that
+    batch's items, so the batch is made again (`KeptBatches`, as for
+    any change to a batch's run), its indexes given afresh and its
+    instances written: that batch's instances only, O(rows shown).
+    Every other batch keeps its instances and indexes.
+  - **Table capacity.** The table rides in the batch's uniform, 128
+    rows (two offsets to each `vec4<f32>`, 1 KiB), well inside
+    WebGPU's guaranteed 64 KiB uniform binding and above the rows in
+    view on the screens measured (17 on the rows page, about 46 at the
+    Pixel's 915 CSS px). A run over more rows than that is split into
+    batches of at most 128 rows each, never truncated or wrapped; a
+    test pins the split at the 129th row.
+  - **Rounding.** No offset is rounded. A lane frame's shift today is
+    its base frame's shift plus the child's start times the scale
+    (`lane_child_at`), and framing requires that start to be whole
+    device pixels (`LaneFramePixel` declines otherwise), so it is an
+    exact integer. A row's offset is that same term, computed by the
+    same function, so an item lands on the pixel it lands on today.
+    The debug check that compares the kept batches put on the page by
+    their frames with the scene batched on the page
+    (`kept_batches_check.rs` `assert_same`) adds each instance's row
+    offset, item by item. A test at scale 2.75 (the Pixel's) runs it
+    with rows whose height is whole in device pixels (framed) and with
+    rows 20.5 px tall (56.375 device px, declined), and asserts both
+    draw as the scene batched on the page.
+  - Accepted when `gpu_rows_draws` is back at 35 text draws (the pin
+    4e relaxed), `draw` within 2% across sizes for `--scaling Insert`
+    and `FlexInsert`, the kept-batches check (`kept_batches_check.rs`)
+    and the Chromium paint comparisons unchanged.
+- **The lane as one unit in the search and the sorted steps** (4f-2b,
+  after #407's measurement). At 4f-2, draw at 1000 rows is 1.344 M
+  instructions a frame for Insert against 1.036 M on main, and 223 k
+  for FlexInsert against 156 k. The draw calls are main's (52 on
+  Insert). The excess is the `batches` phase. Temporary sub-spans
+  split it, for Insert and then FlexInsert, into:
+  - the sort, `KeptBatches::of`: 98 k and 51 k;
+  - making the batches, `framed_batches`: 138 k and 28 k;
+  - the keys: 35 k and 3 k.
+
+  Main's whole `batches` phase is 95 k and 15.5 k. Two causes:
+  - Each row is a frame of its own, and each row frame is searched on
+    its own: `Frames::meeting` lists every row frame in view (one
+    `between` a lane), then the sort reads each row's frame
+    (`view_in`), queries the row's index (`candidates`), and tests each
+    step (`hidden_items`, another `view_in`). Batching reads each row's
+    frame again. A row frame not primed costs one fold of the lane's
+    tree a read.
+  - An insert splices the lane, and a splice unsorts the kept steps
+    (`paint_partial_drawn.rs` `batches_unsorted`), so every insert
+    frame sorts every frame in view afresh.
+
+  4f-2b treats a lane as one unit, as batching already does:
+  - **One search a lane.** `Frames::meeting` lists a framed lane once,
+    not its rows. The sort finds the lane's rows meeting the view in one
+    walk of its tree:
+    - `between` finds the first row;
+    - sequential starts follow to the view's bottom, as
+      `prime_started` does, with no fold a row;
+    - each row's frame comes from those starts (the template plus the
+      row's start, `lane_child_at`).
+
+    Each row's steps are its frame index's candidates in its view,
+    tested item by item as now. The rows found, each with its frame, are
+    kept with the sorted steps. `hidden_items` and `framed_batches` read
+    them, so no row frame is folded in a draw. The cost is
+    O(log rows + rows shown + steps shown) a lane, and a patch adds a
+    pass over the shown steps.
+  - **The batches made with less work a step and a batch** (first, as
+    measured after the lane search: making the batches is 139 k of
+    Insert's 246 k `batches` phase). Each step's items are read once,
+    not once to resolve its frame and again to batch it. A batch in one
+    frame allocates no rows. A batch over a lane's rows numbers its rows
+    without a hash map a batch: a lane batch holds at most
+    `ROWS_PER_BATCH` rows, so a small linear or slot-indexed table
+    serves. Measured against main after this step.
+  - **A splice that only moves a lane's rows patches the steps, at the
+    view's edges.** The lane search above keeps, for each lane, the rows
+    it found meeting the view and each shown step's row. A splice whose
+    edits are rows put in or taken out of framed lanes, and starts moved
+    within them, marks those lanes for the next draw rather than
+    unsorting:
+    - the spliced steps are taken out of the shown steps, or put in when
+      they show;
+    - each marked lane is searched again (one walk);
+    - a row found both times, and wholly inside the view both times,
+      keeps its shown steps;
+    - a row that left drops its steps, and a row that entered, or that
+      meets a view edge either time, is tested step by step.
+
+    The patch is O(log rows + rows at the edges + spliced steps) a lane,
+    not O(rows in view). Steps of other frames stay sorted. A scroll, a
+    frame's clip changing, paint order walked or frames made afresh
+    still unsort.
+  - The debug check that compares the shown steps with testing every
+    step (`kept_batches_check.rs` `assert_candidates`) runs after every
+    draw, as now. It covers both the lane search and the patch. A test
+    splices while rows enter and leave at both edges.
+  - Measured as `vapors-perf 60 10 --scaling Insert`, `FlexInsert` and
+    `Idle`, each against main at the same settings. Insert's `encode`,
+    62 k over main, and its unattributed draw, 70 k over main, are
+    broken down in the same pull request.
+  - Accepted when `draw` is no worse than main on Insert, FlexInsert
+    and Idle at 1000, 3000 and 10000 rows. The kept-batches checks and
+    the Chromium paint comparisons must be unchanged. A patched sort
+    must give the steps a full sort gives (the check above), and a test
+    must splice a row above, inside and below the view.
+  - Order: the lane search, then the batches made with less work, then
+    the patch at the edges, each measured against main. If the pull
+    request passes about 600 lines, the patch goes in 4f-2c, stacked on
+    it.
+- **The a11y touch of started rows** (4f, or 4g if it is large). An
+  insert starts every later row of its lane elsewhere, and
+  `AxMirror::touch_slots` expands each started lane into its rows and
+  puts each row's node in the touched set, about 100 instructions a
+  row in the `update` phase, outside the accessibility phase that
+  holds the a11y ceiling. The take then reads those rows (their
+  records' bounds are from the parent node, section 5.3). From 4f the
+  touch keeps each started lane as its container and first row, and
+  the take walks those rows itself when it reads (the walk
+  `prime_started` already does), so the update adds no per-row work.
+  Accepted when `update` and `layout` hold no per-row term from the
+  touch for `--scaling Insert` and `FlexInsert`, and `accessibility`
+  stays within its ceiling and no more per row than the base; measured
+  before it lands, since the take's own walk moves cost into the
+  accessibility phase, where FlexInsert has about 1.3% of headroom.
+- **Hits** (4d): the kept hits are by frame; a hit test asks the
+  frames that can show at its point (`Frames::meeting`, which finds a
+  lane's rows through `between`) and tests their hits alone, the last
+  in paint order winning (`kept_hits.rs`).
+- **a11y** (4b): the take is told of the lane children whose start
+  changed (a `started` list from the lane, which is O(rows after) but
+  only slots), so the mirror's records stay right; section 5.3's
+  mirror in flow (PR 5) removes that term. Each started child's bounds
+  read its lane frame, one fold of the lane each (4b); from 4d the take
+  first resolves the started children's frames in one pass along each
+  lane, sequential starts filling the frames' memo, O(1) a child.
+
+### 11.3 Slices
+
+| Slice | Content | Accepted when |
+|---|---|---|
+| 4a | This note (approved by the lead, 2026-11-14; ships with 4b) | reviewed |
+| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged |
+| 4c | Layout leaves starts out of later children's layouts; the layout check derives them | the layout check derives every start |
+| 4d | Culling and hits through `between`; the lane's extents entry | hits through `between` match the scan |
+| 4e | Scroll frames under a lane frame composed on read; the `LaneFrameScroller` decline goes | the rows page's list framed (`lanes_framed` above 0 for `--scaling Insert`); for `--scaling Insert`, `layout` and `paint` within 2% across sizes (the 3000- and 10000-row totals each within 2% of the 1000-row total), and `accessibility` within `INSERT_A11Y_PER_ROW` (9600) and no more per row than the base; the Chromium paint comparisons, the frames, placement and kept-paint checks unchanged with a scroller in a framed row; the scroll test above |
+| 4f | Batching across lane frames (a row offset table per batch); the a11y touch keeps started lanes, not their rows | `gpu_rows_draws` at 35 text draws again; `draw` within 2% across sizes and `update` with no per-row term from the touch, for `--scaling Insert` and `FlexInsert`; `accessibility` within its ceiling and no more per row than the base; the kept-batches check and the Chromium paint comparisons unchanged |
+| 4f-2b | The lane as one unit: one search a lane; the batches made with less work a step and a batch; the steps patched at the view's edges on a splice that only moves a lane's rows (4f-2c if past about 600 lines) | `draw` no worse than main for `--scaling Insert`, `FlexInsert` and `Idle` at every size; `assert_candidates` and the Chromium paint comparisons unchanged; a splice above, inside and below the view, and one with rows entering and leaving at both edges, tested |
+
+4b, 4c and 4d are separate stacked pull requests, each reviewed alone,
+then folded into 4d and gated once, so main never carries 4b's added
+per-row cost alone. Measured on 4b alone (instructions per extra row,
+1000 to 3000 rows, base to 4b): Insert accessibility 9406 to 9849,
+layout 964 to 1632, paint 11,883 to 12,319; FlexInsert accessibility
+1770 to 3358, layout 605 to 945, paint 2818 to 3297. Each lane frame
+read by the take folds the lane once (O(B log n)); an insert's
+reshaped walk makes the extents index afresh, now one frame index per
+row; and the start writes stay until 4c.
+
+The folded 4b+4c+4d is accepted when, for `--scaling Insert` and
+`FlexInsert`, every phase but `accessibility` is within 2% across sizes,
+and `accessibility` is within its ceiling (`INSERT_A11Y_PER_ROW`,
+`FLEX_INSERT_A11Y_PER_ROW`) and no more per row than the base, without
+raising either; any term left over the base is reported before the
+gate.
+
+## 12. The per-row terms left after the lane stack
+
+The lane stack (4b to 4f-1) does not finish property 3 alone. Measured
+with `target/release/vapors-perf 60 10 --scaling <change>` at 4e
+(ce006910), in instructions per extra row from 1000 to 3000 rows, insert
+frames unless named. Where a term comes from was found with temporary
+spans around the update's steps and `perf record --call-graph lbr`; each
+slice below measures its cause again before its code.
+
+| Term | Per row | Where | Removed by |
+|---|---|---|---|
+| The a11y touch of started rows | about 100; removed by 4i (2) (Insert update 132 to 49 a row) | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set; now each lane's range is kept and the take expands it once | 4f-3, folded into 4i (2) |
+| Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
+| Draw over the merge base, after 4f-2e | Idle +2.6%, Insert +4.8%, FlexInsert +7.5% (flat across sizes) | `draw`: the batches phase (the sort, making the batches, the keys) and the painter's per-batch work, per row in view, not per row in the list | later optimisation |
+| Lane batches cut at rows that paint shapes (fold option (b)) | unmeasured (no perf scenario holds shapes): a batch or more a row in view, as each such row's steps split the lane's run; a row with a background, an svg icon and text draws about four batches | `framed_batches.rs` `resolved`: a step that paints a shape is batched in its row's own frame, as the shape and mesh pipelines take no table of row offsets, and batches keep paint order | F2 (the flat scene's transform table, `docs/plans/flat-scene.md`) |
+| Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
+| Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
+| Insert box build | about 37; after 4h (A) (#439) Insert layout is 17.2 / 18.7 a row (judged, 1k to 3k / 3k to 10k), from 50.9 / 53.4; after 4h (#443, #444) it is -0.2 a row from 1000 to 3000 and 1.4 from 3000 to 10000 (judged), the step three rows below | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h; what is left is the three rows below |
+| A second insert in one owner in one update | an O(n) search for each insert after the first, up to its place (`lane_children.rs` pins 96 and 396 entries for an insert near the end of 100 and 400 rows) | `layout`, the box rebuild (`Placed::child_position`): the owner's lane takes a row put in only at its next layout, so after the first insert the owner has more children than its lane, and later places are searched for, counted in `UpdateCounts::children_scanned`. The perf scenarios insert one row an update | a known term for updates that insert more than once; not planned |
+| The box's children vector | at most about 0.1: remove frames, which move the same tail, measure 0.1 a row from 10000 to 40000 rows (judged). The 0.25 first recorded was an estimate (8 bytes a row) | `layout`, `put_edited`: an insert or removal in an owner edited in place moves the tail of its box's children vector (`Vec::insert` and `remove`) | 4l |
+| Insert-frame layout, a step at some sizes | 1.4 from 3000 to 10000 rows, which the flat rule would fail if `layout` were judged for Insert (1000 to 10000: +9.3 k, +6.6%); not a slope: -0.3 from 10000 to 20000 and 0.5 from 20000 to 40000. Per frame: 140.9 k, 140.4 k, 141.7 k, 143.9 k, 150.2 k, 147.1 k and 157.1 k at 1000, 3000, 5000, 7000, 10000, 20000 and 40000 rows, within 300 between four runs. Remove frames: 0.2, then 0.1 | `layout`, in `laid_out`, split by temporary spans: from 3000 to 10000 rows the box rebuild adds 3.9 k and the lay out 5.4 k; the lay out is 75.1 k, 70.1 k and 72.4 k at 10000, 20000 and 40000. Not the lane tree's depth, which is 3 at 1000 rows, 4 from 3000 to 7000 and 5 from 10000 to 40000. Not located further; work that depends on the slot numbers (hash probes) would vary like this, unverified. Reproduce: `cargo build --profile judged -p vapors-perf && target/judged/vapors-perf 60 10 --scaling Insert`, other sizes by editing `SIZES` in `crates/perf/src/scaling.rs` | not located; not planned |
+| Resize, after the lane work (2026-11-16) | accessibility 2461, layout 14, update 16 (judged, 1k to 10k, at #434's head); a layout figure of about 33k a row from an earlier count is stale | accessibility: one bounds write per moved row (4i's options); layout and update small | recorded, not a target this iteration |
+| Insert accessibility | about 4720 (FlexInsert about 1800); after 4i about 1230 (FlexInsert about 230), judged | `accessibility`: the take made its index afresh on every insert and remove (`AxIndex::of`, 71% of Insert's take; now patched, 4i (1), #432), and read every started row again in full (now each row's bounds alone, 4i (2)). What is left is one bounds write a moved row: the a11y tree carries every node's bounds, each from its parent node | 4i; the rest deferred by Tom (2026-11-16) to a later accessibility iteration, with the two options under 4i and no slices planned |
+| Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
+| Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
+
+The slices:
+
+- **4f-2, 4f-3** as section 11.2 says (#398).
+- **4g. Placement visits only the marked children of a framed lane.**
+  A framed lane's children are in their own frames, so a scroll of the
+  container or an insert before a child moves none of them in its
+  frame; placement visits the children marked (built again, or with a
+  descendant that changed) and finds each by its handle, not every
+  child by its start. The settle after a scroll settles the scrolled
+  container's own range, not its children's boxes. Accepted when
+  `--scaling Scroll`'s and `Insert`'s `layout` hold no per-row term from
+  placement, and the placement check (`placement_check.rs`) and the
+  scroll tests are unchanged.
+- **4h. An owner's children edited, not walked.** Measured first (10k
+  rows, a cycles profile of `Document::update`): lending from the edited
+  owner, the order splice's copy, and the a11y row touch. (A), #439: an
+  owner edited in place lends only to its inserted children, O(edits);
+  Insert layout 50.9 to 17.2 a row, FlexInsert 50.5 to 17.0. (B), the
+  order splice made in place, was measured and dropped: the copy is a
+  vectorised memcpy, cheap in instructions (judged layout unchanged,
+  50.6 against 50.9) and in layout's median time (about 371 µs either
+  way); its weight in the cycles profile was allocation and page faults.
+  It is not an instruction term. The a11y row touch was outside the
+  layout span (4f-3, removed by 4i (2)). About 17 a row remains in
+  Insert's layout, not yet placed.
+- **4i. The a11y take after an insert.** Measured first: 71% of
+  Insert's take was the index made afresh on every insert and remove,
+  26% every started row's record read again in full. (1), #432: the
+  index is patched from the elements whose entries can change (an
+  indexed attribute written, a subtree inserted, moved or removed),
+  checked against a scan in debug builds. (2), with 4f-3: the update
+  keeps each lane's started range; the take expands it once and gives
+  each row nothing else touched its bounds alone (its record's, or its
+  nearest nodes' when it is not a node; before #436 a started row with
+  no role left its nodes' bounds stale, and #436 read them in full).
+  Judged ceilings
+  tightened to Insert 1250, FlexInsert 240, Resize 2480.
+
+  Still per row: each moved row's bounds are rewritten, as the mirror
+  carries every node's bounds from its parent node, about 1240 a row.
+  Deferred by Tom (2026-11-16) to a later, dedicated accessibility
+  iteration; no slices are planned for it now. The two ways recorded to
+  make it independent of the list's length:
+  - **Bounds relative to a node per lane.** The platform would compose
+    each row's place from a lane node and the row's offset in it, so an
+    insert writes the lane node and the new row. There is no AccessKit
+    here: the platform mirror is the web page's DOM
+    (`crates/platform/src/a11y_mirror_*.rs`), each record an element
+    placed `position: absolute` from its parent's. The in-flow mirror
+    (PR 5 in the comments: rows as static elements of their heights in
+    a lane element, which the browser places) is that option there; a
+    native platform would need per-node transforms, to be checked in its
+    toolkit when one is added.
+  - **Fresh bounds only for rows in or near the view.** Rows far
+    offscreen would keep stale offsets until they come near the view.
+    It needs a check that platforms tolerate it, against the a11y
+    oracle (`ax_oracle --check`) and a screen reader's virtual cursor,
+    which reads offscreen rows.
+- **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
+  is kept in blocks, as the extents index's entries are (`blocks.rs`),
+  so a removal or insert moves one block. Accepted when `paint` is
+  within 2% across sizes on remove frames too.
+- **4k. Rows of fractional height framed.** A row's frame shift is its
+  start in device pixels rounded as an item's edge is (half up), and the
+  row's items are painted from that whole origin, so a row is snapped
+  as a unit rather than each item on the page. An item can then land a
+  pixel from where snapping it on the page puts it. Chromium snaps a
+  box's paint offset before its contents, so the first step is the
+  Chromium paint comparisons on a fractional-row page, framed and
+  declined. If framed rows match Chromium as well as declined rows do,
+  4k frames them; if not, they stay declined. In that case the plan
+  records the cost (every term above, per row, for such lists) and the
+  nightly scaling run reports a fractional-row page. Accepted when the
+  comparisons show no new difference, and `--scaling` on a 19.2 px row
+  page meets the exit checks the whole-row pages meet.
+- **4l. The box's children in blocks.** The box's children vector
+  kept in blocks, as 4j keeps the drawn steps, so an insert or removal
+  in an owner edited in place moves one block, not the tail. Measured
+  at most about 0.1 a row (the table), so recorded, not built.
+
+Order and fold (the lead, on #402; changed 2026-11-16 after Tom's "fine to have optimisations for later"):
+- **4f-2, with 4f-2b to 4f-2e**, first: batching across lane frames (#407), one search a lane and batches made with less work (#414), the patch at a lane's ends (#415), places kept between frames (#418), and one table per lane part with stable row slots (#423).
+- **Then fold and gate.** #423 becomes the fold pull request against main, and the PRs under it close as included. The correctness checks are unchanged. The draw terms left over the stack's merge base (75e63c84) are later optimisations, not blockers; they are recorded in the fold's pull request and in the table below. At 1 codegen unit, draw at 1000 rows (3000 and 10000 flat):
+  - Idle: 907,046 to 930,823 (+2.6%);
+  - Insert: 1,004,567 to 1,052,817 (+4.8%);
+  - FlexInsert: 152,155 to 163,635 (+7.5%).
+
+  Paint falls from 11.1 M to 189 k (Insert) and from 2.8 M to 123 k (FlexInsert).
+- After the fold, each slice lands on main as an ordinary PR with its own exit check in the 11.3 form, in this order:
+  - **4f-3**, the a11y touch of started rows, measured before it lands;
+  - **4g**, as scroll is what a reader feels;
+  - **4i**, the largest term by far. The phases are measured apart, so the layout terms do not confound it.
+  - **4h**;
+  - **4j**, the smallest;
+  - **4k**, which starts with the Chromium evidence and may end with the decline kept and its cost recorded;
+  - **4l**, recorded, not planned;
+  - the draw terms, as a later optimisation.

@@ -4,7 +4,7 @@
 //! position unrounded in CSS px; the capture ends on `pointerup`, with
 //! `gotpointercapture` and `lostpointercapture` around it.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

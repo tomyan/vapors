@@ -3,7 +3,7 @@
 //! any taken subtree, and the taken slots no new box takes become
 //! vacant. Slots outside the taken subtrees are not touched.
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::super::owners::KeptChildren;
 use super::{Key, LayoutBox, Placed, keys, misplaced};
@@ -14,12 +14,28 @@ use super::{Key, LayoutBox, Placed, keys, misplaced};
 pub(crate) struct Taken {
     pub(crate) boxes: FxHashMap<usize, (Key, LayoutBox)>,
     slots: FxHashMap<Key, usize>,
+    /// Each owner edited in place, by slot, with the run of children its
+    /// edits changed, derived from their places (`put_edited`): its old
+    /// children are moved into its new box, not kept to compare.
+    pub(crate) reshaped: FxHashMap<usize, super::super::reshaped::Reshaped>,
+    /// Those owners' slots, whose taken boxes' children were moved out
+    /// and read empty: `reshaped` refuses to compare them.
+    pub(crate) moved_out: FxHashSet<usize>,
+    /// Debug builds: those owners' old children, to check the derived run
+    /// against the compared one (`Rebuilt::subtrees`).
+    #[cfg(debug_assertions)]
+    pub(crate) old_children: FxHashMap<usize, Vec<usize>>,
 }
 
 impl Taken {
     /// The taken slots no new box took, with the key each held.
     pub(crate) fn unclaimed(&self) -> Vec<(usize, Key)> {
         self.slots.iter().map(|(&key, &slot)| (slot, key)).collect()
+    }
+
+    /// The slot `key` held, when its box was taken and not put back.
+    pub(crate) fn held(&self, key: Key) -> Option<usize> {
+        self.slots.get(&key).copied()
     }
 }
 
@@ -49,7 +65,7 @@ impl Placed {
     }
 
     /// Takes out the box at `slot` into `taken`; its children.
-    fn take_box(&mut self, at: usize, taken: &mut Taken) -> Vec<usize> {
+    pub(super) fn take_box(&mut self, at: usize, taken: &mut Taken) -> Vec<usize> {
         let old = std::mem::replace(&mut self.boxes[at], LayoutBox::vacant());
         let key = self.slots.keys[at]
             .take()
@@ -109,21 +125,35 @@ impl Placed {
     /// mapped to slots by `to`.
     fn put_box(&mut self, mut layout_box: LayoutBox, (key, slot): (Key, usize), to: &[usize]) {
         self.hold(key, slot);
+        // a container built again starts its lane afresh, after lending
+        self.lanes.borrow_mut().rebuilt.push(slot);
         for child in &mut layout_box.children {
             *child = to[*child];
         }
         self.boxes[slot] = layout_box;
     }
 
+    /// Drops the lanes of the containers built again (`put_box`), each
+    /// to start afresh, once the boxes are lent their caches: a lane puts
+    /// its children's starts back in the layouts they hold then, which
+    /// a container lent its cache, not laid out again, keeps (section
+    /// 11.2).
+    pub(crate) fn drop_lanes(&mut self) {
+        let mut lanes = self.lanes.borrow_mut();
+        for slot in std::mem::take(&mut lanes.rebuilt) {
+            lanes.remove(slot, &mut self.boxes);
+        }
+    }
+
     /// Records that `key` holds `slot`.
-    fn hold(&mut self, key: Key, slot: usize) {
+    pub(super) fn hold(&mut self, key: Key, slot: usize) {
         let earlier = self.slots.of.insert(key, slot);
         assert!(earlier.is_none(), "box key {key:?} placed twice");
         self.slots.keys[slot] = Some(key);
     }
 
     /// The slot `key` takes, growing the boxes for a new one.
-    fn slot_for(&mut self, key: Key, taken: &mut Taken) -> usize {
+    pub(super) fn slot_for(&mut self, key: Key, taken: &mut Taken) -> usize {
         assert!(
             self.slots.of(key).is_none(),
             "box key {key:?} is built again but holds a slot outside every rebuilt subtree; \
@@ -136,6 +166,9 @@ impl Placed {
             return slot;
         }
         let slot = self.boxes.len();
+        // grown by a quarter, not doubled (`slot_list.rs`); a box is about
+        // 2.8 KB. Each growth copies every box; chunked storage, as the
+        // blocks of #288, is the follow-up if that shows in inserts.
         self.slots.keys.push(None);
         self.boxes.push(LayoutBox::vacant());
         slot
@@ -143,6 +176,9 @@ impl Placed {
 
     /// Frees the taken slots no new box took, once every subtree is put.
     pub(crate) fn free_taken(&mut self, taken: &Taken) {
+        for slot in taken.slots.values() {
+            self.lanes.borrow_mut().forget(*slot);
+        }
         self.slots.free.extend(taken.slots.values().copied());
         self.slots.free.sort_unstable_by(|a, b| b.cmp(a));
         debug_assert_eq!(

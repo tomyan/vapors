@@ -4,27 +4,26 @@
 //! again, and it is returned. Which slots: those built again, and those
 //! moved or whose clip was redone whose part was made from other values
 //! (`BoxFrom`) and cannot be shifted to them (`kept_shift.rs`); no
-//! other kept part is read. A dropped part frees its
-//! slab ids and removes its map entries before any part is painted, so
-//! a part painted after takes them. Scroll thumbs are painted on every
-//! update that paints. The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
-//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
+//! other kept part is read. A dropped part frees its slab ids and
+//! removes its map entries before any part is painted, so a part
+//! painted after takes them. The thumbs painted are those of the scroll
+//! containers that can have changed (`thumbs_again.rs`). The scene is
+//! the parts of the steps that draw walked in paint order
+//! (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which
+//! a debug build checks (`kept_paint.rs`).
 
 use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
-use crate::drawn_steps::DrawnSteps;
-use crate::frame_extents::Extents;
-use crate::frames::Frames;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, started};
-use crate::paint_order::Step;
+use crate::paint_partial_drawn::{batches_unsorted, drawn_updated, walked};
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
 use crate::repaint::Repaint;
+use crate::thumbs_again;
 
 /// Paints `boxes` at `rects`, keeping `last`'s parts in place where
 /// they show what painting again would, and patching its maps for the
@@ -43,22 +42,29 @@ pub(crate) fn paint_partial(
         _ => (started, None),
     };
     let kept = kept_order.is_some();
-    let place = &|step| painted.drawn.place_of(step);
-    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
+    let label_of = &|step| painted.drawn.label_of(step);
+    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, label_of);
     let scale = input.scale;
-    let frames_were = std::mem::replace(&mut painted.frames, frames(&order, boxes, input));
+    let frames_moved_now =
+        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
+    let lanes_moved = !changed.started.is_empty();
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
     crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
-    let (patched, with_hits) = patched_slots((&again, &shifted), changed, &order);
+    let shown_last = kept.then_some(painted.from.thumb_alpha);
+    let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
+    let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
-    repaint.thumbs(input, &mut painted);
+    repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
-    if painted.frames != frames_were {
+    crate::paint_lane_ink::note_painted(&mut painted, input, (walked(&order), &patched));
+    if frames_moved_now {
         frames_moved(&mut painted);
+    } else if lanes_moved {
+        lane_rows_moved(&mut painted, &changed.freed);
     }
     painted.order = order;
     painted
@@ -72,115 +78,28 @@ fn frames_moved(painted: &mut Painted) {
     painted.hits_changed = HitsChanged::Unknown;
 }
 
-/// `painted`'s kept batches, if any, to be sorted again at the next
-/// draw, keeping their keys for the runs made again.
-fn batches_unsorted(painted: &mut Painted) {
-    if let Some(kept) = painted.kept_batches.get_mut() {
-        kept.unsort();
-    }
-}
-
-/// The scroll frames of `order`'s scroll containers, each shifted by
-/// its offset in `input` as `scroll::frame_shift` gives it.
-fn frames(order: &KeptOrder, boxes: &[LayoutBox], input: &PaintInput<'_>) -> Frames {
-    let scrolls = |slot| input.stackings.scrolls(slot);
-    crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
-    let depth = |slot| order.tree.depth(slot);
-    let shift =
-        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
-    Frames::of(&order.thumbs, (&order.clips, &depth), &shift, input.scale)
-}
-
-/// The scroll offset of the scroll container at `slot`, or a panic
-/// naming it: placement settles every scroll container's offset
-/// before paint.
-fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offsets) -> [f32; 2] {
-    let node = boxes[slot].element_in(slot);
-    node.and_then(|node| scroll.get(node)).unwrap_or_else(|| {
-        panic!(
-            "scroll container slot {slot} ({node:?}) has no settled offset: placement \
-             settles every scroll container's (placement_walk.rs `settled_offset`); \
-             reproduce with `cargo xtask test`"
-        )
-    })
+/// After only framed lanes' rows moved (started elsewhere): the kept
+/// batches searched again in those lanes, at the view's edges, and the
+/// hover tested again.
+fn lane_rows_moved(painted: &mut Painted, freed: &[(usize, crate::layout::Key)]) {
+    crate::paint_partial_drawn::batches_lanes_moved(painted, freed);
+    painted.hits_changed = HitsChanged::Unknown;
 }
 
 /// The slots whose parts this update paints again, shifts or drops:
 /// those painted `again`, the `shifted` and the freed, then the scroll
-/// containers, whose thumbs add no hits; and how many come before the
-/// scroll containers.
+/// containers whose `thumbs` it paints, which add no hits; and how many
+/// come before those.
 fn patched_slots(
-    (again, shifted): (&[(usize, BoxFrom)], &[usize]),
+    (again, shifted, thumbs): (&[(usize, BoxFrom)], &[usize], &[usize]),
     changed: &ChangedSlots,
-    order: &KeptOrder,
 ) -> (Vec<usize>, usize) {
     let again = again.iter().map(|(slot, _)| *slot);
     let freed = changed.freed.iter().map(|(slot, _)| *slot);
     let mut slots: Vec<usize> = again.chain(shifted.iter().copied()).chain(freed).collect();
     let with_hits = slots.len();
-    slots.extend(order.thumbs.iter().copied());
+    slots.extend(thumbs.iter().copied());
     (slots, with_hits)
-}
-
-/// `painted`'s drawing steps made afresh, its kept batches unsorted and
-/// its hits dropped, when `order` was walked again; else all three patched for
-/// the `patched` slots, the hits for the first `with_hits` only, noting
-/// the hits that changed.
-fn drawn_updated(
-    painted: &mut Painted,
-    order: &KeptOrder,
-    (patched, with_hits): (&[usize], usize),
-) {
-    // After a splice the drawing steps, hits and batches are made afresh
-    // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.order > 0 || order.walks.splices > 0 {
-        painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
-        let places = order.steps.len();
-        painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);
-        batches_unsorted(painted);
-        painted.hits = std::cell::OnceCell::new();
-        painted.hits_changed = HitsChanged::Unknown;
-        return;
-    }
-    painted
-        .drawn
-        .patch(patched.iter().copied(), &painted.kept_boxes);
-    extents_patched(painted, order, patched);
-    painted.hits_changed = match painted.hits.get_mut() {
-        Some(hits) => {
-            let slots = patched[..with_hits].iter().copied();
-            let changed = hits.patch(slots, &painted.drawn, &painted.kept_boxes);
-            HitsChanged::on_page(changed, &painted.frames)
-        }
-        // Only a release build reaches this arm: the debug check gathers
-        // the hits after every paint (`kept_paint_check.rs`). Unknown is
-        // the safe answer either way; a gather is one hit test's cost.
-        None => HitsChanged::Unknown,
-    };
-    batches_patched(painted, patched);
-    let drawn = painted.drawn.take_counts();
-    painted.index_counts = drawn.and(painted.extents.take_counts());
-}
-
-/// `painted`'s extents index patched for the `patched` slots' steps.
-fn extents_patched(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
-    let places_of = |&slot: &usize| painted.drawn.places_of(slot);
-    let steps: Vec<(usize, Step)> = patched.iter().flat_map(places_of).collect();
-    let drawn = (&painted.drawn, order.steps.len());
-    painted.extents.patch(&steps, drawn, &painted.kept_boxes);
-}
-
-/// `painted`'s kept batches, if any, patched for the `patched` slots'
-/// steps.
-fn batches_patched(painted: &mut Painted, patched: &[usize]) {
-    let Some(mut kept) = painted.kept_batches.take() else {
-        return;
-    };
-    let steps = patched
-        .iter()
-        .flat_map(|&slot| painted.drawn.places_of(slot));
-    kept.patch(steps, painted.batch_sources());
-    *painted.kept_batches.get_mut() = Some(kept);
 }
 
 /// `last` for this update, with `started`'s canvas and scale and its
@@ -191,6 +110,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
     (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
+    last.splice_patched = false;
     (last, Some(order))
 }
 
@@ -205,7 +125,7 @@ fn dropped(again: &[(usize, BoxFrom)], changed: &ChangedSlots, len: usize, paint
         }
     }
     let past = len.min(painted.kept_boxes.len());
-    let past: Vec<KeptBox> = painted.kept_boxes.drain(past..).flatten().collect();
+    let past: Vec<KeptBox> = painted.kept_boxes.drain_from(past).flatten().collect();
     for gone in past {
         gone.drop_from(painted);
     }

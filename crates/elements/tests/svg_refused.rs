@@ -2,7 +2,7 @@
 //! anything outside the subset, before layout, naming the element, the
 //! attribute and the fix.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{SVG, assert_accepted, assert_refused, icon, with_attributes};
 use support::{document, element, text};
@@ -49,7 +49,10 @@ fn svg_attributes_outside_the_subset_are_refused_naming_the_fix() {
             &[("style", "color: red")][..],
             &["style", "not in the icon subset"],
         ),
-        (&[("fill", "none")][..], &["fill", "not in the icon subset"]),
+        (
+            &[("stroke-width", "thick")][..],
+            &["<svg class=\"icon\">: the stroke-width attribute of <svg> is \"thick\""],
+        ),
         (
             &[("xmlns", "http://example.com")][..],
             &["xmlns", "is not the SVG namespace"],

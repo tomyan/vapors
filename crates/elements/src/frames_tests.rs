@@ -1,6 +1,6 @@
 use vapors_scene::{Color, Item, Quad, Rect, TextId};
 
-use super::{Frames, PAGE};
+use super::{FrameInputs, Frames, PAGE};
 use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
 
@@ -27,7 +27,13 @@ fn nested(outer: [f32; 2], inner: [f32; 2], scale: f32) -> Frames {
         vec![PAGE, PAGE, 1],
     );
     let shift = |slot: usize| if slot == 1 { outer } else { inner };
-    Frames::of(&[2, 1], (&clips, &|slot| slot), &shift, scale)
+    let inputs = FrameInputs {
+        clips: &clips,
+        depth: &|slot| slot,
+        shift: &shift,
+        lane_frame: &|_| false,
+    };
+    Frames::of(&[2, 1], &inputs, scale)
 }
 
 #[test]
@@ -65,7 +71,7 @@ fn a_nested_frame_adds_its_shift_to_the_outer_one_and_is_cut_to_its_clip() {
     let frames = nested([0.0, -30.0], [0.0, -5.0], 1.0);
 
     // When
-    let inner = *frames.at(2);
+    let inner = frames.at(2);
 
     // Then: slot 2's clip, (20, 200) in slot 1's frame, is at
     // (20, 170) on the page, below slot 1's clip, which ends at 110
@@ -130,7 +136,7 @@ fn a_hit_is_moved_by_its_frame_and_cut_to_its_frame_clip() {
 }
 
 #[test]
-#[should_panic(expected = "names scroll frame 7, which this paint does not hold")]
+#[should_panic(expected = "names frame 7, which this paint does not hold")]
 fn a_frame_the_paint_does_not_hold_is_refused_by_name() {
     // Given
     let frames = nested([0.0; 2], [0.0; 2], 1.0);

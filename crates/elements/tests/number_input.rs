@@ -6,7 +6,7 @@
 //! pinned by the corpus's `number.events`; these pin the values and
 //! vapors' own commit rule.
 
-mod support;
+use crate::support;
 
 use support::number_page::{click, key, page, shift_key, type_text, value};
 use vapors_dom::{Dom, PropertyValue};

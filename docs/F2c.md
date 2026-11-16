@@ -184,9 +184,9 @@ two places answering one question. The traits (`TraversePartialTree`,
   inline children wraps each inline run in an anonymous block, as CSS
   does. In a flex or grid container each text run becomes an anonymous
   item. Whitespace-only runs are dropped there, and inline elements are
-  blockified. `white-space` collapsing (`normal`, `nowrap`, `pre`,
-  `pre-wrap`; others refused until needed) happens before Parley,
-  which does not collapse.
+  blockified. `white-space: normal` collapsing happens before Parley,
+  which does not collapse; every other value is refused today
+  (`style/text_style.rs`, `fn white_space`), `nowrap` asked for in #347.
 - **Inline-block inside text**, such as a `button` in a paragraph,
   needs Parley inline boxes sized by Taffy. It is deferred: S6 refuses
   it with that message. A button as a flex or grid item, which is how

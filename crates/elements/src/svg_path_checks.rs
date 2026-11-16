@@ -1,9 +1,9 @@
 //! What a `path` of an inline `<svg>` icon refuses (docs/icons.md, The
 //! subset): a place outside an `svg`, attributes outside the subset,
 //! path data `vapors_shapes::IconPath` does not read (the parser paint
-//! uses, so a path that passes rasterises), a fill, a stroke other than
-//! `currentColor`, a `stroke-width` that is not a positive number, and
-//! content.
+//! uses, so a path that passes rasterises), and content. Its paint,
+//! which its presentation attributes and CSS give, is checked on its
+//! used style (`svg_style_checks.rs`).
 
 use std::collections::BTreeMap;
 
@@ -11,7 +11,6 @@ use vapors_dom::NodeId;
 use vapors_shapes::IconPath;
 
 use crate::arena::Arena;
-use crate::svg::positive;
 use crate::svg_checks::outside;
 
 /// The attributes a `path` takes.
@@ -30,7 +29,6 @@ pub(crate) fn reasons(
     }
     found.extend(outside(attributes, &ATTRIBUTES, "<path>"));
     found.extend(data(attributes.get("d")));
-    found.extend(paint(attributes));
     if !arena.children(node).is_empty() {
         found.push("holds content, and a path holds none; remove it".to_owned());
     }
@@ -45,20 +43,4 @@ fn data(d: Option<&String>) -> Option<String> {
     };
     let error = IconPath::parse(d).err()?;
     Some(format!("its d attribute {d:?}: {error}"))
-}
-
-/// `fill`, `stroke` and `stroke-width`.
-fn paint(attributes: &BTreeMap<String, String>) -> Vec<String> {
-    let get = |name| attributes.get(name).map(String::as_str);
-    let mut found = Vec::new();
-    if get("fill") != Some("none") {
-        found.push("needs fill=\"none\": SVG fills a path black by default, and the icon subset draws strokes only".to_owned());
-    }
-    if get("stroke") != Some("currentColor") {
-        found.push("needs stroke=\"currentColor\": an icon is stroked in its svg's CSS color, so set the colour there".to_owned());
-    }
-    if let Some(width) = get("stroke-width").filter(|width| positive(width).is_none()) {
-        found.push(format!("its stroke-width {width:?} is not a positive number with no unit; give viewBox units as a bare number, such as stroke-width=\"1.5\", or leave it out for 1"));
-    }
-    found
 }

@@ -57,6 +57,7 @@ pub fn page(random: &mut Random) -> Rc<RefCell<Document>> {
 
 /// One random change, described for a failure message; the viewport
 /// may change with it.
+#[allow(clippy::too_many_lines)] // one arm per kind of random change; the list is the test's vocabulary
 pub fn change(
     doc: &Rc<RefCell<Document>>,
     random: &mut Random,
@@ -155,10 +156,10 @@ pub fn change(
             let mut d = doc.borrow_mut();
             d.add_stylesheet(&format!("more{step}.css"), ".row { padding-left: 1px; }")
                 .expect("parses");
-            d.add_style(
+            d.add_style(vapors_dom::CompiledSheet::for_tests(
                 &format!("scope{step}"),
                 ":global(.box) { margin-left: 1px; }",
-            );
+            ));
             "add a sheet and a scoped style".to_owned()
         }
     }

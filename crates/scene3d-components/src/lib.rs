@@ -8,7 +8,7 @@
 //! <Scene scene={Some(scene)} surface={Some(surface)} camera={Some(eye)}>
 //!   <Camera handle={Some(eye)} projection={Some(lens)} transform={back} />
 //!   <Group transform={spin}>
-//!     <Mesh geometry={Some(cube)} colour={red} />
+//!     <Mesh geometry={Some(cube)} class="hull" class:lit={lit} />
 //!   </Group>
 //! </Scene>
 //! ```
@@ -19,23 +19,36 @@
 //! `style` (`docs/plans/css-for-3d.md`, C1), or else the component's
 //! own (`own_keys.rs`). The user-agent sheet gives those tags
 //! `display: none`, so an anchor has no box, no paint and no place in
-//! the accessibility tree. No computed value reaches the node yet (C2,
-//! C3): a mesh's colour is its `colour` prop, whatever colour its
-//! anchor inherits. The anchor is the component's identity in the document: its
+//! the accessibility tree. Each anchor's used style is a `SceneUsed`
+//! (vapors-elements; C2), and a declaration its tag does not read is
+//! refused at the update. A mesh's colour and visibility are its
+//! anchor's computed `color` and `visibility`, inherited from the HTML
+//! around the scene where no rule declares them (C3). The anchor is the component's identity in the document: its
 //! children, and the `{if}` and `{for}` blocks among them, are placed in
 //! it, and a node component finds its parent scene node from the
 //! anchor it is placed in, at mount and at any later rebuild of a block.
 //!
-//! Each node is added to the scene at mount. `transform` (and a mesh's
-//! `colour`) is a signal: a change writes it to that node alone and
-//! invalidates the surface, so the next frame writes that node's
-//! uniform (80 bytes; a group's subtree's), uploads no geometry, and
-//! counts the scene's draws in `FrameCounts::surfaces`.
+//! Each node is added to the scene at mount. `transform` is a signal,
+//! and a mesh's appearance follows its anchor's restyle: a change
+//! writes that node alone and invalidates the surface, so the next
+//! frame writes that node's uniform (80 bytes; a transform: its
+//! subtree's; a visibility change alone: none), uploads no geometry,
+//! and counts the scene's draws in `FrameCounts::surfaces`.
 //!
 //! A required prop is an `Option`, refused at mount when `None`, since
 //! a parent's props struct takes every unset prop from `Default`. Markup
 //! that is not a node component, inside `<Scene>` or `<Group>`, is
 //! refused: the anchor would hide it.
+//!
+//! A `<Scene>` answers the pointer's hits on its surface
+//! (`Dom::watch_hits`, docs/plans/css-for-3d.md C4): the mesh `pick`
+//! finds through the camera is the target as its anchor, so `:hover`,
+//! `:active`, `cursor` and pointer events reach mesh anchors and bubble
+//! through the group and scene anchors. A mesh whose anchor's
+//! `pointer-events` is `none` or which is hidden is passed over; a mesh
+//! the application added to the scene itself blocks the pointer, the
+//! surface being the target there. A transform change tells the
+//! document the hits moved.
 //!
 //! Disposing a component's owner (an `{if}` hiding it, a `{for}`
 //! dropping its row, `unmount`) removes its node and the subtree under
@@ -46,6 +59,7 @@ mod camera;
 mod children;
 mod component;
 mod group;
+mod hits;
 mod mesh;
 mod node;
 mod own_keys;

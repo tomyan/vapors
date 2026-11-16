@@ -12,8 +12,9 @@
 //! at that priority; nice slows cargo, linkers, tests and browsers, and
 //! the job cap bounds how many compiles run at once.
 //!
-//! Declared limits: plain `cargo` outside xtask is not reached; test
-//! threads are not capped; `cargo metadata`, git and kill run as they are.
+//! Plain `cargo` outside xtask is capped at the same 4 jobs by
+//! `.cargo/config.toml`, and not niced. Declared limits: test threads
+//! are not capped; `cargo metadata`, git and kill run as they are.
 
 use std::process::Command;
 use std::sync::OnceLock;
@@ -63,14 +64,16 @@ pub fn in_gate(is_gate: bool, gate_env: Option<&str>) -> bool {
     is_gate || gate_env == Some("1")
 }
 
-/// `program` in the gate: as is, marked with [`GATE_ENV`], with any
-/// inherited job cap cleared. Outside it: under `nice -n 10`, marked
+/// `program` in the gate: as is, marked with [`GATE_ENV`], building on
+/// every thread over any inherited cap and `.cargo/config.toml`'s. Outside it: under `nice -n 10`, marked
 /// with [`NICED_ENV`], unless this xtask is already niced or the
 /// program is sccache.
 pub fn command_for(program: &str, in_gate: bool, niced: bool) -> Command {
     if in_gate {
         let mut command = Command::new(program);
-        command.env(GATE_ENV, "1").env_remove("CARGO_BUILD_JOBS");
+        command
+            .env(GATE_ENV, "1")
+            .env("CARGO_BUILD_JOBS", threads());
         return command;
     }
     // sccache may start its server, which keeps the niceness it starts
@@ -81,6 +84,14 @@ pub fn command_for(program: &str, in_gate: bool, niced: bool) -> Command {
     let mut command = Command::new("nice");
     command.args(["-n", "10", program]).env(NICED_ENV, "1");
     command
+}
+
+/// The machine's thread count; 1 when it cannot be read, which only
+/// slows the gate.
+fn threads() -> String {
+    std::thread::available_parallelism()
+        .map_or(1, std::num::NonZero::get)
+        .to_string()
 }
 
 fn configured_jobs() -> Result<u32, String> {

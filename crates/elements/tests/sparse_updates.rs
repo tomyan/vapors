@@ -4,10 +4,10 @@
 //! counters are reported, and the result checked by the correctness
 //! oracle (`support::oracle`) against a full recomputation. Counts
 //! only: timings belong to the baseline in docs/plans/iu1.md.
-//! `cargo nextest run -p vapors-elements --test sparse_updates
+//! `cargo nextest run -p vapors-elements --test tests sparse_updates::
 //! --no-capture` prints the table.
 
-mod support;
+use crate::support;
 
 use support::oracle::assert_matches_full;
 use support::rows_page::{EDITS, Edit, RowsPage, rows_page, rows_viewport};
@@ -61,8 +61,10 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// The walk after each edit of `EDITS`, by row count: elements visited,
 /// boxes built, layout calls (the same-size edit's are constant in
 /// rows: the rebuilt value is laid out in isolation, M10,
-/// `layout/isolated.rs`; the resizing edit's are rows + 12, the body
-/// asking each row), boxes painted, boxes copied (kept parts
+/// `layout/isolated.rs`; the resizing edit's are 13 whatever the rows:
+/// the body's lane asks the resized row only, `layout/lane_layout.rs`;
+/// before the lane they were rows + 12, the body asking each row),
+/// boxes painted, boxes copied (kept parts
 /// read and kept: none, as no edit moves a box it did not build), scene
 /// items built, map
 /// entries patched (the elements built again or moved), paint order
@@ -85,7 +87,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 13]; 6]); 2] = [
         100,
         [
             [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2, 1, 2],
-            [1, 2, 112, 6, 0, 4, 3, 0, 0, 6, 2, 105, 2],
+            [1, 2, 13, 6, 0, 4, 3, 0, 0, 6, 2, 105, 2],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2, 1, 2],
             [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2, 1, 2],
@@ -96,7 +98,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 13]; 6]); 2] = [
         1000,
         [
             [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2, 1, 2],
-            [1, 2, 1012, 6, 0, 4, 3, 0, 0, 6, 2, 1005, 2],
+            [1, 2, 13, 6, 0, 4, 3, 0, 0, 6, 2, 1005, 2],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2, 1, 2],
             [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2, 1, 2],
@@ -171,7 +173,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
 }
 
 const FIX: &str = "update EXPECTED or EXPECTED_WALKS and docs/plans/iu1.md; reproduce: \
-    cargo nextest run -p vapors-elements --test sparse_updates --no-capture";
+    cargo nextest run -p vapors-elements --test tests sparse_updates:: --no-capture";
 
 #[test]
 fn a_hundred_rows_update_sparsely_and_match_a_full_update() {

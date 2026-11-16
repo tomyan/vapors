@@ -1,7 +1,5 @@
 //! Timing function parsing (`src/animation/timing.rs`). Translated from sumi `easing_test.go` and `steps_test.go`.
 
-mod support;
-
 use vapors_css::animation::{StepPosition, TimingFunction};
 
 #[test]

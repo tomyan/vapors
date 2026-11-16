@@ -22,12 +22,19 @@ pub(crate) fn assemble(
     let mut file = header(&component.path, style);
     let scope = component.style.as_ref().and(component.scope.as_ref());
     if let Some(scope) = scope {
-        file.push_str(&scope_constant(scope));
+        file.push_str(&super::shell_sheet::scope_constant(scope));
+    }
+    let global = component.style.is_some() && scope.is_none();
+    if global {
+        file.push_str(&super::shell_sheet::sheet_constant(
+            component.global_sheet_name(),
+        ));
     }
     file.push_str(&super::style_key::key_statics(keys));
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body, scope.is_some()));
+    let registration = super::shell_sheet::registration(scope.is_some(), global, style);
+    file.push_str(&mount_methods(name, info, body, &registration));
     let uses: Vec<&String> = info
         .statements
         .iter()
@@ -38,7 +45,8 @@ pub(crate) fn assemble(
         &super::events_decl::child_types(component),
         &uses,
     ));
-    file.push_str(&accessors());
+    file.push_str(&super::shell_methods::accessors());
+    file.push_str(&super::shell_methods::drop_impl(name));
     file
 }
 
@@ -53,17 +61,6 @@ use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
 /// The `<style>` of `{path}`, resolved at run time by the css crate.
 pub const STYLE: &str = {style:?};
-
-"
-    )
-}
-
-/// The scope the style is added under and each element is tagged with:
-/// the crate and the file, so two crates' `src/panel.wisp` differ.
-fn scope_constant(scope: &str) -> String {
-    format!(
-        "/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
-pub const SCOPE: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?});
 
 "
     )
@@ -112,10 +109,16 @@ fn component_struct(name: &str, info: &ScriptInfo) -> String {
         );
     }
     format!(
-        "/// `{name}`: its signals, and what `unmount` removes.
+        "/// `{name}`: its signals, and what `unmount` removes. Dropping it
+/// disposes its signals and effects, unless the component that mounted
+/// it as a child owns it (`owned_by_parent`).
+#[must_use = \"dropping a top-level component disposes its effects; keep it or call unmount\"]
 pub struct {name} {{
 {fields}    owner: Owner,
     roots: Vec<Root>,
+    /// False once its parent's generated code took it as its child
+    /// (`owned_by_parent`): its owner then goes with the parent's.
+    disposes_on_drop: bool,
 }}
 "
     )
@@ -139,20 +142,26 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> String {
+/// The mount methods; `add_style` is the line that registers the
+/// component's sheet, or empty.
+fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> String {
     let (returned, built) = field_lists(info);
     let allowances = mount_allowances(info, body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
-    let add_style = if styled {
-        "        dom.borrow_mut().add_style(SCOPE, STYLE);\n"
-    } else {
-        ""
-    };
     let mut statements = String::new();
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
     }
+    // a style-only component builds nothing: no place, no roots pushed
+    let (unplaced, roots) = if body.trim().is_empty() {
+        (
+            "        let _ = (parent, before);\n",
+            "#[allow(clippy::let_and_return, reason = \"a style-only component has no roots\")] let roots = Vec::new();",
+        )
+    } else {
+        ("", "let mut roots = Vec::new();")
+    };
     format!(
         "impl {name} {{
     /// Mounts the component at the end of `parent`.
@@ -169,44 +178,15 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
         Rc<RefCell<D>>: DynDom,
     {{
         let {name}Props {{ {prop_names} }} = props;
-{add_style}        dom.borrow_mut().declare_events(&Self::events());
+{unplaced}{add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
-{statements}            let mut roots = Vec::new();
+{statements}            {roots}
 {body}            {returned}
         }});
-        {name} {{ {built} }}
+        {name} {{ {built}, disposes_on_drop }}
     }}
 "
     )
-}
-
-fn accessors() -> String {
-    "
-    /// The top-level nodes now, in order, including those of a block
-    /// or child component at the top level.
-    #[must_use]
-    pub fn roots(&self) -> Vec<NodeId> {
-        vapors_dom::current_nodes(&self.roots)
-    }
-
-    /// The top-level entries, for a parent that mounts this component
-    /// at its own top level.
-    #[must_use]
-    pub fn root_entries(&self) -> &[Root] {
-        &self.roots
-    }
-
-    /// Reads the top-level nodes, disposes the signals and effects, and
-    /// removes the nodes.
-    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
-        let nodes = self.roots();
-        self.owner.dispose();
-        for node in nodes {
-            dom.borrow_mut().remove(node);
-        }
-    }
-}
-"
-    .to_string()
 }

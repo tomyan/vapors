@@ -1,3 +1,21 @@
+# clippy's thresholds. The lints are on in [workspace.lints.clippy]
+# (Cargo.toml) and the clippy step's `-D warnings` makes them hard. Each
+# number is from the measurement of main on 2026-11-13
+# (docs/decisions/2026-11-13-quality-thresholds.md); `cargo xtask quality
+# --distributions` measures again. A function over one is fixed, or
+# allowed at its site with a comment naming the one concept it holds.
+
+# Lines of code in a function body (blank and comment lines not
+# counted): median 8, p90 19, p99 37 in code and 33 in tests, max 99.
+# At 40, 44 functions on main were over; at 50, 14, each allowed at its
+# site. The guideline stays 15 ([quality] in .config/factory.toml).
+too-many-lines-threshold = 50
+
+# Cognitive complexity: median 2, p90 4, p99 6 in code and 7 in tests,
+# max 12. The scale is too coarse for a limit at p99 to leave a band
+# under it, so the limit is main's max: nothing on main is over it.
+cognitive-complexity-threshold = 12
+
 # Every render pipeline and shader module is built through
 # vapors_renderer::pipelines, which counts them, so a frame that builds
 # one is found and refused (one-scene F0; docs/plans/one-scene.md).

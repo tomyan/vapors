@@ -1,6 +1,6 @@
 //! `@supports` (`src/cascade/supports.rs`). Translated from sumi `resolve_styles_test.go`; the value is checked too.
 
-mod support;
+use crate::support;
 
 use support::{computed, css, refusal};
 

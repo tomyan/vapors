@@ -9,6 +9,9 @@ pub(crate) struct Changes<'a> {
     /// Nothing is kept: every slot is placed.
     pub(crate) every: bool,
     pub(crate) rebuilt: &'a [usize],
+    /// Each owner edited in place with the slots to chain to it: the
+    /// children it inserted and the owners rebuilt directly under it.
+    pub(crate) to_chain: &'a rustc_hash::FxHashMap<usize, Vec<usize>>,
     pub(crate) freed: &'a [(usize, Key)],
     pub(crate) written: &'a Written,
     /// The slots of the containers scrolled since the last update.
@@ -16,14 +19,24 @@ pub(crate) struct Changes<'a> {
 }
 
 /// What placing did: the slots not built again whose rect or padding
-/// changed, the scroll containers whose offset as applied changed, and
-/// how many slots it placed.
+/// changed, the scroll containers whose offset as applied changed, those
+/// whose offset or range changed at all, and how many slots it placed.
 pub(crate) struct Placed {
     pub(crate) moved: Vec<usize>,
     pub(crate) offsets_moved: Vec<usize>,
+    pub(crate) states_changed: Vec<usize>,
     pub(crate) count: usize,
     /// In-flow children chained before the walk (`chain_children`).
     pub(crate) chained: usize,
+    /// Scroll containers whose range was measured from their content.
+    pub(crate) ranges_measured: usize,
+    /// The lane containers placed whose children could not be frames
+    /// of their own, with why (`placement_frames.rs`).
+    pub(crate) unframed: Vec<(usize, crate::lane_decline::LaneDecline)>,
+    /// A lane container placed whose children became frames of their own
+    /// or stopped being, which moves their subtrees to other frames
+    /// (`placement_frames.rs`).
+    pub(crate) reframed: bool,
 }
 
 impl<'a> Changes<'a> {
@@ -37,6 +50,7 @@ impl<'a> Changes<'a> {
         Self {
             every: changed.every,
             rebuilt: &changed.rebuilt,
+            to_chain: &changed.to_chain,
             freed: &changed.freed,
             written,
             scrolled,

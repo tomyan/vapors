@@ -58,15 +58,15 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, key, at): (&Run, BatchKey, usize),
+        (run, rows, key, at): (&Run, &[u32], BatchKey, usize),
     ) -> Result<Option<(&KeptRange, &AtlasPins)>, AtlasError> {
         let generation = atlas.generation();
         match self.texts.get(&key) {
             Some(gpu) if gpu.current(run, painted, generation) => {
-                gpu.check(atlas, painted, (run, at));
+                gpu.check(atlas, painted, ((run, rows), at));
                 self.kept += 1;
             }
-            _ => self.write_text((text, atlas), (target, painted), (run, key))?,
+            _ => self.write_text((text, atlas), (target, painted), (run, rows, key))?,
         }
         let Some(gpu) = self.texts.get_mut(&key) else {
             return Ok(None);
@@ -81,12 +81,12 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, key): (&Run, BatchKey),
+        (run, rows, key): (&Run, &[u32], BatchKey),
     ) -> Result<(), AtlasError> {
         if let Some(stale) = self.texts.remove(&key) {
             stale.release((text, atlas));
         }
-        let (bytes, pins) = run_bytes(atlas, painted, run)?;
+        let (bytes, pins) = run_bytes(atlas, painted, (run, rows))?;
         let Some(range) = kept_range(text, target, &bytes) else {
             atlas.unpin(pins);
             return Ok(());
@@ -166,10 +166,15 @@ impl TextGpu {
     /// the atlas holds its glyphs differ from those kept, or a glyph is
     /// gone, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, atlas: &GlyphAtlas, painted: &Painted, (run, at): (&Run, usize)) {
+    fn check(
+        &self,
+        atlas: &GlyphAtlas,
+        painted: &Painted,
+        ((run, rows), at): ((&Run, &[u32]), usize),
+    ) {
         #[cfg(debug_assertions)]
         {
-            let fresh = run_placed_bytes(atlas, painted, run).unwrap_or_else(|| {
+            let fresh = run_placed_bytes(atlas, painted, (run, rows)).unwrap_or_else(|| {
                 panic!(
                     "batch {at} ({run:?}) drew kept text bytes that name a glyph the atlas no \
                      longer holds: a pinned glyph was evicted (atlas_pins.rs), or bytes built \
@@ -180,6 +185,6 @@ impl TextGpu {
             crate::painter::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
         }
         #[cfg(not(debug_assertions))]
-        let _ = (atlas, painted, run, at); // only the debug build's compare uses them
+        let _ = (atlas, painted, run, rows, at); // only the debug build's compare uses them
     }
 }

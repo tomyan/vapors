@@ -15,6 +15,8 @@ impl UpdateCounts {
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
         self.size_answers_disowned = work.disowned;
+        (self.lanes, self.lanes_declined) = (work.lanes.lanes, work.lanes.declined);
+        self.lane_decline = work.lanes.decline;
         let settled = work.settled;
         (
             self.owners_isolated,
@@ -27,6 +29,7 @@ impl UpdateCounts {
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
         self.boxes_shifted = painted.boxes_shifted;
+        self.scroll_frames_worked = painted.frames_worked;
         self.parts_visited_kept = painted.parts_visited_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;
@@ -37,8 +40,15 @@ impl UpdateCounts {
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);
         self.order_splices = walks.splices;
+        self.order_splices_patched = usize::from(painted.splice_patched);
         self.splices_declined = usize::from(walks.declined.is_some());
         self.splice_decline = walks.declined;
+        (self.paint_relabelled, self.paint_relabel_all) = (walks.relabelled, walks.relabel_all);
+        let kept = painted.kept_batches.borrow();
+        self.batch_steps_sorted_again = usize::from(
+            kept.as_ref()
+                .is_some_and(crate::kept_batches::KeptBatches::unsorted),
+        );
     }
 }
 

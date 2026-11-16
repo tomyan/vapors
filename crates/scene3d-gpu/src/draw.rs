@@ -3,13 +3,18 @@
 use crate::FrameError;
 use crate::geometry::Uploaded;
 use vapors_app::WorkCounter;
-use vapors_scene3d::{Colour, GeometryId, Meshes, NodeId, NodeKind, Scene};
+use vapors_scene3d::{Colour, GeometryHandle, GeometryId, Meshes, NodeId, NodeKind, Scene};
 
 /// A mesh node to draw.
 pub(crate) struct MeshNode {
     pub(crate) node: NodeId,
     pub(crate) geometry: GeometryId,
+    /// The node's claim, through which its triangles are read, as
+    /// `pick` reads them: one answer to which triangles a node has.
+    pub(crate) handle: GeometryHandle,
     pub(crate) colour: Colour,
+    /// Drawn (`Scene::visible`); a hidden mesh keeps its slot.
+    pub(crate) visible: bool,
 }
 
 /// Every mesh node under the root, parents before children, each
@@ -18,28 +23,28 @@ pub(crate) fn mesh_nodes(scene: &Scene, meshes: &Meshes) -> Result<Vec<MeshNode>
     let mut found = Vec::new();
     let mut stack = vec![scene.root()];
     while let Some(node) = stack.pop() {
-        found.extend(mesh_node(node, scene.kind(node)?, meshes)?);
+        found.extend(mesh_node(node, scene, meshes)?);
         stack.extend(scene.children(node)?.iter().rev());
     }
     Ok(found)
 }
 
 /// `node` to draw when it is a mesh naming geometry `meshes` issued.
-fn mesh_node(
-    node: NodeId,
-    kind: &NodeKind,
-    meshes: &Meshes,
-) -> Result<Option<MeshNode>, FrameError> {
-    let NodeKind::Mesh { geometry, colour } = *kind else {
+fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<MeshNode>, FrameError> {
+    let NodeKind::Mesh { geometry, colour } = scene.kind(node)? else {
         return Ok(None);
     };
+    let (handle, colour) = (geometry.clone(), *colour);
+    let geometry = handle.id();
     if !meshes.issued(geometry) {
         return Err(FrameError::ForeignGeometry { node, geometry });
     }
     Ok(Some(MeshNode {
         node,
         geometry,
+        handle,
         colour,
+        visible: scene.visible(node)?,
     }))
 }
 

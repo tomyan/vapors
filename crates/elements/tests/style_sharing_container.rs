@@ -5,7 +5,7 @@
 //! is `None`), so two rows in containers of different sizes cannot be
 //! built; the count of unshareable rows pins the guard until they can.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, StyleKey};
@@ -18,17 +18,19 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 #[test]
 fn rows_a_container_rule_can_match_style_each_for_itself() {
     // Given
     let mut doc = document();
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         SCOPE,
         ".row { color: rgb(1 2 3); } @container (min-width: 100px) { .row { color: rgb(4 5 6); } }",
-    );
+    ));
     let body = doc.body();
     for _ in 0..3 {
         let row = doc.create_keyed_element(&ROW);

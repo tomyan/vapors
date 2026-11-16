@@ -4,7 +4,7 @@
 //! so a button holding it keeps its own name; a `role="img"` icon is an
 //! image named by its `aria-label`.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

@@ -1,8 +1,7 @@
 //! `bind:this` written any way but a signal of the shape where it is:
 //! refused, naming the fix.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::refusal;
 

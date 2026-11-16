@@ -2,7 +2,7 @@
 //! `StyleKey`, its `class:` directives toggle through `toggle_classes`
 //! and restyle it. What it refuses: `style_key_refusals.rs`.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE, StyleKey};
@@ -16,17 +16,19 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[],
     style: Some("width: 50px"),
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with the row's sheet under its scope and one keyed row
 /// under the body.
 fn row_page() -> (Document, NodeId) {
     let mut doc = document();
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         SCOPE,
         ".row { color: rgb(1 2 3); } .row.marked { color: rgb(4 5 6); }",
-    );
+    ));
     let row = doc.create_keyed_element(&ROW);
     let body = doc.body();
     doc.append(body, row);

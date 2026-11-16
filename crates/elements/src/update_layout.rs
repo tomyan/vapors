@@ -7,7 +7,7 @@ use crate::error::ElementError;
 use crate::kept_paint::PaintedFrom;
 #[cfg(debug_assertions)]
 use crate::layout::layout_check::{Inputs, check_layout_against_fresh};
-use crate::layout::{Key, Placed, Rebuilt, Slots, Written, lay_out};
+use crate::layout::{Key, Placed, Rebuilt, Settling, Slots, Written, lay_out};
 use crate::paint_order::Stackings;
 use crate::painted::Painted;
 use crate::placement::{Changes, LaidOut, Placed as Placing, Placement};
@@ -23,11 +23,16 @@ impl Document {
         viewport: Viewport,
     ) -> Result<(Placed, Rebuilt, Written), Vec<ElementError>> {
         let (boxes, mut built) = self.rebuilt(viewport.scale);
+        let lanes = self.lanes_on();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let changed = std::mem::take(&mut built.changed);
-        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, changed);
+        let settling = Settling {
+            changed: std::mem::take(&mut built.changed),
+            built: built.slots.clone(),
+            lanes,
+        };
+        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, settling);
         let work = match &laid_out {
             Ok((_, work)) => work,
             Err(failed) => &failed.1,
@@ -35,14 +40,32 @@ impl Document {
         self.counts.count_layout(work);
         let (slotted, work) = laid_out.map_err(|failed| vec![ElementError::Layout(failed.0)])?;
         // Debug timings include this full build and layout on every
-        // narrowed update; `layout_check.rs` says what would retire it.
-        // A test whose own oracle compares the same layout each step
-        // skips it (`skip_layout_check`).
+        // update; `layout_check.rs` says what would retire it. A full
+        // build is checked too: it lays block containers out by lane,
+        // and the check's fresh layout by Taffy. A test whose own
+        // oracle compares the same layout each step skips it
+        // (`skip_layout_check`).
         #[cfg(debug_assertions)]
-        if !built.every && !self.boxes.skip_layout_check {
+        if !self.boxes.skip_layout_check {
             self.check_layout(&slotted, viewport);
         }
         Ok((slotted, built, work.written))
+    }
+
+    /// Whether this update lays containers out by lane: always, but
+    /// for the in-crate lane tests' pages (`KeptBoxes::lanes_off`).
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            reason = "only the test build reads `lanes_off`; outside tests every update uses lanes"
+        )
+    )]
+    fn lanes_on(&self) -> bool {
+        #[cfg(test)]
+        return !self.boxes.lanes_off;
+        #[cfg(not(test))]
+        true
     }
 
     /// Debug builds skip the layout check (`layout/layout_check.rs`)
@@ -62,7 +85,7 @@ impl Document {
     #[cfg(debug_assertions)]
     fn check_layout(&mut self, placed: &Placed, viewport: Viewport) {
         let root = self.root();
-        let text_marks = self.focused_text_marks();
+        let text_marks = self.focused_text_marks(viewport.scale);
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let source = crate::layout::Source {
             arena: &self.arena,
@@ -82,7 +105,7 @@ impl Document {
     /// slots built and freed.
     fn rebuilt(&mut self, scale: f32) -> (Placed, Rebuilt) {
         let root = self.root();
-        let text_marks = self.focused_text_marks();
+        let text_marks = self.focused_text_marks(scale);
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         kept.calcs.begin();
         let source = crate::layout::Source {
@@ -94,6 +117,11 @@ impl Document {
         let may_keep = |node| kept.may_keep_layout(node);
         let (boxes, built) = self.boxes.rebuild(&source, root, scale, &may_keep);
         self.counts.boxes_built = built.count();
+        self.counts.children_edited = built.edits.edited;
+        self.counts.boxes_lend_visited = built.lend_visits;
+        self.counts.children_scanned = built.children_scanned;
+        self.counts.children_edits_declined = built.edits.declined;
+        self.counts.children_edit_decline = built.edits.decline;
         debug_assert!(
             !boxes.boxes.is_empty() || kept.used[&root].layout.display == taffy::Display::None,
             "no boxes built while html is shown: a box build dropped the root"
@@ -115,9 +143,17 @@ impl Document {
         let take = |last: &mut Painted| std::mem::take(&mut last.from.placement);
         let mut placement = last.map(take).unwrap_or_default();
         let scrolls = |slot| stackings.scrolls(slot);
-        let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
+        let lanes = placed.lanes.borrow();
+        let boxes = LaidOut::new(&placed.boxes, &scrolls, &lanes, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
+        // only framed lanes: a start change elsewhere moved the slot
+        let framed = |&&(container, _): &&(usize, usize)| {
+            matches!(placement.framing.get(&container), Some(Ok(())))
+        };
+        changed.started = written.started.iter().filter(framed).copied().collect();
+        changed.scroll_states = done.states_changed;
+        changed.reframed = done.reframed;
         self.made_from(placement, viewport.scale)
     }
 
@@ -125,7 +161,7 @@ impl Document {
     fn made_from(&self, placement: Placement, scale: f32) -> PaintedFrom {
         PaintedFrom {
             placement,
-            thumbs_shown: self.thumbs_shown,
+            thumb_alpha: self.thumb_alpha,
             scale,
         }
     }
@@ -146,6 +182,10 @@ impl Document {
         self.forget_freed(&changed.freed, slots);
         self.counts.boxes_placed = done.count;
         self.counts.boxes_moved = done.moved.len();
+        self.counts.scroll_ranges_measured = done.ranges_measured;
+        self.counts.lanes_framed = placement.framing.values().filter(|f| f.is_ok()).count();
+        self.counts.lanes_unframed = done.unframed.len();
+        self.counts.lane_unframed = done.unframed.first().map(|&(_, decline)| decline);
         self.counts.slots_chained = done.chained;
         self.check_placed(before, (boxes, placement), (&done, changed));
         done

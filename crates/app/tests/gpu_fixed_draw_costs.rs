@@ -4,8 +4,7 @@
 //! made once, and an image's or surface's bind group is made with its
 //! texture and dropped with it.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, bare_document, pixel, update};
 use vapors_app::FrameCounts;

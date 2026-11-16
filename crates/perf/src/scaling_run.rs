@@ -1,5 +1,7 @@
 //! `--scaling <change>`: the change at each size of [`SIZES`], counted
-//! in instructions, tabled and judged.
+//! in instructions, tabled and judged; for `Idle`, then the page left
+//! alone at each size (`idle_run.rs`, property 6), after the
+//! instruction verdict passes: one failure is reported at a time.
 
 use vapors_gpu_harness::Gpu;
 
@@ -33,6 +35,9 @@ pub fn run(gpu: &Gpu, change: RowChange, settings: Settings) -> Result<(), Strin
         println!("{}", scaling_section(title, scaling));
     }
     println!("{}", verdicts(change, &kinds)?);
+    if matches!(change, RowChange::Idle) {
+        crate::idle_run::run(&mut timer, settings)?;
+    }
     Ok(())
 }
 
@@ -44,20 +49,26 @@ fn measure(
     settings: Settings,
 ) -> Result<Vec<AtSize>, String> {
     let name = format!("{rows} rows, {change:?}");
+    let reproduce = format!(
+        "vapors-perf {} {} --scaling {change:?}",
+        settings.runs, settings.warmup
+    );
     let workload = &mut Rows::new(rows, change);
     let settings = settings_for(Some(rows), settings);
     enough_frames(change, settings.runs)?;
     let samples = timer
         .sample(workload, settings)
-        .map_err(|e| format!("{name}: {e}"))?;
+        .map_err(|e| format!("{name}: {e}; reproduce: {reproduce}"))?;
     samples_counted(&name, &samples)?;
-    by_kind(rows, &samples, change.frame_kinds(), settings.warmup)
+    println!("{}", workload.splices().line(rows));
+    by_kind(rows, &samples, change.frame_kinds())
 }
 
 /// The median count of the frame and of each phase `samples` recorded.
 ///
 /// # Errors
 /// A recorded phase that is not in [`PHASES`]: the judge does not know it.
+#[cfg(test)] // the tests' reading of one size; `scaling_kinds` reads any kind
 pub(crate) fn at_size(rows: usize, samples: &Samples, known: &[&str]) -> Result<AtSize, String> {
     medians(rows, kept_counts(rows, samples)?, known)
 }

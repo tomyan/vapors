@@ -3,7 +3,7 @@
 //! the focused element clears focus, Space clicks on its own keyup only,
 //! and Tab with Control, Alt or Meta does not move focus.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

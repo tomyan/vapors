@@ -12,8 +12,10 @@ mod retained;
 use frame::{BACKGROUND, quad, rgba, square, target};
 use retained::{Frame, RED, kept};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target};
-use vapors_scene::{Rect, Shadow};
+use vapors_renderer::{
+    ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target,
+};
+use vapors_scene::{Color, Rect, Shadow};
 
 const SIDE: u32 = 24;
 
@@ -64,7 +66,9 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
     // Then
     let work = frame.pipeline.take_work();
     assert_eq!(frame.row(), [BACKGROUND, BACKGROUND, RED]);
-    assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 16));
+    // one view written: the viewport, the shift and the rows' offsets
+    // (row_offsets.rs), 16 + 1024 bytes
+    assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 1040));
     frame.pipeline.release(red);
 }
 
@@ -87,6 +91,12 @@ trait Made {
 }
 
 impl Made for ShadowPipeline {
+    fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        Self::new(device, format)
+    }
+}
+
+impl Made for ClosedFormPipeline {
     fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         Self::new(device, format)
     }
@@ -128,5 +138,40 @@ fn gpu_kept_shadows_drawn_with_a_shift_match_the_shadow_drawn_at_the_moved_place
     assert!(
         shifted == moved,
         "the shifted shadow differs from the moved one"
+    );
+}
+
+/// A circle at `x`, `y` drawn under a transform of scale 1.5.
+fn circle(x: f32, y: f32) -> ClosedFormShape {
+    let geometry = vapors_shapes::Geometry::Ellipse {
+        centre: [x / 1.5, y / 1.5],
+        radii: [2.0, 2.0],
+    };
+    let red = Color::from_rgba8(200, 30, 20, 255);
+    ClosedFormShape::new(&geometry, None, [1.5, 0.0, 0.0, 1.5, 0.0, 0.0], red)
+        .expect("drawable")
+        .expect("has area")
+}
+
+#[test]
+fn gpu_kept_closed_forms_drawn_with_a_shift_match_the_shape_drawn_at_the_moved_place() {
+    // Given
+    let moved = drawn_on_square(|pipeline: &mut ClosedFormPipeline, at| {
+        pipeline.draw(at, &[circle(7.0, 9.0)]);
+    });
+
+    // When: kept at 4, 4 and drawn shifted by 3, 5
+    let shifted = drawn_on_square(|pipeline: &mut ClosedFormPipeline, at| {
+        let bytes = ClosedFormPipeline::bytes(&[circle(4.0, 4.0)]);
+        let range = pipeline.keep(at, &bytes).expect("room");
+        pipeline.draw_kept(at, &range, Shift::whole([3.0, 5.0]));
+        pipeline.release(range);
+    });
+
+    // Then
+    assert!(moved.iter().any(|&v| v != 40), "the circle drew nothing");
+    assert!(
+        shifted == moved,
+        "the shifted circle differs from the moved one"
     );
 }

@@ -7,7 +7,7 @@
 //! refocuses the field"): a `blur` handler's `focus()` on the field
 //! just hidden does nothing and the body keeps focus.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

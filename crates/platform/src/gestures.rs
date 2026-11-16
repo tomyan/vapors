@@ -1,13 +1,17 @@
 //! Touch gestures from raw touches: one finger pans, two fingers pinch
 //! about their midpoint and pan by its movement, a quick still press is a
-//! tap, and the second of a run of taps close together is a double tap.
+//! tap, the second of a run of taps close together is a double tap, and
+//! a lone finger lifting after it panned flings at its velocity.
 //!
-//! Pure: fed each touch with a monotonic time, it returns the gestures
-//! that touch completed. The window module supplies the clock.
+//! Pure: fed each touch with a monotonic time since its epoch, it
+//! returns the gestures that touch completed. The window module supplies
+//! the clock.
 
 use std::time::Duration;
 
+use crate::clock::Instant;
 use crate::event::{Event, TouchPhase};
+use crate::velocity_tracker::VelocityTracker;
 
 // The numbers follow Android's ViewConfiguration where it has one:
 // DOUBLE_TAP_TIMEOUT is 300 ms, touch slop 8 dp, double-tap slop 100 dp,
@@ -40,23 +44,58 @@ struct Press {
 }
 
 /// The recogniser. One per window.
-#[derive(Default)]
 pub struct Gestures {
+    /// The instant the touch times count from.
+    epoch: Instant,
     fingers: Vec<Finger>,
     /// The single finger that may still become a tap.
     press: Option<Press>,
     /// The last tap, until it is too old to pair with.
     last_tap: Option<tap::Tap>,
+    /// The gesture's finger, while it is the only one there has been:
+    /// only it flings. RELAXED: a gesture that had a second finger does
+    /// not fling, where Chromium's `GestureDetector` flings at `UP` at
+    /// the last finger's own velocity, its history kept through the
+    /// second finger's down, unless a finger lifted moving against
+    /// another (`POINTER_UP`'s dot product clears the tracker); retired
+    /// when a fixture records a two-finger fling.
+    alone: Option<u64>,
+    /// Its velocity.
+    tracker: VelocityTracker,
+    /// Lifts whose velocity could not be measured (`gestures_fling.rs`).
+    unmeasured: u32,
     /// A confused stream (a repeated Started, an unknown finger) is
     /// reported once, because it repeats on every event after.
     reported: bool,
 }
 
+impl Default for Gestures {
+    fn default() -> Self {
+        Self::starting(Instant::now())
+    }
+}
+
 impl Gestures {
-    /// No fingers down.
+    /// No fingers down; touch times count from now.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// No fingers down; touch times count from `epoch`, which a fling's
+    /// time ([`Event::Fling`]) is on.
+    #[must_use]
+    pub fn starting(epoch: Instant) -> Self {
+        Self {
+            epoch,
+            fingers: Vec::new(),
+            press: None,
+            last_tap: None,
+            alone: None,
+            tracker: VelocityTracker::default(),
+            unmeasured: 0,
+            reported: false,
+        }
     }
 
     /// Feed one raw touch. `now` is any monotonic clock.
@@ -71,7 +110,7 @@ impl Gestures {
         let at = [x, y];
         match phase {
             TouchPhase::Started => self.started(id, at, now),
-            TouchPhase::Moved => self.moved(id, at),
+            TouchPhase::Moved => self.moved(id, at, now),
             TouchPhase::Ended => self.ended(id, at, now),
             TouchPhase::Cancelled => self.cancelled(id),
         }
@@ -84,6 +123,10 @@ impl Gestures {
         } else {
             self.fingers.push(Finger { id, at });
         }
+        self.alone = (self.fingers.len() == 1).then_some(id);
+        if self.alone.is_some() {
+            self.tracker.down(at, now);
+        }
         self.press = (self.fingers.len() == 1).then_some(Press {
             id,
             at,
@@ -92,11 +135,14 @@ impl Gestures {
         Vec::new()
     }
 
-    fn moved(&mut self, id: u64, at: [f32; 2]) -> Vec<Event> {
+    fn moved(&mut self, id: u64, at: [f32; 2], now: Duration) -> Vec<Event> {
         let Some(index) = self.fingers.iter().position(|f| f.id == id) else {
             self.inconsistent(&format!("touch {id} moved without starting"));
             return Vec::new();
         };
+        if self.alone == Some(id) {
+            self.tracker.moved(at, now);
+        }
         let before = std::mem::replace(&mut self.fingers[index].at, at);
         let pressed = self.press.as_ref().filter(|press| press.id == id);
         // within the tap slop a finger is still a possible tap and pans
@@ -122,7 +168,7 @@ impl Gestures {
         }
         self.fingers.retain(|f| f.id != id);
         let Some(press) = self.press.take_if(|p| p.id == id) else {
-            return Vec::new();
+            return self.fling(id, now);
         };
         if now.saturating_sub(press.started) > TAP_TIME || distance(press.at, at) > TAP_SLOP {
             return Vec::new();
@@ -131,6 +177,7 @@ impl Gestures {
     }
 
     fn cancelled(&mut self, id: u64) -> Vec<Event> {
+        self.alone.take_if(|alone| *alone == id);
         self.fingers.retain(|f| f.id != id);
         self.press.take_if(|p| p.id == id);
         Vec::new()
@@ -144,48 +191,11 @@ impl Gestures {
     }
 }
 
-fn pan(before: [f32; 2], after: [f32; 2]) -> Event {
-    Event::Pan {
-        dx: after[0] - before[0],
-        dy: after[1] - before[1],
-    }
-}
-
-/// The pan and pinch from one finger moving while `other` stays put.
-/// The pan comes first and the pinch is anchored at the new midpoint:
-/// applied in that order, the image point under the midpoint stays put.
-/// (Pinching first about the new midpoint and then panning would move
-/// it by (factor - 1) times the midpoint's movement every event.)
-fn pinch(other: [f32; 2], before: [f32; 2], after: [f32; 2]) -> Vec<Event> {
-    let spread_before = distance(other, before);
-    let spread_after = distance(other, after);
-    // Coincident fingers have no spread to compare; factor 1.0 is the
-    // right answer, not a division by zero.
-    let factor = if spread_before > 0.0 {
-        spread_after / spread_before
-    } else {
-        1.0
-    };
-    let mid_before = midpoint(other, before);
-    let mid_after = midpoint(other, after);
-    vec![
-        pan(mid_before, mid_after),
-        Event::Pinch {
-            x: mid_after[0],
-            y: mid_after[1],
-            factor,
-        },
-    ]
-}
-
-fn midpoint(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
-    [a[0].midpoint(b[0]), a[1].midpoint(b[1])]
-}
-
-fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt()
-}
-
+#[path = "gestures_fling.rs"]
+mod fling;
+#[path = "gestures_motion.rs"]
+mod motion;
+use motion::{distance, pan, pinch};
 #[path = "gestures_tap.rs"]
 mod tap;
 
@@ -196,3 +206,7 @@ mod tests;
 #[cfg(test)]
 #[path = "gestures_tap_tests.rs"]
 mod tap_tests;
+
+#[cfg(test)]
+#[path = "gestures_fling_tests.rs"]
+mod fling_tests;

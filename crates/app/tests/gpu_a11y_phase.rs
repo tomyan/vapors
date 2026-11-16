@@ -6,8 +6,7 @@
 //! consumer did not take before the next frame is refused naming the
 //! fix.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::rc::Rc;
 

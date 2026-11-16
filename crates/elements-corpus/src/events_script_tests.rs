@@ -71,6 +71,7 @@ fn a_script_reads_as_its_viewport_its_listened_types_and_its_steps() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one table of refused scripts, a case per shape
 fn a_script_of_another_shape_is_refused_naming_its_file_and_line() {
     for (text, needle) in [
         (

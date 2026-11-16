@@ -44,6 +44,25 @@ pub struct Shape {
     pub unit: fn(&mut Document, NodeId, usize, Option<NodeId>) -> Unit,
 }
 
+/// The body, for the shapes whose units are its children.
+pub fn body(doc: &mut Document) -> NodeId {
+    doc.body()
+}
+
+/// An element with `class` made under `parent`, before `before` or last.
+pub fn child_before(
+    doc: &mut Document,
+    parent: NodeId,
+    tag: &str,
+    class: &str,
+    before: Option<NodeId>,
+) -> NodeId {
+    let node = doc.create_element(tag);
+    doc.set_attribute(node, "class", class);
+    doc.insert_before(parent, node, before);
+    node
+}
+
 /// The value text of unit `index`: five digits, so every edit is the
 /// same length.
 #[must_use]

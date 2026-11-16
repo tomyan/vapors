@@ -63,6 +63,15 @@ pub(crate) fn icon_quads(
     icons: &[IconDraw<'_>],
     pins: Option<&mut AtlasPins>,
 ) -> Result<Vec<f32>, AtlasError> {
+    Ok(icon_quads_counted(atlas, icons, pins)?.0)
+}
+
+/// As [`icon_quads`], and each icon's vertices among the floats.
+pub(crate) fn icon_quads_counted(
+    atlas: &mut GlyphAtlas,
+    icons: &[IconDraw<'_>],
+    pins: Option<&mut AtlasPins>,
+) -> Result<(Vec<f32>, Vec<usize>), AtlasError> {
     let strokes = || strokes_of(icons);
     let fetch = |&(draw, i): &(&IconDraw<'_>, usize), pins: Option<&mut AtlasPins>| {
         atlas.icon_pinned((draw.icon, i, draw.size), pins)
@@ -70,10 +79,9 @@ pub(crate) fn icon_quads(
     let placed = placed_all(strokes, pins, fetch)?;
     // read after placing: placing may grow the page
     let page = atlas.coverage_page().size();
-    Ok(icon_floats(
-        strokes().map(|(draw, _)| draw).zip(&placed),
-        page,
-    ))
+    let floats = icon_floats(strokes().map(|(draw, _)| draw).zip(&placed), page);
+    let entries = icons.iter().map(|draw| draw.icon.strokes());
+    Ok((floats, crate::quads::vertices_per_draw(&placed, entries)))
 }
 
 /// Each path of each of `icons`, by its index in its icon.

@@ -160,3 +160,8 @@ fn main_that_cannot_be_read_into_the_scratch_index_is_refused_naming_it() {
     assert!(why.starts_with("git read-tree no-such-ref: "), "{why}");
     assert!(why.contains("(index "), "{why}");
 }
+
+#[test]
+fn each_check_gets_a_scratch_index_of_its_own() {
+    assert_ne!(scratch_index_name(), scratch_index_name());
+}

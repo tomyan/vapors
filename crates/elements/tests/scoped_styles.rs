@@ -3,7 +3,7 @@
 //! every compound of a selector in scope, and gains one attribute's
 //! specificity (Svelte's rule).
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE};
@@ -51,7 +51,10 @@ fn a_scoped_rule_styles_its_own_elements_and_no_others() {
     scoped(&mut doc, body, "a", "t");
     scoped(&mut doc, body, "b", "t");
     scoped(&mut doc, body, "", "t");
-    doc.add_style("a", ".t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".t { height: 2px; background-color: #ff0000; }",
+    ));
 
     // When
     let fills = fills(&mut doc);
@@ -69,7 +72,10 @@ fn every_compound_of_a_scoped_selector_must_be_in_scope() {
     scoped(&mut doc, foreign, "a", "t");
     let own = scoped(&mut doc, body, "a", "p");
     scoped(&mut doc, own, "a", "t");
-    doc.add_style("a", ".p .t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".p .t { height: 2px; background-color: #ff0000; }",
+    ));
 
     // When
     let fills = fills(&mut doc);
@@ -86,7 +92,10 @@ fn a_scoped_rule_gains_one_attributes_specificity_over_the_same_global_rule() {
     let body = doc.body();
     let parent = scoped(&mut doc, body, "a", "p");
     scoped(&mut doc, parent, "a", "t");
-    doc.add_style("a", ".p .t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".p .t { height: 2px; background-color: #ff0000; }",
+    ));
     doc.add_stylesheet("app.css", ".p .t { background-color: #0000ff; }")
         .expect("parses");
 
@@ -105,7 +114,10 @@ fn a_scoped_rule_gains_only_one_attributes_specificity_however_many_compounds() 
     let body = doc.body();
     let parent = scoped(&mut doc, body, "a", "p");
     scoped(&mut doc, parent, "a", "t x y");
-    doc.add_style("a", ".p .t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".p .t { height: 2px; background-color: #ff0000; }",
+    ));
     doc.add_stylesheet("app.css", ".t.x.y { background-color: #0000ff; }")
         .expect("parses");
 
@@ -123,10 +135,16 @@ fn a_scope_added_again_is_not_added_twice() {
     let mut doc = document();
     let body = doc.body();
     scoped(&mut doc, body, "a", "t x");
-    doc.add_style("a", ".t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".t { height: 2px; background-color: #ff0000; }",
+    ));
     doc.add_stylesheet("app.css", ".t.x { background-color: #0000ff; }")
         .expect("parses");
-    doc.add_style("a", ".t { height: 2px; background-color: #ff0000; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".t { height: 2px; background-color: #ff0000; }",
+    ));
 
     // When
     let fills = fills(&mut doc);
@@ -139,7 +157,10 @@ fn a_scope_added_again_is_not_added_twice() {
 fn a_scoped_style_that_does_not_parse_is_refused_by_the_update_naming_its_scope() {
     // Given
     let mut doc = document();
-    doc.add_style("demos/panel.wisp", ".t { colour: red; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "demos/panel.wisp",
+        ".t { colour: red; }",
+    ));
 
     // When
     let found = refusals(&mut doc);
@@ -155,8 +176,14 @@ fn a_scoped_style_that_does_not_parse_is_refused_by_the_update_naming_its_scope(
 fn a_scope_added_again_with_another_style_is_refused_naming_it() {
     // Given: two components that would share a scope
     let mut doc = document();
-    doc.add_style("a", ".t { color: red; }");
-    doc.add_style("a", ".t { color: blue; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".t { color: red; }",
+    ));
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "a",
+        ".t { color: blue; }",
+    ));
 
     // When
     let errors = support::refusals(&mut doc);

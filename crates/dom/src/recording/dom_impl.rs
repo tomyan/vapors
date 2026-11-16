@@ -129,10 +129,32 @@ impl Dom for RecordingDom {
         ));
     }
 
-    fn add_style(&mut self, scope: &str, css: &str) {
+    fn watch_appearance(&mut self, anchor: NodeId, _sink: crate::AppearanceSink) {
+        self.calls.push(Call::WatchAppearance { node: anchor });
+    }
+
+    fn watch_hits(&mut self, anchor: NodeId, surface: &str, _source: crate::HitSource) {
+        self.calls.push(Call::WatchHits {
+            node: anchor,
+            surface: surface.to_owned(),
+        });
+    }
+
+    fn hits_moved(&mut self, anchor: NodeId) {
+        self.calls.push(Call::HitsMoved { node: anchor });
+    }
+
+    fn add_style(&mut self, sheet: crate::CompiledSheet<'_>) {
         self.calls.push(Call::AddStyle {
-            scope: scope.into(),
-            css: css.into(),
+            scope: sheet.name().into(),
+            css: sheet.text().into(),
+        });
+    }
+
+    fn add_global_style(&mut self, sheet: crate::CompiledSheet<'_>) {
+        self.calls.push(Call::AddGlobalStyle {
+            sheet: sheet.name().into(),
+            css: sheet.text().into(),
         });
     }
 

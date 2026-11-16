@@ -3,8 +3,7 @@
 //! in the `.wisp` file: a style that does not parse, and a `:global()`
 //! where the scoping cannot honour it.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use std::path::Path;
 
@@ -107,6 +106,19 @@ fn a_form_feed_or_lone_carriage_return_in_a_style_is_refused_at_its_place() {
     assert!(refusal.contains("form feed"), "{refusal}");
     let crlf = "<style>\r\np { color: red; }\r\n</style>\r\n<p>Card</p>";
     compiles("style_crlf", crlf, Styles::Scoped);
+}
+
+#[test]
+fn a_lone_carriage_return_in_a_style_is_refused_at_its_place() {
+    // Given: old-Mac line endings; CSS would count the CR as a line break
+    let text = "<style>\np { color: red; }\rp { colr: red; }\n</style>\n<p>Card</p>";
+
+    // When
+    let (file, refusal) = one_refusal("style_lone_cr", text, Styles::Scoped);
+
+    // Then
+    assert!(refusal.starts_with(&format!("{file}:2:18: ")), "{refusal}");
+    assert!(refusal.contains("lone carriage return"), "{refusal}");
 }
 
 #[test]

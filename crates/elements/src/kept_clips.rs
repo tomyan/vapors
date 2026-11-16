@@ -9,6 +9,7 @@
 //! beside its clips: its clip parent's when that does not scroll, else
 //! the clip parent itself.
 
+use crate::slot_list::SlotList;
 use rustc_hash::FxHashSet;
 
 use crate::clip_tree::ClipTree;
@@ -21,6 +22,10 @@ pub(crate) trait ClipInputs {
     fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect>;
     /// Whether box `slot` scrolls, so its content is a frame of its own.
     fn scrolls(&self, slot: usize) -> bool;
+    /// Whether box `slot` is a lane child in a frame of its own: its own
+    /// box and everything below it are in that frame
+    /// (`docs/plans/splice-layout.md`, section 11).
+    fn lane_frame(&self, slot: usize) -> bool;
 }
 
 /// The boxes' clip inputs.
@@ -30,18 +35,27 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 /// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
-    own: Vec<Option<BoxRect>>,
-    inner: Vec<Option<BoxRect>>,
-    frame: Vec<usize>,
+    own: SlotList<Option<BoxRect>>,
+    inner: SlotList<Option<BoxRect>>,
+    frame: SlotList<usize>,
 }
 
 impl Clips {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.own.named("clips.own"),
+            self.inner.named("clips.inner"),
+            self.frame.named("clips.frame"),
+        ]
+    }
     /// Every box's clips; the slots that redid.
     pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
-            own: vec![None; tree.len()],
-            inner: vec![None; tree.len()],
-            frame: vec![PAGE; tree.len()],
+            own: vec![None; tree.len()].into(),
+            inner: vec![None; tree.len()].into(),
+            frame: vec![PAGE; tree.len()].into(),
         };
         let mut redone = Vec::new();
         if tree.len() > 0 {
@@ -66,9 +80,9 @@ impl Clips {
     #[cfg(test)]
     pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
-            own: vec![None; inner.len()],
-            inner,
-            frame,
+            own: vec![None; inner.len()].into(),
+            inner: inner.into(),
+            frame: frame.into(),
         }
     }
 
@@ -153,11 +167,17 @@ impl Clips {
     fn redo(&mut self, slot: usize, tree: &ClipTree, inner: Inner<'_>) -> bool {
         let parent = tree.parent(slot);
         // A scroll container's content starts a frame with no clip of
-        // its own: the frame's clip is applied on read (`frames.rs`).
+        // its own, as a lane frame's own box does: the frame's clip is
+        // applied on read (`frames.rs`).
+        let lane_frame = inner.lane_frame(slot);
         let own = parent
-            .filter(|&parent| !inner.scrolls(parent))
+            .filter(|&parent| !inner.scrolls(parent) && !lane_frame)
             .and_then(|parent| self.inner[parent]);
-        let frame = parent.map_or(PAGE, |parent| self.frame_inside(parent, inner));
+        let frame = match parent {
+            _ if lane_frame => slot,
+            Some(parent) => self.frame_inside(parent, inner),
+            None => PAGE,
+        };
         let new = inner.inner(slot, own);
         self.own[slot] = own;
         let was = (self.inner[slot], self.frame[slot]);

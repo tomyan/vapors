@@ -2,7 +2,7 @@
 //! styled by `scrollbar-color` and `scrollbar-width`, placed by the
 //! offset, taking no layout space.
 
-mod support;
+use crate::support;
 
 use support::refusals;
 use support::scroll_list::{List, at, list};
@@ -115,4 +115,28 @@ fn hidden_thumbs_are_not_drawn_and_showing_them_again_redraws() {
     list.doc.set_thumbs_shown(true);
     assert!(list.doc.take_changed());
     assert_eq!(quads_of(&mut list, RED).len(), 1);
+}
+
+#[test]
+fn thumbs_drawn_at_an_opacity_scale_their_colour_alpha_and_each_step_redraws() {
+    // Given
+    let mut list = list("overflow: auto; scrollbar-color: red transparent;");
+    list.doc.update(at(1.0)).expect("updates");
+    list.doc.take_changed();
+
+    // When: half opacity (128 of 255)
+    list.doc.set_thumb_opacity(0.5);
+
+    // Then: the thumb is red at that alpha, and the change redraws
+    assert!(list.doc.take_changed());
+    let half = Color {
+        a: 128.0 / 255.0,
+        ..RED
+    };
+    assert_eq!(quads_of(&mut list, half).len(), 1);
+    list.doc.set_thumb_opacity(0.5);
+    assert!(
+        !list.doc.take_changed(),
+        "the same step again changes nothing"
+    );
 }

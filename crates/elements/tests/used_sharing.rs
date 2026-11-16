@@ -4,7 +4,7 @@
 //! used-style table and what it derived, and a refused element's
 //! refusals still name it.
 
-mod support;
+use crate::support;
 
 use support::{document, refusals, viewport};
 use vapors_dom::{Dom, NodeId, StyleKey};
@@ -18,14 +18,16 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with `css` under the rows' scope and `count` keyed rows
 /// under the body, each with the id `r<i>`, which no sheet selects.
 fn page(css: &str, count: usize) -> (Document, Vec<NodeId>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let rows = (0..count)
         .map(|i| {

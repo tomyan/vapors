@@ -6,6 +6,7 @@
 //! comes from it without a walk over the tree.
 
 use crate::layout::{LayoutBox, containing_blocks};
+use crate::slot_list::SlotList;
 
 /// Each slot's clip parent and depth, and the slots each passes its
 /// clip to.
@@ -13,25 +14,43 @@ use crate::layout::{LayoutBox, containing_blocks};
 pub(crate) struct ClipTree {
     /// The box whose content clip a box takes; `None` for the root and
     /// vacant slots.
-    parent: Vec<Option<usize>>,
+    parent: SlotList<Option<usize>>,
     /// The number of boxes above a box in the tree: a clip parent is
     /// above, so it comes first in depth order.
-    depth: Vec<usize>,
-    /// Slot `s`'s dependents are `dependents[first[s]..first[s + 1]]`.
-    first: Vec<usize>,
-    dependents: Vec<usize>,
+    depth: SlotList<usize>,
+    /// Each slot's dependents, in slot order: kept by a splice in place,
+    /// a slot put in or taken out of its parent's group, not made again
+    /// over every slot.
+    dependents: SlotList<Vec<usize>>,
 }
 
 impl ClipTree {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.parent.named("tree.parent"),
+            self.depth.named("tree.depth"),
+            self.dependents.named("tree.dependents"),
+            self.longest_group(),
+        ]
+    }
+
+    /// The longest slot's group of dependents: name, length, capacity.
+    #[cfg(test)]
+    fn longest_group(&self) -> (&'static str, usize, usize) {
+        let longest = self.dependents.iter().max_by_key(|group| group.len());
+        let (len, capacity) = longest.map_or((0, 0), |group| (group.len(), group.capacity()));
+        ("tree.dependents.longest", len, capacity)
+    }
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
         let (parent, depth) = parents_and_depths(boxes);
-        let (first, dependents) = grouped(&parent);
+        let dependents = grouped(&parent);
         Self {
-            parent,
-            depth,
-            first,
-            dependents,
+            parent: parent.into(),
+            depth: depth.into(),
+            dependents: dependents.into(),
         }
     }
 
@@ -47,14 +66,43 @@ impl ClipTree {
     ) {
         self.parent.resize(len, None);
         self.depth.resize(len, 0);
+        self.dependents.resize_with(len, Vec::new);
         for &(slot, parent) in added {
+            self.leave(slot);
             self.parent[slot] = Some(parent);
             self.depth[slot] = self.depth[parent] + 1;
+            let group = &mut self.dependents[parent];
+            crate::slot_list::reserve(group, group.len() + 1);
+            let at = group.partition_point(|&dependent| dependent < slot);
+            group.insert(at, slot);
         }
-        for slot in freed {
-            (self.parent[slot], self.depth[slot]) = (None, 0);
+        // every freed slot out of its group before any group is cleared:
+        // a freed slot's parent can be freed too
+        let freed: Vec<usize> = freed.collect();
+        for &slot in &freed {
+            self.leave(slot);
+            self.depth[slot] = 0;
         }
-        (self.first, self.dependents) = grouped(&self.parent);
+        for &slot in &freed {
+            self.dependents[slot].clear();
+        }
+    }
+
+    /// Takes `slot` out of its parent's group, if it has a parent;
+    /// a panic naming both when the group does not hold it.
+    fn leave(&mut self, slot: usize) {
+        let Some(parent) = self.parent[slot].take() else {
+            return;
+        };
+        let group = &mut self.dependents[parent];
+        let at = group.binary_search(&slot).unwrap_or_else(|_| {
+            panic!(
+                "slot {slot} has clip parent {parent} but is not among its dependents: the \
+                 groups are out of slot order or were not kept by a splice (clip_tree.rs \
+                 `spliced`); reproduce with `cargo xtask test`"
+            )
+        });
+        group.remove(at);
     }
 
     /// The slots in the tree: one past the last.
@@ -73,7 +121,7 @@ impl ClipTree {
 
     /// The boxes whose clip comes from box `slot`'s content.
     pub(crate) fn dependents(&self, slot: usize) -> &[usize] {
-        &self.dependents[self.first[slot]..self.first[slot + 1]]
+        &self.dependents[slot]
     }
 
     /// The first slot whose parent, depth or dependents differ from
@@ -105,30 +153,21 @@ fn parents_and_depths(boxes: &[LayoutBox]) -> (Vec<Option<usize>>, Vec<usize>) {
     (parent, depth)
 }
 
-/// Each slot's dependents in one vector, grouped by parent, and where
-/// each group starts.
-fn grouped(parent: &[Option<usize>]) -> (Vec<usize>, Vec<usize>) {
-    let first = group_starts(parent);
-    let mut next = first.clone();
-    let mut dependents = vec![0; first[parent.len()]];
+/// Each slot's dependents, in slot order, each group made at its length.
+fn grouped(parent: &[Option<usize>]) -> Vec<Vec<usize>> {
+    let mut counts = vec![0; parent.len()];
+    for &above in parent.iter().flatten() {
+        counts[above] += 1;
+    }
+    let mut dependents: Vec<Vec<usize>> = counts.into_iter().map(Vec::with_capacity).collect();
     for (slot, above) in parent.iter().enumerate() {
         if let Some(above) = *above {
-            dependents[next[above]] = slot;
-            next[above] += 1;
+            dependents[above].push(slot);
         }
     }
-    (first, dependents)
+    dependents
 }
 
-/// Where each slot's group of dependents starts, and one past the last
-/// group's end: the running count of dependents of the slots before.
-fn group_starts(parent: &[Option<usize>]) -> Vec<usize> {
-    let mut first = vec![0; parent.len() + 1];
-    for &above in parent.iter().flatten() {
-        first[above + 1] += 1;
-    }
-    for slot in 0..parent.len() {
-        first[slot + 1] += first[slot];
-    }
-    first
-}
+#[cfg(test)]
+#[path = "clip_tree_tests.rs"]
+mod tests;

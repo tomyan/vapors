@@ -35,11 +35,12 @@ pub struct Input {
 impl Input {
     /// No fingers down, no pointer position and no size yet.
     pub fn new() -> Self {
+        let started = Instant::now();
         Self {
             pointer: None,
             size: None,
-            gestures: Gestures::new(),
-            started: Instant::now(),
+            gestures: Gestures::starting(started),
+            started,
             scale: 1.0,
             modifiers: ModifiersState::empty(),
             clicks: crate::clicks::Clicks::default(),
@@ -51,8 +52,16 @@ impl Input {
         self.scale = scale;
     }
 
-    /// The app events for one winit event, in the order to send them.
-    pub fn translate(&mut self, event: &WindowEvent) -> Vec<Event> {
+    /// [`Input::translate`] at the system clock's time, for the tests
+    /// whose events carry no time of their own.
+    #[cfg(test)]
+    pub(crate) fn translate_now(&mut self, event: &WindowEvent) -> Vec<Event> {
+        self.translate(event, Instant::now())
+    }
+
+    /// The app events for one winit event taken at `now` (the event
+    /// loop's one read of the clock for it), in the order to send them.
+    pub fn translate(&mut self, event: &WindowEvent, now: Instant) -> Vec<Event> {
         if let WindowEvent::PinchGesture { delta, .. } = event {
             return self.pinch(*delta).into_iter().collect();
         }
@@ -63,9 +72,9 @@ impl Input {
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
-        let direct = self.counted(direct);
-        let gestures = self.track(&direct);
-        let mut events: Vec<Event> = self.wheel_placement(event).into_iter().collect();
+        let direct = self.counted(direct, now);
+        let gestures = self.track(&direct, now);
+        let mut events: Vec<Event> = self.wheel_placement(event, now).into_iter().collect();
         events.push(direct);
         events.extend(gestures);
         events
@@ -134,14 +143,19 @@ impl Input {
 
     /// Updates what the gestures need from `event`; any gesture it ends.
     #[allow(clippy::cast_precision_loss)] // window sizes are far below 2^24
-    fn track(&mut self, event: &Event) -> Vec<Event> {
+    fn track(&mut self, event: &Event, now: Instant) -> Vec<Event> {
         match event {
             Event::Resized { width, height } => self.size = Some([*width as f32, *height as f32]),
             Event::PointerMoved { x, y } => self.pointer = Some([*x, *y]),
             Event::PointerLeft => self.pointer = None,
             Event::Touch { id, phase, x, y } => {
-                let now = self.started.elapsed();
-                return self.gestures.touch(*id, *phase, *x, *y, now);
+                // RELAXED: the time this touch is handled, not the touch's
+                // own (winit 0.30 gives none, rust-windowing/winit#1194).
+                // The velocity tracker's 40 ms and 80 ms stop rules then
+                // measure handling gaps as well as a stopped finger
+                // (`velocity_tracker.rs`). Retired by #403.
+                let since = now.saturating_duration_since(self.started);
+                return self.gestures.touch(*id, *phase, *x, *y, since);
             }
             _ => {}
         }
@@ -158,14 +172,14 @@ impl Input {
     /// frame are stamped together and can count as a row. Retired when
     /// winit exposes event times.
     #[allow(clippy::cast_possible_truncation)] // a display scale
-    fn counted(&mut self, event: Event) -> Event {
+    fn counted(&mut self, event: Event, now: Instant) -> Event {
         let Event::PrimaryButton { pressed, .. } = event else {
             return event;
         };
         let scale = self.scale as f32;
         let at = self.pointer.map(|[x, y]| [x / scale, y / scale]);
         let clicks = if pressed {
-            self.clicks.pressed(at, Instant::now())
+            self.clicks.pressed(at, now)
         } else {
             self.clicks.last()
         };
@@ -184,6 +198,10 @@ mod pointer;
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "input_clock_tests.rs"]
+mod clock_tests;
 
 #[cfg(test)]
 #[path = "input_click_tests.rs"]

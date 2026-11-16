@@ -20,17 +20,18 @@ use vapors_scene::Item;
 use crate::blocks::Blocks;
 use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::KeptBox;
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 use crate::scene_view::frame_items;
 
 /// Patching more steps than this, or than a sixteenth of the entries,
 /// makes the index afresh: each patch is a search and a block's move.
-const REBUILD: usize = 64;
+pub(crate) const REBUILD: usize = 64;
 
 /// One drawing step in its frame's index.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Entry {
-    pub(crate) place: usize,
+    pub(crate) label: Label,
     pub(crate) step: Step,
     /// How many items the step paints.
     pub(crate) items: u64,
@@ -48,24 +49,22 @@ pub(crate) struct Entry {
 /// is within this above the view. The rows page has 3 such steps.
 const TALL: f32 = 1024.0;
 
-/// One frame's entries: the short by top then place, the tall by place;
-/// and the items they paint.
+/// One frame's entries: the short by top then label, the tall by label.
 #[derive(Debug, Default, PartialEq)]
 struct FrameIndex {
     entries: Blocks<Entry>,
     tall: Vec<Entry>,
-    items: u64,
 }
 
-/// Where a place's entry is: its frame, its top, and whether it is tall.
-type At = (usize, f32, bool);
+/// Where a label's entry is: its frame, its top, and whether it is tall.
+pub(super) type At = (usize, f32, bool);
 
-/// Every frame's index, and where each place's entry is.
+/// Every frame's index, and where each label's entry is.
 #[derive(Debug, Default)]
 pub(crate) struct Extents {
     frames: FxHashMap<usize, FrameIndex>,
-    /// By place: where the step's entry is, if it draws.
-    at: Vec<Option<At>>,
+    /// By label: where the step's entry is, if it draws.
+    at: Vec<[Option<At>; 3]>,
     /// Times a patch made the index afresh since the last take, for
     /// `UpdateCounts`.
     rebuilds: usize,
@@ -74,32 +73,43 @@ pub(crate) struct Extents {
     /// over the frames (`IndexCounts`).
     moved: usize,
     blocks: usize,
+    /// The frames holding a step that spans every view, each with how
+    /// many (`frame_extents_spans.rs`).
+    spanning: FxHashMap<usize, usize>,
+    /// Over every frame, the items and the short entries: running
+    /// totals too, so a patch and the culled count sum over no frames.
+    items: u64,
+    short: usize,
 }
 
 impl Extents {
-    /// The index of `drawn`'s steps, `places` steps long in all, from
-    /// their parts in `boxes`.
-    pub(crate) fn of(drawn: &DrawnSteps, places: usize, boxes: &[Option<KeptBox>]) -> Self {
+    /// The index of `drawn`'s steps, for `slots` slots, from their parts
+    /// in `boxes`.
+    pub(crate) fn of(drawn: &DrawnSteps, slots: usize, boxes: &[Option<KeptBox>]) -> Self {
         let entries = drawn
-            .placed()
-            .map(|(place, step)| entry(place, step, boxes));
-        Self::from_entries(entries, places)
+            .labelled()
+            .map(|(label, step)| entry(label, step, boxes));
+        Self::from_entries(entries, slots)
     }
 
-    /// The index of `entries`, each with its frame, `places` steps long.
-    fn from_entries(entries: impl Iterator<Item = (usize, Entry)>, places: usize) -> Self {
+    /// The index of `entries`, each with its frame, `slots` steps long.
+    fn from_entries(entries: impl Iterator<Item = (usize, Entry)>, slots: usize) -> Self {
         let mut extents = Self {
             frames: FxHashMap::default(),
-            at: vec![None; places],
+            at: vec![[None; 3]; slots],
             rebuilds: 0,
             moved: 0,
             blocks: 0,
+            spanning: FxHashMap::default(),
+            items: 0,
+            short: 0,
         };
         let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
-            extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
+            *extents.at_mut(entry.step) = Some((frame, entry.top, entry.tall()));
+            extents.count_in(&entry);
+            extents.span_in(frame, &entry);
             let index = extents.frames.entry(frame).or_default();
-            index.items += entry.items;
             if entry.tall() {
                 index.tall.push(entry);
             } else {
@@ -113,45 +123,6 @@ impl Extents {
         }
         extents
     }
-
-    /// `self` with `steps`, each with its place, taken out and put back
-    /// as their parts in `boxes` now draw; made afresh from `drawn`,
-    /// `places` steps long, when there are too many to patch.
-    pub(crate) fn patch(
-        &mut self,
-        steps: &[(usize, Step)],
-        (drawn, places): (&DrawnSteps, usize),
-        boxes: &[Option<KeptBox>],
-    ) {
-        let entries: usize = self.frames.values().map(|index| index.entries.len()).sum();
-        if steps.len() > REBUILD.max(entries / 16) {
-            let rebuilds = self.rebuilds + 1;
-            *self = Self::of(drawn, places, boxes);
-            self.rebuilds = rebuilds;
-            return;
-        }
-        assert_eq!(
-            places,
-            self.at.len(),
-            "the extents index holds {} paint places and paint order has {places}: a change of \
-             paint order reached the patch without a walk, which makes the index afresh \
-             (paint_partial.rs drawn_updated); reproduce with `cargo xtask test`",
-            self.at.len()
-        );
-        for &(place, step) in steps {
-            self.repatch(place, step, boxes);
-        }
-    }
-
-    /// The frames with a drawing step.
-    pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
-        self.frames.keys().copied()
-    }
-
-    /// How many items every drawing step paints.
-    pub(crate) fn items(&self) -> u64 {
-        self.frames.values().map(|index| index.items).sum()
-    }
 }
 
 impl Entry {
@@ -161,22 +132,22 @@ impl Entry {
     }
 }
 
-/// A panic naming `place`, whose entry is not where its record says.
-pub(super) fn missing(place: usize) -> ! {
+/// A panic naming `label`, whose entry is not where its record says.
+pub(super) fn missing(label: Label) -> ! {
     panic!(
-        "the extents index has no entry for paint step place {place} where its record says: an \
-         entry was moved without its place's record (frame_extents.rs); reproduce with `cargo \
+        "the extents index has no entry for paint step label {label} where its record says: an \
+         entry was moved without its label's record (frame_extents.rs); reproduce with `cargo \
          xtask test`"
     )
 }
 
-/// Entries by top, then place.
+/// Entries by top, then label.
 fn order(a: &Entry, b: &Entry) -> std::cmp::Ordering {
-    a.top.total_cmp(&b.top).then(a.place.cmp(&b.place))
+    a.top.total_cmp(&b.top).then(a.label.cmp(&b.label))
 }
 
-/// `step`'s entry at `place` from its part in `boxes`, and its frame.
-fn entry(place: usize, step: Step, boxes: &[Option<KeptBox>]) -> (usize, Entry) {
+/// `step`'s entry at `label` from its part in `boxes`, and its frame.
+fn entry(label: Label, step: Step, boxes: &[Option<KeptBox>]) -> (usize, Entry) {
     let (frame, items) = frame_items(boxes, step);
     let (mut top, mut bottom, mut count) = (f32::INFINITY, f32::NEG_INFINITY, 0);
     for (item, _) in items {
@@ -191,7 +162,7 @@ fn entry(place: usize, step: Step, boxes: &[Option<KeptBox>]) -> (usize, Entry) 
         (top, bottom, count) = (top.min(item_top), bottom.max(item_bottom), count + 1);
     }
     let entry = Entry {
-        place,
+        label,
         step,
         items: count,
         top,
@@ -201,10 +172,19 @@ fn entry(place: usize, step: Step, boxes: &[Option<KeptBox>]) -> (usize, Entry) 
     (frame, entry)
 }
 
+#[path = "frame_extents_at.rs"]
+mod at;
+#[path = "frame_extents_frame.rs"]
+mod frame;
 #[path = "frame_extents_patch.rs"]
 mod patch;
+
 #[path = "frame_extents_query.rs"]
 mod query;
+#[path = "frame_extents_spans.rs"]
+mod spans;
+#[path = "frame_extents_splice.rs"]
+mod splice;
 
 #[cfg(test)]
 #[path = "frame_extents_tests.rs"]

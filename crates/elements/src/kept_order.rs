@@ -12,40 +12,40 @@ use crate::changed_slots::ChangedSlots;
 use crate::clip_tree::ClipTree;
 use crate::kept_clips::{ClipInputs, Clips};
 use crate::layout::{BoxRect, LayoutBox};
-use crate::order_splice::Place;
 use crate::paint::PaintInput;
+use crate::paint_labels::Label;
 use crate::paint_order::{Step, paint_steps_with_outlines};
 use crate::scroll_chains::Chains;
-use crate::splice_decline::SpliceDecline;
+pub(crate) use labels::LabelOf;
+pub(crate) use walks::OrderWalks;
 
 /// The steps of painting, where each box's clip comes from, each box's
 /// clips, and the scroll chains.
 #[derive(Debug, Default)]
 pub(crate) struct KeptOrder {
     pub(crate) steps: Vec<Step>,
+    /// Each step's label, increasing along `steps` (`paint_labels.rs`):
+    /// what every reader of paint order compares.
+    pub(crate) labels: Vec<Label>,
+    /// The spacing of the last walk's labels, which an append or a
+    /// prepend steps by.
+    pub(crate) spacing: u64,
+    /// The first and last labels of each run the last splice put in,
+    /// which a run of the next leans on when it touches one
+    /// (`paint_labels::Lean`).
+    pub(crate) recent: Vec<(Label, Label)>,
+    /// What the splice that made this did, for the drawing steps, the
+    /// extents index and the hits to follow; empty unless it was spliced.
+    pub(crate) splice_edits: crate::kept_order_splice::SpliceEdits,
     pub(crate) tree: ClipTree,
     pub(crate) clips: Clips,
     pub(crate) chains: Chains,
-    /// The scroll containers, whose thumbs are painted on every update
-    /// that paints.
+    /// The scroll containers, each with a thumb step.
     pub(crate) thumbs: Vec<usize>,
     /// The slots whose clips the update that made this redid.
     pub(crate) redone: Vec<usize>,
     /// What the update that made this walked, for `UpdateCounts`.
     pub(crate) walks: OrderWalks,
-}
-
-/// Whole-tree walks of paint order and chains, and boxes whose clips
-/// were redone.
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct OrderWalks {
-    pub(crate) order: usize,
-    pub(crate) chains: usize,
-    pub(crate) clips: usize,
-    /// Shape changes spliced into the kept order (`order_splice.rs`).
-    pub(crate) splices: usize,
-    /// Why the splice declined a shape change, walked instead.
-    pub(crate) declined: Option<SpliceDecline>,
 }
 
 impl KeptOrder {
@@ -63,6 +63,10 @@ impl KeptOrder {
         let steps = paint_steps_with_outlines(boxes, &|index| input.stackings.get(index));
         Self {
             thumbs: thumbs(&steps),
+            labels: crate::paint_labels::afresh(steps.len()),
+            spacing: crate::paint_labels::spacing(steps.len()),
+            recent: Vec::new(),
+            splice_edits: crate::kept_order_splice::SpliceEdits::default(),
             steps,
             tree,
             clips,
@@ -79,19 +83,19 @@ impl KeptOrder {
 
     /// `last` kept for this update when the shape did not change, its
     /// clips redone under the `changed` slots; spliced when it changed
-    /// by in-flow boxes inserted or removed, `place` giving each kept
-    /// step's place; else made afresh.
+    /// by in-flow boxes inserted or removed, `label_of` giving each kept
+    /// step's label; else made afresh.
     pub(crate) fn updated(
         last: Option<Self>,
         (boxes, rects): (&[LayoutBox], &[BoxRect]),
         input: &PaintInput<'_>,
         changed: &ChangedSlots,
-        place: Place<'_>,
+        label_of: LabelOf<'_>,
     ) -> Self {
         match last {
             Some(kept) if !changed.shape_changed => kept.reclipped((boxes, rects), input, changed),
             Some(kept) if !changed.every => {
-                kept.spliced_or_walked((boxes, rects), input, changed, place)
+                kept.spliced_or_walked((boxes, rects), input, changed, label_of)
             }
             _ => Self::of(boxes, rects, input),
         }
@@ -104,9 +108,10 @@ impl KeptOrder {
         (boxes, rects): (&[LayoutBox], &[BoxRect]),
         input: &PaintInput<'_>,
         changed: &ChangedSlots,
-        place: Place<'_>,
+        label_of: LabelOf<'_>,
     ) -> Self {
-        let splice = match crate::order_splice::plan(boxes, input.stackings, changed, place) {
+        let place = |step| label_of(step).map(|label| self.position_of(label));
+        let splice = match crate::order_splice::plan(boxes, input.stackings, changed, &place) {
             Ok(splice) => splice,
             Err(reason) => {
                 let mut walked = Self::of(boxes, rects, input);
@@ -138,6 +143,8 @@ impl KeptOrder {
             clips: self.redone.len(),
             ..OrderWalks::default()
         };
+        // what a splice did is the splice's to set, after this
+        self.splice_edits = crate::kept_order_splice::SpliceEdits::default();
         self
     }
 }
@@ -158,6 +165,15 @@ impl ClipInputs for BoxClips<'_, '_> {
     fn scrolls(&self, slot: usize) -> bool {
         self.input.stackings.scrolls(slot)
     }
+
+    fn lane_frame(&self, slot: usize) -> bool {
+        self.input
+            .placement
+            .framed
+            .get(slot)
+            .copied()
+            .unwrap_or(false)
+    }
 }
 
 /// The slots of `steps`' thumb steps.
@@ -165,3 +181,9 @@ fn thumbs(steps: &[Step]) -> Vec<usize> {
     let thumb = |step: &Step| matches!(step, Step::Thumb(_)).then(|| step.index());
     steps.iter().filter_map(thumb).collect()
 }
+
+#[path = "kept_order_labels.rs"]
+mod labels;
+
+#[path = "kept_order_walks.rs"]
+mod walks;

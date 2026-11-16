@@ -16,7 +16,7 @@ pub const DEFAULT_DEADLINE: Duration = Duration::from_mins(10);
 pub struct Settings {
     /// `[load] wait`: false turns the wait off.
     pub enabled: bool,
-    /// Wait while the one-minute load is over this.
+    /// Wait while the runnable tasks (this reader included) are over this.
     pub threshold: f64,
     /// Then go on, saying so.
     pub deadline: Duration,

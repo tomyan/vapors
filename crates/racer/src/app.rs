@@ -9,7 +9,7 @@ use std::{cell::RefCell, rc::Rc};
 use surface::TrackSurface;
 use vapors_app::{ElementsApp, Failure, FrameCounts, FrameTiming};
 use vapors_elements::Document;
-use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start, report_error};
 use vapors_text::FontSystem;
 
 /// The racer as a platform app: the HUD's document and the track's
@@ -185,6 +185,11 @@ impl App for Racer {
         }
         next
     }
+    // pinned by vapors-perf's gpu_the_driven_racer_builds_every_pipeline_
+    // before_frame_0, which fails at frame 0 without this forward
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.app.start(start)
+    }
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);
     }
@@ -192,6 +197,8 @@ impl App for Racer {
 mod drawing;
 #[cfg(test)]
 mod hud_frame_tests;
+#[cfg(test)]
+mod hud_winners_tests;
 mod input;
 #[cfg(test)]
 mod input_tests;

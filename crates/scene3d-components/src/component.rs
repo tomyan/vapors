@@ -1,7 +1,7 @@
 //! The methods a parent's generated code calls on a component, the same
 //! for every node component (`docs/components.md`, "Child components").
 
-/// Implements `mount`, `events_into`, `root_entries`, `roots`, `unmount`,
+/// Implements `mount`, `owned_by_parent`, `events_into`, `root_entries`, `roots`, `unmount`,
 /// `anchor_element` and `node` for
 /// `$name`, a struct holding `mounted: crate::node::Mounted` and mounted
 /// by its own `mount_before`.
@@ -15,6 +15,13 @@ macro_rules! node_component {
                 props: $props,
             ) -> Self {
                 Self::mount_before(dom, parent, None, props)
+            }
+
+            /// Itself: a node component has no `Drop` that disposes; its
+            /// parent's generated code calls this on every child.
+            #[must_use]
+            pub fn owned_by_parent(self) -> Self {
+                self
             }
 
             /// Adds nothing: the component dispatches no events.

@@ -4,7 +4,7 @@
 //! computed style stays the same, or through what the cell inherits
 //! from the row. Each matches a full update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

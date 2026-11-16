@@ -75,8 +75,7 @@ pub fn section(name: &str, samples: &Samples) -> String {
     out
 }
 
-/// `section` without the GPU rows: for a workload whose frames are not
-/// timed on the GPU (`Workload::times_gpu`).
+/// `section` without the GPU rows.
 #[must_use]
 pub fn times_section(name: &str, samples: &Samples, phases: &[&str]) -> String {
     let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));

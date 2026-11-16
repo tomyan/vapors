@@ -158,8 +158,7 @@ impl Document {
         let Some(tag) = self.tag(node) else {
             return false;
         };
-        let named =
-            INTERACTIVE.contains(&tag) || (tag == "a" && self.attribute(node, "href").is_some());
+        let named = INTERACTIVE.contains(&tag) || self.is_link(node);
         let indexed = matches!(self.attribute(node, "tabindex"), Some("0" | "-1"));
         (named || indexed) && !self.is_disabled_control(node)
     }

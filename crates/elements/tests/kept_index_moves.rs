@@ -6,7 +6,7 @@
 //! entries: 13.6 instructions per row on `--scaling Class`'s add frames
 //! (`docs/perf/class-add-paint-2026-11-13.md`).
 
-mod support;
+use crate::support;
 
 use support::rows_page::{Edit, rows_page, rows_viewport};
 use vapors_elements::UpdateCounts;

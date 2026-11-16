@@ -102,7 +102,7 @@ impl Emitter<'_> {
             format!("_{var}")
         };
         self.line(format!(
-            "let {binding} = {}::mount_before(dom, {}, {}, {var}_props);",
+            "let {binding} = {}::mount_before(dom, {}, {}, {var}_props).owned_by_parent();",
             tag.name,
             place.parent,
             place.before()

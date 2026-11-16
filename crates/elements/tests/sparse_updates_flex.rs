@@ -4,7 +4,7 @@
 //! on the rows; an edit that makes the row taller lays the column out
 //! again. Each update is checked by the correctness oracle.
 
-mod support;
+use crate::support;
 
 use support::flex_list::{FlexList, ROW_MARGIN, flex_list, list_viewport};
 use support::oracle::assert_matches_full;
@@ -18,7 +18,7 @@ const LONGER: &str = "a text long enough to wrap onto a second line in the viewp
 const GROWS: &str = "height: auto; margin: 4px 0;";
 
 const FIX: &str = "update sparse_updates_flex.rs and docs/plans/iu1.md; reproduce: \
-    cargo nextest run -p vapors-elements --test sparse_updates_flex --no-capture";
+    cargo nextest run -p vapors-elements --test tests sparse_updates_flex:: --no-capture";
 
 /// The counts of one update after `edit`, checked by the oracle.
 fn edited(list: &FlexList, edit: impl FnOnce(&FlexList), what: &str) -> UpdateCounts {
@@ -63,8 +63,8 @@ fn a_same_size_edit_lays_out_the_row_alone_at_any_row_count() {
 }
 
 #[test]
-fn an_edit_that_makes_the_row_taller_lays_the_column_out_again() {
-    for rows in [100, 1000] {
+fn an_edit_that_makes_the_row_taller_lays_out_that_row_whatever_the_rows() {
+    let calls = |rows: usize| {
         // Given
         let list = flex_list(rows, GROWS);
 
@@ -72,11 +72,15 @@ fn an_edit_that_makes_the_row_taller_lays_the_column_out_again() {
         let what = format!("{rows} rows, taller edit");
         let counts = edited(&list, |list| list.set_middle_text(LONGER), &what);
 
-        // Then: the column asks every row for its size and lays it out
+        // Then: the row's answer differs, so the column is laid out
+        // again, by its lane: the taller row and its ancestors only
         assert_eq!(owners(&counts), (0, 1, 0), "{what}: {counts:?}; {FIX}");
-        assert!(
-            counts.layout_calls > rows,
-            "{what}: {counts:?}; the column is laid out again; {FIX}"
-        );
-    }
+        assert!(counts.lanes >= 1, "{what}: {counts:?}; {FIX}");
+        counts.layout_calls
+    };
+    assert_eq!(
+        calls(100),
+        calls(1000),
+        "layout calls grow with the rows; {FIX}"
+    );
 }

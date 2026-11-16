@@ -4,7 +4,7 @@
 //! scroll; UI drawn over a surface takes the press; each surface gets
 //! only its own events.
 
-mod surface_input_page;
+use crate::surface_input_page;
 
 use surface_input_page::{PANELS, Page, scrolling};
 use vapors_app::Route;

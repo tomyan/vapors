@@ -13,6 +13,7 @@ use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
 
 use crate::run::{Counts, Workload};
+use crate::splice_tally::SpliceTally;
 
 #[path = "../../elements/tests/support/basics.rs"]
 pub(crate) mod basics;
@@ -35,6 +36,8 @@ pub struct Rows {
     change: RowChange,
     /// The row `Insert` added and has not yet removed.
     inserted: Option<NodeId>,
+    /// The splices and relabels of the frames run (`splice_tally.rs`).
+    splices: std::cell::Cell<SpliceTally>,
 }
 
 impl Rows {
@@ -47,7 +50,7 @@ impl Rows {
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = match change {
-            RowChange::FlexText => Page::list(count),
+            RowChange::FlexText | RowChange::FlexInsert => Page::list(count),
             _ => Page::Rows(rows_page(count)),
         };
         match change {
@@ -58,7 +61,8 @@ impl Rows {
             | RowChange::Text
             | RowChange::FlexText
             | RowChange::Class
-            | RowChange::Insert => {}
+            | RowChange::Insert
+            | RowChange::FlexInsert => {}
         }
         let mut app = ElementsApp::new(Rc::clone(page.doc()));
         app.time_frames(true);
@@ -69,11 +73,19 @@ impl Rows {
             app,
             change,
             inserted: None,
+            splices: std::cell::Cell::default(),
         }
     }
 }
 
 impl Rows {
+    /// The consumer's part of a frame with no change: the a11y update
+    /// taken, as `change` takes it. For a workload around this one that
+    /// makes its change only on some frames (`gpu_idle_frames.rs`).
+    pub fn take_ax_update(&mut self) {
+        let _taken = self.app.ax_update();
+    }
+
     /// Removes the inserted row, or inserts one before the middle row.
     fn toggle_inserted_row(&mut self) {
         let page = self.page.rows();
@@ -91,12 +103,32 @@ impl Rows {
 }
 
 impl Rows {
+    /// Removes the inserted row, or inserts one before the list's middle
+    /// row.
+    fn toggle_inserted_list_row(&mut self) {
+        if let Some(inserted) = self.inserted.take() {
+            self.page.doc().borrow_mut().remove(inserted);
+            return;
+        }
+        self.inserted = Some(self.page.flex_list().insert_before_middle());
+    }
+}
+
+impl Rows {
     /// The body scrolled down one row, or back to the top at the end.
     fn scroll_body(&self) {
         let page = self.page.rows();
         if !page.scroll_body(1.0) {
             page.scroll_body_to_top();
         }
+    }
+}
+
+impl Rows {
+    /// The splices and relabels of the frames run so far.
+    #[must_use]
+    pub fn splices(&self) -> SpliceTally {
+        self.splices.get()
     }
 }
 
@@ -125,6 +157,7 @@ impl Workload for Rows {
             RowChange::FlexText => self.page.set_list_value(sample),
             RowChange::Class | RowChange::HoveredClass => self.page.rows().edit(Edit::ToggleClass),
             RowChange::Insert => self.toggle_inserted_row(),
+            RowChange::FlexInsert => self.toggle_inserted_list_row(),
             RowChange::Resize => self.page.rows().toggle_tall(),
             RowChange::Scroll => self.scroll_body(),
             RowChange::ScrollSize => {
@@ -146,9 +179,14 @@ impl Workload for Rows {
     }
 
     fn check(&self, next: Next) -> Result<(), String> {
+        let counts = self.page.doc().borrow().update_counts();
+        self.splices.set(self.splices.get().and(&counts));
         match (next, self.app.failure().get()) {
             (_, Some(failure)) => Err(failure),
             (Next::Exit, None) => Err("the app exited without a failure".into()),
+            _ if matches!(self.change, RowChange::FlexInsert) => {
+                crate::rows_list::laned(&self.page.doc().borrow().update_counts())
+            }
             _ => Ok(()),
         }
     }

@@ -9,6 +9,7 @@
 - [hold-button.md](hold-button.md): `HoldButton`
 - [icons.md](icons.md): inline SVG icons
 - [RACER_PLAN.md](RACER_PLAN.md): the homepage racer
+- [scene3d.md](scene3d.md): the 3D scene, its renderer and components
 - [text.md](text.md): text
 - [tooltips.md](tooltips.md): `title`, in the a11y tree and as a tooltip
 - [web.md](web.md): the web build

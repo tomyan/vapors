@@ -138,6 +138,7 @@ pub(super) const FIRST_HALF: &[PropertyDef] = &[
         "inline",
         "block | inline | inline-block | flex | inline-flex | grid | inline-grid | none | contents",
     ),
+    def("fill", true, "rgb(0 0 0)", "none | <color>"),
     def("filter", false, "none", "none | <filter-function>+"),
     def(
         "flex-basis",

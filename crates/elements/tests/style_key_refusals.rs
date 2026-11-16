@@ -6,7 +6,7 @@
 //! from every update while the element is in the tree, naming the
 //! site and the fix; none panics.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE, StyleKey};
@@ -18,7 +18,9 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[("title", "a row")],
     style: Some("width: 50px"),
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static TWICE: StyleKey = StyleKey {
@@ -27,7 +29,9 @@ static TWICE: StyleKey = StyleKey {
     tag: "div",
     classes: &[],
     toggles: &["on", "on"],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with an element made from `key` under the body.
@@ -56,6 +60,7 @@ fn setting_an_attribute_the_key_fixes_is_refused_in_any_case_and_changes_nothing
         ("style", "write it there"),
         ("Style", "write it there"),
         (SCOPE_ATTRIBUTE, "write it there"),
+        ("title", "write `title={expr}` there"),
     ] {
         // Given
         let (mut doc, row) = page(&ROW);

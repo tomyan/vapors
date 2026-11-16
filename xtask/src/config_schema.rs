@@ -12,8 +12,12 @@ enum Keys {
 }
 
 /// Every table the factory reads.
-const TABLES: [(&str, Keys); 19] = [
+const TABLES: [(&str, Keys); 21] = [
     ("screenshot", Keys::Only(&["packages"])),
+    (
+        "quality",
+        Keys::Only(&["file_lines", "function_lines", "complexity", "chain_hops"]),
+    ),
     ("web", Keys::Only(&["package", "product"])),
     ("dev", Keys::Only(&["port", "words", "https"])),
     (
@@ -21,6 +25,7 @@ const TABLES: [(&str, Keys); 19] = [
         Keys::Only(&["dir", "https", "path", "check", "check_seconds", "port"]),
     ),
     ("files", Keys::Only(&["max_lines"])),
+    ("targets", Keys::Only(&["max_gb"])),
     ("build", Keys::Only(&["jobs"])),
     (
         "load",

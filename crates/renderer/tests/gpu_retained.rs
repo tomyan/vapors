@@ -133,7 +133,7 @@ fn gpu_a_range_drawn_then_released_before_its_frame_keeps_anything_is_not_reused
 }
 
 #[test]
-#[should_panic(expected = "not a whole number of 128-byte instances")]
+#[should_panic(expected = "not a whole number of 144-byte instances")]
 fn gpu_kept_bytes_not_a_whole_number_of_quads_panic() {
     // Given
     let mut frame = Frame::new(gpu());

@@ -25,6 +25,7 @@ fn main() {
 }
 
 #[cfg(not(target_family = "wasm"))]
+#[allow(clippy::too_many_lines)] // the example's one sequence: parse, cascade, print
 fn run() -> Result<(), String> {
     use vapors_css::cascade::{Cascade, Environment};
     use vapors_css::selector::Element;

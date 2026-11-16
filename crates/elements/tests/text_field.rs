@@ -5,7 +5,7 @@
 //! UTF-16 units, and `selectionchange` fires once per settle. The order
 //! against Chromium is pinned by the corpus's `text.events`.
 
-mod support;
+use crate::support;
 
 use support::text_page::{
     click, control, key, key_with, page, selection, settle, shift, type_text, value,

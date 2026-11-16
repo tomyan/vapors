@@ -3,7 +3,7 @@
 //! the share key, so what a child inherits, and what a selector reads
 //! from its ancestors, splits the share when the parents differ.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,7 +20,9 @@ static PARENT: StyleKey = StyleKey {
     tag: "div",
     classes: &["p"],
     toggles: &["on"],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static CHILD: StyleKey = StyleKey {
@@ -29,7 +31,9 @@ static CHILD: StyleKey = StyleKey {
     tag: "span",
     classes: &["c"],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static BUTTON: StyleKey = StyleKey {
@@ -38,7 +42,9 @@ static BUTTON: StyleKey = StyleKey {
     tag: "button",
     classes: &["b"],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with `css` and `count` keyed parents under the body, each
@@ -50,7 +56,7 @@ fn page(
     children: &[&'static StyleKey],
 ) -> (Document, Vec<NodeId>, Vec<Vec<NodeId>>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let (mut parents, mut kids) = (Vec::new(), Vec::new());
     for _ in 0..count {

@@ -14,7 +14,7 @@
 //! handles point into. An absolute or fixed box is never lent: its
 //! containing block lies outside its subtree.
 
-use taffy::Position;
+use taffy::{Layout, Point, Position};
 use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
@@ -34,12 +34,44 @@ pub(crate) struct KeptBoxes {
     /// Debug builds skip `layout_check.rs` (`Document::skip_layout_check`).
     #[cfg(debug_assertions)]
     pub(crate) skip_layout_check: bool,
+    /// The in-crate lane tests lay their pages out by Taffy alone, so
+    /// that each lane mirror is compared with Taffy's answers rather
+    /// than a lane's (`layout/lane_page.rs`).
+    #[cfg(test)]
+    pub(crate) lanes_off: bool,
 }
 
 impl KeptBoxes {
+    /// The kept boxes' per-slot lists (`Placed::slot_lists`).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        self.placed.slot_lists()
+    }
+
     /// The slot `node`'s element box holds, if it has one.
     pub(crate) fn slot_of(&self, node: NodeId) -> Option<usize> {
         self.placed.slots.of(super::Key::Element(node))
+    }
+
+    /// The elements among the children of the framed lane of the box
+    /// keyed `container`, from the one keyed `first` on, as the boxes
+    /// stand now; `None` when either box or the lane is gone, or the lane no
+    /// longer holds `first`.
+    pub(crate) fn lane_nodes_from(
+        &self,
+        (container, first): (super::Key, super::Key),
+    ) -> Option<Vec<NodeId>> {
+        let slots = &self.placed.slots;
+        let (container, first) = (slots.of(container)?, slots.of(first)?);
+        let children = self.placed.lanes.borrow().children_from(container, first)?;
+        // a text run that is a lane child is its container's text: its
+        // container's nodes did not start elsewhere
+        let keys = children.into_iter().filter_map(|slot| slots.key(slot));
+        let elements = keys.filter_map(|key| match key {
+            super::Key::Element(node) => Some(node),
+            super::Key::Text(..) => None,
+        });
+        Some(elements.collect())
     }
 }
 
@@ -97,11 +129,17 @@ impl KeptBoxes {
         }
         let (old, old_boxes) = (&self.placed.slots, &self.placed.boxes);
         let before = |at: usize| Some((old.key(at)?, old_boxes.get(at)?));
+        // the boxes lent to are placed with no lane yet, so each layout
+        // lent is where Taffy put it, its lane's start added back
+        let lanes = self.placed.lanes.borrow();
+        let located = |at: usize, layout: &Layout| lanes.taffy_location(at, layout);
         let mut lender = Lender {
             before: &before,
             new: &placed.slots,
             may_keep,
+            located: &located,
             lent: 0,
+            visited: 0,
         };
         lender.lend_from(&mut placed.boxes, 0);
         lender.lent
@@ -114,7 +152,11 @@ pub(super) struct Lender<'a> {
     pub(super) before: &'a dyn Fn(usize) -> Option<(Key, &'a LayoutBox)>,
     pub(super) new: &'a Slots,
     pub(super) may_keep: &'a dyn Fn(NodeId) -> bool,
+    /// Where a lent layout in a slot puts its box.
+    pub(super) located: &'a dyn Fn(usize, &Layout) -> Point<f32>,
     pub(super) lent: usize,
+    /// The boxes lending visited, lent or not.
+    pub(super) visited: usize,
 }
 
 impl Lender<'_> {
@@ -125,6 +167,7 @@ impl Lender<'_> {
     /// A kept box, which a shallow owner kept in its slot, keeps its
     /// cache and layout.
     pub(super) fn lend_from(&mut self, boxes: &mut [LayoutBox], at: usize) -> bool {
+        self.visited += 1;
         if boxes[at].kept {
             return true;
         }
@@ -165,6 +208,7 @@ impl Lender<'_> {
         }
         boxes[at].cache = before.cache.clone();
         boxes[at].layout = before.layout;
+        boxes[at].layout.location = (self.located)(at, &before.layout);
         boxes[at].asked.clone_from(&before.asked);
         boxes[at].asked_overflowed = before.asked_overflowed;
         self.lent += 1;

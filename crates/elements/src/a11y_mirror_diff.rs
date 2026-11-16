@@ -10,6 +10,7 @@ use vapors_dom::NodeId;
 use crate::a11y_error::AxError;
 use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
 use crate::a11y_mirror_index::AxIndex;
+use crate::a11y_mirror_started::Rebounding;
 use crate::a11y_mirror_state::Touched;
 use crate::document::Document;
 use crate::node_map::{NodeMap, NodeSet};
@@ -40,7 +41,13 @@ impl Diff {
         self.nodes.push(new);
     }
 
-    fn kept(&mut self, old: &AxMirrorNode, new: AxMirrorNode, moved: bool) {
+    /// `new`, a node's record with new bounds alone: under the same
+    /// parent, so neither placed nor noted as moved (`a11y_mirror_started`).
+    pub(crate) fn rebounded(&mut self, new: AxMirrorNode) {
+        self.nodes.push(new);
+    }
+
+    pub(crate) fn kept(&mut self, old: &AxMirrorNode, new: AxMirrorNode, moved: bool) {
         if old.parent != new.parent || moved {
             self.to_place.push((new.node, new.parent));
         }
@@ -101,12 +108,22 @@ impl Document {
         index: &AxIndex,
         focus: Option<NodeId>,
     ) -> Result<(Diff, Vec<AxPlace>, usize), AxError> {
-        let candidates = self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
+        let (candidates, read) =
+            self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
         self.ax.counts.nodes_read = candidates.len();
         let mut diff = Diff::default();
         for node in candidates {
             self.ax_classify(node, index, &touched.replaced, &mut diff)?;
         }
+        let rows = self.ax_started_rows(&touched.started);
+        let mut rebounding = Rebounding::new(index, &touched.replaced);
+        let (bounds_only, full) = self.ax_rebound_rows(
+            (&rows, touched.started.len()),
+            &read,
+            (&mut rebounding, &mut diff),
+        )?;
+        self.ax.counts.bounds_only = bounds_only;
+        self.ax.counts.nodes_read += full;
         if let Some(node) = focus.filter(|&node| diff.after(node, &self.ax.records) == After::Gone)
         {
             return Err(self.ax_focus_outside(node));
@@ -122,19 +139,28 @@ impl Document {
         }
     }
 
-    /// The index for this take: the one kept, patched for the nodes
-    /// touched, or rebuilt by a scan when the tree's shape changed (an
-    /// element inserted or removed: its hidden descendants carry ids
-    /// without boxes, so no touch names them) or a patch could not be
-    /// certain. With it, the nodes named by an id whose element changed.
+    /// The index for this take: the one kept, patched for the elements
+    /// whose entries may differ (`ax_index_nodes`), or rebuilt by a scan
+    /// when a patch could not be certain. With it, the nodes named by an
+    /// id whose element changed.
     fn ax_index(&mut self, touched: &Touched) -> (AxIndex, Vec<NodeId>) {
         let Some(mut kept) = self.ax.take_index() else {
             return (self.ax_scan(), Vec::new());
         };
-        if !self.ax_shape_changed(touched)
-            && let Some(changed) = kept.patch(self, &touched.nodes)
-        {
-            self.ax.counts.index_entries = touched.nodes.len();
+        let (nodes, inserted) = self.ax_index_nodes(touched);
+        let patched = (!kept.moves_a_shared_id(&inserted))
+            .then(|| kept.patch(self, &nodes))
+            .flatten();
+        if let Some(changed) = patched {
+            self.ax.counts.index_entries = nodes.len();
+            // Debug builds only, a relaxed guard: the comparison is a scan of
+            // every element, the cost the patch removes (4i). Release
+            // builds rely on `ax_index_nodes` naming every element whose
+            // entry can change; a miss there leaves a stale name until the
+            // next scan, reported nowhere. Retired when a release-side
+            // check costs no more than the patch (none is designed yet).
+            #[cfg(debug_assertions)]
+            kept.assert_scanned(self, &AxIndex::of(self));
             let renamed = kept.referrers_of(&changed);
             return (kept, renamed);
         }
@@ -145,8 +171,28 @@ impl Document {
         (index, renamed)
     }
 
-    fn ax_shape_changed(&self, touched: &Touched) -> bool {
-        !touched.replaced.is_empty() || touched.nodes.iter().any(|&node| !self.contains(node))
+    /// The elements whose index entries may differ since the last take:
+    /// those whose `id` or a referring attribute was written, those freed
+    /// with a removed subtree, and every element of each subtree inserted
+    /// or moved, hidden ones included (no box touches those); and those
+    /// in the document after the take apart. A subtree moved into a
+    /// parent outside the document is walked too: its entries are
+    /// dropped, as a removal's are (`AxIndex::patch` keeps entries only
+    /// for elements under the root). Not the boxes moved or started,
+    /// whose entries cannot change. O(those elements), not a scan.
+    fn ax_index_nodes(&self, touched: &Touched) -> (NodeSet, Vec<NodeId>) {
+        let mut nodes = touched.indexed.clone();
+        nodes.extend(touched.freed.iter().copied());
+        let mut inserted = Vec::new();
+        let roots = touched.replaced.iter().filter(|&&node| self.contains(node));
+        for &root in roots {
+            let elements = crate::check::elements(&self.arena, root);
+            nodes.extend(elements.iter().copied());
+            if self.attached(root) {
+                inserted.extend(elements);
+            }
+        }
+        (nodes, inserted)
     }
 
     /// The index rebuilt by a scan of the document, counted.
@@ -158,7 +204,7 @@ impl Document {
     }
 
     /// Reads `node` again and notes what differs from its record.
-    fn ax_classify(
+    pub(crate) fn ax_classify(
         &self,
         node: NodeId,
         index: &AxIndex,

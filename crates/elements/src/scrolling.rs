@@ -62,12 +62,40 @@ impl Document {
     }
 
     /// Shows or hides every scroll container's thumbs from the next
-    /// update: a touch app shows them only while a gesture scrolls.
+    /// update.
     pub fn set_thumbs_shown(&mut self, shown: bool) {
-        if self.thumbs_shown != shown {
+        self.set_thumb_opacity(if shown { 1.0 } else { 0.0 });
+    }
+
+    /// Draws every scroll container's thumbs at least at `opacity` (0
+    /// hidden, 1 as styled; clamped, quantised to 256 steps) from the
+    /// next update. A touch app sets 0 and each container's own
+    /// ([`Document::set_thumb_opacity_of`]).
+    pub fn set_thumb_opacity(&mut self, opacity: f32) {
+        let alpha = alpha_of(opacity);
+        if self.thumb_alpha != alpha {
             self.note_change();
         }
-        self.thumbs_shown = shown;
+        self.thumb_alpha = alpha;
+    }
+
+    /// The opacity every container's thumbs are drawn at least at (as
+    /// [`Document::set_thumb_opacity`] last set it, quantised).
+    #[must_use]
+    pub fn thumb_opacity(&self) -> f32 {
+        f32::from(self.thumb_alpha) / 255.0
+    }
+
+    /// Draws `container`'s own thumbs at `opacity` (as
+    /// [`Document::set_thumb_opacity`]) from the next update, where that
+    /// is above every container's: a touch app shows a container's
+    /// thumbs while it scrolls and fades them after. Ignored for an
+    /// element that is not a scroll container as of the last update.
+    pub fn set_thumb_opacity_of(&mut self, container: NodeId, opacity: f32) {
+        // a thumb is not in the a11y tree, so the mirror is not told
+        if self.scroll.set_alpha(container, alpha_of(opacity)) {
+            self.note_change();
+        }
     }
 
     /// The scroll offset of `element` (CSS pixels, unrounded) as of the
@@ -77,4 +105,15 @@ impl Document {
     pub fn scroll_offset(&self, element: NodeId) -> Option<[f32; 2]> {
         self.scroll.get(element)
     }
+}
+
+/// `opacity` clamped to 0..=1 in 256 steps.
+fn alpha_of(opacity: f32) -> u8 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=1 first, so 0..=255"
+    )]
+    let alpha = (opacity.clamp(0.0, 1.0) * f32::from(u8::MAX)).round() as u8;
+    alpha
 }

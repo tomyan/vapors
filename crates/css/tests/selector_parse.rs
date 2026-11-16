@@ -1,6 +1,6 @@
 //! Selector parsing (`src/selector/parse.rs`). Translated from sumi `selector_test.go` and `selector_structural_test.go`.
 
-mod support;
+use crate::support;
 
 use support::selector;
 use vapors_css::selector::{Combinator, Nth, PseudoClass, parse_selector_list};

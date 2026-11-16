@@ -33,6 +33,14 @@ impl ApplicationHandler<Message> for Handler {
             // at once. Unproven: no test can make the acquire fail, and
             // `Handler` needs a real `ActiveEventLoop`.
             event_loop.set_control_flow(ControlFlow::Wait);
+            // the start gate's deadline, while the window has no size.
+            // RELAXED: no test reaches it; only a window without a size
+            // waits, and no gate step makes one, so removing this call
+            // would leave such a window waiting silently with nothing
+            // catching it. The gate's decision is pinned in
+            // start_gate_tests.rs. Retired by a handler test with a fake
+            // window and event loop.
+            self.start_when_sized(event_loop);
             self.platform.request_redraw();
             self.redraw_if_asked();
         }
@@ -45,7 +53,7 @@ impl ApplicationHandler<Message> for Handler {
         #[cfg(not(target_family = "wasm"))]
         self.ime_message();
         match message {
-            Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
+            Message::GpuReady(Ok(gpu)) => self.gpu_ready(event_loop, gpu),
             Message::GpuReady(Err(error)) => self.fail(event_loop, error),
             Message::FileChosen { name, bytes } => self
                 .app
@@ -55,7 +63,10 @@ impl ApplicationHandler<Message> for Handler {
             // record before they wake. Nothing to do if it ever did.
             Message::GpuStopped => {}
             Message::Wake => self.platform.request_redraw(),
-            Message::Input(event) => self.app.event(event, &self.platform),
+            Message::Input(event) => {
+                self.platform.stamp(crate::Instant::now());
+                self.app.event(event, &self.platform);
+            }
         }
         self.redraw_if_asked();
     }
@@ -79,6 +90,10 @@ impl ApplicationHandler<Message> for Handler {
         {
             gpu.resize(size.width, size.height);
             self.platform.request_redraw();
+            // RELAXED: the start at the first non-zero size; no test reaches
+            // it, for the reason at the deadline's call above, and no gate
+            // step starts unsized. Retired the same way.
+            self.start_when_sized(event_loop);
         }
         if shows_window(&event) {
             self.platform.request_redraw();
@@ -89,7 +104,11 @@ impl ApplicationHandler<Message> for Handler {
         if let Some(window) = &self.window {
             self.input.set_scale(window.scale_factor());
         }
-        for app_event in self.input.translate(&event) {
+        // one read of the clock for the event: its gestures, its click
+        // count and the app's handling all take this time (#440)
+        let now = crate::Instant::now();
+        self.platform.stamp(now);
+        for app_event in self.input.translate(&event, now) {
             self.app.event(app_event, &self.platform);
         }
         self.redraw_if_asked();

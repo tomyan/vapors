@@ -1,6 +1,6 @@
 //! Rule refusals (`src/parse/rules.rs`): unterminated blocks and comments, stray braces, missing and empty selectors. Translated from sumi `parser/style/style_edge_test.go`.
 
-mod support;
+use crate::support;
 
 use support::refusal;
 

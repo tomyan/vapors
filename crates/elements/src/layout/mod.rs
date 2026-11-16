@@ -4,10 +4,51 @@
 mod asked;
 mod boxes;
 mod calcs;
+mod child_edits;
+mod child_edits_check;
 mod field_box;
 mod inline;
 mod isolated;
 mod keep;
+mod lane;
+mod lane_aside;
+mod lane_block;
+mod lane_block_answer;
+mod lane_block_child;
+mod lane_block_child_place;
+mod lane_block_container;
+mod lane_block_item;
+mod lane_block_sizes;
+mod lane_block_summary;
+mod lane_bounds;
+#[cfg(test)]
+mod lane_compare;
+mod lane_fill;
+mod lane_flex;
+mod lane_flex_answer;
+mod lane_flex_base;
+mod lane_flex_child;
+mod lane_flex_column;
+mod lane_flex_contribution;
+mod lane_flex_item;
+mod lane_flex_leaf;
+mod lane_flex_place;
+mod lane_flex_share;
+mod lane_flex_sizes;
+mod lane_flex_summary;
+mod lane_frame;
+mod lane_kind;
+mod lane_layout;
+mod lane_location;
+#[cfg(test)]
+mod lane_page;
+mod lane_set;
+mod lane_share;
+mod lane_tree;
+mod lane_view;
+mod lane_write;
+#[cfg(debug_assertions)]
+mod lane_written_check;
 mod layout_box;
 #[cfg(debug_assertions)]
 pub(crate) mod layout_check;
@@ -19,12 +60,14 @@ mod rebuild;
 mod rebuild_check;
 mod rebuilt;
 mod replaced;
+mod reshaped;
 mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
 mod text_kept;
 mod text_key;
 mod tree;
+mod work;
 mod written;
 
 use taffy::{AvailableSpace, NodeId, Size, compute_root_layout};
@@ -33,12 +76,16 @@ use vapors_text::FontSystem;
 pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
-pub(crate) use isolated::{Changed, Settled};
 pub(crate) use keep::KeptBoxes;
+pub(crate) use lane_block_answer::narrow;
+pub(crate) use lane_layout::LaneCounts;
+pub(crate) use lane_set::{Lanes, SharedLanes};
 pub(crate) use rebuilt::Rebuilt;
+pub(crate) use reshaped::{Reshaped, Shared};
 pub(crate) use slots::{Key, Placed, Slots};
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
+pub(crate) use work::{LayoutWork, Settling};
 pub(crate) use written::Written;
 
 /// A box's border box in document coordinates, CSS pixels.
@@ -60,9 +107,12 @@ pub struct BoxRect {
 /// (`KeptBoxes::rebuild`) is not laid out again. Returns
 /// them and what Taffy did (`LayoutWork`); `placed` gives their
 /// border boxes. An empty tree (html `display: none`) lays out nothing.
-/// Each of `changed`, a rebuilt owner whose subtree changed, is first
-/// settled (`isolated.rs`): laid out in isolation when that answers as
-/// the box it replaced did, else its ancestors are laid out again.
+/// Each of `settling.changed`, a rebuilt owner whose subtree changed,
+/// is first settled (`isolated.rs`): laid out in isolation when that
+/// answers as the box it replaced did, else its ancestors are laid out
+/// again. A block container is laid out by its lane where it qualifies
+/// (`lane_layout.rs`), its children `settling.built` this update laid
+/// out again.
 ///
 /// # Errors
 /// A `calc()` that did not resolve (see `Calcs`), with what Taffy did
@@ -73,9 +123,11 @@ pub(crate) fn lay_out(
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-    changed: Vec<Changed>,
+    settling: Settling,
 ) -> Result<(Placed, LayoutWork), Box<(String, LayoutWork)>> {
     let (fonts, cache) = texts;
+    let shared = std::rc::Rc::clone(&placed.lanes);
+    let mut lanes = shared.borrow_mut();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts,
@@ -85,7 +137,12 @@ pub(crate) fn lay_out(
         written: Written::default(),
         calls: 0,
         disowned: 0,
+        lanes: &mut lanes,
+        lanes_enabled: settling.lanes,
+        stale: settling.built.into_iter().collect(),
+        lane_counts: LaneCounts::default(),
     };
+    let changed = settling.changed;
     let available = Size {
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),
@@ -100,30 +157,23 @@ pub(crate) fn lay_out(
         calls: tree.calls,
         disowned: tree.disowned,
         settled,
+        lanes: tree.lane_counts,
         written: std::mem::take(&mut tree.written),
     };
+    let boxes = tree.boxes;
+    drop(lanes);
     match calcs.failure() {
         Some(failure) => Err(Box::new((failure, work))),
         None => Ok((
             Placed {
-                boxes: tree.boxes,
+                boxes,
                 slots: placed.slots,
+                lanes: placed.lanes,
+                scanned: placed.scanned,
             },
             work,
         )),
     }
-}
-
-/// What one layout did: how many times Taffy laid a box out rather than
-/// reading its cache, how many times it asked a box for its layout, how
-/// the changed owners were settled, and the slots it laid out or wrote.
-pub(crate) struct LayoutWork {
-    pub(crate) laid_out: usize,
-    pub(crate) calls: usize,
-    /// Recorded size answers disowned (`tree_cache.rs`).
-    pub(crate) disowned: usize,
-    pub(crate) settled: Settled,
-    pub(crate) written: Written,
 }
 
 /// Each out-of-flow box's containing block, by box index.
@@ -140,13 +190,14 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
 /// Each box's border box in document coordinates: its place in its
 /// containing block's content, whose origin is that box's corner less
 /// its scroll offset (`offsets`, by box index, in CSS pixels); and each
-/// box's padding, read in the same pass.
+/// box's padding, read in the same pass. A lane child is where Taffy
+/// puts it, its start from `lanes` added back.
 pub(crate) fn placed(
-    boxes: &[LayoutBox],
+    (boxes, lanes): (&[LayoutBox], &Lanes),
     offsets: &[[f32; 2]],
 ) -> (Vec<BoxRect>, Vec<taffy::Rect<f32>>) {
     let corner = |index: usize, origin: (f32, f32)| {
-        let location = boxes[index].layout.location;
+        let location = lanes.taffy_location(index, &boxes[index].layout);
         (origin.0 + location.x, origin.1 + location.y)
     };
     let origins = crate::chain::by_containing_block(boxes, (0.0, 0.0), &|index, origin| {

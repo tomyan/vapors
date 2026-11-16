@@ -7,17 +7,22 @@
 // alpha that gives that result when the hardware blends in encoded
 // space. Two parameters: gamma (the encoding exponent) and contrast.
 
+// The blend parameters, the viewport, the shift of the frame the
+// glyphs are in, and the offsets of the rows of a lane they are in, two
+// to each vec4 (vapors-renderer's row_offsets.rs).
 struct Params {
     gamma: f32,
     contrast: f32,
     viewport: vec2<f32>,
     shift: vec2<f32>,
+    rows: array<vec4<f32>, ROW_PAIRS>,
 }
 
 struct VertexIn {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) row: u32,                 // the row's index in params.rows
 }
 
 struct VertexOut {
@@ -33,7 +38,9 @@ struct VertexOut {
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     var out: VertexOut;
-    let pixel = in.position + params.shift;
+    let pair = params.rows[in.row / 2u];
+    let row = select(pair.xy, pair.zw, in.row % 2u == 1u);
+    let pixel = in.position + params.shift + row;
     let clip = vec2<f32>(
         pixel.x / params.viewport.x * 2.0 - 1.0,
         1.0 - pixel.y / params.viewport.y * 2.0,

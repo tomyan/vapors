@@ -3,7 +3,7 @@
 //! unkeyed or could not share, and what differs in the key (a toggled
 //! class, a state, an attribute a sheet selects) ends the sharing.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, StyleKey};
@@ -17,7 +17,9 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static BUTTON: StyleKey = StyleKey {
@@ -26,14 +28,16 @@ static BUTTON: StyleKey = StyleKey {
     tag: "button",
     classes: &[],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with `css` under the rows' scope and `count` keyed
 /// elements of `key` under the body.
 fn page(css: &str, key: &'static StyleKey, count: usize) -> (Document, Vec<NodeId>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let nodes = (0..count)
         .map(|_| {

@@ -3,8 +3,7 @@
 //! an event-aware one is passed as is, and expression attributes are
 //! patched in effects.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated_with, refusal};
 
@@ -87,13 +86,16 @@ fn dynamic_attributes_are_patched_in_effects() {
 }
 
 #[test]
-fn static_attributes_are_set_once() {
+fn static_attributes_are_fixed_by_the_key_and_set_once_from_it() {
     // When
     let code = generated_with("", "<div title=\"row\" id=\"main\"></div>");
 
     // Then
-    assert_has(&code, "set_attribute(div0, \"title\", \"row\");");
-    assert_has(&code, "set_attribute(div0, \"id\", \"main\");");
+    assert_has(
+        &code,
+        "attributes: &[(\"title\", \"row\"), (\"id\", \"main\")]",
+    );
+    assert_lacks(&code, "set_attribute(");
     assert_lacks(&code, "_if_changed");
     assert_lacks(&code, "Effect::new(");
 }

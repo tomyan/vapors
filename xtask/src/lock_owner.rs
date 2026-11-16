@@ -37,8 +37,24 @@ impl Owner {
 
     /// Whether its process is still the one that wrote the line.
     #[must_use]
+    ///
+    /// Two-valued: a process whose start cannot be read reads as gone.
+    /// The gate lock uses it only to name holders; the quiet lock, which
+    /// releases on it, uses [`Owner::liveness`].
     pub fn live(&self) -> bool {
-        process_start(self.pid).is_some_and(|start| start <= self.since + START_SLACK)
+        self.liveness().unwrap_or(false)
+    }
+
+    /// Whether its process is still the one that wrote the line: false
+    /// only when /proc says the pid is gone or was reused.
+    ///
+    /// # Errors
+    ///
+    /// Its start could not be read (/proc unreadable, a stat line of
+    /// another shape, no boot time or tick rate), naming what.
+    pub fn liveness(&self) -> Result<bool, String> {
+        let start = process_start(self.pid)?;
+        Ok(start.is_some_and(|start| start <= self.since + START_SLACK))
     }
 
     /// How long ago it took the lock, in seconds.
@@ -59,12 +75,31 @@ fn now() -> u64 {
 }
 
 /// When process `pid` started, in unix seconds: boot time (/proc/stat's
-/// btime) plus its starttime field in clock ticks.
-fn process_start(pid: u32) -> Option<u64> {
-    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    let after = &stat[stat.rfind(')')? + 1..];
-    let ticks: u64 = after.split_whitespace().nth(19)?.parse().ok()?;
-    Some(boot_time()? + ticks / clock_ticks()?)
+/// btime) plus its starttime field in clock ticks; none when it is gone.
+fn process_start(pid: u32) -> Result<Option<u64>, String> {
+    let path = format!("/proc/{pid}/stat");
+    let stat = match std::fs::read_to_string(&path) {
+        Ok(stat) => stat,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("{path}: {e}")),
+    };
+    let ticks = start_ticks(&stat, &path)?;
+    let boot = boot_time().ok_or("/proc/stat has no readable btime line")?;
+    let per_second = clock_ticks().ok_or("`getconf CLK_TCK` gave no tick rate")?;
+    Ok(Some(boot + ticks / per_second))
+}
+
+/// The starttime field (the 22nd) of a /proc/<pid>/stat line at `path`.
+fn start_ticks(stat: &str, path: &str) -> Result<u64, String> {
+    stat.rfind(')')
+        .and_then(|end| {
+            stat[end + 1..]
+                .split_whitespace()
+                .nth(19)?
+                .parse::<u64>()
+                .ok()
+        })
+        .ok_or_else(|| format!("{path} reads `{}`, with no start time", stat.trim()))
 }
 
 fn boot_time() -> Option<u64> {
@@ -105,5 +140,22 @@ mod tests {
             }
             .live()
         );
+    }
+
+    #[test]
+    fn a_gone_pid_is_not_live_and_says_so_rather_than_failing() {
+        let gone = Owner::parse("pid 4194305 in /w since 1").expect("parsed");
+        assert_eq!(gone.liveness(), Ok(false));
+    }
+
+    #[test]
+    fn a_stat_line_without_a_start_time_is_refused_naming_it() {
+        let refusal = start_ticks("12 (sh) S 1", "/proc/12/stat").expect_err("short");
+        assert!(
+            refusal.contains("/proc/12/stat reads `12 (sh) S 1`"),
+            "{refusal}"
+        );
+        let full = format!("1 (a) {}77", "0 ".repeat(19));
+        assert_eq!(start_ticks(&full, "p"), Ok(77));
     }
 }

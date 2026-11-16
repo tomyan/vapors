@@ -1,13 +1,15 @@
 //! Moved slots shift their kept paint in place (IU3 3c-3e,
 //! `docs/plans/iu3.md`): at 3000 rows, an edit that resizes a row near
 //! the top paints only the boxes it built again and the boxes whose
-//! size changed; the rows that only moved are shifted. A scroll moves
+//! size changed; the rows after are lane frames, which their frames'
+//! shifts move with no box moved (`docs/plans/splice-layout.md`,
+//! section 11). A scroll moves
 //! no box: the rows are in the scroller's frame (IU4, `frames.rs`). A
 //! moved box whose shift is not exact (a fractional position) is
 //! painted again, never shifted on a guess. A debug build checks every
 //! shifted paint against a fresh one inside `update` (`kept_paint.rs`).
 
-mod support;
+use crate::support;
 
 use support::oracle::assert_matches_full;
 use support::rows_page::{RowsPage, rows_page, rows_viewport};
@@ -33,19 +35,25 @@ fn updated(page: &RowsPage) -> (usize, usize) {
 }
 
 #[test]
-fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_shifts_the_rows_after() {
-    // Given
+fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_moves_no_row_after() {
+    // Given: resized and back once, the first relayout making the
+    // body's lane and framing its rows, which paints every row once in
+    // its lane frame
     let page = rows_page(ROWS);
     page.rows_resizable();
+    for _ in 0..2 {
+        page.toggle_tall();
+        updated(&page);
+    }
 
     // When: the second row doubles in height
     page.toggle_tall();
     let work = updated(&page);
 
     // Then: the row's 7 boxes built again, and html and body, which
-    // grew; every row after the second shifted
-    let rows_after = ROWS - 2;
-    assert_eq!(work, (BOXES_PER_ROW + 2, rows_after * BOXES_PER_ROW));
+    // grew; no row after the second moved, so none is shifted
+    assert_eq!(work, (BOXES_PER_ROW + 2, 0));
+    assert_eq!(page.doc.borrow().update_counts().boxes_moved, 2);
     assert_matches_full(&page.doc, rows_viewport(), "3000 rows, tall row");
 }
 

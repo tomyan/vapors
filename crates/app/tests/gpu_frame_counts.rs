@@ -2,8 +2,7 @@
 //! frame wrote to the GPU and the draw calls it issued, by run kind:
 //! counted where the painter's pipelines issue them, with no readback.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,10 +14,15 @@ use vapors_elements::Document;
 use vapors_scene::{RgbaImage, Size};
 use vapors_text::AtlasConfig;
 
-/// One instance (8 four-float attributes) and the viewport uniform.
-const ONE_QUAD_BYTES: u64 = 8 * 16 + 16;
-/// One shadow instance (7 four-float attributes) and the viewport.
-const ONE_SHADOW_BYTES: u64 = 7 * 16 + 16;
+/// The view uniform written for a batch's first draw: the viewport and
+/// shift, then the 128 rows' offsets (`row_offsets.rs` in vapors-renderer).
+const VIEW_BYTES: u64 = 16 + 128 * 8;
+/// One instance (8 four-float attributes and its row index, padded to
+/// 16 bytes) and the view uniform.
+const ONE_QUAD_BYTES: u64 = 8 * 16 + 16 + VIEW_BYTES;
+/// One shadow instance (7 four-float attributes and its row index,
+/// padded) and the view uniform.
+const ONE_SHADOW_BYTES: u64 = 7 * 16 + 16 + VIEW_BYTES;
 /// The atlas page, one coverage byte per pixel, uploaded whole.
 const PAGE_BYTES: u64 = 1024 * 1024;
 /// The coverage bitmap of the default-size "c" in the test font, one

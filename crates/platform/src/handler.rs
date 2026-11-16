@@ -28,6 +28,8 @@ pub struct Handler {
     error: Option<PlatformError>,
     /// Set when the GPU watch stopped the loop; see `stop_if_gpu_failed`.
     stopped_for_gpu: bool,
+    /// Whether the app's `start` has run: frames are drawn only after it.
+    start_gate: crate::start_gate::StartGate,
     /// The page's text input, once the window is open (the web).
     #[cfg(target_family = "wasm")]
     text_bridge: Option<crate::text_bridge_web::TextBridge>,
@@ -58,6 +60,7 @@ impl Handler {
             missed: 0,
             error: None,
             stopped_for_gpu: false,
+            start_gate: crate::start_gate::StartGate::default(),
             #[cfg(target_family = "wasm")]
             text_bridge: None,
             #[cfg(target_family = "wasm")]
@@ -135,7 +138,10 @@ impl Handler {
         if self.stop_if_gpu_failed(event_loop) {
             return;
         }
-        let (Some(window), Some(gpu)) = (&self.window, self.gpu.as_mut()) else {
+        // no frame before the app's start (handler_gpu.rs)
+        let (true, Some(window), Some(gpu)) =
+            (self.start_gate.started(), &self.window, self.gpu.as_mut())
+        else {
             return;
         };
         let surface_texture = match acquire(window, gpu) {

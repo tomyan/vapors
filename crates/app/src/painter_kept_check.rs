@@ -2,6 +2,7 @@
 //! on every draw from kept bytes, the batch's bytes built afresh equal
 //! those kept.
 
+use vapors_renderer::{ClosedFormPipeline, MeshPipeline, QuadPipeline, ShadowPipeline};
 use vapors_scene::Run;
 
 /// Panics, naming batch `at`, the instance and the attribute (vertex,
@@ -29,11 +30,18 @@ pub(super) fn assert_kept(kept: &[u8], fresh: &[u8], (run, at): (&Run, usize)) {
 
 /// `run`'s kind, the bytes of one instance (a quad's six vertices for
 /// images, surfaces, glyphs and icon masks), and what the parts of one
-/// are and their bytes.
+/// are and their bytes. The instanced kinds' sizes are their pipelines'
+/// own, which the pipelines build their instances to.
 fn described(run: &Run) -> (&'static str, usize, (&'static str, usize)) {
     match run {
-        Run::Shadows(_) => ("shadows", 112, ("attribute", 16)),
-        Run::Quads(_) => ("quads", 128, ("attribute", 16)),
+        Run::Shadows(_) => ("shadows", ShadowPipeline::INSTANCE_BYTES, ("attribute", 16)),
+        Run::Quads(_) => ("quads", QuadPipeline::INSTANCE_BYTES, ("attribute", 16)),
+        Run::Shapes(_) => (
+            "shapes",
+            ClosedFormPipeline::INSTANCE_BYTES,
+            ("attribute", 16),
+        ),
+        Run::Meshes(_) => ("meshes", MeshPipeline::INSTANCE_BYTES, ("attribute", 16)),
         Run::Images(_) => ("images", 96, ("vertex", 16)),
         Run::Surfaces(_) => ("surfaces", 96, ("vertex", 16)),
         Run::Texts(_) => ("texts", 192, ("vertex", 32)),
@@ -43,6 +51,7 @@ fn described(run: &Run) -> (&'static str, usize, (&'static str, usize)) {
 
 #[cfg(test)]
 mod tests {
+    use vapors_renderer::QuadPipeline;
     use vapors_scene::{Color, Quad, Rect, Run};
 
     use super::assert_kept;
@@ -55,10 +64,17 @@ mod tests {
         Run::Quads(vec![quad, quad])
     }
 
+    fn quads_of(run: &Run) -> Vec<Quad> {
+        match run {
+            Run::Quads(quads) => quads.clone(),
+            other => unreachable!("a quads run, not {other:?}"),
+        }
+    }
+
     #[test]
     fn equal_bytes_pass() {
         // Given
-        let bytes = vec![7; 256];
+        let bytes = QuadPipeline::bytes(&quads_of(&quads()));
 
         // When / Then
         assert_kept(&bytes, &bytes, (&quads(), 3));
@@ -67,13 +83,14 @@ mod tests {
     #[test]
     #[should_panic(
         expected = "batch 3 (quads) drew kept bytes that differ from its bytes \
-                               built afresh at instance 1, attribute 2 (byte 160;"
+                               built afresh at instance 1, attribute 2 (byte 176;"
     )]
     fn the_first_differing_byte_is_named_by_instance_and_attribute() {
-        // Given: the second quad's third attribute differs
-        let kept = vec![7; 256];
+        // Given: the second quad's third attribute differs, in the bytes
+        // the quad pipeline builds
+        let kept = QuadPipeline::bytes(&quads_of(&quads()));
         let mut fresh = kept.clone();
-        fresh[160] = 8;
+        fresh[QuadPipeline::INSTANCE_BYTES + 32] ^= 1;
 
         // When
         assert_kept(&kept, &fresh, (&quads(), 3));
@@ -110,9 +127,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "at instance 2, attribute 0 (byte 256; 256 bytes kept, 384 afresh)")]
+    #[should_panic(expected = "at instance 2, attribute 0 (byte 288; 288 bytes kept, 432 afresh)")]
     fn bytes_of_another_length_are_named_where_the_shorter_ends() {
-        // When
-        assert_kept(&[7; 256], &[7; 384], (&quads(), 0));
+        // When: two quads kept, three built afresh
+        assert_kept(&[7; 288], &[7; 432], (&quads(), 0));
     }
 }

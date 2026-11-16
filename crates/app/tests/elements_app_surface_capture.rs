@@ -5,7 +5,7 @@
 //! stays with the HUD over a surface. A touch is captured by what it
 //! went down on without asking.
 
-mod surface_input_page;
+use crate::surface_input_page;
 
 use surface_input_page::{PANELS, Page};
 use vapors_platform::TouchPhase;

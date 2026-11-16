@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use vapors_platform::Waker;
 
-use crate::script::{Shared, frames_over};
+use crate::shared::{Shared, frames_over};
 
 /// From the wake to the time asked for: past the woken frame (llvmpipe
 /// draws this window in well under 50 ms) and past `REPLACE_AFTER`.

@@ -3,7 +3,7 @@
 //! property. A longhand no declaration reached is at its initial value,
 //! which lets a reader skip comparing it with the initial.
 
-mod support;
+use crate::support;
 
 use support::{chain, computed};
 use vapors_css::property::PropertyId;

@@ -1,0 +1,3 @@
+attempt 1 start 13:28:32 load 10.39 16.71 16.66
+attempt 1 end 13:35:39 exit 0 runs-ok 6
+RECORDED docs/perf/scene-run-f0-2026-11-14

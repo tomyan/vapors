@@ -83,9 +83,21 @@ fn a_repeated_only_is_refused_naming_it() {
 #[test]
 fn scaling_names_a_change_and_counts_still_come_before_or_after_it() {
     let o = full(&["60", "--scaling", "Insert", "10"]).expect("parsed");
-    assert!(matches!(o.scaling, Some(crate::rows::RowChange::Insert)));
+    assert!(matches!(
+        o.scaling.as_deref(),
+        Some([crate::rows::RowChange::Insert])
+    ));
     assert_eq!((o.settings.runs, o.settings.warmup), (60, 10));
     assert!(full(&[]).expect("parsed").scaling.is_none());
+}
+
+#[test]
+fn scaling_all_names_every_change_in_the_harness_order() {
+    let all = full(&["--scaling", "all"]).expect("parsed").scaling;
+    assert_eq!(
+        format!("{all:?}"),
+        format!("Some({:?})", crate::rows::RowChange::ALL)
+    );
 }
 
 #[test]

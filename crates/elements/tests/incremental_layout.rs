@@ -2,7 +2,7 @@
 //! last cache and layout, so an update lays out only what changed and
 //! its ancestors; and the result is what a fresh document lays out.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

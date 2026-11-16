@@ -3,7 +3,7 @@
 //! subset accepts that attribute and no other `data-*`, and a scoped
 //! rule reaches the icon.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_accepted, assert_refused, icon};
 use support::viewport;
@@ -38,7 +38,10 @@ fn an_icon_tagged_with_the_scope_attribute_is_accepted() {
 fn a_scoped_color_rule_reaches_the_icon() {
     // Given: a rule in the component's scope, none in the global sheet
     let (mut doc, _) = scoped_icon("");
-    doc.add_style(SCOPE, ".icon { color: rgb(255, 0, 0); }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        SCOPE,
+        ".icon { color: rgb(255, 0, 0); }",
+    ));
 
     // When
     let painted = doc.update(viewport(100.0, 100.0)).expect("updates");

@@ -4,7 +4,7 @@
 //! none), a `mixed` checked or pressed state, which the tree reads as
 //! none, and a focusable `separator` without `aria-valuenow`.
 
-mod support;
+use crate::support;
 
 use support::mirror::page_with;
 use vapors_elements::{AxError, Document};

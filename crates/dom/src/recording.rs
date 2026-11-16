@@ -68,8 +68,24 @@ pub enum Call {
     },
     /// `declare_events`: the names a component dispatches itself.
     DeclareEvents(Vec<String>),
+    /// The sink is not kept: a recording computes no styles.
+    WatchAppearance {
+        node: NodeId,
+    },
+    /// The source is not kept: a recording hit tests nothing.
+    WatchHits {
+        node: NodeId,
+        surface: String,
+    },
+    HitsMoved {
+        node: NodeId,
+    },
     AddStyle {
         scope: String,
+        css: String,
+    },
+    AddGlobalStyle {
+        sheet: String,
         css: String,
     },
 }

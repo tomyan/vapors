@@ -15,12 +15,16 @@ fn gpu_a_mesh_naming_geometry_from_another_meshes_is_refused_naming_the_node() {
         Vec3::new(0.0, 0.0, 5.0),
     );
     let foreign = Meshes::new()
-        .geometry(vec![Vec3::ZERO, Vec3::X, Vec3::Y], vec![0, 1, 2])
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![1.0; 3],
+        )
         .unwrap();
     let root = fixture.root();
     let colour = Colour::srgb(1.0, 0.0, 0.0).unwrap();
     let kind = NodeKind::Mesh {
-        geometry: foreign,
+        geometry: foreign.clone(),
         colour,
     };
     let node = fixture
@@ -49,7 +53,7 @@ fn gpu_a_scene_with_no_active_camera_is_refused_naming_the_fix() {
     let gpu = vapors_gpu_harness::gpu();
     let fixture = Fixture::new();
     let square = fixture.square(0.5);
-    fixture.mesh(fixture.root(), square, RED, Transform::IDENTITY);
+    fixture.mesh(fixture.root(), &square, RED, Transform::IDENTITY);
     let mut renderer = fixture.renderer(&gpu);
 
     // When

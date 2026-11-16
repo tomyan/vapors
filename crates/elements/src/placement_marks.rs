@@ -7,7 +7,8 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::placement::{Changes, NO_SLOT, Placement};
+use crate::layout::Written;
+use crate::placement::{Changes, LaidOut, NO_SLOT, Placement};
 use crate::placement_walk::Mark;
 
 /// The root's slot, the one slot placed in no slot.
@@ -46,9 +47,14 @@ impl Marked {
 
 impl Placement {
     /// Marks the slots `changes` names, and those up each one's chain.
-    pub(crate) fn mark(&mut self, changes: &Changes<'_>) -> Marked {
+    pub(crate) fn mark(&mut self, changes: &Changes<'_>, boxes: &LaidOut<'_>) -> Marked {
         let written = &changes.written;
-        let dirty = written.laid_out.iter().chain(&written.changed);
+        let started = self.started_unframed(written, boxes);
+        let dirty = written
+            .laid_out
+            .iter()
+            .chain(&written.changed)
+            .chain(&started);
         let mut marked = Marked::default();
         for &slot in dirty {
             self.mark_up(slot, Mark::Dirty, &mut marked);
@@ -60,6 +66,29 @@ impl Placement {
             self.mark_up(slot, Mark::Rebuilt, &mut marked);
         }
         marked
+    }
+
+    /// The children whose start may have changed in each lane that was
+    /// not framed: placed again, their starts added back. A framed
+    /// lane's are not; their frames' shifts carry the start, and a lane
+    /// whose framing changes places every child (`placement_frames.rs`).
+    /// A lane dropped later in the layout that noted it holds no child:
+    /// the container's children from `first` on, from its box, then.
+    fn started_unframed(&self, written: &Written, boxes: &LaidOut<'_>) -> Vec<usize> {
+        let unframed = |&&(container, _): &&(usize, usize)| {
+            !matches!(self.framing.get(&container), Some(Ok(())))
+        };
+        let children = |&(container, first): &(usize, usize)| {
+            let held = boxes.lanes.children_from(container, first);
+            let children = &boxes.boxes[container].children;
+            held.unwrap_or_else(|| children_after(children, (container, first)))
+        };
+        written
+            .started
+            .iter()
+            .filter(unframed)
+            .flat_map(children)
+            .collect()
     }
 
     /// Marks `slot` with `mark`, and the slots up its chain not yet
@@ -79,3 +108,23 @@ impl Placement {
         }
     }
 }
+
+/// The children of `container`, `children`, from `first` on, or a panic
+/// naming both when `first` is not one: a `started` entry names a child
+/// of its container in the layout that wrote it, and boxes do not change
+/// within a layout.
+fn children_after(children: &[usize], (container, first): (usize, usize)) -> Vec<usize> {
+    let at = children.iter().position(|&child| child == first);
+    let at = at.unwrap_or_else(|| {
+        panic!(
+            "a started entry names slot {first} under slot {container}, which is not one of \
+             its children (layout/lane_write.rs `write_laid`); reproduce with \
+             `cargo test -p vapors-elements`"
+        )
+    });
+    children[at..].to_vec()
+}
+
+#[cfg(test)]
+#[path = "placement_marks_tests.rs"]
+mod tests;

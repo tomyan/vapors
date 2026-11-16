@@ -62,8 +62,10 @@ mod ime_window;
 mod input;
 mod input_keys;
 mod key_event;
+mod least_squares;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
+mod navigate;
 pub mod page;
 mod paste_key;
 mod picker;
@@ -73,6 +75,8 @@ mod platform;
 mod redraw;
 mod report;
 mod shortcut_modifier;
+mod start;
+mod start_gate;
 mod surface;
 mod surface_texture;
 mod tasks;
@@ -83,6 +87,7 @@ mod text_keys;
 #[cfg(target_family = "wasm")]
 mod timer_web;
 mod uncaptured;
+mod velocity_tracker;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
@@ -104,10 +109,12 @@ pub use error::PlatformError;
 pub use event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 pub use file_kind::FileKind;
 pub use gestures::{Gestures, TAP_SLOP};
+pub use navigate::{Followed, NewContext};
 pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_startup, report_status};
 pub use shortcut_modifier::shortcut_is_command;
+pub use start::Start;
 pub use surface::pick_format;
 pub use text_field::TextField;
 #[cfg(target_family = "wasm")]

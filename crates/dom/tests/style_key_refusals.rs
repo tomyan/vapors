@@ -14,7 +14,9 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked", "wide"],
+    attributes: &[("title", "a row"), ("aria-hidden", "true")],
     style: Some("height: 24px"),
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static PLAIN: StyleKey = StyleKey {
@@ -23,7 +25,9 @@ static PLAIN: StyleKey = StyleKey {
     tag: "span",
     classes: &[],
     toggles: &[],
+    attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// The refusals recorded on `node`, read from the calls; they are
@@ -56,6 +60,8 @@ fn setting_an_attribute_the_key_fixes_is_refused_in_any_case_and_changes_nothing
         ("style", "write it there"),
         ("STYLE", "write it there"),
         (SCOPE_ATTRIBUTE, "write it there"),
+        ("title", "write `title={expr}` there"),
+        ("Aria-Hidden", "write `aria-hidden={expr}` there"),
     ] {
         // Given
         let (mut dom, div) = keyed(&ROW);
@@ -97,11 +103,12 @@ fn other_attributes_of_a_keyed_element_are_not_refused() {
 
     // When
     dom.set_attribute(div, "id", "first");
-    dom.set_attribute_if_changed(div, "title", "a row");
+    dom.set_attribute_if_changed(div, "hidden", "");
 
     // Then
     assert_eq!(refusals(&mut dom, div), Vec::<String>::new());
     assert_eq!(dom.attribute(div, "id").as_deref(), Some("first"));
+    assert_eq!(dom.attribute(div, "title").as_deref(), Some("a row"));
 }
 
 #[test]

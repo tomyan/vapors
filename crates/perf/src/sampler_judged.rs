@@ -26,19 +26,31 @@ pub struct JudgedFrame {
     pub counts: Counts,
 }
 
+/// A judged run: the app's start, before frame 0 and not judged, and
+/// its frames.
+#[derive(Debug)]
+pub struct JudgedRun {
+    /// `App::start`'s wall time, to the GPU's idle after it.
+    pub start_up: Duration,
+    /// Every frame, from the first.
+    pub frames: Vec<JudgedFrame>,
+}
+
 impl Sampler<'_> {
-    /// `frames` frames of `workload`, every one kept, then one more,
-    /// not kept, which reads back the last one's GPU time.
+    /// `workload`'s app started, then `frames` frames of it, every one
+    /// kept, then one more, not kept, which reads back the last one's
+    /// GPU time.
     ///
     /// # Errors
-    /// A frame the workload refused, a failed GPU wait, or a frame
-    /// without a GPU reading, naming it: a missing reading is never
-    /// counted as 0 or left out.
+    /// A start the app refused; a frame the workload refused, a frame
+    /// that built a pipeline or shader module, a failed GPU wait, or a
+    /// frame without a GPU reading, naming it: a missing reading is
+    /// never counted as 0 or left out.
     pub fn judged(
         &mut self,
         workload: &mut dyn Workload,
         frames: usize,
-    ) -> Result<Vec<JudgedFrame>, String> {
+    ) -> Result<JudgedRun, String> {
         let dispatch = tracing::Dispatch::new(self.clock.clone());
         tracing::dispatcher::with_default(&dispatch, || self.judged_frames(workload, frames))
     }
@@ -47,13 +59,15 @@ impl Sampler<'_> {
         &mut self,
         workload: &mut dyn Workload,
         frames: usize,
-    ) -> Result<Vec<JudgedFrame>, String> {
+    ) -> Result<JudgedRun, String> {
         if frames == 0 {
             return Err("a judged run of 0 frames judges nothing; give it at least one".into());
         }
         let texture = self.texture(workload.size());
+        let start_up = self.begin(workload, texture.format())?;
         let (mut kept, mut waiting) = (Vec::with_capacity(frames), None);
         for index in 0..=frames {
+            // `frame` refuses one that built a pipeline
             let measured = self.frame(workload, &texture, index, None)?;
             if let Some((before, counts)) = waiting.take() {
                 kept.push(judged(
@@ -67,7 +81,10 @@ impl Sampler<'_> {
                 waiting = Some((measured, workload.counts()));
             }
         }
-        Ok(kept)
+        Ok(JudgedRun {
+            start_up,
+            frames: kept,
+        })
     }
 }
 

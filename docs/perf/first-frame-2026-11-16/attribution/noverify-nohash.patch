@@ -1,0 +1,58 @@
+diff --git a/crates/elements/src/restyle_compiled.rs b/crates/elements/src/restyle_compiled.rs
+index 46647c1c..4dc0b9b4 100644
+--- a/crates/elements/src/restyle_compiled.rs
++++ b/crates/elements/src/restyle_compiled.rs
+@@ -54,10 +54,8 @@ impl Document {
+         let style = self.compute_from(node, &rules, viewport)?;
+         self.counts.winners_compiled += 1;
+         self.counts.winners_foreign += usize::from(foreign);
+-        let first = self.first_in_state(node, key);
+-        if first || self.compare_every_element {
+-            self.verify(node, key, &style, (viewport, first))?;
+-        }
++        // measurement only: no verification
++        let _ = (Self::first_in_state, Self::verify);
+         Ok(style)
+     }
+ 
+diff --git a/crates/elements/src/restyle_share.rs b/crates/elements/src/restyle_share.rs
+index 905056b7..5a0d8eb1 100644
+--- a/crates/elements/src/restyle_share.rs
++++ b/crates/elements/src/restyle_share.rs
+@@ -113,19 +113,13 @@ impl Document {
+         if let Some(decided) = kept.shared.shareable.get(&address) {
+             return Ok(*decided);
+         }
+-        let runtime = self.sheets.runtime_shareable(key);
++        // measurement only: the compiled answer, unchecked
+         let decided = match key.winners.compiled() {
+             Some(winners) => {
+                 let compiled = self.sheets.compiled_shareable(key, winners);
+-                let compiled = compiled.map_err(ElementError::Refused)?;
+-                if compiled != runtime {
+-                    let why = self.sheets.shareable_disagreement(key, winners, compiled);
+-                    self.refuse_key(key, &why);
+-                    return Err(ElementError::Refused(why));
+-                }
+-                compiled
++                compiled.map_err(ElementError::Refused)?
+             }
+-            None => runtime,
++            None => self.sheets.runtime_shareable(key),
+         };
+         let kept = self.kept.as_mut().expect("restyle sets it");
+         kept.shared.shareable.insert(address, decided);
+diff --git a/crates/elements/src/style/globals.rs b/crates/elements/src/style/globals.rs
+index 7cdc4aab..fcf99fac 100644
+--- a/crates/elements/src/style/globals.rs
++++ b/crates/elements/src/style/globals.rs
+@@ -67,7 +67,8 @@ impl Sheets {
+         let Some(claimed) = sheet.hash() else {
+             return true;
+         };
+-        if claimed == vapors_css::sheet_hash::sheet_hash(sheet.text()) {
++        // measurement only: no hash check
++        if claimed == claimed || claimed == vapors_css::sheet_hash::sheet_hash(sheet.text()) {
+             return true;
+         }
+         let message = format!(

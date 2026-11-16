@@ -18,6 +18,9 @@ pub enum RowChange {
     /// Alternating frames: a row inserted before the middle row, then
     /// that row removed. Starts with an insert, warmup frames counted.
     Insert,
+    /// `Insert` on the flex-column list (`rows_list.rs`): the column is
+    /// a flex lane (`docs/plans/splice-layout.md`, PR 3f).
+    FlexInsert,
     /// The second row's height, between one and two rows: its boxes
     /// are built again and every row after it moves (IU3 3c-3e).
     Resize,
@@ -32,13 +35,14 @@ pub enum RowChange {
 
 impl RowChange {
     /// Every change, in the order the harness lists them.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Idle,
         Self::Text,
         Self::FlexText,
         Self::Class,
         Self::HoveredClass,
         Self::Insert,
+        Self::FlexInsert,
         Self::Resize,
         Self::Scroll,
         Self::ScrollSize,
@@ -62,7 +66,7 @@ impl RowChange {
     #[must_use]
     pub fn frame_kinds(self) -> &'static [&'static str] {
         match self {
-            Self::Insert => &["insert", "remove"],
+            Self::Insert | Self::FlexInsert => &["insert", "remove"],
             Self::Resize => &["taller", "shorter"],
             Self::ScrollSize => &["longer label", "shorter label"],
             Self::Class | Self::HoveredClass => &["add", "remove"],

@@ -2,8 +2,28 @@
 
 use vapors_scene::Color as Rgba;
 
+use crate::property::PropertyId;
+use crate::property::longhands::{FILL, STROKE, STROKE_WIDTH};
 use crate::value::{Calc, CalcKind, Color, ColorScheme, Context, Length, LengthUnit, Value};
 use crate::{Error, Position, Result};
+
+/// Whether `id` keeps `currentcolor` as its computed value, as CSS
+/// Color 4 says every property does: SVG paint inherits the keyword,
+/// so a path takes its own `color`, not its svg's (Chromium). Other
+/// properties still resolve it at compute time (issue #301).
+pub(crate) fn keeps_current_color(id: PropertyId) -> bool {
+    id == FILL || id == STROKE
+}
+
+/// `value` of `id` in its computed form where the property says more
+/// than [`resolve`]: a `stroke-width` number is user units, which are
+/// px, so `1.5` computes to `1.5px`, as Chromium's does.
+pub(crate) fn computed_form(id: PropertyId, value: Value) -> Value {
+    match value {
+        Value::Number(n) if id == STROKE_WIDTH => Value::Length(Length::px(n)),
+        other => other,
+    }
+}
 
 /// Lengths to px (percentages kept), `calc()` evaluated where it can be,
 /// colours to sRGB.
@@ -48,7 +68,17 @@ fn resolve_all(
         .collect()
 }
 
+/// The calc's value; refused when it is not finite, which no computed
+/// value may be (a copy of one could not be checked against itself).
 fn evaluate(c: &Calc, ctx: &Context) -> Result<f64> {
-    c.evaluate(ctx)
-        .map_err(|e| Error::new(Position::default(), e.to_string()))
+    let value = c
+        .evaluate(ctx)
+        .map_err(|e| Error::new(Position::default(), e.to_string()))?;
+    if !value.is_finite() {
+        return Err(Error::new(
+            Position::default(),
+            format!("calc() evaluates to {value}, not a finite number"),
+        ));
+    }
+    Ok(value)
 }

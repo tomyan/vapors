@@ -3,7 +3,7 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use vapors_dom::{Dom, Handler, NodeId, PropertyValue, StyleKey};
+use vapors_dom::{CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
@@ -15,8 +15,13 @@ impl Dom for Document {
     }
 
     fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
-        self.arena
-            .insert(Node::new(Kind::Element(Element::keyed(key))))
+        let node = self
+            .arena
+            .insert(Node::new(Kind::Element(Element::keyed(key))));
+        if let Some(refusal) = self.sheets.keyed_refusal(key) {
+            self.refuse(node, format!("create_keyed_element: {refusal}"));
+        }
+        node
     }
 
     fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
@@ -44,9 +49,24 @@ impl Dom for Document {
 
     /// Every mount calls it; a sheet already added changes nothing. A
     /// new one restyles every element: which elements its rules reach
-    /// is not worked out.
-    fn add_style(&mut self, scope: &str, css: &str) {
-        if self.sheets.add_scoped(scope, css) {
+    /// is not worked out. One whose text does not hash as the compiler
+    /// said is refused (`Sheets::compiled_text`).
+    fn add_style(&mut self, sheet: CompiledSheet<'_>) {
+        if !self.sheets.compiled_text(sheet) {
+            return;
+        }
+        if self.sheets.add_scoped(sheet.name(), sheet.text()) {
+            self.note_change();
+            self.dirty.everything();
+        }
+    }
+
+    /// As [`Dom::add_style`], unscoped.
+    fn add_global_style(&mut self, sheet: CompiledSheet<'_>) {
+        if !self.sheets.compiled_text(sheet) {
+            return;
+        }
+        if self.sheets.add_global(sheet.name(), sheet.text()) {
             self.note_change();
             self.dirty.everything();
         }
@@ -114,11 +134,12 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_replaced(child);
         if let Some(old) = self.parent(child) {
+            self.boxes.note_removed(&self.arena, old, child);
             self.mark_moved_out(old, child, parent);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
-        self.boxes.marks.mark_children(parent);
+        self.boxes.note_inserted(parent, child);
         self.mark_children_changed(parent, child, true);
     }
 
@@ -133,9 +154,12 @@ impl Dom for Document {
         self.note_change();
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, node, false);
-            self.boxes.marks.mark_children(parent);
+            self.boxes.note_removed(&self.arena, parent, node);
         }
         self.drop_focus_within(node);
+        self.drop_sinks(node);
+        self.drop_scene_hits(node);
+        self.note_freed(node);
         self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
@@ -143,6 +167,18 @@ impl Dom for Document {
         self.committed
             .retain(|field, _| self.arena.contains(*field));
         self.editors.retain(|field, _| self.arena.contains(*field));
+    }
+
+    fn watch_appearance(&mut self, anchor: NodeId, sink: vapors_dom::AppearanceSink) {
+        self.watch(anchor, sink);
+    }
+
+    fn watch_hits(&mut self, anchor: NodeId, surface: &str, source: vapors_dom::HitSource) {
+        self.watch_scene_hits(anchor, surface, source);
+    }
+
+    fn hits_moved(&mut self, anchor: NodeId) {
+        self.scene_hits_moved(anchor);
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {
@@ -189,6 +225,9 @@ impl Document {
             .insert(name.to_owned(), value.to_owned());
         self.mark_changed(node);
         self.boxes.marks.mark(node);
+        if crate::a11y_mirror_index::INDEXED.contains(&name) {
+            self.ax.touch_indexed(node);
+        }
         // a text field's editor follows its `value` attribute until the
         // field is edited, as the DOM's value does (E6a); a number
         // field's shown text also follows `step`, `min` and `max`

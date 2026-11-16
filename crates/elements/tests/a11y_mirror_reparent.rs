@@ -5,7 +5,7 @@
 //! removed while its children stay, under its parent. Proven by the
 //! model mirror (`support::mirror::Model`).
 
-mod support;
+use crate::support;
 
 use support::element;
 use support::mirror::{labels, node_of, step, taken_model};

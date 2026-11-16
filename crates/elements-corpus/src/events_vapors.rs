@@ -52,6 +52,7 @@ type Shared = Rc<RefCell<Vec<(String, String)>>>;
 /// # Errors
 /// A refused update, a `capture` target that names no element, or an
 /// action not played here, each naming the script's line.
+#[allow(clippy::too_many_lines)] // the script played: listeners, captures, cancels, then its steps
 pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Log, String> {
     let doc = mounted(fixture, viewport)?;
     let heard = Shared::default();
@@ -120,9 +121,7 @@ fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>
     // the answers are Linux Chromium's: Control+A is select-all
     doc.borrow_mut()
         .set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
-    doc.borrow_mut()
-        .add_stylesheet(fixture.name, fixture.style)
-        .map_err(|e| format!("{}: {e:?}", fixture.name))?;
+    // the mount registers the fixture's sheet itself
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
     doc.borrow_mut()

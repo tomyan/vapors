@@ -7,8 +7,10 @@
 
 mod buckets;
 mod collect;
+mod compiled;
 mod compute;
 mod compute_resolve;
+mod compute_source;
 mod computed;
 mod conditions;
 mod declared;
@@ -20,17 +22,18 @@ mod media_eval;
 mod media_feature;
 mod media_items;
 mod media_range;
+mod presentation;
 mod restyle;
 mod share;
 mod supports;
 
-pub use computed::ComputedStyle;
-pub use environment::Environment;
-pub use inline::INLINE_SHEET;
-pub use restyle::RestyleScope;
-pub use share::{Unshareable, unshareable};
-
-pub(crate) use compute::resolve_for;
+pub use compiled::CompiledRules;
+pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, SVG_TAGS, declarations_of};
+pub use share::{Unshareable, rule_indices_for_key, unshareable};
+pub(crate) use {collect::rank, compute::initial, compute::resolve_for};
+pub use {computed::ComputedStyle, environment::Environment};
+pub(crate) use {font_weight::is_parent_relative, inline::INLINE_SPECIFICITY};
+pub use {inline::INLINE_SHEET, restyle::RestyleScope};
 
 use crate::Result;
 use crate::ast::{Keyframes, Rule, Stylesheet};
@@ -65,7 +68,9 @@ pub(crate) struct CascadeRule {
 /// Stylesheets by origin, ready to compute styles.
 pub struct Cascade {
     rules: Vec<CascadeRule>,
-    sheets: usize,
+    /// Where each sheet's rules start in `rules`, by the order sheets
+    /// were added: a rule found by its sheet and place at once.
+    sheet_starts: Vec<usize>,
     keyframes: Vec<Keyframes>,
     buckets: buckets::Buckets,
     /// Every attribute name a selector reads (`selector::attribute_names`).
@@ -86,7 +91,7 @@ impl Cascade {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
-            sheets: 0,
+            sheet_starts: Vec::new(),
             keyframes: Vec::new(),
             buckets: buckets::Buckets::default(),
             selected: std::collections::BTreeSet::new(),
@@ -107,6 +112,8 @@ impl Cascade {
     }
 
     fn add(mut self, origin: Origin, sheet: Stylesheet) -> Self {
+        let index = self.sheet_starts.len();
+        self.sheet_starts.push(self.rules.len());
         for rule in sheet.rules {
             let conditions =
                 Conditions::parse(&rule.conditions).expect("the parser accepted these conditions");
@@ -115,12 +122,11 @@ impl Cascade {
             self.rules.push(CascadeRule {
                 origin,
                 order: self.rules.len(),
-                sheet: self.sheets,
+                sheet: index,
                 rule,
                 conditions,
             });
         }
-        self.sheets += 1;
         self.keyframes.extend(sheet.keyframes);
         self
     }
@@ -141,6 +147,37 @@ impl Cascade {
     /// Every rule of every sheet, in cascade order.
     pub fn rules(&self) -> impl Iterator<Item = &Rule> {
         self.rules.iter().map(|r| &r.rule)
+    }
+
+    /// Rule `rule` of the sheet added `sheet`-th (the first `user_agent`
+    /// or `author` call is 0), as `Stylesheet::rules` held it: `add`
+    /// keeps every rule of a sheet, in order.
+    #[must_use]
+    pub fn sheet_rule(&self, sheet: usize, rule: usize) -> Option<&Rule> {
+        self.rule_index(sheet, rule)
+            .map(|index| &self.rules[index].rule)
+    }
+
+    /// The index among this cascade's rules of rule `rule` of the sheet
+    /// added `sheet`-th; `None` when there is no such rule.
+    #[must_use]
+    pub fn rule_index(&self, sheet: usize, rule: usize) -> Option<usize> {
+        let start = *self.sheet_starts.get(sheet)?;
+        let end = self
+            .sheet_starts
+            .get(sheet + 1)
+            .copied()
+            .unwrap_or(self.rules.len());
+        let index = start + rule;
+        (index < end).then_some(index)
+    }
+
+    /// The rule at `index` among this cascade's rules, with whether it
+    /// sits under `@media`, `@supports` or `@container` conditions.
+    #[must_use]
+    pub fn rule_at(&self, index: usize) -> Option<(&Rule, bool)> {
+        let rule = self.rules.get(index)?;
+        Some((&rule.rule, !rule.rule.conditions.is_empty()))
     }
 
     pub(crate) fn candidate_rules<E: Element>(
@@ -165,7 +202,12 @@ impl Cascade {
         env: &Environment,
     ) -> Result<ComputedStyle> {
         let inline = inline::declarations(element)?;
-        let winners = collect::winners(self.candidate_rules(element), element, env, &inline);
+        let presentation = presentation::declarations(element)?;
+        let attached = collect::Attached {
+            presentation: &presentation,
+            inline: &inline,
+        };
+        let winners = collect::winners(self.candidate_rules(element), element, env, attached);
         compute::style(&winners, parent, env)
     }
 

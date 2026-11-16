@@ -133,11 +133,20 @@ fn the_rule_reads_max_lines_and_the_two_lists_from_the_settings() {
         rule.generated.get("out.rs").map(String::as_str),
         Some("by build.rs")
     );
+}
+
+#[test]
+fn a_missing_max_lines_is_refused_naming_the_setting_and_the_fix() {
+    // Given
+    let config = Config::parse("[web]\npackage = \"x\"\n").expect("valid");
+
+    // When
+    let error = Rule::from_config(&config).expect_err("no default");
+
+    // Then
     assert_eq!(
-        Rule::from_config(&Config::parse("[web]\npackage = \"x\"\n").expect("valid"))
-            .expect("defaults")
-            .max_lines,
-        DEFAULT_MAX_LINES
+        error,
+        ".config/factory.toml: [files] max_lines is not set; fix: set it, with the measurement it comes from"
     );
 }
 

@@ -11,7 +11,10 @@
 //! layout is a cache hit. Otherwise the ancestors are cleared as before.
 //!
 //! Three states, never a guess: `Same` keeps the ancestors; `Differs`
-//! (the owner's size, margins or baselines changed, it bubbles an
+//! (the owner's size, margins, baselines or scrollable overflow
+//! changed: `Answer::is` compares the whole output, and a scroll
+//! container's kept range depends on the overflow, 4g,
+//! `tests/scroll_range_overflow.rs`; or it bubbles an
 //! out-of-flow box up to an ancestor, or it is styled otherwise than
 //! the box it replaced: its parent reads its style to work out what to
 //! ask) and `Unknown` (no old box, no input asked, a layout's input the

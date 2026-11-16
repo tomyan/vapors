@@ -12,10 +12,12 @@ use rustc_hash::FxHashMap;
 
 use vapors_dom::NodeId;
 
-use super::owners::{KeptChildren, Resolved, Resolver};
-pub(crate) use super::owners::{Owner, Rebuild};
+use super::child_edits::ChildEdits;
+pub(crate) use super::owners::{Build, Owner, Rebuild};
+use super::owners::{Resolved, Resolver};
 use super::slots::Placed;
 use crate::arena::Arena;
+use crate::edit_decline::EditDecline::MarkedInside;
 use crate::style::UsedMap;
 
 /// What changed since the last update: every box, the boxes of these
@@ -25,6 +27,9 @@ pub(crate) struct Marks {
     pub(crate) all: bool,
     nodes: HashSet<NodeId>,
     children: HashSet<NodeId>,
+    /// The inserts and removes behind the children marks, where the
+    /// document recorded them (`child_edits.rs`).
+    pub(super) edits: FxHashMap<NodeId, ChildEdits>,
 }
 
 impl Marks {
@@ -66,12 +71,13 @@ impl Marks {
             placed,
             root,
         };
-        let mut shallow = self.shallow(&resolver);
+        let (mut shallow, unowned) = self.shallow(&resolver);
+        self.unedit_marked(&resolver, &mut shallow);
         let Some(full) = self.full(&resolver, &shallow) else {
             return Rebuild::Every;
         };
         shallow.retain(|node, _| !full.contains(node));
-        Rebuild::Owners(resolver.outermost(&full, shallow))
+        Rebuild::Owners(resolver.outermost(&full, shallow), unowned)
     }
 
     /// The owners of the box marks, and of the children marks that are
@@ -80,7 +86,7 @@ impl Marks {
     fn full(
         &self,
         resolver: &Resolver<'_>,
-        shallow: &FxHashMap<NodeId, KeptChildren>,
+        shallow: &FxHashMap<NodeId, Build>,
     ) -> Option<HashSet<NodeId>> {
         let deep = self
             .children
@@ -98,13 +104,30 @@ impl Marks {
         Some(full)
     }
 
-    /// The children-marked elements that hold a slot and make a box,
-    /// with their kept children.
-    fn shallow(&self, resolver: &Resolver<'_>) -> FxHashMap<NodeId, KeptChildren> {
-        let shallow = |&node: &NodeId| Some((node, resolver.kept_children(node)?));
-        self.children.iter().filter_map(shallow).collect()
+    /// Each edited owner a mark reaches outside the children its edit
+    /// builds, built shallow instead: the edit keeps every other box,
+    /// so it would keep the marked one as it was (review of #285, H1).
+    fn unedit_marked(&self, resolver: &Resolver<'_>, shallow: &mut FxHashMap<NodeId, Build>) {
+        for &node in self.nodes.iter().chain(&self.children) {
+            let Resolved::Element(owner) = resolver.owner(node) else {
+                continue;
+            };
+            let Some(Build::Edited(edits)) = shallow.get(&owner) else {
+                continue;
+            };
+            if owner == node || edits.covers(resolver.arena, node, owner) {
+                continue;
+            }
+            match resolver.kept_children(owner) {
+                Some(kept) => _ = shallow.insert(owner, Build::Shallow(kept, Some(MarkedInside))),
+                None => _ = shallow.remove(&owner),
+            }
+        }
     }
 }
+
+#[path = "marks_build.rs"]
+mod build;
 
 #[cfg(test)]
 #[path = "marks_tests.rs"]

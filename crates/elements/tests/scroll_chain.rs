@@ -3,7 +3,7 @@
 //! next one out; and which boxes move with it, by their containing
 //! blocks, as S8's clips follow them.
 
-mod support;
+use crate::support;
 
 use support::{document, element};
 use vapors_dom::NodeId;

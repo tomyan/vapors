@@ -45,3 +45,65 @@ fn rows_compute_one_style_and_one_used_style_per_share_key_at_any_count() {
         assert_eq!(counts.used_shared, rows * 4 - 4, "{rows} rows");
     }
 }
+
+#[test]
+fn every_compiled_row_element_has_winners_whose_sheets_are_registered_and_hash_alike() {
+    // Given
+    let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+    let body = doc.borrow().body();
+    let _rows = MountRows::mount(
+        &doc,
+        body,
+        MountRowsProps {
+            rows: Signal::new(row_data(2)),
+        },
+    );
+    let doc = doc.borrow();
+
+    // When: every element under the body
+    let mut pending = doc.children(body);
+    let mut checked = 0;
+    while let Some(node) = pending.pop() {
+        pending.extend(doc.children(node));
+        let Some(key) = vapors_dom::Dom::style_key(&*doc, node) else {
+            continue;
+        };
+
+        // Then
+        let winners = key.winners.compiled();
+        let winners = winners.unwrap_or_else(|| panic!("{} has no compiled winners", key.site));
+        for &(sheet, _) in winners.sheets {
+            let held = doc.sheet_hash(sheet);
+            assert!(
+                matches!(held, vapors_elements::SheetHash::Registered(_)),
+                "{}: {sheet:?} is {held:?}, not in the cascade",
+                key.site
+            );
+        }
+        doc.check_compiled_sheets(key)
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        checked += 1;
+    }
+    assert_eq!(checked, 8, "two rows of a div, two spans and a button");
+}
+
+#[test]
+fn every_keyed_row_element_takes_its_style_from_compiled_winners_at_any_count() {
+    // When
+    for rows in [300, 3000] {
+        let counts = first_update(rows);
+
+        // Then: one computed style per share key, each from compiled
+        // winners; none by the full cascade
+        assert!(counts.styles_computed > 0, "{rows} rows: {counts:?}");
+        assert_eq!(
+            counts.winners_compiled, counts.styles_computed,
+            "{rows} rows: {counts:?}"
+        );
+        assert_eq!(
+            counts.winners_runtime + counts.winners_component_tag,
+            0,
+            "{rows} rows"
+        );
+    }
+}

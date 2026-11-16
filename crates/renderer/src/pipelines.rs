@@ -4,7 +4,14 @@
 //! largest cost (docs/perf/scene-run-2026-11-13.md: about 76 ms of
 //! pipeline compiles with Mesa's shader cache empty), so every one is
 //! built before the first frame. `clippy.toml` refuses wgpu's own
-//! constructors anywhere else.
+//! constructors anywhere else in this workspace; touche's workspace has
+//! no such ban yet (its engine builds compute pipelines directly), so
+//! its pin bump adds the same entries and a counted compute door.
+//!
+//! The counts are process-wide: a pipeline built on another thread is
+//! counted in whichever frame the reader is measuring, and pipelines
+//! wgpu builds for itself (at device creation, for example) are never
+//! counted. A count of none means none through this door.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -54,11 +61,20 @@ pub fn shader_module(
 
 impl Built {
     /// What was built between `before` and `self`.
+    ///
+    /// # Panics
+    /// When `before` is later than `self`: the arguments are swapped.
     #[must_use]
     pub fn since(self, before: Built) -> Built {
+        let later = |now: u64, then: u64| {
+            now.checked_sub(then).expect(
+                "Built::since: `before` is later than `self`; the counts only grow, so call \
+                 later.since(earlier)",
+            )
+        };
         Built {
-            pipelines: self.pipelines - before.pipelines,
-            shader_modules: self.shader_modules - before.shader_modules,
+            pipelines: later(self.pipelines, before.pipelines),
+            shader_modules: later(self.shader_modules, before.shader_modules),
         }
     }
 
@@ -68,3 +84,7 @@ impl Built {
         self == Built::default()
     }
 }
+
+#[cfg(test)]
+#[path = "pipelines_tests.rs"]
+mod tests;

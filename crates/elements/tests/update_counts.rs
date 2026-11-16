@@ -3,7 +3,7 @@
 //! nothing changed, and 0 when an earlier refusal stops the update
 //! before its phase runs.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, text, viewport};
 use vapors_dom::Dom;

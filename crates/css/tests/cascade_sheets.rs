@@ -1,7 +1,7 @@
 //! Which sheet each winning declaration came from (`ComputedStyle::
 //! declared_in`), so a caller can name the sheet, line and column.
 
-mod support;
+use crate::support;
 
 #[test]
 fn the_winning_declaration_names_its_sheet_by_the_order_sheets_were_added() {

@@ -5,7 +5,11 @@ use crate::{Colour, Meshes, NodeKind, Vec3};
 /// A mesh node's kind: one triangle in grey.
 pub(crate) fn mesh() -> NodeKind {
     let geometry = Meshes::new()
-        .geometry(vec![Vec3::ZERO, Vec3::X, Vec3::Y], vec![0, 1, 2])
+        .geometry(
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+            vec![0, 1, 2],
+            vec![1.0; 3],
+        )
         .expect("a triangle is valid");
     NodeKind::Mesh {
         geometry,

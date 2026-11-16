@@ -5,8 +5,6 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::scene_judge::REPRODUCE;
-
 /// The cache as the run found it.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ShaderCache {
@@ -46,11 +44,11 @@ pub fn shader_cache(var: impl Fn(&str) -> Option<String>) -> Result<ShaderCache,
         return Ok(ShaderCache::Disabled);
     }
     let Some(dir) = var("MESA_SHADER_CACHE_DIR") else {
-        return Err(format!(
+        return Err(String::from(
             "Mesa's shader cache is its default one, whose state frame 0 depends on; set \
              MESA_SHADER_CACHE_DIR to a new empty directory for a cold run (or one a run has \
-             filled, for a warm run), or MESA_SHADER_CACHE_DISABLE=true: \
-             MESA_SHADER_CACHE_DIR=$(mktemp -d) {REPRODUCE}"
+             filled, for a warm run), or MESA_SHADER_CACHE_DISABLE=true, such as \
+             MESA_SHADER_CACHE_DIR=$(mktemp -d) before the command",
         ));
     };
     let path = PathBuf::from(dir);

@@ -4,7 +4,7 @@
 //! (`ComputedStyle::declared`), so an element with no declarations is
 //! checked without reading its values.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 

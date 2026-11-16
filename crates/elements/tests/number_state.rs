@@ -4,7 +4,7 @@
 //! number when the text is none; fractional steps, by key and by
 //! scrub, written in decimal.
 
-mod support;
+use crate::support;
 
 use support::number_page::{click, key, page, page_with, type_text, value};
 use vapors_dom::Dom;

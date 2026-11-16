@@ -73,18 +73,19 @@ increment per unit:
 with nothing changed and at 0 behind an earlier refusal (an unparsed
 style attribute, a refused tag, a calc that fails at layout).
 `sparse_updates.rs` asserts them per edit at 100 and 1000 rows
-(`EXPECTED_WALKS`). Counts on this machine (2026-11-12):
+(`EXPECTED_WALKS`). Counts on this machine (2026-11-12; the resizing
+label's layout calls 2026-11-13, when the block lane landed):
 
 | Edit | rows | elements visited | boxes built | layout calls | boxes painted | scene items |
 |---|---|---|---|---|---|---|
 | same-size value | 100 | 1 | 2 | 3 | 2 | 1 |
-| resizing label | 100 | 1 | 2 | 112 | 6 | 4 |
+| resizing label | 100 | 1 | 2 | 13 | 6 | 4 |
 | equal write | 100 | 0 | 0 | 1 | 0 | 0 |
 | hover | 100 | 4 | 2 | 1 | 2 | 2 |
 | focus | 100 | 1 | 2 | 1 | 2 | 3 |
 | class toggled | 100 | 4 | 7 | 1 | 7 | 5 |
 | same-size value | 1000 | 1 | 2 | 3 | 2 | 1 |
-| resizing label | 1000 | 1 | 2 | 1012 | 6 | 4 |
+| resizing label | 1000 | 1 | 2 | 13 | 6 | 4 |
 | equal write | 1000 | 0 | 0 | 1 | 0 | 0 |
 | hover | 1000 | 4 | 2 | 1 | 2 | 2 |
 | focus | 1000 | 1 | 2 | 1 | 2 | 3 |
@@ -100,8 +101,11 @@ padding loop does too; none of these is counted. A later counter may
 cover them if IU3 needs it. An edit inside one row that keeps the
 row's size makes 3 layout calls at any row count: the edited row is laid
 out in isolation (M10, `layout/isolated.rs`) and its ancestors keep their
-caches. An edit that resizes the row makes rows + 12 calls, the body
-asking each row for its layout again. A flex or grid parent asks a row for its size before laying
+caches. An edit that resizes the row made rows + 12 calls, the body
+asking each row for its layout again, until the block lane (`layout/
+lane_layout.rs`, `docs/plans/splice-layout.md`): since 2026-11-13 the
+body's lane asks the resized row only, 13 calls at any row count. A
+flex or grid parent asks a row for its size before laying
 it out, and a block row with a vertical margin answers with the margin,
 which Taffy's cache keeps no entry for; before M10c that owner was
 `uncompared` and the column laid out again (3 calls per row). Since M10c

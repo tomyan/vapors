@@ -136,7 +136,8 @@ fn attribute_refusals(
 }
 
 /// Each element's `style` attribute that does not parse, naming the
-/// element and the line and column in the attribute. A tree with one
+/// element and the line and column in the attribute, and each svg or
+/// path presentation attribute the cascade would refuse. A tree with one
 /// cannot be styled, so the update stops at these.
 pub(crate) fn style_attribute_refusals(arena: &Arena, root: NodeId) -> Vec<ElementError> {
     elements(arena, root)
@@ -145,17 +146,34 @@ pub(crate) fn style_attribute_refusals(arena: &Arena, root: NodeId) -> Vec<Eleme
         .collect()
 }
 
-/// The refusal for `node`'s `style` attribute, when it does not parse.
+/// The refusal for `node`'s `style` attribute, when it does not parse,
+/// or for a presentation attribute of an svg or path the cascade would
+/// refuse (S4a), naming the element and, for a keyed one, its template
+/// site, where the build refuses it first.
 pub(crate) fn style_attribute_refusal(arena: &Arena, node: NodeId) -> Option<ElementError> {
     let element = arena.get(node, "style_attribute_refusals").element()?;
-    let error = vapors_css::parse_inline(element.attributes.get("style")?).err()?;
+    let reason = style_reason(element).or_else(|| presentation_reason(element))?;
     Some(ElementError::UnsupportedAttribute(format!(
-        "{}: its style attribute {}:{}: {}",
-        describe(arena, node),
-        error.position.line,
-        error.position.column,
-        error.message
+        "{}: {reason}",
+        describe(arena, node)
     )))
+}
+
+fn style_reason(element: &crate::node::Element) -> Option<String> {
+    let error = vapors_css::parse_inline(element.attributes.get("style")?).err()?;
+    Some(format!(
+        "its style attribute {}:{}: {}",
+        error.position.line, error.position.column, error.message
+    ))
+}
+
+fn presentation_reason(element: &crate::node::Element) -> Option<String> {
+    let attribute = |name: &str| element.attributes.get(name).map(String::as_str);
+    let error = vapors_css::cascade::declarations_of(&element.tag, attribute).err()?;
+    let site = element.key.map_or(String::new(), |key| {
+        format!(" (its template at {})", key.site)
+    });
+    Some(format!("{}{site}", error.message))
 }
 
 /// The element as errors name it: `<div class="panel">`; a text node

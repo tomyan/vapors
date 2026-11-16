@@ -17,7 +17,7 @@ use crate::a11y_roles::Ids;
 use crate::document::Document;
 
 /// Roles whose name is their content.
-const NAMED_BY_CONTENT: [&str; 3] = ["option", "button", "checkbox"];
+const NAMED_BY_CONTENT: [&str; 4] = ["option", "button", "checkbox", "link"];
 
 impl Document {
     /// `node`'s accessible name, empty for none.

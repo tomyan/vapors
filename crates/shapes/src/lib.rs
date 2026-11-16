@@ -5,13 +5,47 @@
 //! element tree refuses what it does not, so a path that passes the
 //! check rasterises. No GPU and no text dependency.
 
+mod basic_shape;
+mod basic_shape_read;
+mod canonical;
+mod classify;
+mod classify_near;
+mod classify_round;
+mod css_number;
 mod geometry;
+mod geometry_box;
+mod mesh;
+mod mesh_check;
+mod mesh_edges;
+mod mesh_normals;
+mod mesh_slivers;
+mod mesh_wedge;
 mod path;
 mod path_lex;
+mod path_verb;
+mod runtime_shape;
+mod segment;
+mod shape_cache;
 mod shape_id;
 mod table;
 mod table_error;
+mod tessellate;
+mod tessellate_path;
 
-pub use geometry::{Geometry, MeshVertex, check_geometry};
+pub use basic_shape::{
+    Outline, PAINT_ATTRIBUTES, allowed, geometry_names, not_taken, outline, refusal,
+};
+pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
+pub use classify::{Classified, classify};
+pub use css_number::css_number;
+pub use geometry::{Geometry, MIN_RADIUS, check_geometry, fitted_radii};
+pub use geometry_box::transformed_box;
+pub use mesh::{CONVEX, INSIDE, MeshCorner, MeshTriangle, REFLEX};
+pub use mesh_check::check_mesh;
+pub use mesh_edges::mesh_triangles;
 pub use path::{IconPath, PathError};
+pub use runtime_shape::{RuntimeShape, TOLERANCE_PX};
+pub use segment::{Pen, Segment, non_finite, to_zeno};
+pub use shape_cache::{CacheRef, MAX_PX_PER_UNIT, ShapeCache, SlotChange};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};
+pub use tessellate::{Mesh, tessellate};

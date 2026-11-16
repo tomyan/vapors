@@ -22,7 +22,7 @@ pub(crate) struct PaintedFrom {
     /// Each slot's border box, scroll offsets applied, and what placing
     /// it again needs (`placement.rs`).
     pub(crate) placement: Placement,
-    pub(crate) thumbs_shown: bool,
+    pub(crate) thumb_alpha: u8,
     /// Device pixels per CSS pixel. A scale change builds every box,
     /// but with no box (html `display: none`) none is built.
     pub(crate) scale: f32,
@@ -31,11 +31,14 @@ pub(crate) struct PaintedFrom {
 impl PaintedFrom {
     /// Whether paint made from `self` shows what a paint made from `now`
     /// would, after an update that changed the `changed` slots: some
-    /// kept, none built or moved, no scroll offset moved, and the same
-    /// thumbs and scale.
+    /// kept, none built or moved, no scroll offset or framed row's start
+    /// moved (keeping skips the lane bases, `paint_frames.rs`), and the
+    /// same thumbs and scale.
     pub(crate) fn shows(&self, now: &Self, changed: &ChangedSlots) -> bool {
-        let same = (self.thumbs_shown, self.scale) == (now.thumbs_shown, now.scale);
+        let same = (self.thumb_alpha, self.scale) == (now.thumb_alpha, now.scale);
         let unmoved = changed.moved.is_empty() && changed.offsets_moved.is_empty();
+        let unmoved = unmoved && changed.started.is_empty();
+        let unmoved = unmoved && changed.scroll_states.is_empty();
         same && !changed.every && changed.built() == 0 && unmoved
     }
 }
@@ -56,6 +59,7 @@ pub(crate) fn keep(
         crate::kept_paint_check::assert_same(&kept, &fresh);
     }
     kept.hits_changed = crate::kept_hits::HitsChanged::Known(Vec::new());
+    kept.frames_worked = 0;
     kept
 }
 
@@ -85,3 +89,7 @@ fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> 
     *input.cache = cache;
     painted
 }
+
+#[cfg(test)]
+#[path = "kept_paint_tests.rs"]
+mod tests;

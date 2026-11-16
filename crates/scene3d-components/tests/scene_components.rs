@@ -146,3 +146,17 @@ fn unmounting_the_page_removes_every_node_but_the_root() {
     // Then
     assert_eq!(rig.scene.borrow().len(), 1);
 }
+
+#[test]
+fn a_page_dropped_after_its_app_removes_its_nodes_without_a_refusal() {
+    // Given
+    let rig = Rig::new();
+    let (page, app, scene) = (rig.page, rig.app, rig.scene);
+
+    // When: the app, and with it the event loop, goes first
+    drop(app);
+    drop(page);
+
+    // Then: the page's nodes are gone, the root alone left
+    assert_eq!(scene.borrow().len(), 1);
+}

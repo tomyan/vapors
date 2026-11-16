@@ -84,7 +84,7 @@ touché slices 4 and 5 ship here.
 
 | Slice | Depends on | touché ships |
 |---|---|---|
-| F2d `br`, `a`, mixed inline metrics, `tnum` and variation settings | | Chat text with inline code; readouts that do not jitter |
+| F2d touch momentum (fling) for scrolling, held to Pixel recordings (docs/plans/touch-momentum.md); `br`, `a`, mixed inline metrics, `tnum` and variation settings | | Lists that coast after a flick as Chrome's do; chat text with inline code; readouts that do not jitter |
 | 3-E6 text editing, 3-E7 web IME (Q9) | 3-E2 | The Composer in vapors on both targets |
 | 1-R4 `await` in script and template, 1-R5 `<boundary>` | 1-R3 | The timeline's first load with pending content; failed decodes shown in place |
 | 5-A3 web a11y mirror (Q8), 5-A5 live regions | 5-A1 | TalkBack on the Pixel; the reply read as it streams |

@@ -11,31 +11,43 @@
 //! code hands it closures that build a branch or a row, and it decides
 //! what to create, move, update or remove.
 
+mod appearance;
 pub mod blocks;
 mod class_names;
+mod compiled_sheet;
 mod dispatcher;
 mod event;
 mod event_key;
 mod event_pointer;
+mod key_winners;
 mod listener;
 mod listener_result;
 mod modifiers;
 pub mod recording;
 mod roots;
+mod scene_hits;
 mod snippet;
 mod style_key;
 mod style_key_refusals;
 
+pub use appearance::{Appearance, AppearanceSink};
 pub use class_names::class_names;
+pub use compiled_sheet::CompiledSheet;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
 pub use event_pointer::{Capture, Pointer};
+pub use key_winners::{
+    BaseWinner, DeclarationRef, KeyWinners, PropertyRef, RuleRef, SheetRef, Winners,
+};
 pub use listener::{Handler, Listener};
 pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
 pub use modifiers::Modifiers;
 pub use roots::{BlockNodes, Root, current_nodes};
+pub use scene_hits::{HitAsk, HitSource};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
 pub use style_key::{MAX_TOGGLES, StyleKey};
+pub use style_key_refusals::PRESENTATION as PRESENTATION_ATTRIBUTES;
+pub use style_key_refusals::SVG_TAGS;
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
@@ -114,15 +126,40 @@ pub trait Dom: Listeners {
     fn remove(&mut self, node: NodeId);
     /// Calls `handler` for each `event` (such as `click`) on the node.
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler);
-    /// Adds a component's `<style>` under `scope`, the value its
-    /// elements carry in [`SCOPE_ATTRIBUTE`]: its rules match
-    /// only those elements. Each mount calls it; a scope already added
-    /// is not added again.
-    fn add_style(&mut self, scope: &str, css: &str);
+    /// Adds a component's `<style>` (`sheet`, which only generated code
+    /// makes) under its scope, the value its elements carry in
+    /// [`SCOPE_ATTRIBUTE`]: its rules match only those elements. Each
+    /// mount calls it; a scope already added is not added again.
+    fn add_style(&mut self, sheet: CompiledSheet<'_>);
+    /// Adds a `Styles::Global` component's `<style>` as an author sheet
+    /// named `sheet` (the component's crate and file), unscoped: its
+    /// rules may match any element. Each mount calls it; a sheet already
+    /// added is not added again. It stays after its component unmounts
+    /// and still styles every element it matches, as Svelte's `:global`
+    /// styles do; `compile_dir_global` is for the layout corpus alone,
+    /// which mounts one fixture per document.
+    fn add_global_style(&mut self, sheet: CompiledSheet<'_>);
     /// Names events a component dispatches itself ([`Dispatcher`]), so a
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.
     fn declare_events(&mut self, names: &[&str]);
+    /// Calls `sink` with the appearance of `anchor`, a 3D scene
+    /// component's `mesh` anchor: at the first update after the watch
+    /// and at each update that changes it, until `anchor` leaves the
+    /// tree ([`AppearanceSink`]). A sink's error refuses that update, and
+    /// the next update reports the appearance again. Refused on any node
+    /// but a `mesh`, and on a mesh already watched.
+    fn watch_appearance(&mut self, anchor: NodeId, sink: AppearanceSink);
+    /// Asks `source` for the anchor under the pointer whenever a hit
+    /// test lands on the `gpu-surface` named `surface`, until `anchor`,
+    /// a 3D scene component's `scene` anchor, leaves the tree
+    /// ([`HitSource`]). Refused on any node but a `scene`, on a scene
+    /// already watched, and for a surface another scene is watched on.
+    fn watch_hits(&mut self, anchor: NodeId, surface: &str, source: HitSource);
+    /// Says what `anchor`'s scene draws under its surface may have
+    /// changed (a node moved, hid or changed geometry), so the next update
+    /// tests the hover again when the pointer is over that surface.
+    fn hits_moved(&mut self, anchor: NodeId);
     /// A text node's text; `None` for an element. The `_if_changed`
     /// setters read this: `None` means absent or the wrong kind, and
     /// they then call the plain setter, which refuses the wrong kind

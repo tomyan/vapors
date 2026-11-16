@@ -33,7 +33,10 @@ const SUPPORTED: &[&str] = &[
     "gpu-surface",
     "svg",
     "path",
+    "rect",
+    "circle",
     "span",
+    "a",
     "b",
     "strong",
     "code",
@@ -46,22 +49,20 @@ const SUPPORTED: &[&str] = &[
     "var",
 ];
 
-/// The anchors of the 3D scene components (vapors-scene3d-components,
-/// docs/plans/css-for-3d.md C1): styled by the cascade, `display: none`
-/// from the user-agent sheet, and drawn by their surface, never laid
-/// out. Not offered in the refusal's list: only the components make
-/// them. `decal` has no component yet: `<Decal>` arrives in
-/// docs/plans/one-scene.md S8.
-const SCENE_ANCHORS: &[&str] = &["scene", "group", "mesh", "camera", "decal"];
-
-/// Whether `tag` is a scene component's anchor.
+/// Whether `tag` is a 3D scene component's anchor
+/// (vapors-scene3d-components, docs/plans/css-for-3d.md C1): one of
+/// vapors-css's `SceneTag`s, the one list of them. Styled by the
+/// cascade, `display: none` from the user-agent sheet, drawn by its
+/// surface and never laid out. Not offered in the refusal's list: only
+/// the components make them. `decal` has no component yet: `<Decal>`
+/// arrives in docs/plans/one-scene.md S8.
 pub(crate) fn is_scene_anchor(tag: &str) -> bool {
-    SCENE_ANCHORS.contains(&tag)
+    vapors_css::property::scene::SceneTag::from_tag(tag).is_some()
 }
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2d, the first item after F2c", &["br", "a"]),
+    ("F2d, the first item after F2c", &["br"]),
     ("F3", &["canvas"]),
     (
         "F4",
@@ -130,6 +131,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_tree_implements_every_svg_element_the_cascade_paints() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        for tag in vapors_css::cascade::SVG_TAGS {
+            assert_eq!(unsupported(tag), None, "{tag}");
+        }
+    }
+
+    #[test]
     fn a_block_container_is_supported() {
         // Given
         let tag = "section";
@@ -170,13 +179,11 @@ mod tests {
     }
 
     #[test]
-    fn line_breaks_and_links_are_refused_naming_f2d() {
-        for tag in ["br", "a"] {
-            // When
-            let refusal = unsupported(tag).expect("refused until F2d");
+    fn line_breaks_are_refused_naming_f2d() {
+        // When
+        let refusal = unsupported("br").expect("refused until F2d");
 
-            // Then
-            assert!(refusal.contains("F2d"), "{refusal}");
-        }
+        // Then
+        assert!(refusal.contains("F2d"), "{refusal}");
     }
 }

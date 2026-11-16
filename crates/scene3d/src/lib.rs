@@ -25,18 +25,24 @@
 //! descendants, and returns them. The root names the active camera by
 //! [`CameraHandle`].
 //!
-//! A mesh node names its triangles by [`GeometryId`], issued by a
+//! A mesh node names its triangles by a [`GeometryHandle`], issued by a
 //! [`Meshes`] that validates them and holds them for each scene
-//! renderer (`vapors-scene3d-gpu`) to upload once.
+//! renderer (`vapors-scene3d-gpu`) to upload once, while any handle to
+//! them lives (the application's, or a mesh node's).
 
 mod appearance;
 mod camera;
+mod camera_error;
 mod colour;
 mod error;
+mod geometry_handle;
 mod handle;
 mod mesh_error;
 mod meshes;
 mod node;
+mod pick;
+mod pick_error;
+mod pick_ray;
 mod projection;
 mod store;
 mod store_error;
@@ -47,13 +53,17 @@ mod world;
 #[cfg(test)]
 mod test_support;
 
+pub use camera_error::CameraError;
 pub use colour::Colour;
 pub use error::SceneError;
+pub use geometry_handle::GeometryHandle;
 pub use glam::{Mat4, Quat, Vec3};
 pub use handle::{CameraHandle, NodeId};
-pub use mesh_error::MeshError;
+pub use mesh_error::{MeshError, VERTEX_BYTES};
 pub use meshes::{Geometry, GeometryId, Meshes};
 pub use node::NodeKind;
+pub use pick::{PickAt, pick};
+pub use pick_error::PickError;
 pub use projection::{Projection, project, view_projection};
 pub use store::Scene;
 pub use store_error::StoreError;
