@@ -169,6 +169,7 @@ pub(crate) fn lay_out(
                 boxes,
                 slots: placed.slots,
                 lanes: placed.lanes,
+                scanned: placed.scanned,
             },
             work,
         )),

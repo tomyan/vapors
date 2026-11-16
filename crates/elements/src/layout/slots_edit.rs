@@ -37,9 +37,14 @@ impl Placed {
     ) -> (Vec<usize>, Vec<usize>) {
         let key = Key::Element(owner);
         let slot = self.slot_for(key, taken);
-        let mut children = old_children(taken, slot);
+        let boxed = !edits.removed.is_empty() || !edits.inserted.is_empty();
+        let mut children = old_children(taken, slot, boxed);
+        if boxed {
+            let reshaped = self.reshaped_by(source, (slot, &children, edits), taken);
+            taken.reshaped.insert(slot, reshaped);
+        }
         for &removed in &edits.removed {
-            let at = position(&children, removed);
+            let at = self.child_position(slot, &children, removed);
             children.remove(at);
             self.lanes
                 .borrow_mut()
@@ -49,7 +54,7 @@ impl Placed {
         let mut roots = Vec::new();
         let mut pending = edits.inserted.clone();
         while let Some(child) = next_in_order(source, &mut pending) {
-            let at = self.after_previous(source, (child, &children), taken);
+            let at = self.after_previous(source, (slot, child, &children), taken);
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             let after = at.checked_sub(1).map(|before| children[before]);
             children.insert(at, built[0]);
@@ -72,22 +77,22 @@ impl Placed {
 
     /// The slot `node`'s box holds, or held when another owner rebuilt
     /// this update took it and has not put it back yet.
-    fn slot_held(&self, node: NodeId, taken: &Taken) -> usize {
+    pub(super) fn slot_held(&self, node: NodeId, taken: &Taken) -> usize {
         let key = Key::Element(node);
         let slot = self.slots.of(key).or_else(|| taken.held(key));
         slot.unwrap_or_else(|| panic!("{node:?}, before an inserted child, has no box"))
     }
 
-    /// Where `child` goes among `children`: after the box of its
-    /// nearest previous sibling that makes one, or first.
+    /// Where `child` goes among `children`, the owner's in `owner`: after
+    /// the box of its nearest previous sibling that makes one, or first.
     fn after_previous(
         &self,
         source: &Source<'_>,
-        (child, children): (NodeId, &[usize]),
+        (owner, child, children): (usize, NodeId, &[usize]),
         taken: &Taken,
     ) -> usize {
         match previous_box(source, child) {
-            Some(node) => position(children, self.slot_held(node, taken)) + 1,
+            Some(node) => self.child_position(owner, children, self.slot_held(node, taken)) + 1,
             None => 0,
         }
     }
@@ -111,7 +116,7 @@ fn next_in_order(source: &Source<'_>, pending: &mut Vec<NodeId>) -> Option<NodeI
 /// `child`'s nearest previous sibling that makes a box, past empty text
 /// and `display: none`: `Resolver::edits` let no other text or inline
 /// element through.
-fn previous_box(source: &Source<'_>, child: NodeId) -> Option<NodeId> {
+pub(super) fn previous_box(source: &Source<'_>, child: NodeId) -> Option<NodeId> {
     let previous = |node: NodeId| source.arena.get(node, "put_edited").previous;
     let mut at = previous(child);
     while let Some(node) = at {
@@ -127,17 +132,34 @@ fn previous_box(source: &Source<'_>, child: NodeId) -> Option<NodeId> {
     None
 }
 
-fn old_children(taken: &Taken, slot: usize) -> Vec<usize> {
+/// The edited owner's old children, from its box taken at `slot`: moved
+/// out when its edits insert or remove a box (debug builds keep a copy,
+/// `Taken::old_children`), copied when they change nothing, as lending
+/// then compares the old box's children (`Lender::lend_from`). Moved
+/// out, the old box's children read empty: lending finds them changed,
+/// as the edits changed them, and `reshaped` refuses the slot.
+fn old_children(taken: &mut Taken, slot: usize, boxed: bool) -> Vec<usize> {
     let (_, old) = taken
         .boxes
-        .get(&slot)
+        .get_mut(&slot)
         .unwrap_or_else(|| panic!("the edited owner's box in slot {slot} was not taken"));
-    old.children.clone()
+    if !boxed {
+        return old.children.clone();
+    }
+    let children = std::mem::take(&mut old.children);
+    taken.moved_out.insert(slot);
+    #[cfg(debug_assertions)]
+    taken.old_children.insert(slot, children.clone());
+    children
 }
 
-fn position(children: &[usize], slot: usize) -> usize {
+/// `slot`'s index in `children`, by a linear search.
+pub(super) fn position(children: &[usize], slot: usize) -> usize {
     children
         .iter()
         .position(|&child| child == slot)
         .unwrap_or_else(|| panic!("slot {slot} is not a child of the edited owner's box"))
 }
+
+#[path = "slots_edit_places.rs"]
+mod places;

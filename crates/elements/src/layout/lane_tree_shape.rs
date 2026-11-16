@@ -98,6 +98,7 @@ impl<S: Summary> LaneTree<S> {
         };
         let right = self.alloc(right);
         self.adopt(right);
+        self.resize(node);
         let parent = match self.nodes[node].parent {
             Some(parent) => parent,
             None => self.new_root(node),
@@ -178,17 +179,24 @@ impl<S: Summary> LaneTree<S> {
         }
     }
 
+    /// Stores `node` and its size, worked out from its children, which
+    /// are sized already.
     fn alloc(&mut self, node: Node<S>) -> usize {
-        if let Some(index) = self.free_nodes.pop() {
+        let index = if let Some(index) = self.free_nodes.pop() {
             self.nodes[index] = node;
-            return index;
-        }
-        self.nodes.push(node);
-        self.nodes.len() - 1
+            index
+        } else {
+            self.nodes.push(node);
+            self.sizes.push(0);
+            self.nodes.len() - 1
+        };
+        self.resize(index);
+        index
     }
 
     fn release(&mut self, node: usize) {
         self.nodes[node] = Node::default();
+        self.sizes[node] = 0;
         self.free_nodes.push(node);
     }
 }

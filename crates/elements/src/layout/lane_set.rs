@@ -130,6 +130,31 @@ impl Lanes {
         found.expect("a lane holds that many children").0
     }
 
+    /// Whether `container`'s box, with `children` children, holds the box
+    /// in `child`, from its lane; `None` when it has no lane holding every
+    /// one of its children.
+    pub(crate) fn holds_among(
+        &self,
+        container: usize,
+        (child, children): (usize, usize),
+    ) -> Option<bool> {
+        let lane = self.lane(container).filter(|lane| lane.len() == children)?;
+        Some(lane.holds(child))
+    }
+
+    /// The index of the child in `child` among the `children` children
+    /// of `container`, from its lane; `None` when it has no lane holding
+    /// every one of its children (one with a child put in this update
+    /// waiting ranks the children after it short) or holding the child.
+    pub(crate) fn index_of(
+        &self,
+        container: usize,
+        (child, children): (usize, usize),
+    ) -> Option<usize> {
+        let lane = self.lane(container).filter(|lane| lane.len() == children)?;
+        lane.index_of(child)
+    }
+
     /// The children of the lane container in `container` from the one
     /// in `first` on, by slot, in order; `None` when it has no lane
     /// holding `first`: a `started` entry whose lane a later ask of the
