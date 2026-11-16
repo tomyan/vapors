@@ -30,6 +30,8 @@ pub struct DocumentInput {
     touch: crate::touch_scroll::TouchScroll,
     /// The touch thumbs' fade at the last frame (`advance_fling`).
     thumbs: crate::thumb_fade::Phase,
+    /// Event times, held at or after the last frame's (`clock`).
+    clock: clock::EventClock,
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last reported; `None` once the host showed its own.
     cursor: Option<Cursor>,
@@ -57,6 +59,7 @@ impl DocumentInput {
             pointer: None,
             touch: crate::touch_scroll::TouchScroll::default(),
             thumbs: crate::thumb_fade::Phase::Hidden,
+            clock: clock::EventClock::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
             held: route::Held::default(),
@@ -107,7 +110,8 @@ impl DocumentInput {
         let route = self.route(document, event)?;
         if route == Route::Host {
             let action = self.action(&document.borrow(), event)?;
-            self.tooltip_event(&document.borrow(), event, action, platform.now());
+            let now = self.clock.at(platform.now());
+            self.tooltip_event(&document.borrow(), event, action, now);
             return Ok(Given {
                 route,
                 changed: false,
@@ -131,7 +135,7 @@ impl DocumentInput {
         platform: &Platform,
     ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
-        let now = platform.now();
+        let now = self.clock.at(platform.now());
         let (flinging, fading) = (self.flinging(), self.touch_thumbs_fading(now));
         if let Some(action) = action {
             self.act(document, action, now);
@@ -196,6 +200,8 @@ fn point_of(action: Action) -> Option<Point> {
 
 #[path = "document_input_act.rs"]
 mod act;
+#[path = "document_input_clock.rs"]
+mod clock;
 #[path = "document_input_fling.rs"]
 mod fling;
 pub(crate) use fling::curve_carries;

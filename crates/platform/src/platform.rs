@@ -35,8 +35,9 @@ pub struct Platform {
     ax_updates: RefCell<Vec<AxUpdate>>,
     /// The links a detached platform was asked to follow (`navigate.rs`).
     pub(crate) followed: RefCell<Vec<crate::navigate::Followed>>,
-    /// The time [`Platform::now`] answers; `None` for the system clock.
-    clock: Cell<Option<crate::Instant>>,
+    /// The time of the event being handled, read once when the event
+    /// loop took it (`Platform::stamp`); `None` before any.
+    event_time: Cell<Option<crate::Instant>>,
 }
 
 impl Platform {
@@ -60,23 +61,32 @@ impl Platform {
             text_field: RefCell::new(None),
             ax_updates: RefCell::new(Vec::new()),
             followed: RefCell::new(Vec::new()),
-            clock: Cell::new(None),
+            event_time: Cell::new(None),
         }
     }
 
-    /// The time an event is handled at: the system clock, or what
-    /// [`Platform::set_now`] set. An app stamps input with this rather
-    /// than reading the clock itself, so a test that drives its frames on
-    /// its own clock drives its events on the same one (#440).
+    /// The time of the event being handled: the one read the event loop
+    /// made when it took the event, which its gestures and click count
+    /// were stamped with too (#440). An app stamps input with this rather
+    /// than reading the clock itself. A detached platform with no event
+    /// stamped answers the system clock.
     #[must_use]
     pub fn now(&self) -> crate::Instant {
-        self.clock.get().unwrap_or_else(crate::Instant::now)
+        self.event_time.get().unwrap_or_else(crate::Instant::now)
     }
 
-    /// Sets the time [`Platform::now`] answers from here on: for a test
-    /// that times its frames itself.
-    pub fn set_now(&self, now: crate::Instant) {
-        self.clock.set(Some(now));
+    /// Notes `now` as the time of the event about to be handled.
+    pub(crate) fn stamp(&self, now: crate::Instant) {
+        self.event_time.set(Some(now));
+    }
+
+    /// Stamps the next events a test delivers with `now`, as the event
+    /// loop stamps each event it takes; `None` hands them back to the
+    /// system clock. Behind the `test-support` feature: an app's events
+    /// are stamped by the event loop alone.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_now(&self, now: Option<crate::Instant>) {
+        self.event_time.set(now);
     }
 
     /// Ask for a frame: what an app that returns

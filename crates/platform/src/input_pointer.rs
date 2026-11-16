@@ -4,19 +4,20 @@
 use winit::event::WindowEvent;
 
 use super::Input;
+use crate::Instant;
 use crate::event::Event;
 
 impl Input {
     /// A wheel event the page placed (`wheel_position`) as the pointer
     /// moving there, sent before the scroll, and kept as the pointer's
     /// position.
-    pub(super) fn wheel_placement(&mut self, event: &WindowEvent) -> Option<Event> {
+    pub(super) fn wheel_placement(&mut self, event: &WindowEvent, now: Instant) -> Option<Event> {
         if !matches!(event, WindowEvent::MouseWheel { .. }) {
             return None;
         }
         let [x, y] = crate::wheel_position::take()?;
         let moved = Event::PointerMoved { x, y };
-        self.track(&moved);
+        self.track(&moved, now);
         Some(moved)
     }
 

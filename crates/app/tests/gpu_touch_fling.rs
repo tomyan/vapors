@@ -60,7 +60,7 @@ fn deliver(
     touch: (TouchPhase, f32, u64),
 ) {
     let (phase, y, ms) = touch;
-    platform.set_now(base + Duration::from_millis(ms));
+    platform.set_now(Some(base + Duration::from_millis(ms)));
     app.event(finger(phase, y), platform);
     for gesture in gestures.touch(0, phase, 50.0, y, Duration::from_millis(ms)) {
         app.event(gesture, platform);
@@ -116,7 +116,7 @@ fn gpu_a_flicked_list_coasts_after_the_finger_lifts_and_then_rests() {
         );
     }
     let dragged = doc.borrow().scroll_offset(list).expect("scrolls")[1];
-    platform.set_now(base + Duration::from_millis(88));
+    platform.set_now(Some(base + Duration::from_millis(88)));
     app.event(finger(TouchPhase::Ended, 170.0), &platform);
     let _ = platform.take_redraw_request();
 
