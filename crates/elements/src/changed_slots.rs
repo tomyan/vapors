@@ -15,6 +15,9 @@ pub(crate) struct ChangedSlots {
     pub(crate) every: bool,
     /// The slots a built box took.
     pub(crate) rebuilt: Vec<usize>,
+    /// Each owner edited in place, by slot, with the slots of the children
+    /// it inserted (`Rebuilt::inserted`).
+    pub(crate) inserted: rustc_hash::FxHashMap<usize, Vec<usize>>,
     /// The slots whose box is gone, with the key each held.
     pub(crate) freed: Vec<(usize, Key)>,
     /// The kept slots whose rect or padding differs from the last
@@ -67,6 +70,7 @@ impl ChangedSlots {
             reframed: false,
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
+            inserted: rebuilt.inserted,
             freed: rebuilt.freed,
             reshaped: rebuilt.reshaped,
             stackings,
@@ -78,6 +82,7 @@ impl ChangedSlots {
         Self {
             every: true,
             rebuilt: rebuilt.slots,
+            inserted: rustc_hash::FxHashMap::default(),
             freed: rebuilt.freed,
             moved: Vec::new(),
             offsets_moved: Vec::new(),

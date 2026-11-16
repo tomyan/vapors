@@ -9,6 +9,8 @@ pub(crate) struct Changes<'a> {
     /// Nothing is kept: every slot is placed.
     pub(crate) every: bool,
     pub(crate) rebuilt: &'a [usize],
+    /// Each owner edited in place with the children it inserted.
+    pub(crate) inserted: &'a rustc_hash::FxHashMap<usize, Vec<usize>>,
     pub(crate) freed: &'a [(usize, Key)],
     pub(crate) written: &'a Written,
     /// The slots of the containers scrolled since the last update.
@@ -47,6 +49,7 @@ impl<'a> Changes<'a> {
         Self {
             every: changed.every,
             rebuilt: &changed.rebuilt,
+            inserted: &changed.inserted,
             freed: &changed.freed,
             written,
             scrolled,

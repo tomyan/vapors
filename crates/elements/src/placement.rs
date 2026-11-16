@@ -169,7 +169,10 @@ impl Placement {
     /// more than once); how many children. A slot changes the slot it is
     /// placed in only when its box is built again under another parent,
     /// or its parent is laid out with it newly in flow. A hoisted box is
-    /// chained by `patch_containing`.
+    /// chained by `patch_containing`. An owner edited in place chains only
+    /// the children it inserted: its kept children keep their slots and
+    /// it keeps its own, and a kept child whose flow changed is marked,
+    /// which builds the owner shallowly instead (4h).
     fn chain_children(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) -> usize {
         let mut slots: Vec<usize> = changes.rebuilt.to_vec();
         slots.extend_from_slice(&changes.written.laid_out);
@@ -177,7 +180,8 @@ impl Placement {
         slots.dedup();
         let mut chained = 0;
         for slot in slots {
-            for &child in &boxes[slot].children {
+            let children = changes.inserted.get(&slot).unwrap_or(&boxes[slot].children);
+            for &child in children {
                 if self.containing[child].is_none() {
                     self.up[child] = slot;
                     chained += 1;
