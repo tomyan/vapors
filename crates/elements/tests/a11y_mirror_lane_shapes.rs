@@ -183,15 +183,15 @@ fn lanes_inside_the_rows_of_a_lane_keep_every_bound() {
     update_and_take(&doc, &mut model);
 }
 
-#[test]
-fn a_node_hoisted_out_of_a_node_under_a_moved_row_keeps_its_bounds() {
-    // Given: 40 rows, each a positioned div with no role holding a group
-    // that holds an absolutely positioned button: the button's containing
-    // block is the row, so it is hoisted out of the group
+/// 40 rows, each positioned, with role `role` if given, holding a group
+/// that holds an absolutely positioned button: the button's containing
+/// block is the row, so it is hoisted out of the group. A row put in at
+/// the top, the lane framed after it, taken and held against a first take.
+fn hoisted_under_moved_rows(role: Option<&str>) {
     let mut doc = document();
     let body = doc.body();
     let rows: Vec<NodeId> = (0..40)
-        .map(|_| hoisting_row(&mut doc, body, None))
+        .map(|_| hoisting_row(&mut doc, (body, None), role))
         .collect();
     let css = "body { margin: 0; } .row { position: relative; height: 24px; } \
                .floating { display: block; position: absolute; left: 100px; top: 2px; }";
@@ -200,19 +200,37 @@ fn a_node_hoisted_out_of_a_node_under_a_moved_row_keeps_its_bounds() {
     let doc = Rc::new(RefCell::new(doc));
     assert!(doc.borrow().update_counts().lanes_framed > 0);
     let mut model = first_take(&doc);
-
-    // When: a row put in at the top
-    hoisting_row(&mut doc.borrow_mut(), body, Some(rows[0]));
-
-    // Then
-    update_and_take(&doc, &mut model);
+    hoisting_row(&mut doc.borrow_mut(), (body, Some(rows[0])), role);
+    doc.borrow_mut().update(rows_viewport()).expect("updates");
+    assert!(
+        doc.borrow().update_counts().lanes_framed > 0,
+        "still framed"
+    );
+    take(&doc, &mut model);
 }
 
-/// A positioned row holding a group that holds a floating button, put
-/// in `parent` before `before`.
-fn hoisting_row(doc: &mut Document, parent: NodeId, before: Option<NodeId>) -> NodeId {
+#[test]
+fn a_node_hoisted_out_of_a_node_under_a_moved_row_keeps_its_bounds() {
+    hoisted_under_moved_rows(None);
+}
+
+#[test]
+fn a_node_hoisted_out_of_a_node_under_a_moved_row_that_is_a_node_keeps_its_bounds() {
+    hoisted_under_moved_rows(Some("listitem"));
+}
+
+/// A positioned row, with role `role` if given, holding a group that
+/// holds a floating button, put in `parent` before `before`.
+fn hoisting_row(
+    doc: &mut Document,
+    (parent, before): (NodeId, Option<NodeId>),
+    role: Option<&str>,
+) -> NodeId {
     let row = doc.create_element("div");
     doc.set_attribute(row, "class", "row");
+    if let Some(role) = role {
+        doc.set_attribute(row, "role", role);
+    }
     doc.insert_before(parent, row, before);
     let group = element(doc, row, "div", "");
     doc.set_attribute(group, "role", "group");

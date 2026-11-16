@@ -120,7 +120,11 @@ impl AxMirror {
                 )
             });
             self.touched.nodes.insert(node_of(key));
-            self.touched.started.insert(node_of(key));
+            // a text run that is a lane child is its container's text: the
+            // container is touched, but its nodes did not start elsewhere
+            if let Key::Element(row) = key {
+                self.touched.started.insert(row);
+            }
         }
         let built = changed.rebuilt.iter().chain(&changed.moved).copied();
         for key in built.filter_map(|slot| slots.key(slot)) {

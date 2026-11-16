@@ -1,15 +1,17 @@
 //! What a take reads (R6): every node a touch reaches, each once. A
 //! touch reaches the node, its ancestors up to one reached already
 //! (whose own ancestors are in), and the nodes referring by id to it or
-//! to an ancestor; an element inserted that is not a node reaches the
+//! to an ancestor. An element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
-//! stayed (absolutely positioned), and so does a row a lane start moved
+//! stayed (absolutely positioned); so does a row a lane start moved
 //! that is not a node, as their bounds are from a node above the row,
-//! and the hoisted nodes under such a row, whose bounds are from the
-//! viewport;
-//! a node named by an id whose element
-//! changed, the nodes focus left and came to, and the hoisted nodes in
-//! the frame of a scroll container scrolled, are read as well.
+//! and so do the hoisted nodes under any such row, whose bounds are from
+//! the viewport. The walk to a row's nearest nodes visits every element
+//! with no record between, hidden subtrees included: its cost follows
+//! what is under a row, not its nodes (4i (2) gives the nodes their
+//! bounds alone). A node named by an id whose element changed, the nodes
+//! focus left and came to, and the hoisted nodes in the frame of a scroll
+//! container scrolled, are read as well.
 
 use vapors_dom::NodeId;
 

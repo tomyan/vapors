@@ -37,6 +37,8 @@ fn insert_at_top(page: &RowsPage, model: &mut Model) -> AxTakeCounts {
         let mut doc = page.doc.borrow_mut();
         row_before(&mut doc, 99, Some(page.rows[0].element));
         doc.update(rows_viewport()).expect("updates");
+        // the rows start elsewhere in a framed lane, not placed again
+        assert!(doc.update_counts().lanes_framed > 0, "the lane is framed");
     }
     let update = page.doc.borrow_mut().take_ax_update().expect("updated");
     if let Some(update) = &update {
@@ -104,6 +106,8 @@ fn flex_column_rows_a_lane_start_moved_are_in_the_mirror() {
         .borrow_mut()
         .update(list_viewport())
         .expect("updates");
+    let framed = list.doc.borrow().update_counts().lanes_framed;
+    assert!(framed > 0, "the list's lane is framed");
     let update = list.doc.borrow_mut().take_ax_update().expect("updated");
 
     // Then
