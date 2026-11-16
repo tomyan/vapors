@@ -8,20 +8,28 @@
 
 use vapors_scene::{Batched, Item, Run};
 
-use crate::framed_batches::hidden_items;
-use crate::frames::Frames;
-use crate::frames_draw::BatchFrame;
+use crate::framed_batches::{FramedBatched, hidden_items};
 use crate::kept_batches::{Shown, Sources};
 use crate::kept_batches_keys::KeptBatched;
 
 /// Panics, naming the first differing batch, frame or the culled
 /// counts, when `kept` is not `fresh`.
-pub(crate) fn assert_same(kept: &KeptBatched, fresh: &(Batched, Vec<BatchFrame>)) {
-    let difference = first_difference(&kept.batched, &fresh.0).or_else(|| {
-        let at = (0..kept.frames.len().max(fresh.1.len()))
-            .find(|&at| kept.frames.get(at) != fresh.1.get(at))?;
-        let (kept, fresh) = (kept.frames.get(at), fresh.1.get(at));
-        Some(format!("batch {at} is in frame {kept:?}, afresh {fresh:?}"))
+pub(crate) fn assert_same(kept: &KeptBatched, fresh: &FramedBatched) {
+    let difference = first_difference(&kept.batched, &fresh.batched).or_else(|| {
+        let longest = kept.frames.len().max(fresh.frames.len());
+        let differs = |at: &usize| {
+            kept.frames.get(*at) != fresh.frames.get(*at)
+                || kept.rows.get(*at) != fresh.rows.get(*at)
+        };
+        let at = (0..longest).find(differs)?;
+        let (frame, rows) = (
+            (kept.frames.get(at), fresh.frames.get(at)),
+            (kept.rows.get(at), fresh.rows.get(at)),
+        );
+        Some(format!(
+            "batch {at} is in {:?} with rows {:?}, afresh {:?} with {:?}",
+            frame.0, rows.0, frame.1, rows.1
+        ))
     });
     if let Some(difference) = difference {
         panic!(
@@ -33,73 +41,19 @@ pub(crate) fn assert_same(kept: &KeptBatched, fresh: &(Batched, Vec<BatchFrame>)
     }
 }
 
-/// Panics, naming the first differing item, when `kept`'s items put on
-/// the page by `frames` are not `page`'s: a frame's shift or clip is
-/// not the one its items were painted for, or culling in the frame
-/// differs from culling on the page.
-pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched) {
-    let (on_page, page_items) = (items_on_page(kept, frames), page_items(page));
-    let longest = on_page.len().max(page_items.len());
-    let differing = (0..longest).find(|&at| on_page.get(at) != page_items.get(at));
-    let culled = (kept.batched.culled, page.culled);
-    if differing.is_none() && culled.0 == culled.1 {
-        return;
-    }
-    let at = differing.unwrap_or(longest);
-    on_page_differs(at, (on_page.get(at), page_items.get(at)), culled);
-}
-
-/// An item, its clip and whether its batch is culled.
-type Placed = ((Item, Option<vapors_scene::Rect>), bool);
-
-/// `kept`'s items put on the page by their frames in `frames`.
-fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
-    let batches = kept.batched.batches.iter().zip(&kept.frames);
-    let on_page = batches.flat_map(|(batch, frame)| {
-        let put = move |item| (frames.item(frame.0, &item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(put)
-    });
-    on_page.collect()
-}
-
-/// `page`'s items, each with its batch's clip.
-fn page_items(page: &Batched) -> Vec<Placed> {
-    let items = page.batches.iter().flat_map(|batch| {
-        let item = move |item| ((item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(item)
-    });
-    items.collect()
-}
-
-/// Panics naming item `at`, as put on the page and as batched there,
-/// and the culled counts.
-fn on_page_differs(
-    at: usize,
-    (kept, page): (Option<&Placed>, Option<&Placed>),
-    culled: (u64, u64),
-) {
-    panic!(
-        "the kept batches put on the page by their frames differ from batching the scene on \
-         the page at item {at}: {kept:?}, on the page {page:?} (culled {} and {}); a frame's \
-         shift or clip is not the one its items were painted for (frames.rs, frames_draw.rs), \
-         or culling in a frame's view differs from culling on the page (framed_batches.rs); \
-         reproduce with `cargo xtask test`",
-        culled.0, culled.1
-    );
-}
-
 /// Panics, naming the first step one has and the other does not, when
 /// the steps `shown` in `view` through the extents index are not the
 /// steps of `sources` testing every one shows: a step's extent is wrong
 /// or a reach was not kept (`frame_extents.rs`).
 pub(crate) fn assert_candidates(shown: &[Shown], view: vapors_scene::Rect, sources: Sources<'_>) {
     let boxes = (sources.boxes, sources.frames);
-    let in_view =
-        |&(_, step): &(usize, crate::paint_order::Step)| hidden_items(step, boxes, view).is_none();
-    let every: Vec<_> = sources.drawn.placed().filter(in_view).collect();
+    let in_view = |&(_, step): &(crate::paint_labels::Label, crate::paint_order::Step)| {
+        hidden_items(step, boxes, view).is_none()
+    };
+    let every: Vec<_> = sources.drawn.labelled().filter(in_view).collect();
     let found: Vec<_> = shown
         .iter()
-        .map(|&(place, step, _)| (place, step))
+        .map(|shown| (shown.label, shown.step))
         .collect();
     let longest = every.len().max(found.len());
     let Some(at) = (0..longest).find(|&at| every.get(at) != found.get(at)) else {
@@ -115,7 +69,7 @@ pub(crate) fn assert_candidates(shown: &[Shown], view: vapors_scene::Rect, sourc
 }
 
 /// The items of `run`.
-fn run_items(run: &Run) -> Vec<Item> {
+pub(crate) fn run_items(run: &Run) -> Vec<Item> {
     match run {
         Run::Shadows(shadows) => shadows.iter().map(|&shadow| Item::Shadow(shadow)).collect(),
         Run::Quads(quads) => quads.iter().map(|&quad| Item::Quad(quad)).collect(),
@@ -140,3 +94,7 @@ fn first_difference(kept: &Batched, fresh: &Batched) -> Option<String> {
     (kept.culled != fresh.culled)
         .then(|| format!("culled {} items, afresh {}", kept.culled, fresh.culled))
 }
+
+#[path = "kept_batches_check_page.rs"]
+mod page;
+pub(crate) use page::assert_on_page;

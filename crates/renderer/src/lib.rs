@@ -37,12 +37,17 @@ mod quads;
 mod quads_setup;
 mod readback;
 mod retained;
+mod row_offsets;
 mod shadows;
 mod shift;
 mod solid;
 mod target;
 mod uniform_slots;
 mod upload;
+mod word_hash;
+
+#[cfg(test)]
+mod gpu_uniform_slots_tests;
 mod work;
 
 pub use arena_full::{ArenaFull, Holding};
@@ -58,6 +63,7 @@ pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
 pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
+pub use instanced::assert_rows;
 pub use kept_bind_group::KeptBindGroup;
 pub use kept_range::KeptRange;
 pub use mesh_entries::{MeshEntries, MeshEntry, mesh_entry_bytes};
@@ -68,6 +74,7 @@ pub use projective::{Bound, ScenePassFormats};
 pub use quads::QuadPipeline;
 pub use readback::read_rgba8;
 pub use retained::Retained;
+pub use row_offsets::RowOffsets;
 pub use shadows::ShadowPipeline;
 pub use shift::Shift;
 pub use solid::SolidPipeline;

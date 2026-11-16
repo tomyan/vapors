@@ -4,14 +4,21 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, float_bytes};
+use crate::instanced::{Instanced, instance_bytes, rowed_instances};
 use crate::quads::rgba;
-use crate::{GpuWork, KeptRange, Shift, Target};
+use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
 
 impl ShadowPipeline {
+    /// Four-float attributes an instance holds.
+    const VEC4S: u32 = 7;
+
+    /// Bytes per instance in a draw's or a kept buffer: the attributes and
+    /// the row index after them (`instanced.rs`).
+    pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
+
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
@@ -19,8 +26,8 @@ impl ShadowPipeline {
             device,
             format,
             "shadows",
-            include_str!("shadows.wgsl"),
-            7,
+            &RowOffsets::shader(include_str!("shadows.wgsl")),
+            Self::VEC4S,
         ))
     }
 
@@ -32,7 +39,19 @@ impl ShadowPipeline {
     /// The instance bytes of `shadows`, as a draw writes them.
     #[must_use]
     pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
-        float_bytes(shadows.iter().flat_map(instance))
+        Self::bytes_in_rows(shadows, &[])
+    }
+
+    /// The instance bytes of `shadows`, item `i` in row `rows[i]` of the
+    /// batch's [`RowOffsets`], or every item in row 0 for an empty `rows`.
+    ///
+    /// # Panics
+    ///
+    /// When `rows` is neither empty nor one index an item, or names a row
+    /// past the table ([`RowOffsets::CAPACITY`]).
+    #[must_use]
+    pub fn bytes_in_rows(shadows: &[Shadow], rows: &[u32]) -> Vec<u8> {
+        rowed_instances(("shadows", Self::VEC4S as usize), (shadows, rows), instance)
     }
 
     /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,
@@ -50,7 +69,22 @@ impl ShadowPipeline {
     ///
     /// If `kept` was kept by another pipeline.
     pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, shift);
+        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
+    }
+
+    /// As [`Self::draw_kept`], each instance moved by its row's offset in
+    /// `rows` as well.
+    ///
+    /// # Panics
+    ///
+    /// If `kept` was kept by another pipeline.
+    pub fn draw_kept_in_rows(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        (shift, rows): (Shift, &RowOffsets),
+    ) {
+        self.0.draw_kept(target, kept, (shift, rows));
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

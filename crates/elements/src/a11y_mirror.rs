@@ -41,6 +41,10 @@ impl Document {
             return Err(AxError::NotUpdated);
         }
         self.ax.counts = AxTakeCounts::default();
+        if let Some(painted) = &self.painted {
+            // one pass along each lane for the rows that started elsewhere
+            painted.frames.prime_started();
+        }
         if self.ax.all {
             return self.ax_rebuild().map(Some);
         }

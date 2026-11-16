@@ -72,18 +72,15 @@ pub fn batched<I: Borrow<Item>>(
 ) -> Batched {
     let mut batched = Batched::default();
     for (item, clip) in items {
-        let item = item.borrow();
-        if !culled(item, clip, view) {
-            batched.push(item, clip, false);
-            continue;
-        }
-        batched.culled += 1;
-        if let Item::Surface { .. } = item {
-            batched.push(item, clip, true);
-        }
+        batched.add(item.borrow(), clip, view);
     }
     batched
 }
+
+/// The rows of a lane one batch may hold, each item naming its row: the
+/// painter's table of row offsets holds this many (vapors-renderer's
+/// `RowOffsets::CAPACITY`), and a longer run is split into batches.
+pub const ROWS_PER_BATCH: usize = 128;
 
 /// True when nothing `item` paints falls inside `view` cut to `clip`:
 /// the rule [`batched`] culls by.
@@ -94,6 +91,35 @@ pub fn culled(item: &Item, clip: Option<Rect>, view: Rect) -> bool {
 }
 
 impl Batched {
+    /// Adds `item` under `clip`, culled against `view` as [`batched`]
+    /// culls: to the last batch when it can join it, else as a new one;
+    /// counted culled, and kept only as a culled surface, when nothing of
+    /// it falls in the view. Whether it was added to a batch. For items
+    /// each culled in a view of its own (the rows of a lane, each in its
+    /// own frame's coordinates).
+    pub fn add(&mut self, item: &Item, clip: Option<Rect>, view: Rect) -> bool {
+        self.add_culled(item, clip, culled(item, clip, view))
+    }
+
+    /// As [`Batched::add`], with whether `item` is culled worked out by the
+    /// caller ([`culled`]), and batched under `clip`: for an item culled
+    /// under its clip in its row's coordinates and batched under that clip
+    /// moved into the lane's, so items of different rows under equal clips
+    /// in their rows are not batched under one scissor; and so one test
+    /// serves the caller's split and the batching.
+    pub fn add_culled(&mut self, item: &Item, clip: Option<Rect>, is_culled: bool) -> bool {
+        if !is_culled {
+            self.push(item, clip, false);
+            return true;
+        }
+        self.culled += 1;
+        let surface = matches!(item, Item::Surface { .. });
+        if surface {
+            self.push(item, clip, true);
+        }
+        surface
+    }
+
     /// Adds `item` under `clip` to the last batch when it is of the same
     /// kind, clip and culling, else as a new batch.
     fn push(&mut self, item: &Item, clip: Option<Rect>, culled: bool) {
@@ -111,6 +137,25 @@ impl Batched {
 }
 
 impl Run {
+    /// How many items the run holds.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        match self {
+            Run::Shadows(shadows) => shadows.len(),
+            Run::Quads(quads) => quads.len(),
+            Run::Shapes(shapes) | Run::Meshes(shapes) => shapes.len(),
+            Run::Texts(items) | Run::Images(items) | Run::Icons(items) | Run::Surfaces(items) => {
+                items.len()
+            }
+        }
+    }
+
+    /// Whether the run holds no item.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// An empty run of `item`'s kind.
     fn empty(item: &Item) -> Self {
         match item {

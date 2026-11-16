@@ -59,7 +59,8 @@ pub(crate) fn compare_each(
     compare_ask: fn(&mut BoxTree<'_>, usize, &Asked) -> Result<Answered, LaneDecline>,
 ) -> Compared {
     let kept = doc.kept.as_ref().expect("updated");
-    let mut placed = std::mem::take(&mut doc.boxes.placed);
+    let placed = std::mem::take(&mut doc.boxes.placed);
+    let mut lanes = placed.lanes.borrow_mut();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts: &mut doc.fonts,
@@ -69,7 +70,7 @@ pub(crate) fn compare_each(
         written: Written::default(),
         calls: 0,
         disowned: 0,
-        lanes: &mut placed.lanes,
+        lanes: &mut lanes,
         lanes_enabled: false,
         stale: rustc_hash::FxHashSet::default(),
         lane_counts: crate::layout::lane_layout::LaneCounts::default(),

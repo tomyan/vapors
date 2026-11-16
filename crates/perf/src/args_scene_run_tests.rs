@@ -35,7 +35,7 @@ fn scene_run_with_an_unknown_word_after_it_is_refused() {
 #[test]
 fn scene_run_with_a_count_is_refused_naming_it() {
     let error = parsed(&["--scene-run", "200"]).expect_err("a count");
-    assert!(error.contains("takes no counts"), "{error}");
+    assert!(error.contains("take no counts"), "{error}");
     assert!(error.contains("but 200 was given"), "{error}");
 }
 

@@ -147,6 +147,7 @@ impl Dom for Document {
         self.drop_focus_within(node);
         self.drop_sinks(node);
         self.drop_scene_hits(node);
+        self.note_freed(node);
         self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
@@ -212,6 +213,9 @@ impl Document {
             .insert(name.to_owned(), value.to_owned());
         self.mark_changed(node);
         self.boxes.marks.mark(node);
+        if crate::a11y_mirror_index::INDEXED.contains(&name) {
+            self.ax.touch_indexed(node);
+        }
         // a text field's editor follows its `value` attribute until the
         // field is edited, as the DOM's value does (E6a); a number
         // field's shown text also follows `step`, `min` and `max`

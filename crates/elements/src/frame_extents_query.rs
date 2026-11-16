@@ -4,12 +4,29 @@
 use vapors_scene::Rect;
 
 use super::{Entry, Extents, FrameIndex, missing};
+use crate::paint_labels::Label;
+use crate::paint_order::Step;
 
 impl Extents {
     /// The frames with a drawing step.
     #[cfg(test)]
     pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
         self.frames.keys().copied()
+    }
+
+    /// The least top and greatest bottom of frame `frame`'s drawing
+    /// steps' items, device pixels in the frame; `None` for none, or for
+    /// a frame holding a step that spans every view, which every view
+    /// searches anyway. O(the frame's steps): read for a lane frame,
+    /// a row's few.
+    pub(crate) fn frame_span(&self, frame: usize) -> Option<[f32; 2]> {
+        let index = self.frames.get(&frame)?;
+        let entries = index.entries.iter().chain(&index.tall);
+        let span = entries.fold(
+            [f32::INFINITY, f32::NEG_INFINITY],
+            |[top, bottom], entry| [top.min(entry.top), bottom.max(entry.bottom)],
+        );
+        (span[0] <= span[1]).then_some(span)
     }
 
     /// The frames holding a step that spans every view.
@@ -36,18 +53,18 @@ impl Extents {
         (short != self.short).then_some("extents index short entries total")
     }
 
-    /// How many items the step at `place` paints; 0 when it draws
+    /// How many items the step at `label` paints; 0 when it draws
     /// nothing.
-    pub(crate) fn items_at(&self, place: usize) -> u64 {
-        let Some((frame, top, tall)) = self.at[place] else {
+    pub(crate) fn items_at(&self, label: Label, step: Step) -> u64 {
+        let Some((frame, top, tall)) = self.at_of(step) else {
             return 0;
         };
         let index = &self.frames[&frame];
         if tall {
-            return index.tall[index.tall_position(place)].items;
+            return index.tall[index.tall_position(label)].items;
         }
-        let entry = index.entries.get(index.position(top, place));
-        entry.map_or_else(|| missing(place), |entry| entry.items)
+        let entry = index.entries.get(index.position(top, label));
+        entry.map_or_else(|| missing(label), |entry| entry.items)
     }
 
     /// The entries of frame `frame` whose extent meets `view` (frame
