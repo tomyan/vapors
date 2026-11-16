@@ -78,9 +78,9 @@ pub(crate) struct Sheets {
     scopes: std::collections::HashMap<String, String>,
     /// Each global component sheet added, by name, with its text.
     globals: std::collections::HashMap<String, String>,
-    /// Each component sheet in the cascade, by name, with its text's
-    /// hash (`sheet_hashes`).
-    hashes: std::collections::HashMap<(sheet_hashes::SheetKind, String), u64>,
+    /// Each component sheet in the cascade, by kind and name: its place
+    /// and its text's hash (`sheet_hashes`).
+    components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
     refused: Vec<ElementError>,
 }
 
@@ -94,7 +94,7 @@ impl Sheets {
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
             globals: std::collections::HashMap::new(),
-            hashes: std::collections::HashMap::new(),
+            components: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
@@ -150,7 +150,7 @@ impl Sheets {
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());
-        self.note_hash(sheet_hashes::SheetKind::Scope, scope, text);
+        self.note_sheet(sheet_hashes::SheetKind::Scope, scope, text);
     }
 
     /// Which elements a flip of `flag` restyles, as the sheets use it.

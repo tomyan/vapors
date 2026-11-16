@@ -132,7 +132,10 @@ pub trait Dom: Listeners {
     /// Adds a `Styles::Global` component's `<style>` as an author sheet
     /// named `sheet` (the component's crate and file), unscoped: its
     /// rules may match any element. Each mount calls it; a sheet already
-    /// added is not added again.
+    /// added is not added again. It stays after its component unmounts
+    /// and still styles every element it matches, as Svelte's `:global`
+    /// styles do; `compile_dir_global` is for the layout corpus alone,
+    /// which mounts one fixture per document.
     fn add_global_style(&mut self, sheet: &str, css: &str);
     /// Names events a component dispatches itself ([`Dispatcher`]), so a
     /// tree that refuses listeners for events it never fires takes

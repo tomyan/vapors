@@ -10,24 +10,44 @@ impl Sheets {
     /// A global component's style, named `sheet`, added once however
     /// often it is mounted. As for a scope, one that does not parse, or
     /// that holds `:global()`, is kept as a refusal for every update.
-    /// False when it was already added with this text and nothing
-    /// changed.
+    /// False when nothing changed: it was already added with this text,
+    /// or its other text was already refused.
+    ///
+    /// Like a scoped sheet, it stays in the cascade after its component
+    /// unmounts; unlike one, it still styles every element it matches,
+    /// as Svelte's `:global` styles do after the component is destroyed
+    /// (build-time-styles.md, R1a). `compile_dir_global` is for the
+    /// layout corpus alone, which mounts one fixture per document.
     pub(crate) fn add_global(&mut self, sheet: &str, text: &str) -> bool {
         match self.globals.get(sheet) {
             Some(added) if added == text => return false,
-            Some(_) => {
-                self.refused.push(refusal(
-                    sheet,
-                    format!("global sheet `{sheet}` was already added with another text: two components share a file name; give their files different paths"),
-                ));
-                return true;
-            }
+            Some(_) => return self.refuse_other_text(sheet),
             None => drop(self.globals.insert(sheet.to_owned(), text.to_owned())),
         }
         match self.add_author(sheet, text) {
-            Ok(()) => self.note_hash(super::sheet_hashes::SheetKind::Global, sheet, text),
+            Ok(()) => self.note_sheet(super::sheet_hashes::SheetKind::Global, sheet, text),
             Err(refused) => self.refused.push(refused),
         }
+        true
+    }
+
+    /// Refuses `sheet` added with another text than before, once. Its
+    /// name holds the crate's name, so within one build only two versions
+    /// of one crate in the dependency graph can collide.
+    fn refuse_other_text(&mut self, sheet: &str) -> bool {
+        let reported = (self.refused.iter())
+            .any(|e| matches!(e, ElementError::Css { sheet: s, .. } if s == sheet));
+        if reported {
+            return false;
+        }
+        self.refused.push(refusal(
+            sheet,
+            format!(
+                "global sheet `{sheet}` was already added with another text: two versions of \
+                 its crate are in the build; fix: depend on one version of it (`cargo tree -d` \
+                 lists the duplicates)"
+            ),
+        ));
         true
     }
 }

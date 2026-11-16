@@ -61,24 +61,21 @@ fn a_second_mounts_registration_of_the_same_sheet_restyles_nothing() {
 }
 
 #[test]
-fn another_text_under_the_same_name_is_refused_naming_the_fix() {
+fn another_text_under_the_same_name_is_refused_once_naming_two_versions_of_the_crate() {
     // Given
     let mut doc = document_with_paragraph();
     doc.add_global_style(SHEET, CARD);
 
-    // When
+    // When: mounted twice more with the other text
     doc.add_global_style(SHEET, "\np { color: blue; }\n");
-    let refused = format!("{:?}", doc.update(VIEWPORT).err().expect("refused"));
+    doc.add_global_style(SHEET, "\np { color: blue; }\n");
+    let errors = doc.update(VIEWPORT).err().expect("refused");
 
     // Then
-    assert!(
-        refused.contains("already added with another text"),
-        "{refused}"
-    );
-    assert!(
-        refused.contains("give their files different paths"),
-        "{refused}"
-    );
+    let refused = format!("{errors:?}");
+    assert_eq!(errors.len(), 1, "{refused}");
+    assert!(refused.contains("two versions of its crate"), "{refused}");
+    assert!(refused.contains("fix: depend on one version"), "{refused}");
 }
 
 #[test]
