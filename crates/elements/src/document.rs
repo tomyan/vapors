@@ -154,9 +154,11 @@ impl Document {
     /// An analysed element exists, naming it and the fix; or the CSS
     /// crate's refusal, with line and column. The sheet is not added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
+        // a refused call changes nothing (`dom_keyed.rs`)
+        self.sheets.add_rust(name, text)?;
         self.note_change();
         self.dirty.everything();
-        self.sheets.add_rust(name, text)
+        Ok(())
     }
 
     /// Whether `node` is in the document (created and not removed).

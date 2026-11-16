@@ -29,7 +29,8 @@ impl Sheets {
             return Err(ElementError::Refused(format!(
                 "add_stylesheet(\"{name}\") after the analysed element at {site} was created: its \
                  compiled winners cannot see a sheet added from Rust; fix: put the rules in a \
-                 component's <style> (a .wisp the build compiles)"
+                 component's <style> (a .wisp the build compiles; one with no markup registers \
+                 just its sheet); reproduce: the add_stylesheet call after the page's mount"
             )));
         }
         self.add_author(name, text)?;
@@ -46,7 +47,9 @@ impl Sheets {
         Some(format!(
             "the element at {}: its compiled winners cannot see \"{name}\", a sheet added from \
              Rust with add_stylesheet; fix: put that sheet's rules in a component's <style> (a \
-             .wisp the build compiles), or build this element without the analysed component",
+             .wisp the build compiles; one with no markup registers just its sheet), or build \
+             this element without the analysed component; reproduce: the page's first update \
+             after the add_stylesheet call",
             key.site
         ))
     }

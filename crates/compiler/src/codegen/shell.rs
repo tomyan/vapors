@@ -186,6 +186,15 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> 
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
     }
+    // a style-only component builds nothing: no place, no roots pushed
+    let (unplaced, roots) = if body.trim().is_empty() {
+        (
+            "        let _ = (parent, before);\n",
+            "#[allow(clippy::let_and_return, reason = \"a style-only component has no roots\")] let roots = Vec::new();",
+        )
+    } else {
+        ("", "let mut roots = Vec::new();")
+    };
     format!(
         "impl {name} {{
     /// Mounts the component at the end of `parent`.
@@ -202,11 +211,11 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> 
         Rc<RefCell<D>>: DynDom,
     {{
         let {name}Props {{ {prop_names} }} = props;
-{add_style}        dom.borrow_mut().declare_events(&Self::events());
+{unplaced}{add_style}        dom.borrow_mut().declare_events(&Self::events());
         let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
-{statements}            let mut roots = Vec::new();
+{statements}            {roots}
 {body}            {returned}
         }});
         {name} {{ {built}, disposes_on_drop }}

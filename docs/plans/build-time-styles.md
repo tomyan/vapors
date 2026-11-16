@@ -600,6 +600,14 @@ below as the record of what was weighed.
    crate's sheet and counted in `winners_foreign`; refuse only after.
    **Recommend (a):** it keeps the record as decided, and costs one
    corpus migration.
+   **Cost found at R1b (review of #433, 2026-11-16; kept by the lead,
+   as Tom's analysable-sources rule):** beyond the corpus, 14 vapors
+   tests moved to style-only compiled components (a `<style>` and no
+   markup, which R1b also allows), and touche adds Rust sheets beside
+   its compiled bar, tool card and launcher (`tokens.css`,
+   `controls.css`, `root.css`, `placement.css`); they move to compiled
+   style-only components in the touche PR that bumps vapors past R1b
+   (tomyan/touche#198).
 3. **Ancestors above a component's root.** (a) First version: any
    selector with an ancestor compound is conditional and tested at run
    time. (b) Index every mount site of each component in the crate and

@@ -40,10 +40,18 @@ pub(crate) fn split(source: &Source) -> Result<Sections, CompileError> {
     }
     sections.template_start = pos + whitespace_len(&source.text[pos..]);
     sections.template_end = source.text.trim_end().len();
+    // a style-only component (a `<style>` and no markup) registers its
+    // sheet when mounted and builds nothing: how an app adds a compiled
+    // sheet, where a sheet from Rust beside analysed elements is refused
     if sections.template_start >= sections.template_end {
+        if sections.style.is_some() {
+            sections.template_start = sections.template_end.max(last_end);
+            sections.template_end = sections.template_start;
+            return Ok(sections);
+        }
         return Err(source.error(
             last_end,
-            "a .wisp needs a template: put at least one element after the <script> and <style> sections",
+            "a .wisp needs a template or a <style>: put at least one element after the <script> section",
         ));
     }
     Ok(sections)
