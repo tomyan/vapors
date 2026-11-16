@@ -2,7 +2,7 @@
 //! `StyleKey`, its `class:` directives toggle through `toggle_classes`
 //! and restyle it. What it refuses: `style_key_refusals.rs`.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE, StyleKey};

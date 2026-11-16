@@ -3,7 +3,7 @@
 //! invalid one is refused at its position; an `&` that does not start
 //! a reference is kept as written.
 
-mod common;
+use crate::common;
 
 use common::{attr_literal, element, literal, parse_err, parse_ok, text_parts};
 

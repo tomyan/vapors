@@ -3,7 +3,7 @@
 //! deferred (docs/components.md says so), so a component using them
 //! is refused at that stage, not here.
 
-mod common;
+use crate::common;
 
 use common::{element, parse_ok};
 use vapors_compiler::ast::Node;

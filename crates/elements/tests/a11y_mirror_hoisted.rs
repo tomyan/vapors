@@ -10,7 +10,7 @@
 // a row height of 24: exact in f32
 #![allow(clippy::cast_precision_loss)]
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

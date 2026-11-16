@@ -1,7 +1,7 @@
 //! A scroll only repaints (F2c S9): no element is restyled, no box laid
 //! out, no text laid out again; only the placement moves.
 
-mod support;
+use crate::support;
 
 use support::scroll_list::{at, list};
 use support::text;

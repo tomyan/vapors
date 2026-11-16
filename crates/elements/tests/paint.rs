@@ -1,7 +1,7 @@
 //! What an update paints: backgrounds as quads snapped to device
 //! pixels, text runs, and the canvas colour from the root or body.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_elements::Viewport;

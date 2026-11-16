@@ -4,7 +4,7 @@
 //! neither when unfocused; the caret and a selection where the keys put
 //! them; a field without a width is refused.
 
-mod support;
+use crate::support;
 
 use support::number_page::{click, key, page, shift_key};
 use support::{document, element, refusals};

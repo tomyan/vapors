@@ -2,7 +2,7 @@
 //! ids across updates, a box painted again frees its ids for later
 //! boxes to take, and a removed box's ids resolve no more.
 
-mod support;
+use crate::support;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

@@ -7,8 +7,7 @@
 //! is the css crate's at run time, so the compiler only carries the
 //! `<style>` text.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated, generated_with};
 

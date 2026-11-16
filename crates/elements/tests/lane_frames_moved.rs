@@ -4,7 +4,7 @@
 //! list moves with it, and a nested lane's ink is found from the outer
 //! lane.
 
-mod support;
+use crate::support;
 
 use support::lane_page::{assert_drawn_afresh, header_list};
 use support::narrow_list::{ROWS, VIEW};

@@ -7,7 +7,7 @@
 //! offsets into the file, `None` for an absent section, and the
 //! template keeps its position too.
 
-mod common;
+use crate::common;
 
 use common::parse_file;
 

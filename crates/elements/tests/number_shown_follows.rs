@@ -3,7 +3,7 @@
 //! (`number_shown.rs`): changing one of them while the field is focused
 //! or not leaves editing on the new shown text (review of vapors#133).
 
-mod support;
+use crate::support;
 
 use support::number_page::{Page, click, key, page_with, type_text, value};
 use support::viewport;

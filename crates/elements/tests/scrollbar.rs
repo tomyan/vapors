@@ -2,7 +2,7 @@
 //! styled by `scrollbar-color` and `scrollbar-width`, placed by the
 //! offset, taking no layout space.
 
-mod support;
+use crate::support;
 
 use support::refusals;
 use support::scroll_list::{List, at, list};

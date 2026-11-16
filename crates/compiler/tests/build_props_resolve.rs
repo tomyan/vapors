@@ -4,10 +4,8 @@
 //! crate root). A tag that resolves to no component in the directory
 //! is not checked, and is listed as unchecked with its file and line.
 
-#[path = "common/build.rs"]
-mod build;
-#[path = "common/props.rs"]
-mod props;
+use crate::common_build as build;
+use crate::common_props as props;
 
 use build::write;
 use props::{USE_PLAIN, shown, with_plain};

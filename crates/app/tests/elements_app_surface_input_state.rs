@@ -3,7 +3,7 @@
 //! none` lets a press through to what is under it, and it takes focus
 //! only with a `tabindex`.
 
-mod surface_input_page;
+use crate::surface_input_page;
 
 use surface_input_page::{PANELS, Page};
 use vapors_dom::Dom;

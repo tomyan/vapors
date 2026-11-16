@@ -2,7 +2,7 @@
 //! source does (docs/plans/css-for-3d.md C4): the surface is the target
 //! for that hit, and the next update is refused, once per message.
 
-mod support;
+use crate::support;
 
 use support::scene_hits_page::{Answer, OVER_A, page};
 use vapors_dom::Dom;

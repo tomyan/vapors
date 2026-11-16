@@ -5,7 +5,7 @@
 //! its shapes; the icon atlas's size cap is the icon route's alone; a
 //! circle path is a closed form.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_refused, icon};
 use support::viewport;

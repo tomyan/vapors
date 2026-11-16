@@ -1,6 +1,6 @@
 //! Specificity (`src/selector/specificity.rs`). Translated from sumi `selector_test.go` and `logical_test.go`.
 
-mod support;
+use crate::support;
 
 use support::selector;
 use vapors_css::selector::Specificity;

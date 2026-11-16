@@ -5,7 +5,7 @@
 //! here (a Rust expression often contains `{}`); sumi closes a text
 //! hole at the first `}`.
 
-mod common;
+use crate::common;
 
 use common::{attr_literal, element, expr, literal, parse_ok, parts, text_parts};
 

@@ -3,7 +3,7 @@
 //! gained it; a move to nothing emits `Some(None)`; a move refused
 //! (a disabled button) emits nothing.
 
-mod support;
+use crate::support;
 
 use support::mirror::{labels, node_of, step, taken_model};
 use vapors_elements::Document;

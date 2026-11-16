@@ -5,7 +5,7 @@
 //! box, refused naming it. A class change that only recolours
 //! tessellates nothing.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_refused, icon};
 use support::viewport;

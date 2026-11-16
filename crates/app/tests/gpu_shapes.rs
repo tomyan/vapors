@@ -5,8 +5,7 @@
 //! paint the items through `vapors_elements::test_items` until S4a's
 //! `<path>` paints them.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_app::PaintError;

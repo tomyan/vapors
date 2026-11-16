@@ -1,7 +1,7 @@
 //! Which calls ask for a frame: every change to what is shown, and not
 //! a listener.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_dom::Dom;

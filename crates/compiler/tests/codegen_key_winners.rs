@@ -3,8 +3,7 @@
 //! indexes, each with the hash of the text the runtime registers, the
 //! always declarations that win, and the rules decided at run time.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, generated};
 use vapors_compiler::styles::CrateSheets;

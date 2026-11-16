@@ -1,6 +1,6 @@
 //! The property table (`src/property/table.rs`): every entry parses and is sorted.
 
-mod support;
+use crate::support;
 
 use support::sheet;
 use vapors_css::property::{PROPERTIES, PropertyId, is_shorthand};

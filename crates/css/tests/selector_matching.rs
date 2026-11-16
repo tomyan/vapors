@@ -1,6 +1,6 @@
 //! Matching (`src/selector/matching.rs`). Translated from the matching halves of sumi `resolve_test.go` and `logical_test.go`.
 
-mod support;
+use crate::support;
 
 use support::{matches_chain, selector, siblings};
 use vapors_css::selector::matches;

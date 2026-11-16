@@ -3,7 +3,7 @@
 //! matched with has an equal run; a class toggle gives new keys
 //! only to the batches holding the row's items.
 
-mod support;
+use crate::support;
 
 use support::rows_page::{EDITS, Edit, RowsPage, rows_page, rows_viewport};
 use vapors_elements::KeptBatched;

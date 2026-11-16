@@ -4,7 +4,7 @@
 //! in its frames. A debug build also
 //! makes that comparison inside every draw (`kept_batches_check.rs`).
 
-mod support;
+use crate::support;
 
 use support::element;
 use support::rows_page::{EDITS, RowsPage, rows_page, rows_viewport};

@@ -1,6 +1,6 @@
 //! Declaration parsing (`src/property/declaration.rs`): grammar refusals, CSS-wide keywords, pending values.
 
-mod support;
+use crate::support;
 
 use support::{refusal, sheet};
 

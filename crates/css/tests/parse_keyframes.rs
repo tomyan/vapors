@@ -1,6 +1,6 @@
 //! `@keyframes` blocks (`src/parse/keyframes.rs`). Translated from sumi `style_keyframe_test.go`.
 
-mod support;
+use crate::support;
 
 use support::{refusal, sheet};
 

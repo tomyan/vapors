@@ -2,7 +2,7 @@
 //! not laid out, after everything else in the scene, and refused where
 //! vapors cannot draw them.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_scene::{Color, Item};

@@ -1,6 +1,6 @@
 //! Media features (`src/cascade/media_feature.rs`). Translated from sumi `media_test.go`.
 
-mod support;
+use crate::support;
 
 use support::cascade_media::{BLACK, RED, color_under};
 use support::env;

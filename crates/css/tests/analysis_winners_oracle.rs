@@ -11,8 +11,7 @@
 
 #[path = "support/winners_oracle.rs"]
 mod oracle;
-#[path = "support/winners.rs"]
-mod support;
+use crate::support_winners as support;
 
 use oracle::{allowed, cascade, computed, orders};
 use support::{Page, page, winners};

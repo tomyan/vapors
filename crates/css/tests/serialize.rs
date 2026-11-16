@@ -1,6 +1,6 @@
 //! Serialize round-trips (`src/serialize.rs`). Translated from sumi `parser/style/serialize_test.go`.
 
-mod support;
+use crate::support;
 
 use support::prop;
 use support::serialize::round_trip;

@@ -1,6 +1,6 @@
 //! `@container` evaluation (`src/cascade/conditions.rs`). Translated from sumi `resolve_styles_test.go`.
 
-mod support;
+use crate::support;
 
 use support::{add, computed, css};
 use vapors_css::tree::Tree;

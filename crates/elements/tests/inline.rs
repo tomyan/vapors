@@ -2,7 +2,7 @@
 //! a point over one hits it, its background is painted behind the
 //! text, and what is not laid out yet is refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, text, viewport};
 use vapors_dom::Dom;

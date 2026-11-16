@@ -1,6 +1,6 @@
 //! Pseudo-classes (`src/selector/pseudo.rs`): parsing and refusals.
 
-mod support;
+use crate::support;
 
 use support::{refusal, selector};
 use vapors_css::selector::{PseudoClass, parse_selector_list};

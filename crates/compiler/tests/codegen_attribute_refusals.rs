@@ -3,8 +3,7 @@
 //! boolean attribute from an expression (always on), a colon-named
 //! attribute that is not a directive, and `{` in a quoted value.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::refusal;
 

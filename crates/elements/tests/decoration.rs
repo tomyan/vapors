@@ -1,7 +1,7 @@
 //! Borders, radii, shadows and the cursor: what the scene holds for an
 //! element, and what is refused.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
