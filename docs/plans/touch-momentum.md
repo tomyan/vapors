@@ -202,6 +202,13 @@ container shares (`set_thumb_opacity`: 1 while a mouse is in use, 0 on
 touch). Each container fades on its own, as each has its own controller
 in cc: scrolling one list shows and fades only its thumbs.
 
+Two gaps are open. Until the first touch the floor is a mouse's (1),
+so the first finger down hides every thumb at once (#405); Chrome on
+Android shows none at load. And only a touch drag or a fling shows the
+thumbs on touch, where cc shows them for every scroll it applies (#406).
+While a mouse is in use the containers' own fades are dropped, so no
+fade asks for frames under the mouse's floor.
+
 ## What the Pixel recorded (2026-11-15)
 
 27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device

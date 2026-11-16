@@ -73,3 +73,37 @@ fn each_container_fades_on_its_own_and_the_earliest_start_is_waited_for() {
     assert_eq!(fades.phase(at + 650 * MS), Phase::Fading);
     assert_eq!(fades.phase(at + 700 * MS), Phase::Hidden);
 }
+
+#[test]
+fn a_container_faded_out_is_forgotten() {
+    // Given a container scrolled, its fade over
+    let (doc, list, _) = crate::scroll_fixture::nested();
+    let (mut fades, at) = (super::ThumbFades::default(), Instant::now());
+    fades.scrolled(list, at);
+    fades.apply(&mut doc.borrow_mut(), at);
+    assert_eq!(fades.len(), 1);
+
+    // When drawn at the fade's end
+    fades.apply(&mut doc.borrow_mut(), at + FADE_DELAY + FADE_DURATION);
+
+    // Then it is no longer visited each frame
+    assert_eq!(fades.len(), 0);
+}
+
+#[test]
+fn hiding_every_fade_draws_each_hidden_and_forgets_them() {
+    // Given a container shown by a scroll
+    let (doc, list, _) = crate::scroll_fixture::nested();
+    let (mut fades, at) = (super::ThumbFades::default(), Instant::now());
+    fades.scrolled(list, at);
+    fades.apply(&mut doc.borrow_mut(), at);
+    doc.borrow_mut().take_changed();
+
+    // When the mouse takes over
+    fades.hide_all(&mut doc.borrow_mut());
+
+    // Then its own alpha is dropped once, and no fade is left
+    assert!(doc.borrow_mut().take_changed());
+    assert_eq!(fades.len(), 0);
+    assert_eq!(fades.phase(at), Phase::Hidden);
+}

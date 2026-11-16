@@ -106,6 +106,21 @@ impl ThumbFades {
             .retain(|_, fade| fade.phase(now) != Phase::Hidden);
     }
 
+    /// Every faded container's own thumbs hidden and its fade dropped:
+    /// the mouse's floor shows them all, and no fade needs a frame.
+    pub(crate) fn hide_all(&mut self, document: &mut Document) {
+        for container in self.by_container.keys() {
+            document.set_thumb_opacity_of(*container, 0.0);
+        }
+        self.by_container.clear();
+    }
+
+    /// How many containers are fading or shown.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.by_container.len()
+    }
+
     /// Where the fades are at `now`: fading if any is, else shown until
     /// the earliest fade start, else hidden.
     pub(crate) fn phase(&self, now: Instant) -> Phase {

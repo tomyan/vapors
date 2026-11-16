@@ -104,8 +104,19 @@ impl TouchScroll {
     /// Every container's thumbs drawn as they are at `now`: fully while
     /// the mouse is in use, else each at its own touch fade.
     pub(crate) fn draw_thumbs(&mut self, document: &mut Document, now: Instant) {
-        document.set_thumb_opacity(if self.touching { 0.0 } else { 1.0 });
-        self.fades.apply(document, now);
+        if self.touching {
+            document.set_thumb_opacity(0.0);
+            self.fades.apply(document, now);
+        } else {
+            document.set_thumb_opacity(1.0);
+            self.fades.hide_all(document);
+        }
+    }
+
+    /// How many containers' fades are left.
+    #[cfg(test)]
+    pub(crate) fn fades_left(&self) -> usize {
+        self.fades.len()
     }
 
     /// How opaque `container`'s thumbs are at `now`.

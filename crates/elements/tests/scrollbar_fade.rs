@@ -99,3 +99,19 @@ fn an_element_that_does_not_scroll_takes_no_opacity() {
     assert!(!doc.take_changed());
     assert_eq!(thumb_alphas(&mut doc), Vec::<f32>::new());
 }
+
+#[test]
+fn a_thumbs_opacity_changes_nothing_the_a11y_mirror_reads() {
+    // Given two lists, the mirror up to date
+    let (mut doc, left, _) = two_lists();
+    doc.take_ax_update().expect("takes");
+
+    // When a fade step changes the left list's thumbs
+    doc.set_thumb_opacity_of(left, 0.5);
+    doc.update(at(1.0)).expect("updates");
+
+    // Then the mirror reads nothing again: a thumb is not in the a11y
+    // tree
+    assert_eq!(doc.take_ax_update().expect("takes"), None);
+    assert_eq!(doc.ax_take_counts().nodes_read, 0);
+}

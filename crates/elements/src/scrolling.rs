@@ -85,8 +85,9 @@ impl Document {
     /// thumbs while it scrolls and fades them after. Ignored for an
     /// element that is not a scroll container as of the last update.
     pub fn set_thumb_opacity_of(&mut self, container: NodeId, opacity: f32) {
+        // a thumb is not in the a11y tree, so the mirror is not told
         if self.scroll.set_alpha(container, alpha_of(opacity)) {
-            self.note_scrolled(container);
+            self.note_change();
         }
     }
 

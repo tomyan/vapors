@@ -165,22 +165,33 @@ mod thumb_tests {
     use super::FrameDecision;
 
     #[test]
-    fn fading_thumbs_draw_again_at_once_and_shown_ones_wait_for_the_fade() {
+    fn fading_thumbs_draw_again_at_once() {
         // Given
-        let fade_at = Instant::now() + Duration::from_millis(300);
-        let tooltip = fade_at + Duration::from_millis(200);
-        let shown = FrameDecision {
-            thumbs_fade_at: Some(fade_at),
-            tooltip_deadline: Some(tooltip),
-            ..FrameDecision::default()
-        };
         let fading = FrameDecision {
             thumbs_fading: true,
             ..FrameDecision::default()
         };
 
         // Then
-        assert_eq!(shown.next(), Next::WaitUntil(fade_at));
         assert_eq!(fading.next(), Next::Continue);
+    }
+
+    #[test]
+    fn shown_thumbs_wait_for_the_earlier_of_their_fade_and_the_tooltip() {
+        // Given fades and tooltips due before and after each other
+        let soon = Instant::now() + Duration::from_millis(100);
+        let later = soon + Duration::from_millis(200);
+        let waits = |fade_at, tooltip| {
+            FrameDecision {
+                thumbs_fade_at: Some(fade_at),
+                tooltip_deadline: Some(tooltip),
+                ..FrameDecision::default()
+            }
+            .next()
+        };
+
+        // Then
+        assert_eq!(waits(soon, later), Next::WaitUntil(soon));
+        assert_eq!(waits(later, soon), Next::WaitUntil(soon));
     }
 }

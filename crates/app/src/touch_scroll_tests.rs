@@ -76,38 +76,75 @@ fn a_pan_without_a_finger_down_scrolls_nothing() {
 }
 
 #[test]
-fn thumbs_show_with_a_mouse_and_on_touch_from_each_scroll_then_fade() {
-    // Given
-    let (doc, outer, inner) = nested();
+fn thumbs_show_fully_while_a_mouse_is_in_use() {
+    // Given a gesture that scrolled and faded out
+    let (doc, _, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
-    let ms = |n: u64| at + std::time::Duration::from_millis(n);
     assert_eq!(
         touch.thumb_opacity(inner, at),
         1.0,
         "a mouse until a finger touches"
     );
-
-    // When / Then: a finger down, not yet scrolling
     touch.down(1, [10.0, 10.0]);
-    assert_eq!(touch.thumb_opacity(inner, at), 0.0);
-
-    // When / Then: the gesture scrolls and ends; the thumbs stay, then
-    // fade from 300 ms after the scroll over 300 ms
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
     touch.up(1);
-    assert_eq!(touch.thumb_opacity(inner, ms(10)), 1.0);
+
+    // When the mouse moves again
+    touch.mouse();
+
+    // Then
+    let later = at + std::time::Duration::from_millis(600);
+    assert_eq!(touch.thumb_opacity(inner, later), 1.0);
+}
+
+#[test]
+fn a_finger_down_shows_no_thumbs_until_it_scrolls() {
+    // Given
+    let (_, _, inner) = nested();
+    let mut touch = TouchScroll::default();
+
+    // When
+    touch.down(1, [10.0, 10.0]);
+
+    // Then
     assert_eq!(
-        touch.thumb_opacity(outer, ms(10)),
-        0.0,
-        "only the list that scrolled"
+        touch.thumb_opacity(inner, vapors_platform::Instant::now()),
+        0.0
     );
+}
+
+#[test]
+fn a_scroll_shows_only_the_scrolled_containers_thumbs() {
+    // Given
+    let (doc, outer, inner) = nested();
+    let mut touch = TouchScroll::default();
+    let at = vapors_platform::Instant::now();
+    touch.down(1, [10.0, 10.0]);
+
+    // When the inner list scrolls
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
+
+    // Then
+    assert_eq!(touch.thumb_opacity(inner, at), 1.0);
+    assert_eq!(touch.thumb_opacity(outer, at), 0.0);
+}
+
+#[test]
+fn thumbs_stay_after_the_lift_then_fade_300_ms_after_the_scroll() {
+    // Given a scroll at `at`, then the lift
+    let (doc, _, inner) = nested();
+    let mut touch = TouchScroll::default();
+    let at = vapors_platform::Instant::now();
+    let ms = |n: u64| at + std::time::Duration::from_millis(n);
+    touch.down(1, [10.0, 10.0]);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
+    touch.up(1);
+
+    // Then
+    assert_eq!(touch.thumb_opacity(inner, ms(10)), 1.0);
     assert!((touch.thumb_opacity(inner, ms(450)) - 0.5).abs() < 1e-3);
     assert_eq!(touch.thumb_opacity(inner, ms(600)), 0.0);
-
-    // When / Then: the mouse again
-    touch.mouse();
-    assert_eq!(touch.thumb_opacity(inner, ms(600)), 1.0);
 }
 
 #[test]
@@ -259,4 +296,22 @@ fn a_finger_down_does_not_hide_thumbs_still_showing() {
         touch.thumb_opacity(inner, at + std::time::Duration::from_millis(100)),
         1.0
     );
+}
+
+#[test]
+fn the_mouse_taking_over_mid_fade_leaves_no_fade_to_draw() {
+    // Given a scroll that shows a container's thumbs
+    let (doc, _, _) = nested();
+    let mut touch = TouchScroll::default();
+    let at = vapors_platform::Instant::now();
+    touch.down(1, [10.0, 10.0]);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
+    touch.up(1);
+
+    // When the mouse moves, and a frame draws the thumbs
+    touch.mouse();
+    touch.draw_thumbs(&mut doc.borrow_mut(), at);
+
+    // Then no fade asks for frames
+    assert_eq!(touch.fades_left(), 0);
 }
