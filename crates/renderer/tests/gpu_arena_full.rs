@@ -12,7 +12,7 @@ use vapors_renderer::{ArenaFull, FrameEncoder, Holding, QuadPipeline};
 /// The lowered `max_buffer_size`: twice the arena's first buffer.
 const LIMIT: u64 = 128 * 1024;
 /// A quad's instance bytes.
-const QUAD_BYTES: u64 = 128;
+const QUAD_BYTES: u64 = 144;
 const SIDE: u32 = 4;
 
 #[test]

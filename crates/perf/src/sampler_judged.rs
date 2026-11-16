@@ -5,7 +5,6 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use super::start::Apps;
 use super::{Measured, Sampler};
 use crate::gpu_reading::frame_gpu_time;
 use crate::run::{Counts, Workload};
@@ -65,11 +64,11 @@ impl Sampler<'_> {
             return Err("a judged run of 0 frames judges nothing; give it at least one".into());
         }
         let texture = self.texture(workload.size());
-        let start_up = self.begin(workload, texture.format(), Apps::Started)?;
+        let start_up = self.begin(workload, texture.format())?;
         let (mut kept, mut waiting) = (Vec::with_capacity(frames), None);
         for index in 0..=frames {
             // `frame` refuses one that built a pipeline
-            let measured = self.frame(workload, &texture, (index, Apps::Started), None)?;
+            let measured = self.frame(workload, &texture, index, None)?;
             if let Some((before, counts)) = waiting.take() {
                 kept.push(judged(
                     before,

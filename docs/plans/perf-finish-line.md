@@ -5,7 +5,10 @@ vapors work until every property below holds, measured. The comparative
 benchmark, the website and outside funding applications wait for it.
 
 Each property is measured by `crates/perf` (`vapors-perf`) in a release
-build on the dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
+build, its `--scaling` growth checks in the judged profile (release with
+one codegen unit, since 2026-11-16; the per-row ceilings were set again
+then, `docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"), on the
+dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
 three runs, medians, and recorded in `docs/perf/`. A property holds when
 the harness shows it, not when the code is believed to do it.
 
@@ -42,9 +45,9 @@ mount, pipeline creation and first uploads.
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
-cargo build --release -p vapors-perf
+cargo build --profile judged -p vapors-perf
 for change in Idle Text FlexText Class HoveredClass; do
-  ./target/release/vapors-perf 60 10 --scaling $change || echo "$change grows"
+  ./target/judged/vapors-perf 60 10 --scaling $change || echo "$change grows"
 done
 ```
 

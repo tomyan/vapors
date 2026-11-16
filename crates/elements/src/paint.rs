@@ -35,6 +35,13 @@ pub(crate) struct PaintInput<'a> {
     /// The document's run-time shapes, which elements that paint shapes
     /// acquire from.
     pub(crate) shapes: &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
+    /// The placement painted from: whether each slot is a lane child in
+    /// a frame of its own, which clips read, and each framed lane's
+    /// container, which its children's frames are worked out from
+    /// (`placement_frames.rs`, `frames_lane.rs`).
+    pub(crate) placement: &'a crate::placement::Placement,
+    /// The lanes, which lane frames read their shifts from.
+    pub(crate) lanes: &'a crate::layout::SharedLanes,
 }
 
 impl<'a> PaintInput<'a> {
@@ -44,11 +51,12 @@ impl<'a> PaintInput<'a> {
         (used, stackings): (&'a UsedMap, &'a Stackings),
         page: (NodeId, NodeId),
         (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
-        (scroll, shapes): (
+        (scroll, lanes, shapes): (
             &'a crate::scroll::Offsets,
+            &'a crate::layout::SharedLanes,
             &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
         ),
-        from: &crate::kept_paint::PaintedFrom,
+        from: &'a crate::kept_paint::PaintedFrom,
     ) -> Self {
         Self {
             used,
@@ -63,6 +71,8 @@ impl<'a> PaintInput<'a> {
             scroll,
             thumb_alpha: from.thumb_alpha,
             shapes,
+            placement: &from.placement,
+            lanes,
         }
     }
 }

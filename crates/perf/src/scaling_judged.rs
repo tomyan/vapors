@@ -16,24 +16,36 @@ use crate::scaling::PhaseSeries;
 ///
 /// Relaxed from 9500 (2026-11-13): main measured 9538, 9541.5 and 9542
 /// per row, the accessibility mirror's per-row cost since #258 tracks
-/// hoisted nodes; 9600 is that rounded up to the next hundred, ten
-/// times the repeat noise. Layout-lane PR 5 (the accessibility mirror
-/// in flow, `docs/plans/splice-layout.md`) retires it, restoring 9500.
-pub const INSERT_A11Y_PER_ROW: u64 = 9600;
+/// hoisted nodes; 9600 was that rounded up to the next hundred.
+///
+/// Set again for the judged profile (2026-11-16, one codegen unit):
+/// 10,500.2 to 10,550.3 per row over four judged runs (three at
+/// 30c03ed2, one at #411's head); 10,600 is the first hundred at least
+/// 0.4% over the highest, 0.47% of headroom
+/// (`docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"). Layout-lane
+/// PR 5 (the accessibility mirror in flow, `docs/plans/splice-layout.md`)
+/// retires it, with the lower ceiling measured judged then.
+pub const INSERT_A11Y_PER_ROW: u64 = 10_600;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `FlexInsert`, on the flex-column list,
 /// whose rows are one block holding their text: measured 1829.6 and
 /// 1832.9 per row (insert and remove frames, 2026-11-14, layout-lane PR
-/// 3f-2); 1900 is that rounded up to the next hundred. Layout-lane PR 5
-/// (the accessibility mirror in flow) retires it.
-pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1900;
+/// 3f-2); 1900 was that rounded up to the next hundred. Set again for
+/// the judged profile (2026-11-16): 1961.2 to 1968.1 over the same four
+/// judged runs; 1980 is the first ten at least 0.4% over the highest,
+/// 0.60% of headroom. Layout-lane PR 5 (the accessibility mirror in
+/// flow) retires it.
+pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1980;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
 ///
 /// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
-/// 13,443 and 13,446.3 per row. Layout-lane PR 5 retires it, restoring
-/// 13,000.
-pub const RESIZE_A11Y_PER_ROW: u64 = 13_500;
+/// 13,443 and 13,446.3 per row. Set again for the judged profile
+/// (2026-11-16): 15,639.5 to 15,721.2 over the same four judged runs;
+/// 15,800 is the first hundred at least 0.4% over the highest, 0.50% of
+/// headroom. Layout-lane PR 5 retires
+/// it, with the lower ceiling measured judged then.
+pub const RESIZE_A11Y_PER_ROW: u64 = 15_800;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
 /// every size: the take reads the scrolled container alone, its rows'
@@ -111,9 +123,11 @@ impl Judged {
                 ceiling: RESIZE_A11Y_PER_ROW,
                 flat: &[],
             },
+            // layout flat since 4g: a container that only scrolled keeps
+            // its range (docs/plans/splice-layout.md section 12)
             RowChange::Scroll => Self::AccessibilityPerRow {
                 ceiling: SCROLL_A11Y_PER_ROW,
-                flat: &[],
+                flat: &["layout"],
             },
             RowChange::ScrollSize => Self::AccessibilityPerRow {
                 ceiling: SCROLL_SIZE_A11Y_PER_ROW,

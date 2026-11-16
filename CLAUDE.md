@@ -27,8 +27,9 @@ cargo xtask serve         the release build of main on the tailnet where [serve]
                           tailscale serve mounts it, and again through the tailnet URL after.
                           Needs lingering (loginctl enable-linger); prints the URL
 cargo xtask test          one tier (default unit)
-cargo xtask scaling       vapors-perf's scaling judge (`--scaling all`, every change) in
-                          release on a clean tree; ends `scaling: pass|fail <sha>`
+cargo xtask scaling       vapors-perf's scaling judge (`--scaling all`, every change),
+                          built with the judged profile (release, one codegen unit) on a
+                          clean tree; ends `scaling: pass|fail <sha>`
 scripts/nightly-scaling.sh [--install]
                           that judge on origin/main in ~/.cache/w-nightly/vapors, a GitHub
                           issue per failing change, closed when it passes; --install writes
@@ -84,8 +85,10 @@ plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` 
 `.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
 ci` runs go at once on the machine, and the next waits for a slot,
 naming who holds them. A worktree's `target` lives under
-`~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
-the directory:
+`~/.cache`, never the `/tmp` tmpfs, and holds at most 80 GB (the lead's
+limit, set after the disk filled on 2026-11-09): every build xtask starts
+is refused over it (`[targets] max_gb`, `xtask/src/target_cap.rs`). When
+its PR merges, empty it and keep the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
 
 ## Rules

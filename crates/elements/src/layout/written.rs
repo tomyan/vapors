@@ -15,4 +15,11 @@ pub(crate) struct Written {
     pub(crate) changed: Vec<usize>,
     /// Slots whose hoisted list was written.
     pub(crate) hoisting: Vec<usize>,
+    /// Each lane container whose children's starts may have changed,
+    /// with the slot of the first such child: it and every later child
+    /// (`Lanes::children_from`). A lane child's layout leaves its start
+    /// out (`lane_layout.rs`), so placement of a lane that is not
+    /// framed, paint and the a11y take learn of new starts from this
+    /// list: one entry per lane, whatever the children.
+    pub(crate) started: Vec<(usize, usize)>,
 }

@@ -20,7 +20,7 @@ use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_owner::Owner;
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
-use crate::layout::{Key, Slots};
+use crate::layout::{Key, Lanes, Slots};
 use crate::node_map::{NodeMap, NodeSet};
 
 /// What a take collects before it reads anything.
@@ -37,6 +37,14 @@ pub(crate) struct Touched {
     /// The scroll containers whose offset as applied changed: each moves
     /// the hoisted nodes in its frame on the page (`a11y_mirror_reach`).
     pub(crate) scrolled: NodeSet,
+    /// The elements removed since the last take, each subtree's every
+    /// element, hidden ones included: their ids are freed with them, so
+    /// the take drops their index entries by this list (4i).
+    pub(crate) freed: NodeSet,
+    /// The elements whose `id` or a referring attribute was written
+    /// (`a11y_mirror_index::INDEXED`): with the inserted and freed ones,
+    /// the only elements whose index entries can differ.
+    pub(crate) indexed: NodeSet,
 }
 
 pub(crate) struct AxMirror {
@@ -74,7 +82,7 @@ impl Default for AxMirror {
 
 impl AxMirror {
     /// Notes the boxes an update built, moved or freed, by their nodes.
-    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, slots: &Slots) {
+    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, (slots, lanes): (&Slots, &Lanes)) {
         // a box made or unmade a containing block, or a positioned box
         // freed, can change which parent node a node's box is placed in
         // (hoisted or not) without moving it, so nothing touches it:
@@ -86,8 +94,20 @@ impl AxMirror {
         if self.all {
             return;
         }
-        let built = changed.rebuilt.iter().chain(&changed.moved);
-        for key in built.filter_map(|&slot| slots.key(slot)) {
+        // a framed lane child that started elsewhere has not moved in
+        // its frame, but its record's bounds are from its parent node
+        // (`docs/plans/splice-layout.md`, 5.3; until PR 5's mirror in flow)
+        let started = changed
+            .started
+            .iter()
+            // a lane dropped later in the layout: placement places its rows
+            // again (`started_unframed`), and a row whose rect changed is in
+            // `moved` above; one placed where it was keeps its record
+            .flat_map(|&(container, first)| {
+                lanes.children_from(container, first).unwrap_or_default()
+            });
+        let built = changed.rebuilt.iter().chain(&changed.moved).copied();
+        for key in built.chain(started).filter_map(|slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
         }
         for (_, key) in &changed.freed {
@@ -119,10 +139,28 @@ impl AxMirror {
         self.touched.replaced.insert(node);
     }
 
+    /// Notes `node`'s `id` or a referring attribute written.
+    pub(crate) fn touch_indexed(&mut self, node: NodeId) {
+        if !self.all {
+            self.touched.indexed.insert(node);
+        }
+    }
+
+    /// Notes `elements`, a removed subtree's, freed.
+    fn touch_freed(&mut self, elements: Vec<NodeId>) {
+        if !self.all {
+            self.touched.freed.extend(elements);
+        }
+    }
+
     /// Whether nothing was touched since the last take.
     pub(crate) fn touched_nothing(&self) -> bool {
         let touched = &self.touched;
-        touched.nodes.is_empty() && touched.renamed.is_empty() && touched.scrolled.is_empty()
+        touched.nodes.is_empty()
+            && touched.renamed.is_empty()
+            && touched.scrolled.is_empty()
+            && touched.freed.is_empty()
+            && touched.indexed.is_empty()
     }
 
     /// What was touched since the last take; cleared.
@@ -143,6 +181,8 @@ impl AxMirror {
         touched.replaced.extend(self.touched.replaced.drain());
         touched.renamed.extend(self.touched.renamed.drain());
         touched.scrolled.extend(self.touched.scrolled.drain());
+        touched.freed.extend(self.touched.freed.drain());
+        touched.indexed.extend(self.touched.indexed.drain());
         self.touched = touched;
         self.index = Some(index);
     }
@@ -211,5 +251,15 @@ impl Document {
     pub(crate) fn note_replaced(&mut self, node: NodeId) {
         self.note_change();
         self.ax.touch_replaced(node);
+    }
+
+    /// Notes the elements of `node`'s subtree, about to be removed and
+    /// freed, for the next take's index; nothing before the first take,
+    /// which scans.
+    pub(crate) fn note_freed(&mut self, node: NodeId) {
+        if !self.ax.all {
+            let elements = crate::check::elements(&self.arena, node);
+            self.ax.touch_freed(elements);
+        }
     }
 }

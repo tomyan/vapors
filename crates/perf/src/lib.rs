@@ -8,6 +8,8 @@
 
 pub mod args;
 pub mod args_off_path;
+pub mod build_profile;
+pub mod child_deadline;
 pub mod circuit;
 pub mod driver;
 pub mod element_memory;
@@ -15,6 +17,8 @@ pub mod element_memory_add;
 pub mod element_memory_flat;
 pub mod element_memory_run;
 pub mod element_memory_sizes;
+pub mod first_frame_report;
+pub mod first_frame_run;
 pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
@@ -26,7 +30,6 @@ pub mod instructions;
 pub mod instructions_check;
 pub mod mount;
 pub mod mount_memory;
-pub mod mount_report;
 pub mod mount_run;
 pub mod off_path;
 pub mod off_path_kinds;
@@ -59,6 +62,7 @@ pub mod select;
 pub mod shader_cache;
 mod span_instructions;
 pub mod spans;
+pub mod splice_tally;
 pub mod stats;
 pub mod workloads;
 

@@ -18,6 +18,11 @@ pub struct Component {
     /// by `compile_dir`, else the path as named. `None` when the app adds
     /// the style as a global sheet (`compile_dir_global`).
     pub scope: Option<String>,
+    /// What a `compile_dir_global` component's sheet is named by, after
+    /// the crate's name: the path under the compiled directory's parent,
+    /// as a scope is, so it is the same on every machine; else the path
+    /// as named. `None` for a scoped component.
+    pub global_sheet: Option<String>,
     /// The file's text, for positioning later refusals.
     pub text: String,
     /// The `<script>` section, if present.

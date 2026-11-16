@@ -21,7 +21,7 @@ fn a_tree_with_changes_is_refused_naming_the_revision_and_the_fix() {
 }
 
 #[test]
-fn the_judge_runs_every_change_after_the_release_build_each_with_a_deadline() {
+fn the_judge_runs_every_change_after_the_judged_build_each_with_a_deadline() {
     // When
     let steps = steps();
 
@@ -30,8 +30,8 @@ fn the_judge_runs_every_change_after_the_release_build_each_with_a_deadline() {
     assert_eq!(
         lines,
         [
-            "cargo build --release -p vapors-perf",
-            "target/release/vapors-perf 60 10 --scaling all"
+            "cargo build --profile judged -p vapors-perf",
+            "target/judged/vapors-perf 60 10 --scaling all"
         ]
     );
     assert!(steps.iter().all(|step| step.deadline.is_some()));

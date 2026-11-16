@@ -16,6 +16,7 @@ pub mod property;
 pub mod scope;
 pub mod selector;
 pub mod serialize;
+pub mod sheet_hash;
 pub mod syntax;
 pub mod token;
 pub mod tree;

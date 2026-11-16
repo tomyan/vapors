@@ -2,24 +2,25 @@
 //! (`docs/plans/splice-layout.md`, section 2 (a) and (d), section 10):
 //! the container's inputs settled (`lane_block.rs`, `lane_flex.rs`),
 //! only the children put in, laid out again or sharing new inputs laid
-//! out and their leaves put in the tree (`lane_fill.rs`), the starts of
-//! the children from the first that moved written into their layouts,
-//! and the container's answer folded (`lane_kind.rs`). A container, or
-//! one of its children, the lane does not lay out is handed to Taffy's
-//! algorithm, counted with the reason (`LaneCounts`).
+//! out and their leaves put in the tree (`lane_fill.rs`), their layouts
+//! written with the relative offset alone along the axis (section 11.2:
+//! the start stays in the lane), and the container's answer folded
+//! (`lane_kind.rs`). A container, or one of its children, the lane does
+//! not lay out is handed to Taffy's algorithm, counted with the reason
+//! (`LaneCounts`).
 
 use taffy::{
-    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, compute_block_layout,
+    BlockContext, LayoutInput, LayoutOutput, NodeId, RunMode, compute_block_layout,
     compute_flexbox_layout,
 };
 
 use super::lane::Lane;
 use super::lane_block::Settled;
-use super::lane_block_answer::narrow;
 use super::lane_flex::FlexSettled;
 use super::lane_flex_share::FlexLane;
 use super::lane_kind::LaneKind;
 use super::lane_share::BlockLane;
+use super::lane_view::LaneView;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
@@ -61,7 +62,7 @@ impl BoxTree<'_> {
             Settled::Declined(decline) => Err(decline),
             Settled::Laid(container) => self.lane_answer::<BlockLane>(id, &container),
         };
-        self.counted(id, laid)
+        self.counted((id, inputs), laid)
             .unwrap_or_else(|| compute_block_layout(self, id, inputs, block))
     }
 
@@ -77,16 +78,17 @@ impl BoxTree<'_> {
             FlexSettled::Declined(decline) => Err(decline),
             FlexSettled::Laid(column) => self.lane_answer::<FlexLane>(id, &column),
         };
-        self.counted(id, laid)
+        self.counted((id, inputs), laid)
             .unwrap_or_else(|| compute_flexbox_layout(self, id, inputs))
     }
 
     /// The container's answer counted as a lane's, or its decline
-    /// counted and its lane dropped: then `None`, for Taffy to lay it
-    /// out.
+    /// counted: then `None`, for Taffy to lay it out. A declined layout
+    /// drops the lane, since Taffy writes every child; a declined size
+    /// query writes none, so the lane is kept as written.
     fn counted(
         &mut self,
-        id: NodeId,
+        (id, inputs): (NodeId, LayoutInput),
         laid: Result<LayoutOutput, LaneDecline>,
     ) -> Option<LayoutOutput> {
         match laid {
@@ -96,7 +98,9 @@ impl BoxTree<'_> {
             }
             Err(decline) => {
                 self.lane_counts.decline(decline);
-                self.lanes.remove(usize::from(id));
+                if inputs.run_mode == RunMode::PerformLayout {
+                    self.lanes.remove(usize::from(id), &mut self.boxes);
+                }
                 None
             }
         }
@@ -129,12 +133,27 @@ impl BoxTree<'_> {
         c: &K::Container,
     ) -> Result<LayoutOutput, LaneDecline> {
         let slot = usize::from(id);
-        let mut lane = K::lanes(self.lanes)
-            .remove(&slot)
-            .unwrap_or_else(|| Lane::new(K::gap(c)));
-        let run = self.fill(slot, c, &mut lane)?;
-        K::lanes(self.lanes).insert(slot, lane);
-        K::answer(c, &run)
+        let held = K::lanes(self.lanes).remove(&slot);
+        let existed = held.is_some();
+        let mut lane = held.unwrap_or_else(|| Lane::new(K::gap(c)));
+        let aside = self.answers_aside(c, &lane);
+        let run = if aside {
+            self.fill_aside::<K>(slot, c)
+        } else {
+            self.fill(slot, c, &mut lane)
+        };
+        // a lane answered aside is as written, even when the ask declines;
+        // one dropped puts its written children's starts back, as the
+        // container's next layout may come from Taffy's cache
+        if run.is_ok() || aside {
+            self.lane_kept(slot, lane);
+        } else {
+            // a lane held, dropped: a change, which a frames' memo built on
+            // it must see (one made for this ask and declined changes none)
+            self.lanes.changes += u64::from(existed);
+            lane.restore_starts(slot, &mut self.boxes);
+        }
+        K::answer(c, &run?)
     }
 
     fn fill<K: LaneKind>(
@@ -156,30 +175,10 @@ impl BoxTree<'_> {
         }
         let run = lane.tree.total();
         if K::writes(c) {
-            self.write_starts(c, lane, &run);
+            lane.facts.top = K::top(c, &run);
+            lane.written = lane.share.clone().zip(lane.heights);
+            self.write_laid(slot, lane);
         }
         Ok(run)
-    }
-
-    /// Writes the layout of every child from the first that moved on:
-    /// its start from the tree, from where the kind measures starts.
-    fn write_starts<K: LaneKind>(
-        &mut self,
-        c: &K::Container,
-        lane: &mut Lane<K>,
-        run: &K::Summary,
-    ) {
-        let Some(first) = lane.first_moved() else {
-            return;
-        };
-        let top = K::top(c, run);
-        for (handle, start) in lane.tree.starts_from(first) {
-            let slot = lane.slots[&handle];
-            let (mut layout, relative) = lane.take_write(slot, self.boxes[slot].layout);
-            layout.location.y = narrow(top + start) + relative;
-            self.set_unrounded_layout(NodeId::from(slot), &layout);
-        }
-        lane.moved.clear();
-        lane.pending.clear();
     }
 }
