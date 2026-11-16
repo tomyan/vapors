@@ -57,6 +57,12 @@ pub const SHARP_TURN: f32 = 0.28;
 /// #420's fix: at most 0.0033.
 pub const DISTANCE_TOLERANCE: f32 = 0.01;
 
+/// How far under 0.5 minus its distance an inside pixel may read where a
+/// triangle without the near sharp corner can cover it (#421): measured
+/// at most 0.0124 under, on Redo at 1.55 (pixel (22, 15)), on 2026-11-16;
+/// that and one more 8-bit step's margin, 0.02.
+pub const UNDER_TOLERANCE: f32 = 0.02;
+
 /// Asserts every pixel whose centre lies within half a device pixel of
 /// `mesh`'s outline under `transform` is within [`DISTANCE_TOLERANCE`]
 /// of 0.5 minus its CPU distance to the outline, which is what the
@@ -141,6 +147,15 @@ impl Band<'_> {
         if own_edges && (drawn - by_distance).abs() > self.tolerance {
             return Some(format!(
                 "0.5 minus its distance to the outline is {by_distance}"
+            ));
+        }
+        // A triangle without the near corner over-covers by up to the
+        // corner's distance (it reads a farther edge of its own; #421), so
+        // an inside pixel it may cover is held from below only, within
+        // UNDER_TOLERANCE
+        if !own_edges && drawn < by_distance - UNDER_TOLERANCE {
+            return Some(format!(
+                "under 0.5 minus its distance to the outline, {by_distance}"
             ));
         }
         let boxed = self.drawing[at];
