@@ -1,6 +1,7 @@
-//! `compile_dir_global`: components whose `STYLE` the app adds as a
-//! global sheet, as the layout corpus does so that its CSS means what
-//! Chromium reads. Nothing is scoped: no `SCOPE`, no `add_style`, no tag.
+//! `compile_dir_global`: components whose `STYLE` is a global sheet, as
+//! the layout corpus needs so that its CSS means what Chromium reads.
+//! Nothing is scoped: no `SCOPE`, no `add_style`, no tag; each mount
+//! registers the sheet itself under `SHEET`, its crate and file.
 
 #[path = "common/build.rs"]
 mod build;
@@ -25,6 +26,39 @@ fn a_globally_styled_component_keeps_its_style_and_scopes_nothing() {
     for scoping in ["pub const SCOPE", "add_style(", "scope: Some(SCOPE)"] {
         assert!(!code.contains(scoping), "{scoping} in {code}");
     }
+}
+
+#[test]
+fn a_globally_styled_component_registers_its_sheet_under_the_name_its_winners_use() {
+    // Given
+    let (src, out) = dirs("global_sheet");
+    write(&src, "card.wisp", STYLED);
+
+    // When
+    compile_dir_into_styled(&src, &out, Styles::Global).unwrap_or_else(|errs| panic!("{errs:?}"));
+
+    // Then: one name, built the same way, in the constant, the mount's
+    // registration and the key's winners
+    let code = read(&out.join("wisp/card.rs"));
+    let file = format!("{:?}", src.join("card.wisp").display().to_string());
+    let name = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {file})");
+    for needle in [
+        format!("pub const SHEET: &str = {name};"),
+        "dom.borrow_mut().add_global_style(SHEET, STYLE);".to_owned(),
+        format!("vapors_dom::SheetRef::Global({name})"),
+    ] {
+        assert!(
+            squashed(&code).contains(&squashed(&needle)),
+            "{needle} missing from {code}"
+        );
+    }
+}
+
+/// Without whitespace or the trailing commas prettyplease adds when it
+/// wraps a long line.
+fn squashed(code: &str) -> String {
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    compact.replace(",)", ")")
 }
 
 #[test]

@@ -156,15 +156,17 @@ fn conditional(
     (winners.rules.iter()).filter(|rule| matches!(rule.verdict, Match::Conditional(_)))
 }
 
-/// `id` as the runtime names it: a scope under the crate's name, as the
-/// generated `SCOPE` constant is.
+/// `id` as the runtime names it: under the crate's name, as the
+/// generated `SCOPE` and `SHEET` constants are.
 fn sheet_ref(id: &SheetId) -> String {
     match id {
         SheetId::UserAgent => "vapors_dom::SheetRef::UserAgent".to_owned(),
         SheetId::Scope(scope) => format!(
             "vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?}))"
         ),
-        SheetId::Global(file) => format!("vapors_dom::SheetRef::Global({file:?})"),
+        SheetId::Global(file) => format!(
+            "vapors_dom::SheetRef::Global(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {file:?}))"
+        ),
     }
 }
 

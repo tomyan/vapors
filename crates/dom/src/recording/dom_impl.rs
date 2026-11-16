@@ -151,6 +151,13 @@ impl Dom for RecordingDom {
         });
     }
 
+    fn add_global_style(&mut self, sheet: &str, css: &str) {
+        self.calls.push(Call::AddGlobalStyle {
+            sheet: sheet.into(),
+            css: css.into(),
+        });
+    }
+
     fn current_text(&self, node: NodeId) -> Option<&str> {
         match &self.record(node).kind {
             Kind::Text(text) => Some(text),

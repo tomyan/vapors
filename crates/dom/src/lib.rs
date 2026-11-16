@@ -127,6 +127,11 @@ pub trait Dom: Listeners {
     /// only those elements. Each mount calls it; a scope already added
     /// is not added again.
     fn add_style(&mut self, scope: &str, css: &str);
+    /// Adds a `Styles::Global` component's `<style>` as an author sheet
+    /// named `sheet` (the component's crate and file), unscoped: its
+    /// rules may match any element. Each mount calls it; a sheet already
+    /// added is not added again.
+    fn add_global_style(&mut self, sheet: &str, css: &str);
     /// Names events a component dispatches itself ([`Dispatcher`]), so a
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.

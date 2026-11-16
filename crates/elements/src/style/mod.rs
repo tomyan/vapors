@@ -12,6 +12,7 @@ mod grid_gate;
 mod grid_style;
 
 pub(crate) use grid_gate::is_container;
+mod globals;
 mod honoured;
 mod inline;
 pub(crate) mod outline;
@@ -73,6 +74,8 @@ pub(crate) struct Sheets {
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
     scopes: std::collections::HashMap<String, String>,
+    /// Each global component sheet added, by name, with its text.
+    globals: std::collections::HashMap<String, String>,
     refused: Vec<ElementError>,
 }
 
@@ -85,6 +88,7 @@ impl Sheets {
             cascade: Cascade::new().user_agent(ua),
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
+            globals: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
