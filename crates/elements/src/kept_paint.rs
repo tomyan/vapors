@@ -31,11 +31,13 @@ pub(crate) struct PaintedFrom {
 impl PaintedFrom {
     /// Whether paint made from `self` shows what a paint made from `now`
     /// would, after an update that changed the `changed` slots: some
-    /// kept, none built or moved, no scroll offset moved, and the same
-    /// thumbs and scale.
+    /// kept, none built or moved, no scroll offset or framed row's start
+    /// moved (keeping skips the lane bases, `paint_frames.rs`), and the
+    /// same thumbs and scale.
     pub(crate) fn shows(&self, now: &Self, changed: &ChangedSlots) -> bool {
         let same = (self.thumb_alpha, self.scale) == (now.thumb_alpha, now.scale);
         let unmoved = changed.moved.is_empty() && changed.offsets_moved.is_empty();
+        let unmoved = unmoved && changed.started.is_empty();
         let unmoved = unmoved && changed.scroll_states.is_empty();
         same && !changed.every && changed.built() == 0 && unmoved
     }
@@ -87,3 +89,7 @@ fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> 
     *input.cache = cache;
     painted
 }
+
+#[cfg(test)]
+#[path = "kept_paint_tests.rs"]
+mod tests;

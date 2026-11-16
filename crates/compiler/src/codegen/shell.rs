@@ -64,10 +64,18 @@ pub const STYLE: &str = {style:?};
 fn scope_constant(scope: &str) -> String {
     format!(
         "/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
-pub const SCOPE: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?});
+pub const SCOPE: &str = {};
 
-"
+",
+        in_crate(scope)
     )
+}
+
+/// A sheet's name as the runtime holds it: `path` after the crate's
+/// name. `SCOPE` and every `SheetRef` the winners write are made here,
+/// so the two cannot name one sheet differently.
+pub(super) fn in_crate(path: &str) -> String {
+    format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {path:?})")
 }
 
 fn props_struct(name: &str, info: &ScriptInfo) -> String {

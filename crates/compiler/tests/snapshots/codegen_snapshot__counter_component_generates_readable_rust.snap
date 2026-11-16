@@ -16,6 +16,265 @@ use vapors_signals::{Effect, Memo, Owner, Signal};
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
+static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
+    sheets: &[
+        (vapors_dom::SheetRef::UserAgent, 0xe774_afd0_8061_102b),
+        (vapors_dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
+    ],
+    base: &[
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(12),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 5,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(13),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(14),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(15),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(16),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(17),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(18),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(19),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(20),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(21),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(22),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(23),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(24),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(25),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(26),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 4,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(27),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(28),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 3,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(31),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 1,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(32),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 6,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(37),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 0,
+                    rule: 60,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(82),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(83),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(84),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_dom::BaseWinner {
+            property: vapors_dom::PropertyRef::Longhand(85),
+            declaration: vapors_dom::DeclarationRef::Rule {
+                rule: vapors_dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+    ],
+    conditional: &[
+        vapors_dom::RuleRef {
+            sheet: 0,
+            rule: 68,
+        },
+        vapors_dom::RuleRef {
+            sheet: 0,
+            rule: 69,
+        },
+    ],
+    shareable: true,
+};
 static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
     site: concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp:10:1"),
     scope: Some(SCOPE),
@@ -24,6 +283,7 @@ static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
     toggles: &[],
     style: None,
     attributes: &[],
+    winners: vapors_dom::Winners::Compiled(&WINNERS_BUTTON0),
 };
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]

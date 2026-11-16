@@ -14,8 +14,8 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
-                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
-                     [--scene-run [racer|one-scene]]";
+                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] [--first-frame <rows>] \
+                     [--scene-run [racer|one-scene]]; --scaling needs `--profile judged` in place of `--release`";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -31,12 +31,17 @@ pub struct Options {
     /// Run these changes at each size of `scaling::SIZES` and judge their
     /// growth: one named change, or [`RowChange::ALL`] for `--scaling all`.
     pub scaling: Option<Vec<RowChange>>,
-    /// Run the Mount workload at each size of `scaling::SIZES`.
+    /// The Mount page's memory at each size of `scaling::SIZES`, a
+    /// process each (`mount_run`).
     pub mount: bool,
+    /// The Mount page of this many rows: mount, `App::start` and frame 0
+    /// in this process (`first_frame_run`).
+    pub first_frame: Option<usize>,
     /// Run the Mount workload at one size, in this process, and print its
     /// resident set on one line (`mount_memory`'s child mode).
     pub mount_memory: Option<usize>,
-    /// Run a scene for 60 s of frames, every one judged (`scene_run`):
+    /// Run a scene for 60 s of frames, each held to the frame budget
+    /// (`scene_run`), on the shipped profile:
     /// the racer, or the scene named after the flag; no counts, no other
     /// flag.
     pub scene_run: Option<SceneKind>,
@@ -61,6 +66,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         scaling,
         mount,
         mount_memory,
+        first_frame,
         scene_run,
     } = flags;
     refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
@@ -79,9 +85,10 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         ("--scaling", scaling.is_some()),
         ("--mount", mount),
         ("--mount-memory", mount_memory.is_some()),
+        ("--first-frame", first_frame.is_some()),
         ("--scene-run", scene_run.is_some()),
     ])?;
-    refuse_counts_with_scene_run(scene_run.is_some(), &counts)?;
+    refuse_counts_with_scene_run(scene_run.is_some() || first_frame.is_some(), &counts)?;
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
@@ -90,6 +97,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         scaling,
         mount,
         mount_memory,
+        first_frame,
         scene_run,
     })
 }
@@ -103,6 +111,7 @@ struct Flags {
     scaling: Option<Vec<RowChange>>,
     mount: bool,
     mount_memory: Option<usize>,
+    first_frame: Option<usize>,
     scene_run: Option<SceneKind>,
 }
 
@@ -116,7 +125,8 @@ impl Flags {
             "--off-path" => self.set = WorkloadSet::OffPath,
             "--mount" => self.mount = true,
             "--scene-run" => return self.scene_run(rest),
-            "--mount-memory" => self.mount_memory = Some(mount_rows(rest.next())?),
+            "--mount-memory" => self.mount_memory = Some(rows_of("--mount-memory", rest.next())?),
+            "--first-frame" => self.first_frame = Some(rows_of("--first-frame", rest.next())?),
             "--scaling" if self.scaling.is_some() => {
                 return Err(format!("--scaling given twice: {USAGE}"));
             }
@@ -172,7 +182,7 @@ fn refuse_scaling_with_others(scaling: bool, only: bool, instructions: bool) -> 
 /// `modes` is every flag that selects or replaces, with whether it was
 /// given, in the order they may follow: each from the fourth is refused
 /// with the flags before it.
-fn refuse_mount_with_others(modes: [(&str, bool); 6]) -> Result<(), String> {
+fn refuse_mount_with_others(modes: [(&str, bool); 7]) -> Result<(), String> {
     for (at, (mode, _)) in modes.iter().enumerate().skip(3) {
         let given = modes[at].1;
         let other = modes[..at]
@@ -186,20 +196,22 @@ fn refuse_mount_with_others(modes: [(&str, bool); 6]) -> Result<(), String> {
 }
 
 /// The 60 s run has a fixed length and judges every frame from the
-/// first, so it takes neither runs nor warmup.
-fn refuse_counts_with_scene_run(scene_run: bool, counts: &[String]) -> Result<(), String> {
+/// first, and a first-frame run times one page's first frame, so
+/// neither takes runs or warmup.
+fn refuse_counts_with_scene_run(fixed: bool, counts: &[String]) -> Result<(), String> {
     match counts.first() {
-        Some(count) if scene_run => Err(format!(
-            "--scene-run takes no counts (it runs 3750 frames, no warmup), but {count} was given: {USAGE}"
+        Some(count) if fixed => Err(format!(
+            "--scene-run and --first-frame take no counts (each runs a fixed set of frames, no \
+             warmup), but {count} was given: {USAGE}"
         )),
         _ => Ok(()),
     }
 }
 
-fn mount_rows(value: Option<String>) -> Result<usize, String> {
+fn rows_of(flag: &str, value: Option<String>) -> Result<usize, String> {
     value
         .and_then(|rows| rows.parse().ok())
-        .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
+        .ok_or_else(|| format!("{flag} needs a row count: {USAGE}"))
 }
 
 fn scaling_change(value: Option<String>) -> Result<Vec<RowChange>, String> {

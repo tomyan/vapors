@@ -4,7 +4,7 @@
 //! kept one) and the bind group over them, kept between frames. Create
 //! once per target format.
 
-use vapors_renderer::{FrameArena, Retained, UniformSlots, WorkCounter};
+use vapors_renderer::{FrameArena, Retained, RowOffsets, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
 use crate::atlas_texture::AtlasTexture;
@@ -32,11 +32,14 @@ impl Default for BlendParams {
 
 /// Floats per vertex: position 2, uv 2, colour 4.
 pub(crate) const FLOATS_PER_VERTEX: usize = 8;
-pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>()) as u64;
+/// A vertex's bytes: its floats, then its row's index (`u32`).
+pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 4) as u64;
 
-/// Bytes of the params uniform: gamma, contrast, the viewport and a
-/// scroll frame's shift, padded to 32.
-pub(crate) const PARAMS_SIZE: usize = 32;
+/// Bytes of the params uniform before the rows' offsets: gamma,
+/// contrast, the viewport and a frame's shift, padded to 32.
+pub(crate) const PARAMS_HEAD: usize = 32;
+/// Bytes of the params uniform: its head, then the rows' offsets.
+pub(crate) const PARAMS_SIZE: usize = PARAMS_HEAD + RowOffsets::CAPACITY * 8;
 
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {
@@ -63,7 +66,9 @@ impl TextPipeline {
             device,
             wgpu::ShaderModuleDescriptor {
                 label: Some("text"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(
+                    RowOffsets::shader(include_str!("text.wgsl")).into(),
+                ),
             },
         );
         let layout = bind_group_layout(device);
@@ -158,3 +163,7 @@ mod tests {
         assert_eq!(params.contrast, 0.2);
     }
 }
+
+#[cfg(test)]
+#[path = "pipeline_layout_tests.rs"]
+mod layout_tests;

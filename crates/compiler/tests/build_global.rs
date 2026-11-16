@@ -28,6 +28,24 @@ fn a_globally_styled_component_keeps_its_style_and_scopes_nothing() {
 }
 
 #[test]
+fn a_global_components_winners_name_its_sheet_by_its_path_under_the_build_root() {
+    // Given
+    let (src, out) = dirs("global_winners");
+    write(&src, "card.wisp", STYLED);
+
+    // When
+    compile_dir_into_styled(&src, &out, Styles::Global).unwrap_or_else(|errs| panic!("{errs:?}"));
+
+    // Then: the same on every machine, as a scope's name is
+    let code: String = read(&out.join("wisp/card.rs")).split_whitespace().collect();
+    let name =
+        "vapors_dom::SheetRef::Global(concat!(env!(\"CARGO_PKG_NAME\"),\"/\",\"src/card.wisp\")";
+    assert!(code.contains(name), "{name} missing from {code}");
+    let root = src.display().to_string();
+    assert!(!code.contains(&format!("Global(\"{root}")), "{code}");
+}
+
+#[test]
 fn a_scoped_build_of_the_same_component_scopes_it() {
     // Given
     let (src, out) = dirs("scoped_styles");

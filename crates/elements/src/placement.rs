@@ -4,7 +4,10 @@
 //! (`layout/written.rs`), built again or scrolled, and the boxes placed
 //! in a box whose content moved (`placement_walk.rs`).
 
-use crate::layout::{BoxRect, LayoutBox, containing_blocks};
+use rustc_hash::FxHashMap;
+
+use crate::lane_decline::LaneDecline;
+use crate::layout::{BoxRect, Lanes, LayoutBox, containing_blocks};
 pub(crate) use crate::placement_changes::{Changes, Placed};
 use crate::placement_marks::Marked;
 use crate::placement_walk::{Mark, Walk};
@@ -41,12 +44,18 @@ pub(crate) struct Placement {
     pub(crate) containing: SlotList<Option<usize>>,
     /// Marks for the walk, all `Mark::None` between updates.
     pub(crate) marks: SlotList<Mark>,
+    /// Whether each slot is a lane child placed in a frame of its own
+    /// (`placement_frames.rs`): its rect leaves out the lane's start.
+    pub(crate) framed: SlotList<bool>,
+    /// Each lane container's last framing decision.
+    pub(crate) framing: FxHashMap<usize, Result<(), LaneDecline>>,
 }
 
-/// The laid-out boxes, which of them scroll, and the scale.
+/// The laid-out boxes, which of them scroll, their lanes and the scale.
 pub(crate) struct LaidOut<'a> {
     pub(crate) boxes: &'a [LayoutBox],
     pub(crate) scrolls: &'a dyn Fn(usize) -> bool,
+    pub(crate) lanes: &'a Lanes,
     pub(crate) scale: f32,
 }
 
@@ -54,11 +63,13 @@ impl<'a> LaidOut<'a> {
     pub(crate) fn new(
         boxes: &'a [LayoutBox],
         scrolls: &'a dyn Fn(usize) -> bool,
+        lanes: &'a Lanes,
         scale: f32,
     ) -> Self {
         Self {
             boxes,
             scrolls,
+            lanes,
             scale,
         }
     }
@@ -76,6 +87,7 @@ impl Placement {
             self.up.named("placement.up"),
             self.containing.named("placement.containing"),
             self.marks.named("placement.marks"),
+            self.framed.named("placement.framed"),
         ]
     }
 
@@ -95,7 +107,7 @@ impl Placement {
         let marked = if changes.every {
             Marked::default()
         } else {
-            self.mark(changes)
+            self.mark(changes, boxes)
         };
         let mut walk = Walk::new(self, boxes, scroll, changes.every, &marked.under);
         walk.place_from_root();
@@ -129,6 +141,8 @@ impl Placement {
             up: vec![NO_SLOT; len].into(),
             containing: containing_blocks(boxes).into(),
             marks: vec![Mark::None; len].into(),
+            framed: vec![false; len].into(),
+            framing: FxHashMap::default(),
         }
     }
 
@@ -143,6 +157,8 @@ impl Placement {
         self.resize(boxes.len());
         for &(slot, _) in changes.freed {
             self.up[slot] = NO_SLOT;
+            self.framed[slot] = false;
+            self.framing.remove(&slot);
         }
         self.patch_containing(boxes, changes);
         self.chain_children(boxes, changes)
@@ -179,6 +195,7 @@ impl Placement {
         self.up.resize(len, NO_SLOT);
         self.containing.resize(len, None);
         self.marks.resize(len, Mark::None);
+        self.framed.resize(len, false);
     }
 
     /// Clears the containing block of each slot built again or freed,

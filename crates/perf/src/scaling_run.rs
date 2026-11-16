@@ -60,6 +60,7 @@ fn measure(
         .sample(workload, settings)
         .map_err(|e| format!("{name}: {e}; reproduce: {reproduce}"))?;
     samples_counted(&name, &samples)?;
+    println!("{}", workload.splices().line(rows));
     by_kind(rows, &samples, change.frame_kinds())
 }
 
@@ -67,6 +68,7 @@ fn measure(
 ///
 /// # Errors
 /// A recorded phase that is not in [`PHASES`]: the judge does not know it.
+#[cfg(test)] // the tests' reading of one size; `scaling_kinds` reads any kind
 pub(crate) fn at_size(rows: usize, samples: &Samples, known: &[&str]) -> Result<AtSize, String> {
     medians(rows, kept_counts(rows, samples)?, known)
 }

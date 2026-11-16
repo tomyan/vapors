@@ -10,7 +10,6 @@ use vapors_scene::Color;
 use crate::gpu_reading::frame_gpu_time;
 use crate::gpu_time::GpuClock;
 use crate::instruction_samples::InstructionSamples;
-use crate::mount::Mount;
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
@@ -68,42 +67,26 @@ impl<'g> Sampler<'g> {
         workload: &mut dyn Workload,
         settings: Settings,
     ) -> Result<Samples, String> {
-        self.sample_apps(workload, settings, Apps::Started)
-    }
-
-    /// The Mount workload's frames, each a new app's first, never
-    /// started ([`Apps::NewEachFrame`]): its frames build the pipelines
-    /// and keep no GPU time.
-    ///
-    /// # Errors
-    /// A frame the workload's check refused, or a GPU wait that failed.
-    pub fn sample_mounts(
-        &mut self,
-        mount: &mut Mount,
-        settings: Settings,
-    ) -> Result<Samples, String> {
-        self.sample_apps(mount, settings, Apps::NewEachFrame)
+        self.sample_apps(workload, settings)
     }
 
     fn sample_apps(
         &mut self,
         workload: &mut dyn Workload,
         settings: Settings,
-        apps: Apps,
     ) -> Result<Samples, String> {
         let dispatch = tracing::Dispatch::new(self.clock.clone());
-        tracing::dispatcher::with_default(&dispatch, || self.frames(workload, settings, apps))
+        tracing::dispatcher::with_default(&dispatch, || self.frames(workload, settings))
     }
 
     fn frames(
         &mut self,
         workload: &mut dyn Workload,
         settings: Settings,
-        apps: Apps,
     ) -> Result<Samples, String> {
         let frames = u32::try_from(settings.runs).map_err(|_| "too many runs".to_owned())?;
         let mut gpu_clock = GpuClock::new(&self.gpu.device, frames);
-        let mut samples = self.timed_frames(workload, (settings, apps), gpu_clock.as_mut())?;
+        let mut samples = self.timed_frames(workload, settings, gpu_clock.as_mut())?;
         samples.gpu = gpu_clock
             .map(|clock| clock.spans(&self.gpu.device, &self.gpu.queue))
             .transpose()?;
@@ -116,11 +99,11 @@ impl<'g> Sampler<'g> {
     fn timed_frames(
         &mut self,
         workload: &mut dyn Workload,
-        (settings, apps): (Settings, Apps),
+        settings: Settings,
         mut gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Samples, String> {
         let texture = self.texture(workload.size());
-        self.begin(workload, texture.format(), apps)?;
+        self.begin(workload, texture.format())?;
         let mut samples = Samples {
             warmup: settings.warmup,
             ..Samples::default()
@@ -128,8 +111,8 @@ impl<'g> Sampler<'g> {
         let timed = settings.warmup..settings.warmup + settings.runs;
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
-            let measured = self.frame(workload, &texture, (index, apps), clock)?;
-            if index > timed.start && apps == Apps::Started {
+            let measured = self.frame(workload, &texture, index, clock)?;
+            if index > timed.start {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
@@ -157,7 +140,10 @@ type PhaseTakes = (BTreeMap<String, Duration>, Option<BTreeMap<String, u64>>);
 
 #[path = "sampler_start.rs"]
 mod start;
-use start::Apps;
+
+#[path = "sampler_first.rs"]
+mod first;
+pub use first::{FirstFrame, Phases};
 
 #[path = "sampler_frame.rs"]
 mod frame;

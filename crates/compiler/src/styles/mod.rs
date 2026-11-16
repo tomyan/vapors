@@ -9,12 +9,14 @@
 //! component tag it is variable, since the mount site decides.
 
 mod facts;
+mod others;
 mod report;
 mod walk;
 
 use std::collections::BTreeMap;
 
 pub use facts::ElementFacts;
+pub use others::{CrateSheets, OtherSheets};
 pub use report::report;
 
 use vapors_css::analysis::{KeyWinners, SheetId};
@@ -115,7 +117,7 @@ pub fn analyse(
 
 /// The component's `<style>` as the runtime registers it: scoped
 /// under its scope, or a global sheet named by the file.
-fn own_sheet(
+pub(super) fn own_sheet(
     component: &Component,
     section: &crate::ast::Section,
     source: &Source,
@@ -127,7 +129,9 @@ fn own_sheet(
             (SheetId::Scope(scope.clone()), scoped)
         }
         None => (
-            SheetId::Global(component.path.clone()),
+            SheetId::Global(
+                (component.global_sheet.clone()).unwrap_or_else(|| component.path.clone()),
+            ),
             crate::style_check::checked(source, section, Styles::Global)?,
         ),
     })

@@ -85,5 +85,7 @@ fn gpu_a_scroll_writes_only_the_batches_entering_the_view() {
     );
     assert_eq!((counts.batches_written, counts.batches_kept), (2, 10));
     let bytes = (counts.shadows.buffer_bytes, counts.quads.buffer_bytes);
-    assert_eq!(bytes, (112 + 16, 128 + 16), "{counts:?}");
+    // each batch's instance with its row index (16 more) and its view
+    // uniform with the rows' offsets (16 + 1024)
+    assert_eq!(bytes, (112 + 16 + 1040, 128 + 16 + 1040), "{counts:?}");
 }

@@ -31,7 +31,9 @@ fn gpu_the_rows_pages_idle_frame_draws_the_rows_in_view_only() {
     let frame = samples.counts.frame;
     let in_view = rows_in_view();
     // Unclipped runs: the first label, each button's text with the next
-    // row's label (in view - 1), the last button's text in view.
+    // row's label (in view - 1), the last button's text in view. Each row
+    // is a lane frame of its own; a batch spans them, each item at its
+    // row's offset (4f).
     let unclipped_runs = 1 + (in_view - 1) + 1;
     // One run per value in view.
     let texts = unclipped_runs + in_view;

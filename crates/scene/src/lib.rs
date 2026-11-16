@@ -11,7 +11,7 @@ mod scissor;
 mod shape;
 mod transform;
 
-pub use batch::{Batch, Batched, Run, batched, culled};
+pub use batch::{Batch, Batched, ROWS_PER_BATCH, Run, batched, culled};
 pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use image::RgbaImage;
