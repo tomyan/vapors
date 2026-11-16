@@ -153,6 +153,17 @@ app = "vapors-app host"
 [imports.web_sys]
 "crates/platform/" = "vapors-platform: the window, input and file picker on the web"
 
+# `CompiledSheet::__compiled`, the hidden constructor of the only sheet
+# `Dom::add_style` takes (build-time-styles.md, decision 2 (a)): named by
+# the code that emits it and defines it, and by the tests that pin the
+# emitted text; anywhere else it is hand-written code registering a
+# sheet the analysis cannot see.
+[imports.__compiled]
+"crates/dom/src/compiled_sheet.rs" = "defines it"
+"crates/compiler/src/codegen/shell_sheet.rs" = "emits it in each mount"
+"crates/compiler/tests/codegen_style_only.rs" = "pins the emitted registration"
+"crates/compiler/tests/build_global.rs" = "pins the emitted registration"
+
 # The merge queue (`cargo xtask queue`, a systemd user timer): vapors
 # merges when GitHub's checks are all green and a review clear holds
 # (xtask/src/queue.rs). It rebases and updates in its own worktree,

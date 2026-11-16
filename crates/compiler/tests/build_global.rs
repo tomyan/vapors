@@ -71,7 +71,8 @@ fn a_globally_styled_component_registers_its_sheet_under_the_name_its_winners_us
     let code = read(&out.join("wisp/card.rs"));
     for needle in [
         format!("pub const SHEET: &str = {NAME};"),
-        "dom.borrow_mut().add_global_style(SHEET, STYLE);".to_owned(),
+        "dom.borrow_mut().add_global_style(vapors_dom::CompiledSheet::__compiled(SHEET, STYLE,"
+            .to_owned(),
         format!("vapors_dom::SheetRef::Global({NAME})"),
     ] {
         assert!(
@@ -104,10 +105,13 @@ fn a_scoped_build_of_the_same_component_scopes_it() {
     let code = read(&out.join("wisp/card.rs"));
     for scoping in [
         "pub const SCOPE",
-        "add_style(SCOPE, STYLE)",
+        "add_style(vapors_dom::CompiledSheet::__compiled(SCOPE, STYLE,",
         "scope: Some(SCOPE)",
     ] {
-        assert!(code.contains(scoping), "{scoping} missing from {code}");
+        assert!(
+            squashed(&code).contains(&squashed(scoping)),
+            "{scoping} missing from {code}"
+        );
     }
 }
 

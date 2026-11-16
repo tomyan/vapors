@@ -110,9 +110,9 @@ fn colours(
         doc.verify_as_release();
     }
     if key.scope.is_some() {
-        doc.add_style(OWN, CARD);
+        doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     } else {
-        doc.add_global_style(OWN, CARD);
+        doc.add_global_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     }
     let body = doc.body();
     let nodes: Vec<_> = (placed.iter())

@@ -27,10 +27,10 @@ static ROW: StyleKey = StyleKey {
 fn rows_a_container_rule_can_match_style_each_for_itself() {
     // Given
     let mut doc = document();
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         SCOPE,
         ".row { color: rgb(1 2 3); } @container (min-width: 100px) { .row { color: rgb(4 5 6); } }",
-    );
+    ));
     let body = doc.body();
     for _ in 0..3 {
         let row = doc.create_keyed_element(&ROW);

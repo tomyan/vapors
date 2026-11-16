@@ -8,6 +8,10 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+# `CompiledSheet::for_tests`, for tests of a tree (crates that implement `Dom`)
+test-support = []
+
 [dependencies]
 vapors-signals.workspace = true
 

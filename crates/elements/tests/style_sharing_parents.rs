@@ -56,7 +56,7 @@ fn page(
     children: &[&'static StyleKey],
 ) -> (Document, Vec<NodeId>, Vec<Vec<NodeId>>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let (mut parents, mut kids) = (Vec::new(), Vec::new());
     for _ in 0..count {
