@@ -1088,6 +1088,88 @@ slice below measures its cause again before its code.
 |---|---|---|---|
 | The a11y touch of started rows | about 100 | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set | 4f-3 |
 | Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
+| Draw over the merge base, after 4f-2e | Idle +2.6%, Insert +4.8%, FlexInsert +7.5% (flat across sizes) | `draw`: the batches phase (the sort, making the batches, the keys) and the painter's per-batch work, per row in view, not per row in the list | later optimisation |
+| Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
+| Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
+| Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
+| Insert accessibility | about 4720 (FlexInsert about 1800) | `accessibility`: the take reads every started row again, as a record's bounds are from its parent node (section 5.3), and makes the take's index afresh (`AxIndex::of`) | 4i |
+| Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
+| Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
+
+The slices:
+
+- **4f-2, 4f-3** as section 11.2 says (#398).
+- **4g. Placement visits only the marked children of a framed lane.**
+  A framed lane's children are in their own frames, so a scroll of the
+  container or an insert before a child moves none of them in its
+  frame; placement visits the children marked (built again, or with a
+  descendant that changed) and finds each by its handle, not every
+  child by its start. The settle after a scroll settles the scrolled
+  container's own range, not its children's boxes. Accepted when
+  `--scaling Scroll`'s and `Insert`'s `layout` hold no per-row term from
+  placement, and the placement check (`placement_check.rs`) and the
+  scroll tests are unchanged.
+- **4h. An owner's children edited, not walked.** An insert or removal
+  under an owner rebuilds the owner's box with its children list made
+  again from every child; the child edits (`child_edits.rs`) already
+  name the one inserted or removed, so the list is edited at that
+  place and the other children's slots are not looked up. Accepted
+  when `Insert`'s and `FlexInsert`'s box build holds no per-row term.
+- **4i. A lane row's a11y record bounded in its lane frame.** A started
+  row has not moved in its frame; its record's bounds are taken from
+  its frame (resolved as `Frames::at` does) rather than from its parent
+  node, so the take reads the rows the update changed, not every
+  started row, and the take's index is patched, not made afresh.
+  Accepted when `accessibility` for `Insert` and `FlexInsert` holds no
+  per-row term from started rows, the mirror model checks
+  (`a11y_mirror` tests) are unchanged, and the platform a11y bounds
+  equal a full take's.
+- **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
+  is kept in blocks, as the extents index's entries are (`blocks.rs`),
+  so a removal or insert moves one block. Accepted when `paint` is
+  within 2% across sizes on remove frames too.
+- **4k. Rows of fractional height framed.** A row's frame shift is its
+  start in device pixels rounded as an item's edge is (half up), and the
+  row's items are painted from that whole origin, so a row is snapped
+  as a unit rather than each item on the page. An item can then land a
+  pixel from where snapping it on the page puts it. Chromium snaps a
+  box's paint offset before its contents, so the first step is the
+  Chromium paint comparisons on a fractional-row page, framed and
+  declined. If framed rows match Chromium as well as declined rows do,
+  4k frames them; if not, they stay declined. In that case the plan
+  records the cost (every term above, per row, for such lists) and the
+  nightly scaling run reports a fractional-row page. Accepted when the
+  comparisons show no new difference, and `--scaling` on a 19.2 px row
+  page meets the exit checks the whole-row pages meet.
+
+Order and fold (the lead, on #402; changed 2026-11-16 after Tom's "fine to have optimisations for later"):
+- **4f-2, with 4f-2b to 4f-2e**, first: batching across lane frames (#407), one search a lane and batches made with less work (#414), the patch at a lane's ends (#415), places kept between frames (#418), and one table per lane part with stable row slots (#423).
+- **Then fold and gate.** #423 becomes the fold pull request against main, and the PRs under it close as included. The correctness checks are unchanged. The draw terms left over the stack's merge base (75e63c84) are later optimisations, not blockers; they are recorded in the fold's pull request and in the table below. At 1 codegen unit, draw at 1000 rows (3000 and 10000 flat):
+  - Idle: 907,046 to 930,823 (+2.6%);
+  - Insert: 1,004,567 to 1,052,817 (+4.8%);
+  - FlexInsert: 152,155 to 163,635 (+7.5%).
+
+  Paint falls from 11.1 M to 189 k (Insert) and from 2.8 M to 123 k (FlexInsert).
+- After the fold, each slice lands on main as an ordinary PR with its own exit check in the 11.3 form, in this order:
+  - **4f-3**, the a11y touch of started rows, measured before it lands;
+  - **4g**, as scroll is what a reader feels;
+  - **4i**, the largest term by far. The phases are measured apart, so the layout terms do not confound it.
+  - **4h**;
+  - **4j**, the smallest;
+  - **4k**, which starts with the Chromium evidence and may end with the decline kept and its cost recorded;
+  - the draw terms, as a later optimisation.
+The lane stack (4b to 4f-1) does not finish property 3 alone. Measured
+with `target/release/vapors-perf 60 10 --scaling <change>` at 4e
+(ce006910), in instructions per extra row from 1000 to 3000 rows, insert
+frames unless named. Where a term comes from was found with temporary
+spans around the update's steps and `perf record --call-graph lbr`; each
+slice below measures its cause again before its code.
+
+| Term | Per row | Where | Removed by |
+|---|---|---|---|
+| The a11y touch of started rows | about 100 | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set | 4f-3 |
+| Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
+| Draw over the merge base, after 4f-2e | Idle +2.6%, Insert +4.8%, FlexInsert +7.5% (flat across sizes) | `draw`: the batches phase (the sort, making the batches, the keys) and the painter's per-batch work, per row in view, not per row in the list | later optimisation |
 | Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
 | Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
 | Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
