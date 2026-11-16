@@ -1,7 +1,7 @@
 //! `gpu-surface` in the scene (docs/gpu-surface.md): its renderer's
 //! content over its content box, after its own background and before
 //! its children, under its ancestors' clip; nothing when hidden or
-//! empty. What it refuses: `gpu_surface_refused.rs`.
+//! empty. What it refuses: `surface_element_refused.rs`.
 
 use crate::support;
 

@@ -50,19 +50,26 @@ pub(crate) struct RunBytes {
 }
 
 /// `run`'s instance or vertex bytes, as its pipeline draws them, a
-/// shape run's entries from `shapes`.
+/// shape run's entries from `shapes`; shadow and quad items each in its
+/// row of `rows` (none for a batch in one frame). Images and surfaces,
+/// drawn an item at a time, carry their row in the shift; shapes and
+/// meshes are batched in their row's own frame (vapors-elements
+/// `framed_batches.rs` `resolved`), so they have no rows.
 ///
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
-pub(crate) fn run_bytes(run: &Run, shapes: &ShapeStore) -> Result<RunBytes, PaintError> {
+pub(crate) fn run_bytes(
+    (run, rows): (&Run, &[u32]),
+    shapes: &ShapeStore,
+) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {
         let (instances, meshes) = shapes.mesh_instances(items).map_err(PaintError::Shape)?;
         let bytes = MeshPipeline::bytes(&instances);
         return Ok(RunBytes { bytes, meshes });
     }
     let bytes = match run {
-        Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
-        Run::Quads(quads) => QuadPipeline::bytes(quads),
+        Run::Shadows(shadows) => ShadowPipeline::bytes_in_rows(shadows, rows),
+        Run::Quads(quads) => QuadPipeline::bytes_in_rows(quads, rows),
         Run::Shapes(items) => {
             ClosedFormPipeline::bytes(&shapes.closed_forms(items).map_err(PaintError::Shape)?)
         }

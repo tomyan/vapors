@@ -8,6 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 autotests = false
+
 [dependencies]
 syn.workspace = true
 prettyplease.workspace = true

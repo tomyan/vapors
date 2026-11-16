@@ -99,10 +99,10 @@ fn a_scroll_reads_the_scrolled_container_alone_and_scans_nothing() {
     let (a, b) = (scroll(&small), scroll(&large));
 
     // Then: the rows moved by the scroll alone are left out; the body
-    // is read with html above it, the index patched for it, never
-    // scanned
+    // is read with html above it; the index reads no entry, as no id or
+    // referring attribute was written (4i), and is never scanned
     assert_eq!((a.nodes_read, b.nodes_read), (2, 2));
-    assert_eq!((a.index_entries, b.index_entries), (1, 1));
+    assert_eq!((a.index_entries, b.index_entries), (0, 0));
     assert_eq!((a.index_scans, b.index_scans), (0, 0));
 }
 

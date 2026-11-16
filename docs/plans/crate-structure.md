@@ -629,7 +629,9 @@ The order:
    Done 2026-11-16 for all four (`scripts/one-test-binary.sh`, measured
    by `scripts/test-build-time.sh`: one `touch src/lib.rs`, then
    `cargo test -p <crate> --no-run --timings`, 4 jobs, no sccache, no
-   incremental). Before, at load 5 to 19; after, at load 6:
+   incremental). Before, at load 5 to 19; after, at load 6, so the wall
+   times are indicative; the test units' summed CPU depends far less on
+   load:
 
    | crate | wall before | wall after | test units before | test units after |
    |---|---|---|---|---|
@@ -643,7 +645,11 @@ The order:
    in number, plus one per crate: `every_test_file_is_a_module` refuses
    a file under `tests/` that `tests/main.rs` does not declare. A test's
    nextest id is now `<file>::<function>`, so the tiers split on a
-   `gpu_` id or a `gpu_` function name (`xtask/src/steps_tiers.rs`).
+   `gpu_` id or a `gpu_` function name (`xtask/src/steps_tiers.rs`),
+   and every test in a `tests/gpu_*.rs` file runs in the gpu tier.
+   The tiers, CI and bacon run tests with nextest, one process a test;
+   a plain `cargo test -p <crate>` now runs the crate's integration
+   tests as threads of one process, GPU tests included.
 2. **The module-boundary check.** `cargo xtask check-modules`: reads
    `clusters.txt` (moved to `.config/`), builds the cluster graph the
    way `modgraph.py` does, and refuses an edge the file's `allowed`
@@ -776,7 +782,7 @@ structure.
 **D5. Test binaries.** (a) One integration-test binary per crate
 (`tests/main.rs`). (b) One per cluster. (c) As today. Recommendation:
 (a) if step 1's measurement shows the link time; (b) if a per-cluster
-binary keeps `cargo test -p vapors-elements --test paint` useful to
+binary keeps `cargo test -p vapors-elements --test tests paint::` useful to
 agents.
 
 **D6. When.** (a) After the finish line, as the brief says. (b) Steps

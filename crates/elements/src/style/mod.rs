@@ -22,6 +22,8 @@ mod scene_appearance;
 mod scene_used;
 mod scrollbar;
 mod share;
+mod sheet_hashes;
+pub use sheet_hashes::SheetHash;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
@@ -33,6 +35,7 @@ mod text_style;
 mod used;
 mod used_share;
 mod values;
+mod winners_oracle;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
@@ -72,6 +75,9 @@ pub(crate) struct Sheets {
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
     scopes: std::collections::HashMap<String, String>,
+    /// Each component sheet in the cascade, by name, with its text's
+    /// hash (`sheet_hashes`).
+    hashes: std::collections::HashMap<String, u64>,
     refused: Vec<ElementError>,
 }
 
@@ -84,6 +90,7 @@ impl Sheets {
             cascade: Cascade::new().user_agent(ua),
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
+            hashes: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
@@ -139,6 +146,7 @@ impl Sheets {
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());
+        self.note_hash(scope, text);
     }
 
     /// Which elements a flip of `flag` restyles, as the sheets use it.

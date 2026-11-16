@@ -59,6 +59,9 @@ mod gpu_kept_batches;
 mod gpu_kept_scroll;
 mod gpu_kept_text;
 mod gpu_kept_text_pressure;
+mod gpu_lane_rows;
+mod gpu_lane_rows_clipped;
+mod gpu_lane_rows_shapes;
 mod gpu_one_pass;
 mod gpu_one_submit;
 mod gpu_paint_arena_full;
@@ -100,8 +103,10 @@ fn every_test_file_is_a_module() {
     assert!(
         missing.is_empty(),
         "tests/{missing:?} not declared in tests/main.rs, so never run; fix: add `mod <name>;` there, \
-         and in the file `use crate::<module>;` for each shared module it declared (see \
-         scripts/one-test-binary.sh); reproduce: cargo test -p {} --test tests every_test_file_is_a_module",
+         and in the file `use crate::<dir>;` in place of a plain `mod <dir>;` of a shared tests/<dir>/, \
+         and `use crate::<module> as <name>;` in place of a `#[path]` include of a support file \
+         main.rs declares (its #[path] lines name each); reproduce: cargo nextest run -p {} --test \
+         tests every_test_file_is_a_module",
         env!("CARGO_PKG_NAME")
     );
 }

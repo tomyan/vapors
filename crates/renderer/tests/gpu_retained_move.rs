@@ -11,21 +11,23 @@ mod frame;
 mod retained;
 
 use frame::{BACKGROUND, quad};
-use retained::{BLUE, FIRST_SIZE, Frame, GREEN, QUAD_BYTES, RED, kept};
+use retained::{BLUE, BUFFER_QUADS, FIRST_SIZE, Frame, GREEN, QUAD_BYTES, RED, kept};
 use vapors_gpu_harness::gpu;
 use vapors_renderer::QuadPipeline;
 
 #[test]
 fn gpu_a_full_buffer_half_free_compacts_and_each_range_draws_its_own_quads() {
     // Given: the buffer filled by A, B, C and D, then A and C released,
-    // leaving two holes of 160 quads
+    // leaving two holes of 5/16 of it each
     let mut frame = Frame::new(gpu());
     let filling = frame.encoder();
+    let (hole, b) = (BUFFER_QUADS * 5 / 16, BUFFER_QUADS * 5 / 32);
+    let d = BUFFER_QUADS - 2 * hole - b;
     let ranges = [
-        (160, 3.0, RED),
-        (80, 0.0, GREEN),
-        (160, 3.0, RED),
-        (112, 1.0, BLUE),
+        (hole, 3.0, RED),
+        (b, 0.0, GREEN),
+        (hole, 3.0, RED),
+        (d, 1.0, BLUE),
     ];
     let [first, kept_b, third, kept_d] =
         ranges.map(|range| kept(frame.keep(&filling, range), "fill"));
@@ -34,10 +36,12 @@ fn gpu_a_full_buffer_half_free_compacts_and_each_range_draws_its_own_quads() {
     frame.pipeline.release(third);
     let _ = frame.pipeline.take_work();
 
-    // When: B drawn, then 240 quads kept, then D and the new range drawn
+    // When: B drawn, then more quads kept than a hole holds, then D and
+    // the new range drawn
     let encoder = frame.encoder();
     frame.draw(&encoder, &kept_b);
-    let kept_e = kept(frame.keep(&encoder, (240, 2.0, RED)), "E");
+    let e = BUFFER_QUADS * 15 / 32;
+    let kept_e = kept(frame.keep(&encoder, (e, 2.0, RED)), "E");
     frame.draw(&encoder, &kept_d);
     frame.draw(&encoder, &kept_e);
     encoder.submit(&frame.gpu.queue).expect("no refusal");
@@ -47,7 +51,7 @@ fn gpu_a_full_buffer_half_free_compacts_and_each_range_draws_its_own_quads() {
     assert_eq!((work.retained_compacted, work.retained_grown), (1, 0));
     assert_eq!(
         frame.pipeline.retained_bytes(),
-        (80 + 112 + 240) * QUAD_BYTES
+        (b + d + e) as u64 * QUAD_BYTES
     );
     assert_eq!(frame.row(), [GREEN, BLUE, RED]);
 }
@@ -77,13 +81,13 @@ fn gpu_a_released_range_is_reused_once_a_newer_encoder_writes() {
     // Given: a quad kept and released in one frame
     let mut frame = Frame::new(gpu());
     let first = frame.encoder();
-    let red = kept(frame.keep(&first, (512, 0.0, RED)), "red");
+    let red = kept(frame.keep(&first, (BUFFER_QUADS, 0.0, RED)), "red");
     frame.pipeline.release(red);
     first.submit(&frame.gpu.queue).expect("no refusal");
 
     // When: a whole buffer's worth kept in the next
     let second = frame.encoder();
-    let green = kept(frame.keep(&second, (512, 1.0, GREEN)), "green");
+    let green = kept(frame.keep(&second, (BUFFER_QUADS, 1.0, GREEN)), "green");
     frame.draw(&second, &green);
     second.submit(&frame.gpu.queue).expect("no refusal");
 

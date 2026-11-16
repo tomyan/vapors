@@ -83,7 +83,7 @@ fn sweep(control: usize) {
     // Then
     assert!(
         failures.is_empty(),
-        "{} cases panicked or left the document refusing updates; re-resolve the node with `still_in` after the dispatch (cargo test -p vapors-elements --test listener_removal_sweep removes_the_{name}):\n{}",
+        "{} cases panicked or left the document refusing updates; re-resolve the node with `still_in` after the dispatch (cargo test -p vapors-elements --test tests listener_removal_sweep:: removes_the_{name}):\n{}",
         failures.len(),
         failures.join("\n")
     );

@@ -2,12 +2,16 @@
 
 use super::Step;
 
-// GPU tests are test functions whose names start with `gpu_` (kept in
-// `tests/gpu_*.rs` files); the tiers split on the name because nextest
-// refuses a `binary()` filter that matches no binary, and a repository
-// may have no GPU tests yet. The unit tier sets this variable and
-// gpu_harness::gpu() refuses it, so a GPU test without the prefix fails
-// here on a machine with a GPU, as it would on a runner without.
+// GPU tests are the tests GPU_TESTS selects by nextest id: a function
+// named `gpu_`, and in a crate whose integration tests are one binary
+// every test in a `tests/gpu_*.rs` file, since the file is the id's
+// first segment. The tiers split on the id because nextest refuses a
+// `binary()` filter that matches no binary, and a repository may have
+// no GPU tests yet. The unit tier sets this variable and
+// gpu_harness::gpu() refuses it, so a GPU test the filter does not
+// select fails here on a machine with a GPU, as it would on a runner
+// without. A test in a `gpu_*.rs` file that opens no GPU runs in the
+// gpu tier only, unchecked by that refusal.
 pub(super) const UNIT_TIER: (&str, &str) = ("VAPORS_TEST_TIER", "unit");
 
 /// The GPU tests: a nextest id beginning `gpu_` (a test in a root `gpu_`

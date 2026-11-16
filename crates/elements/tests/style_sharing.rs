@@ -19,6 +19,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static BUTTON: StyleKey = StyleKey {
@@ -29,6 +30,7 @@ static BUTTON: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with `css` under the rows' scope and `count` keyed

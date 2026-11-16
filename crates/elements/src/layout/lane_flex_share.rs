@@ -8,11 +8,12 @@ use taffy::{
     AlignItems, AvailableSpace, Direction, Layout, LayoutOutput, NodeId, Point, Rect, RunMode, Size,
 };
 
-use super::lane::{Lane, Lanes};
+use super::lane::Lane;
 use super::lane_flex::Column;
 use super::lane_flex_answer::lane_flex_answer;
 use super::lane_flex_summary::FlexSummary;
 use super::lane_kind::LaneKind;
+use super::lane_set::Lanes;
 use super::lane_share::reads_heights;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;

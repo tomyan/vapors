@@ -52,3 +52,27 @@ fn an_icon_moved_by_a_later_repack_in_the_same_call_samples_its_final_rect() {
         [small_rect[0], small_rect[1]]
     );
 }
+
+/// Two strokes, two masks: the lines at `y`s 4 and 12.
+fn two_line_icon() -> Icon {
+    let stroke = |y: &str| IconStroke {
+        path: IconPath::parse(&format!("M0 {y}H16")).expect("parses"),
+        width: 2.0,
+    };
+    Icon::new([0.0, 0.0, 16.0, 16.0], vec![stroke("4"), stroke("12")]).expect("a valid icon")
+}
+
+#[test]
+fn each_icons_vertices_are_six_for_each_of_its_inked_strokes() {
+    // Given: a one-stroke icon, then a two-stroke one
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(64));
+    let (one, two) = (line_icon("8"), two_line_icon());
+    let icons = [draw(&one, [16, 16]), draw(&two, [16, 16])];
+
+    // When
+    let (floats, vertices) = icon_quads_counted(&mut atlas, &icons, None).expect("quads");
+
+    // Then
+    assert_eq!(vertices, [6, 12]);
+    assert_eq!(floats.len(), 18 * FLOATS_PER_VERTEX);
+}

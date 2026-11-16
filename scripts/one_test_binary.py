@@ -4,12 +4,11 @@ import os
 import re
 import sys
 
+from one_test_binary_crate import refuse_targets, rewrite_reproduce, write_manifest
+from one_test_binary_refuse import refuse
+
 PATH_ATTRIBUTE = re.compile(r'\s*#\[path = "([^"]+)"\]\s*$')
 PLAIN_MOD = re.compile(r"^mod ([a-z_0-9]+);$")
-
-
-def refuse(message):
-    sys.exit(f"one-test-binary: {message}")
 
 
 def module_of(relative):
@@ -128,8 +127,10 @@ fn every_test_file_is_a_module() {
     assert!(
         missing.is_empty(),
         "tests/{missing:?} not declared in tests/main.rs, so never run; fix: add `mod <name>;` there, \\
-         and in the file `use crate::<module>;` for each shared module it declared (see \\
-         scripts/one-test-binary.sh); reproduce: cargo test -p {} --test tests every_test_file_is_a_module",
+         and in the file `use crate::<dir>;` in place of a plain `mod <dir>;` of a shared tests/<dir>/, \\
+         and `use crate::<module> as <name>;` in place of a `#[path]` include of a support file \\
+         main.rs declares (its #[path] lines name each); reproduce: cargo nextest run -p {} --test \\
+         tests every_test_file_is_a_module",
         env!("CARGO_PKG_NAME")
     );
 }
@@ -153,22 +154,11 @@ def write_main(tests, files, shared, lifted):
     open(os.path.join(tests, "main.rs"), "w").write("\n".join(lines) + "\n" + GUARD)
 
 
-def write_manifest(manifest):
-    text = open(manifest).read()
-    marker = "[package]\n"
-    if text.count(marker) != 1:
-        refuse(f"{manifest} has no single [package] table")
-    start = text.index(marker) + len(marker)
-    end = text.find("\n[", start)
-    end = len(text) if end < 0 else end + 1
-    package = text[start:end].rstrip("\n") + "\nautotests = false\n"
-    target = "\n# The integration tests as one binary (scripts/one-test-binary.sh)\n[[test]]\nname = \"tests\"\npath = \"tests/main.rs\"\n"
-    open(manifest, "w").write(text[:start] + package + text[end:].rstrip("\n") + "\n" + target)
-
-
 def main():
-    tests, manifest = sys.argv[1], sys.argv[2]
+    tests, manifest, nextest, written = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
     files = sorted(f for f in os.listdir(tests) if f.endswith(".rs"))
+    refuse_targets(manifest, files, nextest)
+    package = re.search(r'(?m)^name = "([^"]+)"', open(manifest).read()).group(1)
     shared, includes = scan(tests, files)
     counts = {}
     for pairs in includes.values():
@@ -185,6 +175,9 @@ def main():
         rewrite_file(tests, file, shared, lifted)
     write_main(tests, files, shared, lifted)
     write_manifest(manifest)
+    reproduced = rewrite_reproduce(package, files, ["crates", "docs", "xtask", "scripts"])
+    rust = [os.path.join(tests, f) for f in files] + [os.path.join(tests, r) for r in counts] + reproduced
+    open(written, "w").write("\n".join(sorted({p for p in rust if p.endswith(".rs")})) + "\n")
 
 
 main()

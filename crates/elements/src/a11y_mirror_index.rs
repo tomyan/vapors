@@ -18,6 +18,10 @@ use crate::node_map::{NodeMap, NodeSet};
 /// description changes with the named element's content.
 pub(crate) const REFERRING: [&str; 2] = ["aria-labelledby", "aria-describedby"];
 
+/// The attributes an element's entry is read from: writing one notes the
+/// element for the next take's patch (`Touched::indexed`).
+pub(crate) const INDEXED: [&str; 3] = ["id", REFERRING[0], REFERRING[1]];
+
 pub(crate) struct AxIndex {
     pub(crate) ids: Ids,
     pub(crate) referrers: HashMap<String, Vec<NodeId>>,
@@ -33,9 +37,15 @@ struct Entry {
     names: Vec<String>,
 }
 
+/// Whether a scan reads `node`: an element in the tree under the root,
+/// not one freed or not yet inserted.
+fn scanned(doc: &Document, node: NodeId) -> bool {
+    doc.attached(node) && doc.tag(node).is_some()
+}
+
 impl Entry {
     fn of(doc: &Document, node: NodeId) -> Self {
-        if !doc.contains(node) || doc.tag(node).is_none() {
+        if !scanned(doc, node) {
             return Self::default();
         }
         let names = REFERRING
@@ -67,23 +77,39 @@ impl AxIndex {
     }
 
     /// Patches the entries of `touched`, each read again; the ids whose
-    /// element changed. `None` when a patch cannot be certain (an id
-    /// carried by more than one element), which asks for a scan.
+    /// element changed. A node a scan does not read (one no longer in the
+    /// document, or a text node) has any entry dropped and none added. `None` when a patch cannot be
+    /// certain (an id carried by more than one element, counting those
+    /// patched together), which asks for a scan.
     pub(crate) fn patch(&mut self, doc: &Document, touched: &NodeSet) -> Option<Vec<String>> {
         let differing: Vec<(NodeId, Entry)> = touched
             .iter()
             .map(|&node| (node, Entry::of(doc, node)))
-            .filter(|(node, now)| self.by_node.get(node) != Some(now))
+            .filter(|(node, now)| self.differs(doc, *node, now))
             .collect();
-        if !differing.iter().all(|(node, now)| self.certain(*node, now)) {
+        let certain = differing.iter().all(|(node, now)| self.certain(*node, now));
+        if !certain || ids_repeat(&differing) {
             return None;
         }
         let mut changed = Vec::new();
         for (node, now) in differing {
             self.drop(node, &mut changed);
-            self.add_changed(node, now, &mut changed);
+            if scanned(doc, node) {
+                self.add_changed(node, now, &mut changed);
+            }
         }
         Some(changed)
+    }
+
+    /// Whether `node`'s entry is to be patched: `now` differs from what it
+    /// put in, or a scan would not read it and it holds an entry.
+    fn differs(&self, doc: &Document, node: NodeId, now: &Entry) -> bool {
+        let held = self.by_node.get(&node);
+        if scanned(doc, node) {
+            held != Some(now)
+        } else {
+            held.is_some()
+        }
     }
 
     /// Whether patching `node` to `now` needs no scan: its old id had no
@@ -99,6 +125,61 @@ impl AxIndex {
             .as_ref()
             .is_some_and(|id| self.ids.get(id).is_some_and(|&holder| holder != node));
         !old_shared && !new_shared
+    }
+
+    /// Panics, naming the first id or element that differs, when this
+    /// patched index is not `scanned`, a scan of the same document: a
+    /// patch missed an element whose entry changed, such as one in an
+    /// inserted, moved or removed subtree (`ax_index_nodes`). Referrers
+    /// compare as sets, as a patch appends where a scan goes in document
+    /// order.
+    #[cfg(debug_assertions)]
+    pub(crate) fn assert_scanned(&self, doc: &Document, scanned: &Self) {
+        if let Some(what) = self.first_differing(doc, scanned) {
+            panic!(
+                "the patched a11y index differs from a scan: {what}; a take patched it \
+                 without an element whose entry changed (a11y_mirror_diff.rs \
+                 `ax_index_nodes`); reproduce with the failing test alone"
+            );
+        }
+    }
+
+    /// The first id or element whose entry differs from `scanned`'s,
+    /// described.
+    #[cfg(debug_assertions)]
+    fn first_differing(&self, doc: &Document, scanned: &Self) -> Option<String> {
+        let tag = |node: &NodeId| doc.tag(*node).unwrap_or("not an element in the document");
+        let ids = self.ids.keys().chain(scanned.ids.keys());
+        if let Some(id) = ids
+            .into_iter()
+            .find(|id| self.ids.get(*id) != scanned.ids.get(*id))
+        {
+            let (kept, fresh) = (self.ids.get(id), scanned.ids.get(id));
+            return Some(format!("id {id:?} names {kept:?}, a scan finds {fresh:?}"));
+        }
+        let nodes = self.by_node.keys().chain(scanned.by_node.keys());
+        let entry = nodes
+            .into_iter()
+            .find(|n| self.by_node.get(*n) != scanned.by_node.get(*n));
+        if let Some(node) = entry {
+            return Some(format!("the entry of {node:?} (<{}>)", tag(node)));
+        }
+        if self.holders != scanned.holders {
+            return Some("the holders of an id".to_owned());
+        }
+        (referrer_sets(&self.referrers) != referrer_sets(&scanned.referrers))
+            .then(|| "the referrers of an id".to_owned())
+    }
+
+    /// Whether any of `moved`, elements put elsewhere in the document,
+    /// carries an id another element carries too: which of them the id
+    /// names follows document order, which only a scan tells.
+    pub(crate) fn moves_a_shared_id(&self, moved: &[NodeId]) -> bool {
+        let ids = moved
+            .iter()
+            .filter_map(|node| self.by_node.get(node)?.id.as_ref());
+        ids.into_iter()
+            .any(|id| self.holders.get(id).copied().unwrap_or_default() > 1)
     }
 
     /// How many elements put something in.
@@ -158,4 +239,28 @@ impl AxIndex {
             }
         }
     }
+}
+
+/// Each id's referrers as a sorted list, ids with none left out.
+#[cfg(debug_assertions)]
+fn referrer_sets(referrers: &HashMap<String, Vec<NodeId>>) -> Vec<(&String, Vec<NodeId>)> {
+    let mut sets: Vec<(&String, Vec<NodeId>)> = referrers
+        .iter()
+        .filter(|(_, nodes)| !nodes.is_empty())
+        .map(|(id, nodes)| {
+            let mut nodes = nodes.clone();
+            nodes.sort_unstable_by_key(|node| node.0);
+            (id, nodes)
+        })
+        .collect();
+    sets.sort_unstable_by(|a, b| a.0.cmp(b.0));
+    sets
+}
+
+/// Whether two of `entries`, patched together, carry one id: which of
+/// them it names is a matter of document order, which only a scan tells.
+fn ids_repeat(entries: &[(NodeId, Entry)]) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    let ids = entries.iter().filter_map(|(_, entry)| entry.id.as_ref());
+    ids.into_iter().any(|id| !seen.insert(id))
 }

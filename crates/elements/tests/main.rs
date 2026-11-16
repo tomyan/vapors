@@ -13,11 +13,13 @@ mod a11y_drive;
 mod a11y_drive_hover;
 mod a11y_drive_json;
 mod a11y_find;
+mod a11y_hidden_label_text;
 mod a11y_mirror;
 mod a11y_mirror_focus;
 mod a11y_mirror_hoisted;
 mod a11y_mirror_hoisted_scroll;
 mod a11y_mirror_index;
+mod a11y_mirror_index_moves;
 mod a11y_mirror_labelledby;
 mod a11y_mirror_owner;
 mod a11y_mirror_refused;
@@ -45,6 +47,7 @@ mod child_edits_for;
 mod child_edits_marks;
 mod clipping;
 mod clipping_refused;
+mod compiled_sheets;
 mod counter;
 mod declared_events;
 mod decoration;
@@ -62,8 +65,6 @@ mod focus_review;
 mod focus_style;
 mod focus_window;
 mod focus_window_held;
-mod gpu_surface;
-mod gpu_surface_refused;
 mod grid_off;
 mod html_none;
 mod html_none_focus;
@@ -107,11 +108,19 @@ mod kept_slabs;
 mod key_fields;
 mod key_use;
 mod keys;
+mod lane_batches;
 mod lane_block;
 mod lane_block_stale;
 mod lane_drift;
 mod lane_flex;
 mod lane_flex_heights;
+mod lane_frame_declines;
+mod lane_frames;
+mod lane_frames_moved;
+mod lane_ink_spliced;
+mod lane_scrollers;
+mod lane_shapes;
+mod lane_starts;
 mod listener_removal;
 mod listener_removal_more;
 mod listener_removal_review;
@@ -135,9 +144,11 @@ mod number_state;
 mod order_splice;
 mod order_splice_anchors;
 mod order_splice_declined;
+mod order_splice_long;
 mod order_splice_moved;
 mod outline;
 mod paint;
+mod paint_labels;
 mod pointer_capture;
 mod pointer_capture_edges;
 mod pointer_capture_review;
@@ -167,12 +178,16 @@ mod scroll;
 mod scroll_chain;
 mod scroll_frames;
 mod scroll_offsets;
+mod scroll_range_kept;
+mod scroll_range_overflow;
+mod scroll_range_refusals;
 mod scrollbar;
 mod scrollbar_fade;
 mod select_all_platform;
 mod shaped_once;
 mod sparse_updates;
 mod sparse_updates_flex;
+mod splice_patched;
 mod stacking;
 mod style_key_refusals;
 mod style_keys;
@@ -180,6 +195,8 @@ mod style_sharing;
 mod style_sharing_container;
 mod style_sharing_parents;
 mod style_sharing_presentation;
+mod surface_element;
+mod surface_element_refused;
 mod svg;
 mod svg_basic_shape_refusals;
 mod svg_basic_shapes;
@@ -212,6 +229,7 @@ mod typing_after_hide;
 mod ua_focus;
 mod update_counts;
 mod used_sharing;
+mod winners_oracle;
 
 /// Every `.rs` file directly under tests/ is a module above, so none is
 /// silently left out of the binary.
@@ -236,8 +254,10 @@ fn every_test_file_is_a_module() {
     assert!(
         missing.is_empty(),
         "tests/{missing:?} not declared in tests/main.rs, so never run; fix: add `mod <name>;` there, \
-         and in the file `use crate::<module>;` for each shared module it declared (see \
-         scripts/one-test-binary.sh); reproduce: cargo test -p {} --test tests every_test_file_is_a_module",
+         and in the file `use crate::<dir>;` in place of a plain `mod <dir>;` of a shared tests/<dir>/, \
+         and `use crate::<module> as <name>;` in place of a `#[path]` include of a support file \
+         main.rs declares (its #[path] lines name each); reproduce: cargo nextest run -p {} --test \
+         tests every_test_file_is_a_module",
         env!("CARGO_PKG_NAME")
     );
 }

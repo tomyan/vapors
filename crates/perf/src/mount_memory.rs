@@ -10,9 +10,10 @@ use std::process::Command;
 
 use vapors_gpu_harness::Gpu;
 
+use crate::child_deadline::output_within;
 use crate::instructions_check::checked_counter;
 use crate::mount::Mount;
-use crate::run::Settings;
+use crate::run::Workload;
 use crate::sampler::Sampler;
 
 /// Prefix of the line a child prints.
@@ -78,7 +79,8 @@ pub fn parse_line(line: &str) -> Result<MemoryRow, String> {
 /// A mount or frame that failed, or a resident set that cannot be read.
 pub fn run_child(gpu: &Gpu, rows: usize) -> Result<MemoryRow, String> {
     let mut workload = Mount::new(rows, checked_counter()?);
-    Sampler::new(gpu).sample_mounts(&mut workload, Settings { warmup: 0, runs: 1 })?;
+    workload.ready()?;
+    Sampler::new(gpu).first_frame(&mut workload)?;
     let first = workload.mounted[0];
     let framed = workload.after_frame.borrow()[0];
     Ok(MemoryRow {
@@ -89,6 +91,11 @@ pub fn run_child(gpu: &Gpu, rows: usize) -> Result<MemoryRow, String> {
         peak_kib: framed.peak_kib,
     })
 }
+
+/// The longest one size's process may take: a 10,000-row child took
+/// 1.4 s on the dev machine at load 8 (2026-11-16); 60 s is about 40
+/// times that.
+const CHILD_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Each of `sizes` in a process of its own.
 ///
@@ -101,10 +108,9 @@ pub fn in_processes(sizes: &[usize]) -> Result<Vec<MemoryRow>, String> {
 }
 
 fn child(exe: &std::path::Path, rows: usize) -> Result<MemoryRow, String> {
-    let output = Command::new(exe)
-        .args(["--mount-memory", &rows.to_string()])
-        .output()
-        .map_err(|e| format!("starting {} for {rows} rows: {e}", exe.display()))?;
+    let mut command = Command::new(exe);
+    command.args(["--mount-memory", &rows.to_string()]);
+    let output = output_within(&mut command, CHILD_DEADLINE)?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

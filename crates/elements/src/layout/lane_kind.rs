@@ -9,14 +9,15 @@ use std::fmt::Debug;
 use rustc_hash::FxHashMap;
 use taffy::{Layout, LayoutOutput};
 
-use super::lane::{Lane, Lanes};
+use super::lane::Lane;
+use super::lane_set::Lanes;
 use super::lane_tree::Summary;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
 /// A layout algorithm a lane lays a container's children out with.
 pub(crate) trait LaneKind: Sized + Debug {
-    type Summary: Summary + Copy + Default + Debug;
+    type Summary: Summary + Copy + Default + Debug + PartialEq;
     /// The container's inputs, settled for one ask.
     type Container;
     /// What every child's leaf depends on but the height bases.
