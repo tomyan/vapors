@@ -22,10 +22,14 @@ use crate::scaling::PhaseSeries;
 /// 10,500.2 to 10,550.3 per row over four judged runs (three at
 /// 30c03ed2, one at #411's head); 10,600 is the first hundred at least
 /// 0.4% over the highest, 0.47% of headroom
-/// (`docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"). Layout-lane
-/// PR 5 (the accessibility mirror in flow, `docs/plans/splice-layout.md`)
+/// (`docs/perf/a11y-phase-2026-11-12.md`, "Judged profile").
+/// Tightened (2026-11-16, 4i (1) and (2): the index patched, started rows
+/// given their bounds alone): 1232.9 to 1233.5 over four judged runs at
+/// 4i (2)'s head; 1300 is the first hundred at least 0.4% over the
+/// highest, 5.4% of headroom (same record, "4i (2)"). Layout-lane PR 5
+/// (the accessibility mirror in flow, `docs/plans/splice-layout.md`)
 /// retires it, with the lower ceiling measured judged then.
-pub const INSERT_A11Y_PER_ROW: u64 = 10_600;
+pub const INSERT_A11Y_PER_ROW: u64 = 1300;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `FlexInsert`, on the flex-column list,
 /// whose rows are one block holding their text: measured 1829.6 and
@@ -33,9 +37,11 @@ pub const INSERT_A11Y_PER_ROW: u64 = 10_600;
 /// 3f-2); 1900 was that rounded up to the next hundred. Set again for
 /// the judged profile (2026-11-16): 1961.2 to 1968.1 over the same four
 /// judged runs; 1980 is the first ten at least 0.4% over the highest,
-/// 0.60% of headroom. Layout-lane PR 5 (the accessibility mirror in
-/// flow) retires it.
-pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1980;
+/// 0.60% of headroom. Tightened (2026-11-16, 4i (1) and (2)): 232.5 to
+/// 232.6 over four judged runs at 4i (2)'s head; 240 is the first ten at
+/// least 0.4% over the highest, 3.2% of headroom. Layout-lane PR 5 (the
+/// accessibility mirror in flow) retires it.
+pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 240;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
 ///
@@ -43,9 +49,11 @@ pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1980;
 /// 13,443 and 13,446.3 per row. Set again for the judged profile
 /// (2026-11-16): 15,639.5 to 15,721.2 over the same four judged runs;
 /// 15,800 is the first hundred at least 0.4% over the highest, 0.50% of
-/// headroom. Layout-lane PR 5 retires
-/// it, with the lower ceiling measured judged then.
-pub const RESIZE_A11Y_PER_ROW: u64 = 15_800;
+/// headroom. Tightened (2026-11-16, 4i (1) and (2)): 2441.9 to 2444.7
+/// over four judged runs at 4i (2)'s head; 2500 is the first hundred at
+/// least 0.4% over the highest, 2.3% of headroom. Layout-lane PR 5
+/// retires it, with the lower ceiling measured judged then.
+pub const RESIZE_A11Y_PER_ROW: u64 = 2500;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
 /// every size: the take reads the scrolled container alone, its rows'
