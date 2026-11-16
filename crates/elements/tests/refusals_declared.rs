@@ -2,7 +2,7 @@
 //! column), and an inherited value is refused once, at the element that
 //! declared it, not at every descendant.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals};
 

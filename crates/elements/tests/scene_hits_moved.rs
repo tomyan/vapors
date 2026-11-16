@@ -4,7 +4,7 @@
 //! is over that scene; and only then. The scene's anchors sit in a
 //! holder away from the pointer, so no box under it is rebuilt.
 
-mod support;
+use crate::support;
 
 use support::pointer::quad_colours;
 use support::scene_hits_page::{Answer, OVER_A, OVER_B, OVER_SIDE, Page, page};

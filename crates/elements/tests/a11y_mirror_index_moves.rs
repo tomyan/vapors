@@ -5,7 +5,7 @@
 //! neither scans. Every patched take is compared with a scan in debug
 //! builds (`AxIndex::assert_scanned`).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

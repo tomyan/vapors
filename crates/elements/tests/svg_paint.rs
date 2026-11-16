@@ -2,7 +2,7 @@
 //! its content box snapped to device pixels, in its used `color`, under
 //! its ancestors' clip; nothing when it is not visible.
 
-mod support;
+use crate::support;
 
 use support::svg_page::with_attributes;
 use support::{document, element, viewport};

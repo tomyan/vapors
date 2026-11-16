@@ -2,7 +2,7 @@
 //! whichever node holds it: a page of equal labels shapes one, and
 //! each width layout asks for is broken from that one shaping.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_elements::Document;

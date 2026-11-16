@@ -3,10 +3,8 @@
 //! component in the same directory that declares no `anchor` prop has
 //! no element to put them on, and the tag is refused at the attribute.
 
-#[path = "common/build.rs"]
-mod build;
-#[path = "common/props.rs"]
-mod props;
+use crate::common_build as build;
+use crate::common_props as props;
 
 use props::refusals;
 

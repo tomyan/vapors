@@ -1,6 +1,6 @@
 //! Interpolation (`src/animation/interpolate.rs`). vapors-specific: Oklab, premultiplied alpha.
 
-mod support;
+use crate::support;
 
 use support::animation_sample::{px, rgb};
 use vapors_css::animation::interpolate;

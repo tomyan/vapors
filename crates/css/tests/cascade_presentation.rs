@@ -6,7 +6,7 @@
 //! keep `currentcolor` as their computed value, so a path inherits the
 //! keyword, not its svg's colour.
 
-mod support;
+use crate::support;
 
 use support::{add, chain, computed, css, env, sheet};
 use vapors_css::cascade::{Cascade, PRESENTATION_SHEET};

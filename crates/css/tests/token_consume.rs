@@ -1,6 +1,6 @@
 //! Token consumers (`src/token/consume.rs`): numbers, strings, escapes, `url()`.
 
-mod support;
+use crate::support;
 
 use support::tokenizer::{ident, kinds};
 use vapors_css::token::{TokenKind, tokenize};

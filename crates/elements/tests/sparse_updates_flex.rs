@@ -4,7 +4,7 @@
 //! on the rows; an edit that makes the row taller lays the column out
 //! again. Each update is checked by the correctness oracle.
 
-mod support;
+use crate::support;
 
 use support::flex_list::{FlexList, ROW_MARGIN, flex_list, list_viewport};
 use support::oracle::assert_matches_full;
@@ -18,7 +18,7 @@ const LONGER: &str = "a text long enough to wrap onto a second line in the viewp
 const GROWS: &str = "height: auto; margin: 4px 0;";
 
 const FIX: &str = "update sparse_updates_flex.rs and docs/plans/iu1.md; reproduce: \
-    cargo nextest run -p vapors-elements --test sparse_updates_flex --no-capture";
+    cargo nextest run -p vapors-elements --test tests sparse_updates_flex:: --no-capture";
 
 /// The counts of one update after `edit`, checked by the oracle.
 fn edited(list: &FlexList, edit: impl FnOnce(&FlexList), what: &str) -> UpdateCounts {

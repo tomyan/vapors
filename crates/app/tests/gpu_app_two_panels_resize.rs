@@ -2,10 +2,8 @@
 //! renders at the new size; `FrameCounts` counts one composition per
 //! panel (docs/gpu-surface.md, 3D slice 1c PR 4).
 
-#[path = "support/panels.rs"]
-mod panels;
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_panels as panels;
+use crate::support_surface as support;
 
 use panels::{FLEXIBLE, OVERSIZED, Panels};
 use support::{BLUE, RED, pixel};

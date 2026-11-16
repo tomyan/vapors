@@ -6,7 +6,7 @@
 //! is a lane batch of one row. Kept batches match a fresh batching after
 //! a scroll and an insert (the debug check in `kept_batches`).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

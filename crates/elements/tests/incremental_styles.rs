@@ -2,7 +2,7 @@
 //! elements an update restyles after one kind of change, on html >
 //! body > column > 10 rows of 5 cells (63 elements).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

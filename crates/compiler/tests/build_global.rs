@@ -2,8 +2,7 @@
 //! global sheet, as the layout corpus does so that its CSS means what
 //! Chromium reads. Nothing is scoped: no `SCOPE`, no `add_style`, no tag.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use build::{dirs, read, write};
 use vapors_compiler::build::{Styles, compile_dir_into_styled};

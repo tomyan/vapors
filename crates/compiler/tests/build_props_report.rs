@@ -3,10 +3,8 @@
 //! reported, in file order; unchecked tags reach the build output as
 //! cargo warnings.
 
-#[path = "common/build.rs"]
-mod build;
-#[path = "common/props.rs"]
-mod props;
+use crate::common_build as build;
+use crate::common_props as props;
 
 use build::write;
 use props::{USE_PLAIN, shown, with_plain};

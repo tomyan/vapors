@@ -3,8 +3,7 @@
 //! an event-aware one is passed as is, and expression attributes are
 //! patched in effects.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated_with, refusal};
 

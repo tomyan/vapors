@@ -3,10 +3,8 @@
 //! root's `--tooltip-*` properties give; placed by `place_tooltip` and
 //! inside the window at its edges. `ElementsApp`'s frames are in
 //! `gpu_tooltip_app.rs`.
-#[path = "support/surface.rs"]
-mod support;
-#[path = "support/tooltip.rs"]
-mod tooltip;
+use crate::support_surface as support;
+use crate::support_tooltip as tooltip;
 
 use support::{RED, Rig, SIZE, Solid, document, pixel, update};
 use tooltip::{GREEN, TOOLTIP, bounds};

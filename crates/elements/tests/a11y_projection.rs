@@ -5,7 +5,7 @@
 //! hidden listbox is left out with the combobox's `controls`, an open
 //! one is there with the active option as `activedescendant`.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

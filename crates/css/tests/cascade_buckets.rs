@@ -1,6 +1,6 @@
 //! Rule buckets (`src/cascade/buckets.rs`).
 
-mod support;
+use crate::support;
 
 use support::{chain, sheet};
 use vapors_css::cascade::Cascade;

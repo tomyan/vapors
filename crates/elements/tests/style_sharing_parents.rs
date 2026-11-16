@@ -3,7 +3,7 @@
 //! the share key, so what a child inherits, and what a selector reads
 //! from its ancestors, splits the share when the parents differ.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,8 +1,7 @@
 //! GPU tier: a refused frame's `frame_counts` hold the work issued
 //! before the refusal, including the refused run's own (IU1 PR 3).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{RED, Rig, Solid, bare_document, update};
 use vapors_app::PaintError;

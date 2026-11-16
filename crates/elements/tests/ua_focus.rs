@@ -3,7 +3,7 @@
 //! does not; a button's width includes its padding and border, as
 //! Chromium's buttons are `box-sizing: border-box`.
 
-mod support;
+use crate::support;
 
 use support::focus_page::{page, tab};
 use support::{document, element, viewport};

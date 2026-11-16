@@ -2,7 +2,7 @@
 //! padding box, `release_pointer_capture`, the pointer leaving the
 //! window while captured, and a capturing element removed mid-drag.
 
-mod support;
+use crate::support;
 
 use support::pointer::{Log, record, setup};
 use vapors_dom::{Dom, Event};

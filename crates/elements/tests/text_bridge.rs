@@ -5,7 +5,7 @@
 //! `input`, the composing range underlined. An edit made against a text
 //! the field no longer holds is refused, naming both.
 
-mod support;
+use crate::support;
 
 use support::text_page::{click, page, selection, value};
 use vapors_elements::{Document, TextEdit};

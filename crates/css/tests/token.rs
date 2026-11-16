@@ -1,6 +1,6 @@
 //! Tokenizer (`src/token/mod.rs`): token shapes per CSS Syntax Level 3. vapors-specific; sumi tokenizes by character.
 
-mod support;
+use crate::support;
 
 use support::tokenizer::{ident, kinds};
 use vapors_css::token::{Token, TokenKind, tokenize};

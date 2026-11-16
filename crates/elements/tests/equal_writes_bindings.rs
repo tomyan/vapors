@@ -3,7 +3,7 @@
 //! update restyles, lays out and shapes nothing; a different value is
 //! written and drawn.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

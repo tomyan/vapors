@@ -1056,7 +1056,8 @@ on SwiftShader and the Pixel 9 Pro; if either lacks them, (b) stays on
 the web and (a) natively, both behind one trait, reported in the status
 line.
 
-**D9. One-scene S7 before or after this plan.** (a) Build S7 as
+**D9. One-scene S7 before or after this plan.** Tom, 2026-11-16: property 9 is judged on the flat scene; S7 and the SceneRenderer decal route are not built; the decal comes as F9.
+The options are kept as the record. (a) Build S7 as
 planned if property 9 reaches it first; F9 retires it. (b) Hold S7 and
 reach property 9's decal through F8 and F9: property 9 waits for F1 to
 F8. Recommend (a): property 9 is the finish line and S7 is about 400

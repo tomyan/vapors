@@ -2,7 +2,7 @@
 //! children (F2c S7): the hovered element is restyled alone, and its
 //! children because its style changed.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

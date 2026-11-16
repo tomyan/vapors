@@ -45,6 +45,10 @@ pub(crate) struct Touched {
     /// (`a11y_mirror_index::INDEXED`): with the inserted and freed ones,
     /// the only elements whose index entries can differ.
     pub(crate) indexed: NodeSet,
+    /// The rows a lane start moved: one that is not a node itself has its
+    /// nearest nodes read again (`a11y_mirror_reach.rs`), as their bounds
+    /// are from a node above the row.
+    pub(crate) started: NodeSet,
 }
 
 pub(crate) struct AxMirror {
@@ -106,8 +110,24 @@ impl AxMirror {
             .flat_map(|&(container, first)| {
                 lanes.children_from(container, first).unwrap_or_default()
             });
+        for slot in started {
+            let key = slots.key(slot).unwrap_or_else(|| {
+                panic!(
+                    "the lane child in slot {slot}, which started elsewhere this update, holds no \
+                     box: the lane names a slot the slots freed (layout/lane_write.rs \
+                     `write_laid`, a11y_mirror_state.rs `touch_slots`); reproduce with \
+                     `cargo xtask test`"
+                )
+            });
+            self.touched.nodes.insert(node_of(key));
+            // a text run that is a lane child is its container's text: the
+            // container is touched, but its nodes did not start elsewhere
+            if let Key::Element(row) = key {
+                self.touched.started.insert(row);
+            }
+        }
         let built = changed.rebuilt.iter().chain(&changed.moved).copied();
-        for key in built.chain(started).filter_map(|slot| slots.key(slot)) {
+        for key in built.filter_map(|slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
         }
         for (_, key) in &changed.freed {
@@ -183,6 +203,7 @@ impl AxMirror {
         touched.scrolled.extend(self.touched.scrolled.drain());
         touched.freed.extend(self.touched.freed.drain());
         touched.indexed.extend(self.touched.indexed.drain());
+        touched.started.extend(self.touched.started.drain());
         self.touched = touched;
         self.index = Some(index);
     }

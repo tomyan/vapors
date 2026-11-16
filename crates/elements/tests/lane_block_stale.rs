@@ -3,7 +3,7 @@
 //! `fill_stale`): the child is cleared once per changed descendant, and
 //! the lane reads each cleared slot once.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

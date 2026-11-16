@@ -4,7 +4,7 @@
 
 use vapors_platform::Next;
 
-use crate::fling_replay::{Compared, Replayed};
+use super::fling_replay::{Compared, Replayed};
 
 /// The coast's first frames, held to `FIRST_ALLOWANCE`; the fit saw
 /// these and nothing after them (`fit.py coast`).

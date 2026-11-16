@@ -2,7 +2,7 @@
 //! left unscoped, so a component can style `body` or an ancestor it did
 //! not create. In a sheet that is not a component's it is refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::{Dom, SCOPE_ATTRIBUTE};

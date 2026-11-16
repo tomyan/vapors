@@ -3,7 +3,7 @@
 //! cancels it), `:active` with two fingers, and a finger that lands on
 //! nothing.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

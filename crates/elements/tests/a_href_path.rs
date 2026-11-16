@@ -4,7 +4,7 @@
 //! not stop it; a checkbox inside a link takes the click and the link is
 //! not followed; a button inside a link follows it.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

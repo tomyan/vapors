@@ -1,7 +1,7 @@
 //! Parley layouts are kept between updates: a run whose text, styles
 //! and width are unchanged is not laid out again (F2c S7).
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

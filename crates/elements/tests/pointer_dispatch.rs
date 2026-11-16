@@ -1,7 +1,7 @@
 //! Pointer input dispatch: DOM-style bubbling, `stop_propagation`,
 //! `click` on the nearest common ancestor, and a disabled button.
 
-mod support;
+use crate::support;
 
 use support::pointer::{Log, SHEET, record, setup, update};
 use vapors_dom::{Dom, Event};

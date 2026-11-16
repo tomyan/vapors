@@ -4,7 +4,7 @@
 //! the steps. Chromium paints the full number; this differs on
 //! purpose, for display only (touché, ux-review-1).
 
-mod support;
+use crate::support;
 
 use support::number_page::{Page, click, key, page, type_text, value};
 use support::viewport;

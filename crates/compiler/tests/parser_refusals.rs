@@ -6,7 +6,7 @@
 //! terminal title in sumi; a window title is a platform concern here,
 //! so the tag is refused with that pointer rather than parsed.
 
-mod common;
+use crate::common;
 
 use common::{parse_err, parse_file, parse_ok};
 

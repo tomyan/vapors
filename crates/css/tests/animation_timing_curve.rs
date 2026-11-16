@@ -1,6 +1,6 @@
 //! Curve evaluation (`src/animation/timing_curve.rs`). Translated from sumi `easing_test.go` and `steps_test.go`.
 
-mod support;
+use crate::support;
 
 use support::animation_timing::{bisect_bezier, near};
 use vapors_css::animation::TimingFunction;

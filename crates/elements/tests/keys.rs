@@ -2,7 +2,7 @@
 //! button is clicked by Enter on keydown and by Space on keyup; a
 //! prevented keydown does neither, nor moves focus.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,6 +1,6 @@
 //! Winners per property (`src/cascade/collect.rs`). Translated from the cascade halves of sumi `resolve_test.go`, `resolve_focus_test.go`, `logical_test.go` and `resolve_styles_test.go`; unmatched properties are their initial value.
 
-mod support;
+use crate::support;
 
 use support::cascade::{BLUE, GREEN, RED};
 use support::cascade_computed::color_with_ua;

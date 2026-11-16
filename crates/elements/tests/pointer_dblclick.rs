@@ -3,7 +3,7 @@
 //! held are on `pointerdown`, `pointerup`, `click` and `dblclick`
 //! (the DOM's altKey, ctrlKey, metaKey and shiftKey).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;

@@ -5,7 +5,7 @@
 //! becomes "has one text child with parts". `<box>` and `<text>` are
 //! refused here as there, with a pointer to `div` and `span`.
 
-mod common;
+use crate::common;
 
 use common::{element, literal, parse_err, parse_ok, text_parts};
 

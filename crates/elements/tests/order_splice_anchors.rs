@@ -5,7 +5,7 @@
 //! container or the owner keeps only out-of-flow children. Each also
 //! matches a full update through the oracle.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

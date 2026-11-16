@@ -8,8 +8,7 @@
 //! does not animate; a worker thread relays a request through a channel
 //! and a wake.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

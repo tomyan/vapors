@@ -5,7 +5,7 @@
 //! `range_changes` there, and the kept range needs the right-to-left
 //! overflow Taffy computes.
 
-mod support;
+use crate::support;
 
 use support::{document, element};
 use vapors_dom::Dom;

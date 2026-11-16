@@ -7,7 +7,7 @@
 //! `LayoutBox::kept` ignored: what changes the value builds the box
 //! again. The text layout case fails without `KeptBox::touch`.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId, PropertyValue};

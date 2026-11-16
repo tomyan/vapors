@@ -1,6 +1,6 @@
 //! The incremental restyle rule (`src/cascade/restyle.rs`). vapors-specific.
 
-mod support;
+use crate::support;
 
 use support::{cascade, siblings};
 use vapors_css::cascade::RestyleScope;

@@ -1,7 +1,7 @@
 //! `:hover` and `:active` follow the pointer and ask for a frame only
 //! when they change.
 
-mod support;
+use crate::support;
 
 use support::pointer::{Log, SHEET, quad_colours, record, setup, update};
 use vapors_dom::Dom;

@@ -2,7 +2,7 @@
 //! z-index and stacking context, beyond what the `stacking` paint
 //! fixture compares with Chromium.
 
-mod support;
+use crate::support;
 
 use support::{document, element};
 

@@ -1,8 +1,7 @@
 //! `build::build_script_report`: what `compile_dir` prints for cargo
 //! and whether the build script must fail.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use build::{COUNTER, dirs, write};
 use vapors_compiler::build::{build_script_report, resolve_src};

@@ -1,6 +1,6 @@
 //! Computed values (`src/cascade/compute.rs`): inheritance, units, colours, `var()`. Partly translated from sumi `resolve_styles_test.go`.
 
-mod support;
+use crate::support;
 
 use support::cascade::RED;
 use support::{add, chain, computed, css, env, sheet};

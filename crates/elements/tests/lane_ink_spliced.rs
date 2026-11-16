@@ -4,7 +4,7 @@
 //! rows noted before is carried into the frames made afresh, and the
 //! draw still finds the shadows of rows above the view.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

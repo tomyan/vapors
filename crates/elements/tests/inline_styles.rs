@@ -2,7 +2,7 @@
 //! naming the element when it does not parse, and named as the
 //! attribute when one of its values is refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::Dom;

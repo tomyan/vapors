@@ -6,7 +6,7 @@
 //! are not are declined, and both draw as the scene batched on the page
 //! (the debug check in `kept_batches`).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

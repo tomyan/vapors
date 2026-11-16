@@ -7,8 +7,7 @@
 //! Difference: a signal method called explicitly (`{count.get()}`,
 //! `{items.with(..)}`) is left alone rather than doubled.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated_with};
 
