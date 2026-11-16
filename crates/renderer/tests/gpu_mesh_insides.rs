@@ -6,6 +6,8 @@
 //! an acute join, a join just under the miter limit and one over it;
 //! and a mirrored polygon.
 
+#[path = "support/mesh_oracle.rs"]
+mod oracle;
 #[path = "support/meshes.rs"]
 mod support;
 
@@ -15,6 +17,25 @@ use vapors_shapes::{MeshTriangle, mesh_triangles};
 fn check(triangles: &[MeshTriangle], transform: [f32; 6], what: &str) {
     let coverage = coverage(&[white(triangles.to_vec(), transform)]);
     assert_ramp_within_half_a_pixel(&coverage, triangles, transform, what);
+}
+
+/// The ramp's band against the CPU drawing, for each subpath of `data`
+/// drawn alone: where two subpaths overlap, the pipeline blends one ramp
+/// over the other, which a union's area differs from by up to a quarter
+/// (S3b's known overlap limit), so overlaps are left to `check`'s rule.
+fn check_band(data: &str, stroke: Option<f32>, transform: [f32; 6], what: &str) {
+    assert!(
+        !data.contains('m'),
+        "{what}: split at absolute moves only; a relative move needs its start"
+    );
+    for start in data.match_indices('M').map(|(at, _)| at) {
+        let end = data[start + 1..]
+            .find('M')
+            .map_or(data.len(), |at| start + 1 + at);
+        let subpath = mesh(&data[start..end], stroke);
+        let coverage = coverage(&[white(subpath.clone(), transform)]);
+        oracle::assert_band_matches_cpu(&coverage, &subpath, transform, what);
+    }
 }
 
 /// The notched rect `M0 0H1V1H2V0H3V3H2.1H0Z` at 8x, its notch's right
@@ -43,12 +64,20 @@ fn gpu_a_notched_rect_as_the_review_triangulated_it_is_full_inside() {
 
     // When, Then
     check(&triangles, NOTCHED, "the review's notched rect");
+    let coverage = coverage(&[white(triangles.clone(), NOTCHED)]);
+    oracle::assert_band_matches_cpu(&coverage, &triangles, NOTCHED, "the review's notched rect");
 }
 
 #[test]
 fn gpu_a_notched_rect_as_lyon_triangulates_it_is_full_inside() {
     check(
         &mesh("M0 0H1V1H2V0H3V3H2.1H0Z", None),
+        NOTCHED,
+        "lyon's notched rect",
+    );
+    check_band(
+        "M0 0H1V1H2V0H3V3H2.1H0Z",
+        None,
         NOTCHED,
         "lyon's notched rect",
     );
@@ -70,6 +99,7 @@ fn gpu_touches_icons_at_2x_ramp_within_half_a_pixel() {
     ];
     for data in icons {
         check(&mesh(data, Some(1.5)), [2.0, 0.0, 0.0, 2.0, 0.0, 0.0], data);
+        check_band(data, Some(1.5), [2.0, 0.0, 0.0, 2.0, 0.0, 0.0], data);
     }
 }
 
@@ -94,6 +124,7 @@ fn gpu_strokes_joins_ramp_within_half_a_pixel() {
     ];
     for (data, what) in joins {
         check(&mesh(data, Some(3.0)), [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], what);
+        check_band(data, Some(3.0), [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], what);
     }
 }
 
@@ -111,10 +142,28 @@ fn gpu_a_mirrored_polygon_ramps_within_half_a_pixel() {
     // pixel centre 0.25 inside it is covered 0.75, which a corner moved
     // in rather than out would leave uncovered
     assert_ramp_within_half_a_pixel(&coverage, &triangles, mirrored, "mirrored polygon");
+    oracle::assert_band_matches_cpu(&coverage, &triangles, mirrored, "mirrored polygon");
     assert_at(
         &coverage,
         (16, 4),
         0.75,
         "0.25 inside the mirrored top edge",
     );
+}
+
+#[test]
+fn gpu_the_outer_ramp_beside_a_near_straight_corner_is_not_cut() {
+    // Given touche's Redo icon at 1.55: its top edge runs straight into
+    // the arc at (9.05, 5.25), a corner turning 8 degrees, and from x =
+    // 8.5 to there the pixels just outside the edge read 0 where the CPU
+    // drawing gives 0.375 (found by decal D2's 8x comparison)
+    let redo = "M5 3L2 6l3 3M2 6h7a4 4 0 0 1 0 8H6";
+
+    // When, Then
+    for transform in [
+        [1.55, 0.0, 0.0, 1.55, 3.3, 2.5],
+        [1.55, 0.0, 0.0, 0.83, 3.3, 6.3],
+    ] {
+        check_band(redo, Some(1.5), transform, "Redo at 1.55");
+    }
 }
