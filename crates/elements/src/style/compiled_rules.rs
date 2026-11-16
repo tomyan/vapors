@@ -94,7 +94,8 @@ impl Sheets {
         index.map(Some).ok_or_else(|| {
             format!(
                 "{}: its compiled winners name rule {} of {}, which has no such rule; fix: \
-                 rebuild the crate that compiled it; reproduce: mount it after a clean build",
+                 rebuild the crate that compiled it; reproduce: `cargo run -p vapors-compiler \
+                 --bin wisp-check -- --styles <its .wisp>` prints the rules its winners name",
                 key.site, rule.rule, self.names[*sheet]
             )
         })
