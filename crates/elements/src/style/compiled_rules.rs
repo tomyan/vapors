@@ -59,7 +59,7 @@ impl Sheets {
                 continue;
             };
             let entry = (index, declaration as usize);
-            self.declaration_exists(key, entry)?;
+            self.base_entry_holds(key, entry)?;
             if !entries.contains(&entry) {
                 entries.push(entry);
             }
@@ -100,20 +100,36 @@ impl Sheets {
         })
     }
 
-    fn declaration_exists(
+    /// Whether `(rule, declaration)` may be a base entry: the declaration
+    /// exists, and its rule sits under no `@media`, `@supports` or
+    /// `@container` condition, which base entries are entered without
+    /// testing (the analysis judges such a rule conditional).
+    fn base_entry_holds(
         &self,
         key: &StyleKey,
         (rule, declaration): (usize, usize),
     ) -> Result<(), String> {
-        let rules = self.cascade.rules().nth(rule);
-        if rules.is_some_and(|rule| declaration < rule.declarations.len()) {
-            return Ok(());
+        let found = self.cascade.rule_at(rule);
+        let refuse = |why: String| {
+            Err(format!(
+                "{}: its compiled winners name {why}; fix: rebuild the crate that compiled it with \
+                 this vapors-css, else report the analysis; reproduce: `cargo run -p \
+                 vapors-compiler --bin wisp-check -- --styles <its .wisp>` prints them",
+                key.site
+            ))
+        };
+        match found {
+            Some((rule, _)) if declaration >= rule.declarations.len() => refuse(format!(
+                "declaration {declaration} of a rule that has fewer"
+            )),
+            Some((rule, true)) => refuse(format!(
+                "a rule under a condition as always winning: `{}`, whose condition only the \
+                 element's environment decides",
+                vapors_css::serialize::component_values(&rule.prelude).trim()
+            )),
+            Some(_) => Ok(()),
+            None => refuse(format!("rule {rule}, which the cascade does not have")),
         }
-        Err(format!(
-            "{}: its compiled winners name declaration {declaration} of a rule that has fewer; \
-             fix: rebuild the crate that compiled it; reproduce: mount it after a clean build",
-            key.site
-        ))
     }
 
     /// Whether a sheet the key does not reference has a candidate rule
