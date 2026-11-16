@@ -57,6 +57,10 @@ pub struct Document {
     pub(crate) checks: crate::kept_checks::KeptChecks,
     /// The last update's structural counts.
     pub(crate) counts: crate::UpdateCounts,
+    /// Whether every element computed from compiled winners is held
+    /// against the full cascade (`restyle_compiled`): debug builds, unless
+    /// a test takes the release path (`Document::verify_as_release`).
+    pub(crate) compare_every_element: bool,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
     /// How opaque scroll thumbs are drawn now, 0 (hidden) to 255.
@@ -110,6 +114,7 @@ impl Document {
             boxes: crate::layout::KeptBoxes::default(),
             checks: crate::kept_checks::KeptChecks::default(),
             counts: crate::UpdateCounts::default(),
+            compare_every_element: cfg!(debug_assertions),
             scroll: crate::scroll::Offsets::default(),
             thumb_alpha: u8::MAX,
             images: crate::images::Images::default(),
@@ -144,16 +149,21 @@ impl Document {
     }
 
     /// Adds a global author stylesheet, after those already added.
-    /// `name` is how errors refer to it.
+    /// `name` is how errors refer to it. Refused once an analysed
+    /// element (one made from a key with compiled winners) exists, and
+    /// such an element is refused in a document holding one
+    /// (build-time-styles.md, decision 2).
     ///
     /// # Errors
     ///
-    /// The CSS crate's refusal, with line and column; the sheet is not
-    /// added.
+    /// An analysed element exists, naming it and the fix; or the CSS
+    /// crate's refusal, with line and column. The sheet is not added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
+        // a refused call changes nothing (`dom_keyed.rs`)
+        self.sheets.add_rust(name, text)?;
         self.note_change();
         self.dirty.everything();
-        self.sheets.add_author(name, text)
+        Ok(())
     }
 
     /// Whether `node` is in the document (created and not removed).

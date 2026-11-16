@@ -22,21 +22,19 @@ pub(crate) fn assemble(
     let mut file = header(&component.path, style);
     let scope = component.style.as_ref().and(component.scope.as_ref());
     if let Some(scope) = scope {
-        file.push_str(&scope_constant(scope));
+        file.push_str(&super::shell_sheet::scope_constant(scope));
     }
     let global = component.style.is_some() && scope.is_none();
     if global {
-        file.push_str(&sheet_constant(component.global_sheet_name()));
+        file.push_str(&super::shell_sheet::sheet_constant(
+            component.global_sheet_name(),
+        ));
     }
     file.push_str(&super::style_key::key_statics(keys));
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    let registration = match (scope, global) {
-        (Some(_), _) => "        dom.borrow_mut().add_style(SCOPE, STYLE);\n",
-        (None, true) => "        dom.borrow_mut().add_global_style(SHEET, STYLE);\n",
-        (None, false) => "",
-    };
-    file.push_str(&mount_methods(name, info, body, registration));
+    let registration = super::shell_sheet::registration(scope.is_some(), global, style);
+    file.push_str(&mount_methods(name, info, body, &registration));
     let uses: Vec<&String> = info
         .statements
         .iter()
@@ -66,37 +64,6 @@ pub const STYLE: &str = {style:?};
 
 "
     )
-}
-
-/// The scope the style is added under and each element is tagged with:
-/// the crate and the file, so two crates' `src/panel.wisp` differ.
-fn scope_constant(scope: &str) -> String {
-    format!(
-        "/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
-pub const SCOPE: &str = {};
-
-",
-        in_crate(scope)
-    )
-}
-
-/// A global component's sheet name: its crate and file, as compiled
-/// winners name it (`codegen::key_winners`).
-fn sheet_constant(path: &str) -> String {
-    format!(
-        "/// The name [`STYLE`] is added under, unscoped, by each mount.
-pub const SHEET: &str = {};
-
-",
-        in_crate(path)
-    )
-}
-
-/// A sheet's name as the runtime holds it: `path` after the crate's
-/// name. `SCOPE` and every `SheetRef` the winners write are made here,
-/// so the two cannot name one sheet differently.
-pub(super) fn in_crate(path: &str) -> String {
-    format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {path:?})")
 }
 
 fn props_struct(name: &str, info: &ScriptInfo) -> String {
@@ -186,6 +153,15 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> 
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
     }
+    // a style-only component builds nothing: no place, no roots pushed
+    let (unplaced, roots) = if body.trim().is_empty() {
+        (
+            "        let _ = (parent, before);\n",
+            "#[allow(clippy::let_and_return, reason = \"a style-only component has no roots\")] let roots = Vec::new();",
+        )
+    } else {
+        ("", "let mut roots = Vec::new();")
+    };
     format!(
         "impl {name} {{
     /// Mounts the component at the end of `parent`.
@@ -202,11 +178,11 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> 
         Rc<RefCell<D>>: DynDom,
     {{
         let {name}Props {{ {prop_names} }} = props;
-{add_style}        dom.borrow_mut().declare_events(&Self::events());
+{unplaced}{add_style}        dom.borrow_mut().declare_events(&Self::events());
         let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
-{statements}            let mut roots = Vec::new();
+{statements}            {roots}
 {body}            {returned}
         }});
         {name} {{ {built}, disposes_on_drop }}

@@ -45,7 +45,7 @@ fn an_elements_winners_list_the_user_agent_sheet_and_its_own_by_scope_hashed_as_
         "winners: vapors_dom::Winners::Compiled(&WINNERS_DIV0)",
     );
     // the own sheet, second, marked as the key's own for check 1
-    assert_has(&code, "shareable: true, own: Some(1) }");
+    assert_has(&code, "blocked_by: &[], own: Some(1) }");
     assert_has(
         &code,
         &format!(
@@ -138,6 +138,47 @@ fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() 
         ),
     );
     assert_has(&code, "vapors_dom::RuleRef { sheet: 2, rule: 0 }]");
+}
+
+#[test]
+fn a_sheet_holding_a_rule_that_blocks_sharing_is_named_by_its_renumbered_index() {
+    // Given a crate of three components: `a.wisp`'s rule reaches no
+    // `div`, so its sheet is left out; `b.wisp` reads siblings of a `div`
+    let dir = TempDir::new("key-winners-blocked");
+    let write = |name: &str, text: String| {
+        let path = dir.0.join(name);
+        std::fs::write(&path, text).expect("written");
+        parse_file_under(&path, &dir.0).expect("parses")
+    };
+    let card = write(
+        "card.wisp",
+        format!("<style>{STYLE}</style>\n<div class=\"card\"></div>"),
+    );
+    let a = write(
+        "a.wisp",
+        "<style>:global(p) { margin: 0; }</style>\n<span></span>".to_owned(),
+    );
+    let blocking = "\n:global(div + div) { margin: 0; }\n";
+    let b = write(
+        "b.wisp",
+        format!("<style>{blocking}</style>\n<span></span>"),
+    );
+    let sheets = CrateSheets::of([&card, &a, &b]);
+
+    // When
+    let code = generate_checked(&card, &PropsIndex::default(), &sheets.others_for(&card))
+        .expect("generates")
+        .code;
+
+    // Then: `b.wisp` is the analysis' fourth sheet and the winners' third
+    assert_has(
+        &code,
+        &format!(
+            "(vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"b.wisp\")), {})]",
+            hash(blocking)
+        ),
+    );
+    assert_has(&code, "blocked_by: &[2]");
 }
 
 /// A directory removed when dropped, so a failed test leaves nothing in

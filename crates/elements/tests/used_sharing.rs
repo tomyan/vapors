@@ -27,7 +27,7 @@ static ROW: StyleKey = StyleKey {
 /// under the body, each with the id `r<i>`, which no sheet selects.
 fn page(css: &str, count: usize) -> (Document, Vec<NodeId>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let rows = (0..count)
         .map(|i| {

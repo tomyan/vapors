@@ -140,6 +140,7 @@ mod repaint;
 mod restyle;
 mod restyle_check;
 mod restyle_children;
+mod restyle_compiled;
 mod restyle_pass;
 mod restyle_scene;
 mod restyle_share;

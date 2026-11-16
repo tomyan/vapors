@@ -8,7 +8,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use vapors_css::cascade::unshareable;
 use vapors_css::selector::Element as _;
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE, StyleKey};
 
@@ -48,10 +47,13 @@ impl Document {
         else {
             return Ok((self.compute_own(node, viewport)?, Path::Unkeyed));
         };
-        if !self.shareable(key) {
-            let style = self.compute_own(node, viewport)?;
-            self.check_winners(node, key, &style);
-            return Ok((style, Path::Unshareable));
+        // check 1 first: a sheet registered with other text is that, not a
+        // disagreement of the sharing answers (review of #437, M2)
+        if let Some(winners) = key.winners.compiled() {
+            self.compiled_key(key, winners)?;
+        }
+        if !self.shareable(key)? {
+            return Ok((self.compute_keyed(node, key, viewport)?, Path::Unshareable));
         }
         self.shared_style(node, key, viewport)
     }
@@ -72,15 +74,18 @@ impl Document {
             }
             return Ok((style, Path::Shared));
         }
-        let style = self.compute_own(node, viewport)?;
-        self.check_winners(node, key, &style);
+        let style = self.compute_keyed(node, key, viewport)?;
         let parent = self.parent_style(node);
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.insert(share_key, Rc::clone(&style), parent);
         Ok((style, Path::Computed))
     }
 
-    fn compute_own(&self, node: NodeId, viewport: Viewport) -> Result<Rc<Counted>, ElementError> {
+    pub(crate) fn compute_own(
+        &self,
+        node: NodeId,
+        viewport: Viewport,
+    ) -> Result<Rc<Counted>, ElementError> {
         let kept = self.kept.as_ref().expect("restyle sets it");
         let parent = self.parent(node).map(|p| kept.styles.of(p));
         let style =
@@ -96,26 +101,40 @@ impl Document {
             .map(Rc::clone)
     }
 
-    /// Whether `key`'s elements may share: decided once per `Kept` from
-    /// the rules any of them can match.
-    fn shareable(&mut self, key: &'static StyleKey) -> bool {
+    /// Whether `key`'s elements may share: decided once per `Kept`, from
+    /// the key's compiled winners when it has them (B3b), else from the
+    /// rules any of its elements can match. Shared elements skip B3a's
+    /// verification, so in every build the compiled answer is held
+    /// against the matched rules' when it is made, before the key's first
+    /// element, of whatever state, shares: a difference refuses the key.
+    fn shareable(&mut self, key: &'static StyleKey) -> Result<bool, ElementError> {
         let address = std::ptr::from_ref(key) as usize;
-        let kept = self.kept.as_mut().expect("restyle sets it");
+        let kept = self.kept.as_ref().expect("restyle sets it");
         if let Some(decided) = kept.shared.shareable.get(&address) {
-            return *decided;
+            return Ok(*decided);
         }
-        let classes: Vec<&str> = key.classes.iter().chain(key.toggles).copied().collect();
-        let decided = !self
-            .sheets
-            .rules_for_key(key.tag, &classes)
-            .any(|rule| unshareable(rule).is_some());
+        let runtime = self.sheets.runtime_shareable(key);
+        let decided = match key.winners.compiled() {
+            Some(winners) => {
+                let compiled = self.sheets.compiled_shareable(key, winners);
+                let compiled = compiled.map_err(ElementError::Refused)?;
+                if compiled != runtime {
+                    let why = self.sheets.shareable_disagreement(key, winners, compiled);
+                    self.refuse_key(key, &why);
+                    return Err(ElementError::Refused(why));
+                }
+                compiled
+            }
+            None => runtime,
+        };
+        let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.shareable.insert(address, decided);
-        decided
+        Ok(decided)
     }
 
     /// The share key of `node`: its template key, its parent's kept
     /// style, its states, its toggles and its selected attributes.
-    fn share_key(&self, node: NodeId, key: &'static StyleKey) -> ShareKey {
+    pub(crate) fn share_key(&self, node: NodeId, key: &'static StyleKey) -> ShareKey {
         let data = self
             .arena
             .get(node, "restyle")
@@ -151,14 +170,6 @@ impl Document {
             })
             .map(|(name, value)| (name.clone(), value.clone()))
             .collect()
-    }
-
-    /// Debug builds: the key's compiled winners against the style the
-    /// cascade computed (`style::winners_oracle`).
-    fn check_winners(&self, node: NodeId, key: &StyleKey, style: &Counted) {
-        if cfg!(debug_assertions) {
-            self.sheets.check_winners(key, &self.describe(node), style);
-        }
     }
 
     /// The oracle: `shared` must equal the style computed for `node`
@@ -202,6 +213,10 @@ impl UpdateCounts {
         self.styles_computed = 0;
         self.styles_unkeyed = 0;
         self.styles_unshareable = 0;
+        self.winners_compiled = 0;
+        self.winners_runtime = 0;
+        self.winners_component_tag = 0;
+        self.winners_foreign = 0;
         self.used_shared = 0;
         self.used_derived = 0;
     }

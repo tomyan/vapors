@@ -14,6 +14,7 @@
 mod appearance;
 pub mod blocks;
 mod class_names;
+mod compiled_sheet;
 mod dispatcher;
 mod event;
 mod event_key;
@@ -31,6 +32,7 @@ mod style_key_refusals;
 
 pub use appearance::{Appearance, AppearanceSink};
 pub use class_names::class_names;
+pub use compiled_sheet::CompiledSheet;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
 pub use event_pointer::{Capture, Pointer};
@@ -124,11 +126,11 @@ pub trait Dom: Listeners {
     fn remove(&mut self, node: NodeId);
     /// Calls `handler` for each `event` (such as `click`) on the node.
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler);
-    /// Adds a component's `<style>` under `scope`, the value its
-    /// elements carry in [`SCOPE_ATTRIBUTE`]: its rules match
-    /// only those elements. Each mount calls it; a scope already added
-    /// is not added again.
-    fn add_style(&mut self, scope: &str, css: &str);
+    /// Adds a component's `<style>` (`sheet`, which only generated code
+    /// makes) under its scope, the value its elements carry in
+    /// [`SCOPE_ATTRIBUTE`]: its rules match only those elements. Each
+    /// mount calls it; a scope already added is not added again.
+    fn add_style(&mut self, sheet: CompiledSheet<'_>);
     /// Adds a `Styles::Global` component's `<style>` as an author sheet
     /// named `sheet` (the component's crate and file), unscoped: its
     /// rules may match any element. Each mount calls it; a sheet already
@@ -136,7 +138,7 @@ pub trait Dom: Listeners {
     /// and still styles every element it matches, as Svelte's `:global`
     /// styles do; `compile_dir_global` is for the layout corpus alone,
     /// which mounts one fixture per document.
-    fn add_global_style(&mut self, sheet: &str, css: &str);
+    fn add_global_style(&mut self, sheet: CompiledSheet<'_>);
     /// Names events a component dispatches itself ([`Dispatcher`]), so a
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.

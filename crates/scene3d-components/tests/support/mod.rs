@@ -62,11 +62,34 @@ pub struct Stage {
     pub log: Rc<RendererLog>,
 }
 
+/// Adds `Sheet`'s compiled style to `doc` as a test's per-case CSS, by
+/// mounting the style-only component (a `<style>` and no markup), which
+/// builds nothing: a sheet added from Rust beside the analysed pages is
+/// refused (R1b). Its handle is forgotten, as a dropped component would
+/// dispose of what it mounted, and it mounted nothing.
+#[macro_export]
+macro_rules! add_sheet {
+    ($doc:expr, $module:ident :: $sheet:ident) => {{
+        let root = $doc.borrow().root();
+        std::mem::forget($crate::support::$module::$sheet::mount(
+            &$doc,
+            root,
+            Default::default(),
+        ));
+    }};
+}
+
 impl Stage {
     pub fn new() -> Self {
         let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
-        let sheet = "html, body { margin: 0; background-color: #ffffff; }";
-        doc.borrow_mut().add_stylesheet("app.css", sheet).unwrap();
+        // html and body unmargined on white, from a compiled sheet: a
+        // sheet added from Rust beside the analysed pages is refused (R1b)
+        let root = doc.borrow().root();
+        std::mem::forget(app_sheet::AppSheet::mount(
+            &doc,
+            root,
+            app_sheet::AppSheetProps::default(),
+        ));
         let mut app = ElementsApp::new(Rc::clone(&doc));
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));

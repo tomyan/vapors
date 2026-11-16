@@ -37,7 +37,7 @@ static BUTTON: StyleKey = StyleKey {
 /// elements of `key` under the body.
 fn page(css: &str, key: &'static StyleKey, count: usize) -> (Document, Vec<NodeId>) {
     let mut doc = document();
-    doc.add_style(SCOPE, css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(SCOPE, css));
     let body = doc.body();
     let nodes = (0..count)
         .map(|_| {

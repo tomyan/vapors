@@ -19,6 +19,7 @@ pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
+mod rust_sheets;
 mod scene_appearance;
 mod scene_used;
 mod scrollbar;
@@ -28,6 +29,8 @@ pub use sheet_hashes::SheetHash;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
+mod compiled_rules;
+mod compiled_shareable;
 mod sizes;
 mod styles;
 mod surface;
@@ -36,7 +39,6 @@ mod text_style;
 mod used;
 mod used_share;
 mod values;
-mod winners_oracle;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
@@ -78,6 +80,8 @@ pub(crate) struct Sheets {
     scopes: std::collections::HashMap<String, String>,
     /// Each global component sheet added, by name, with its text.
     globals: std::collections::HashMap<String, String>,
+    /// Rust-added sheets against analysed elements (`rust_sheets`).
+    rust: rust_sheets::RustSheets,
     /// Each component sheet in the cascade, by kind and name: its place
     /// and its text's hash (`sheet_hashes`).
     components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
@@ -94,6 +98,7 @@ impl Sheets {
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
             globals: std::collections::HashMap::new(),
+            rust: rust_sheets::RustSheets::default(),
             components: std::collections::HashMap::new(),
             refused: Vec::new(),
         }

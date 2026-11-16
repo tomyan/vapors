@@ -58,3 +58,26 @@ fn refusal(sheet: &str, message: String) -> ElementError {
         error: vapors_css::Error::new(vapors_css::Position { line: 1, column: 1 }, message),
     }
 }
+
+impl Sheets {
+    /// Whether `sheet`'s text hashes as the compiler said it does: a
+    /// sheet claiming text it does not carry is refused, naming it, for
+    /// every update. A test's sheet carries no hash.
+    pub(crate) fn compiled_text(&mut self, sheet: vapors_dom::CompiledSheet<'_>) -> bool {
+        let Some(claimed) = sheet.hash() else {
+            return true;
+        };
+        if claimed == vapors_css::sheet_hash::sheet_hash(sheet.text()) {
+            return true;
+        }
+        let message = format!(
+            "sheet `{}` claims hash {claimed:#x} for text that hashes otherwise: it was not made \
+             by the compiler from this text; fix: register a component's sheet by mounting the \
+             component, never by naming its hidden constructor; reproduce: the mount that \
+             registered it",
+            sheet.name()
+        );
+        self.refused.push(refusal(sheet.name(), message));
+        false
+    }
+}

@@ -76,7 +76,10 @@ fn stroke_width(doc: &Document, node: NodeId) -> String {
 fn keys_with_different_literal_stroke_widths_keep_their_own() {
     // Given
     let mut doc = document();
-    doc.add_style(SCOPE, "svg { display: block; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        SCOPE,
+        "svg { display: block; }",
+    ));
     let (thin, wide) = (icon(&mut doc, &THIN), icon(&mut doc, &WIDE));
 
     // When

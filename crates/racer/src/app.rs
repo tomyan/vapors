@@ -197,6 +197,8 @@ impl App for Racer {
 mod drawing;
 #[cfg(test)]
 mod hud_frame_tests;
+#[cfg(test)]
+mod hud_winners_tests;
 mod input;
 #[cfg(test)]
 mod input_tests;
