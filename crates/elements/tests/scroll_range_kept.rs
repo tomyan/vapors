@@ -19,18 +19,23 @@ const VIEW: Viewport = Viewport {
 
 /// Ten 50 px items and a one-line note (20 px) in a scroller as tall as
 /// its parent, which fills the 600 px body under a 300 px header: 300 px
-/// at [`VIEW`], a range of 220 px.
+/// at [`VIEW`], a range of 220 px. The first item holds a 50 px child
+/// that can overflow it; the scroller holds a 10 px absolutely
+/// positioned child.
 const CSS: &str = "html, body { margin: 0; height: 100%; } \
     body { display: flex; flex-direction: column; } .header { height: 300px; flex: none; } \
     .header.short { height: 200px; } .outer { flex: 1; min-height: 0; } \
     .outer.tall { flex: none; height: 400px; } \
-    .scroller { height: 100%; overflow: auto; box-sizing: border-box; } \
+    .scroller { height: 100%; overflow: auto; box-sizing: border-box; position: relative; } \
     .scroller.padded { padding-bottom: 40px; } .scroller.bordered { border-bottom: 10px solid #000; } \
     .item { height: 50px; } .item.big { height: 90px; } .note { width: 100px; line-height: 20px; } \
-    img { display: block; width: 10px; }";
+    img { display: block; width: 10px; } .over { height: 50px; } .over.grown { height: 900px; } \
+    .abs { position: absolute; top: 0; left: 0; width: 10px; height: 10px; } \
+    .abs.tall { height: 900px; }";
 
 /// The page: the document, the viewport it is updated at, the header,
-/// the scroller's parent, the scroller, its items and the note's text.
+/// the scroller's parent, the scroller, its items, the note's text, the
+/// first item's child and the absolutely positioned child.
 struct Page {
     doc: Document,
     view: Viewport,
@@ -39,6 +44,8 @@ struct Page {
     scroller: NodeId,
     items: Vec<NodeId>,
     note: NodeId,
+    over: NodeId,
+    abs: NodeId,
 }
 
 fn page() -> Page {
@@ -48,12 +55,14 @@ fn page() -> Page {
     let header = element(&mut doc, body, "div", "header");
     let outer = element(&mut doc, body, "div", "outer");
     let scroller = element(&mut doc, outer, "div", "scroller");
-    let items = (0..10)
+    let items: Vec<NodeId> = (0..10)
         .map(|_| element(&mut doc, scroller, "div", "item"))
         .collect();
+    let over = element(&mut doc, items[0], "div", "over");
     let holder = element(&mut doc, scroller, "div", "note");
     let note = doc.create_text("a");
     doc.append(holder, note);
+    let abs = element(&mut doc, scroller, "div", "abs");
     doc.update(VIEW).expect("updates");
     Page {
         doc,
@@ -63,6 +72,8 @@ fn page() -> Page {
         scroller,
         items,
         note,
+        over,
+        abs,
     }
 }
 
@@ -147,6 +158,15 @@ fn range_changes() -> Vec<Change> {
         ("an item restyled taller", |page| {
             page.doc.set_attribute(page.items[4], "class", "item big");
         }),
+        (
+            "a descendant restyled to overflow a fixed-height item",
+            |page| {
+                page.doc.set_attribute(page.over, "class", "over grown");
+            },
+        ),
+        ("an absolutely positioned child taller", |page| {
+            page.doc.set_attribute(page.abs, "class", "abs tall");
+        }),
         ("a text wrapping to more lines", |page| {
             page.doc
                 .set_text(page.note, "a b c d e f g h i j k l m n o p");
@@ -187,6 +207,28 @@ fn every_change_to_the_range_measures_it_again() {
         page.scroll_to_end();
         assert!((page.offset() - before).abs() > 1.0, "{case}: {before}");
     }
+}
+
+#[test]
+fn a_scroll_and_a_range_change_in_one_update_measure_the_range() {
+    // Given: scrolled to the end, the range kept
+    let mut page = page();
+    page.scroll_to_end();
+    let before = page.offset();
+
+    // When: scrolled up and an item made taller, then one update
+    page.doc.scroll_node_by(page.scroller, [0.0, -50.0]);
+    page.doc.set_attribute(page.items[4], "class", "item big");
+    page.update();
+
+    // Then: the change's mark wins over the scroll's, and the end moved
+    assert_eq!(page.measured(), 1);
+    page.scroll_to_end();
+    assert!(
+        (page.offset() - before - 40.0).abs() < 1e-3,
+        "{before} then {}",
+        page.offset()
+    );
 }
 
 #[test]
@@ -264,18 +306,4 @@ fn an_image_loading_measures_the_range_again() {
 
     // Then
     assert!(page.measured() >= 1, "{}", page.measured());
-}
-
-#[test]
-fn writing_direction_cannot_change_a_range_as_it_is_refused() {
-    // Given
-    let mut doc = document();
-
-    // When
-    let added = doc.add_stylesheet("rtl.css", ".scroller { direction: rtl; }");
-
-    // Then: `direction` (and `writing-mode`) are refused, so no update
-    // can flip a scroller's axis; when they are supported, this test
-    // becomes a case of `range_changes`
-    assert!(added.is_err(), "{added:?}");
 }

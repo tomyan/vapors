@@ -123,9 +123,11 @@ impl Judged {
                 ceiling: RESIZE_A11Y_PER_ROW,
                 flat: &[],
             },
+            // layout flat since 4g: a container that only scrolled keeps
+            // its range (docs/plans/splice-layout.md section 12)
             RowChange::Scroll => Self::AccessibilityPerRow {
                 ceiling: SCROLL_A11Y_PER_ROW,
-                flat: &[],
+                flat: &["layout"],
             },
             RowChange::ScrollSize => Self::AccessibilityPerRow {
                 ceiling: SCROLL_SIZE_A11Y_PER_ROW,
