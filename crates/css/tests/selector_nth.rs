@@ -1,6 +1,6 @@
 //! An+B (`src/selector/nth.rs`). Translated from sumi `nth_test.go`.
 
-mod support;
+use crate::support;
 
 use support::selector;
 use vapors_css::selector::{Nth, PseudoClass, parse_selector_list};

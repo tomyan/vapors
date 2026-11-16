@@ -1,6 +1,6 @@
 //! The `border` shorthand (`src/property/shorthand_border.rs`).
 
-mod support;
+use crate::support;
 
 use support::property_shorthand::longhands;
 

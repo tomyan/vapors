@@ -2,7 +2,7 @@
 //! `parser/template/tagname_test.go`: the file-name to component-name
 //! rule, plus the refusal of an unknown lowercase tag.
 
-mod common;
+use crate::common;
 
 use common::parse_err;
 use vapors_compiler::component_name;

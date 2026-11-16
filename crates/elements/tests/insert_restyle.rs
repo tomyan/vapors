@@ -4,7 +4,7 @@
 //! sheets can reach from the change. Counted on html > body > column >
 //! 10 rows of 5 cells (63 elements); a row with its cells is 6.
 
-mod support;
+use crate::support;
 
 use support::column_page::{ALL, Page, page, restyled_after};
 use vapors_dom::Dom;

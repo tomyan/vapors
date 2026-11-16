@@ -2,7 +2,7 @@
 //! Enter, as in Chromium: here unmodified, a new tab with Control or
 //! Meta, a new window with Shift, a download with Alt.
 
-mod support;
+use crate::support;
 
 use support::link_page::{click_with, followed, key, key_with, page};
 use vapors_elements::{Modifiers, Opened};

@@ -46,7 +46,7 @@ impl Document {
         debug_assert_eq!(
             self.sheets.name(USER_AGENT_SHEET),
             crate::style::USER_AGENT_NAME,
-            "the sheet at USER_AGENT_SHEET is not the user-agent sheet, so an author sheet would escape the scene set check; put the user-agent sheet first in Sheets::new (crates/elements/src/style/mod.rs). Reproduce with `cargo test -p vapors-elements --test scene_used`"
+            "the sheet at USER_AGENT_SHEET is not the user-agent sheet, so an author sheet would escape the scene set check; put the user-agent sheet first in Sheets::new (crates/elements/src/style/mod.rs). Reproduce with `cargo test -p vapors-elements --test tests scene_used::`"
         );
         let element = self.arena.get(node, "restyle").element()?;
         Some(SceneContext {

@@ -6,7 +6,7 @@
 //! Chromium 155 gives the span top -1 and height 13 at 1x, -0.5 and 13
 //! at 2x (2026-11-15).
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 

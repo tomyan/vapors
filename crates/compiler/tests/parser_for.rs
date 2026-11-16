@@ -4,7 +4,7 @@
 //! `{for PATTERN in EXPR key=EXPR}`, so `Clause` becomes `pattern` and
 //! `iterable`.
 
-mod common;
+use crate::common;
 
 use common::{element, for_block, if_block, parse_err, parse_ok};
 

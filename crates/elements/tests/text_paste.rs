@@ -5,7 +5,7 @@
 //! text field focused the paste is not the document's, and the app has
 //! it.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

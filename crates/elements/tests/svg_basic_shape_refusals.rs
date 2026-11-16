@@ -4,7 +4,7 @@
 //! naming the attribute or the fix. A change to one alone rechecks its
 //! svg.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_refused, changed};
 use support::svg_shapes_page::{Attributes, CIRCLE, RECT, drawn, page};

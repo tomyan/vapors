@@ -2,8 +2,7 @@
 //! `Signal<BTreeMap<K, NodeId>>` under the row's `key=`, and out of it
 //! when the row goes, unless the key holds another node by then.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, at, generated_with};
 

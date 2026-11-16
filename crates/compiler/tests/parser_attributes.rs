@@ -2,7 +2,7 @@
 //! stores an expression attribute as the string `"{expr}"`; here it is
 //! `AttrValue::Expr` holding the code without braces.
 
-mod common;
+use crate::common;
 
 use common::{attr_expr, attr_literal, component, element, parse_err, parse_ok};
 

@@ -3,10 +3,8 @@
 //! in one render pass (vapors #181: about 110 µs of GPU time per pass
 //! on ANV, and 9017 passes in one encoder failed with Out of Memory).
 
-#[path = "support/surface.rs"]
-mod support;
-#[path = "support/tooltip.rs"]
-mod tooltip;
+use crate::support_surface as support;
+use crate::support_tooltip as tooltip;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -4,8 +4,7 @@
 //! and an element with more `class:` directives than a tree keeps as
 //! bits is refused, naming it.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, generated, refusal};
 

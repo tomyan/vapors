@@ -2,7 +2,7 @@
 //! disables in HTML, and an atomic inline outside a flex or grid
 //! container.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals};
 use vapors_dom::Dom;

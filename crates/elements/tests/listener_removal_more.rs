@@ -3,7 +3,7 @@
 //! `pointerdown`, a number field's step, and a text field's caret
 //! after a press, a click or a tap.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

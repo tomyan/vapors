@@ -8,7 +8,7 @@
 //! (`layout/asked.rs`); this pins it, with the placement check that
 //! settles every container afresh on each debug update.
 
-mod support;
+use crate::support;
 
 use support::{document, element};
 use vapors_dom::{Dom, NodeId};

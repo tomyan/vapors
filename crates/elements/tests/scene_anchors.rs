@@ -4,7 +4,7 @@
 //! A scene node is drawn by its surface, never laid out, so any other
 //! `display` is refused naming the declaration.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_css::property::scene::SceneTag;

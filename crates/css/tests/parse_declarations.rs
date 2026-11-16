@@ -1,6 +1,6 @@
 //! Declarations (`src/parse/declarations.rs`). Translated from sumi `style_test.go` and `style_edge_test.go`, plus the refusals vapors adds.
 
-mod support;
+use crate::support;
 
 use support::{prop, refusal, sheet};
 

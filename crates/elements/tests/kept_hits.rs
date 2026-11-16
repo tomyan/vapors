@@ -4,7 +4,7 @@
 //! what a fresh paint's would. A debug build also compares the kept hits
 //! with a fresh gather on every update (`kept_paint_check.rs`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::{Dom, NodeId};

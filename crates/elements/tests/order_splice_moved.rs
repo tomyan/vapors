@@ -4,7 +4,7 @@
 //! inserting the steps a second time. Each also matches a full update
 //! through the oracle.
 
-mod support;
+use crate::support;
 
 use support::rows_page::RowsPage;
 use support::splice_page::{assert_declined, inserted, matches_full, page, updated};

@@ -1,6 +1,6 @@
 //! Transition sampling (`src/animation/transition.rs`).
 
-mod support;
+use crate::support;
 
 use support::animation_sample::px;
 use vapors_css::animation::{TimingFunction, Transition, TransitionProperty, TransitionSpec};

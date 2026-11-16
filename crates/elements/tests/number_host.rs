@@ -2,7 +2,7 @@
 //! `Document::set_committed_number`: the field shows it, nothing fires,
 //! and the same number typed again fires `change` again.
 
-mod support;
+use crate::support;
 
 use support::number_page::{click, key, page, type_text, value};
 use vapors_elements::SetNumberError;

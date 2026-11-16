@@ -5,7 +5,7 @@
 //! update, and the debug checks compare placement, frames and paint with
 //! ones made afresh.
 
-mod support;
+use crate::support;
 
 use support::mirror_model::Model;
 use support::narrow_list::{List, ROWS, VIEW, list};

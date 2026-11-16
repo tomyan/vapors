@@ -6,7 +6,7 @@
 //! The app says which platform it runs on
 //! (`Document::set_shortcut_modifier`).
 
-mod support;
+use crate::support;
 
 use support::text_page::{click, key_with, page, type_text, value};
 use vapors_elements::{Document, Modifiers, ShortcutModifier};

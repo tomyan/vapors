@@ -4,7 +4,7 @@
 //! a link is focusable, followed on Enter, link-coloured and given the
 //! link role; an `a` without `href` gets none of those.
 
-mod support;
+use crate::support;
 
 use support::link_page::{Page, key, page, taken};
 use support::viewport;

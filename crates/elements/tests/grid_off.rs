@@ -5,7 +5,7 @@
 //! (see `style/grid_gate.rs` for why ci does not run it).
 #![cfg(not(feature = "grid"))]
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals};
 

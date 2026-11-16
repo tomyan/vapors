@@ -1,6 +1,6 @@
 //! Keyframe resolution (`src/animation/keyframes.rs`). Translated from sumi `resolve_keyframes_test.go`.
 
-mod support;
+use crate::support;
 
 use support::animation_sample::pulse_animation;
 use support::{cascade, chain, css, env, sheet};

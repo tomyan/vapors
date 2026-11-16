@@ -2,7 +2,7 @@
 //! round thumb at the value, from the `--vapors-*` parts, with the
 //! user-agent parts when none are set; nothing when hidden.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::Dom;

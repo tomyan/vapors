@@ -3,7 +3,7 @@
 //! accessibility default action does; one still outside the viewport,
 //! or with `pointer-events: none`, is refused as its own problem.
 
-mod support;
+use crate::support;
 
 use support::drive::{log, node, shared, target};
 use support::roles_page::{button, labelled, page};

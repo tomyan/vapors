@@ -6,7 +6,7 @@
 //! attribute a drag selects text, as a text field's does, and steps
 //! nothing.
 
-mod support;
+use crate::support;
 
 use support::number_page::{page, type_text, value};
 use vapors_dom::Dom;

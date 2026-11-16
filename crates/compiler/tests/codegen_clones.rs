@@ -3,8 +3,7 @@
 //! review): the closure is `move`, so without the clone a later use of
 //! the binding finds it moved.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, generated_with};
 

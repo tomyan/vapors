@@ -7,7 +7,7 @@
 //! 0.5 px at 2x (`inline_baseline.rs`); the field's content box starts
 //! 2 px down (a 1 px border and 1 px padding).
 
-mod support;
+use crate::support;
 
 use support::text_page::{Page, click, key, page};
 use vapors_scene::{Color, Item};

@@ -1,6 +1,6 @@
 //! Basic value types (`src/syntax/types.rs`) through the property grammars.
 
-mod support;
+use crate::support;
 
 use support::property_values::{accepts, accepts_as};
 use support::refusal;

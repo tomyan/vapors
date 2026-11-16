@@ -3,7 +3,7 @@
 //! its name, value, states and border box; refused when the document
 //! has changed since its last update.
 
-mod support;
+use crate::support;
 
 use support::roles_page::{STYLE, labelled, page};
 use support::{document, viewport};

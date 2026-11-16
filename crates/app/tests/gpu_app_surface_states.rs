@@ -2,8 +2,7 @@
 //! last frame's decision, for a failing check to print
 //! (`surface_gradient --check`'s trace).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

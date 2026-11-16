@@ -11,11 +11,12 @@
 //
 // The distance is taken in the shape's units and divided by its rate
 // of change across the screen: its gradient there, worked out in the
-// shape's units (a unit vector), carried to the screen by the
-// derivatives of the shape-unit position. On the page that position is
-// affine in screen space, so its derivatives are exact; under the
-// scene's projection they are the local Jacobian to second order
-// (closed_forms_3d.wgsl). The distance's own derivatives would not do:
+// shape's units (a unit vector), carried to the screen by the map from
+// device pixels to shape units at the fragment (`covered`): on the page
+// the derivatives of the shape-unit position, exact under its affine;
+// in the scene the analytic Jacobian (closed_forms_3d.wgsl), since a
+// derivative under a projection is the Jacobian half a pixel or more
+// away. The distance's own derivatives would not do:
 // it has a kink where its nearest edge changes (a rect's diagonals and
 // centre line, a circle's centre), and a 2x2 quad across the kink would
 // read it as flat.
@@ -186,10 +187,11 @@ fn ellipse_distance(p: vec2<f32>, centre: vec2<f32>, radii: vec2<f32>) -> vec3<f
     return vec3(select(d, -d, inside), side * normal);
 }
 
-@fragment
-fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let across_x = dpdx(in.local);
-    let across_y = dpdy(in.local);
+// The colour of `in` with its coverage, `across_x` and `across_y` the
+// shape units the position moves per device pixel right and down there:
+// the page takes them from the position's derivatives, exact under its
+// affine; the scene from the analytic Jacobian (closed_forms_3d.wgsl).
+fn covered(in: Out, across_x: vec2<f32>, across_y: vec2<f32>) -> vec4<f32> {
     var dg = rect_distance(in.local, in.form.xy, in.form.zw, in.radii);
     if (in.params.x != 0.0) {
         dg = ellipse_distance(in.local, in.form.xy, in.form.zw);

@@ -1,6 +1,6 @@
 //! `var()` at compute time (`src/cascade/compute.rs`): custom properties, inheritance, shadowing, refusals and shorthands. Partly translated from sumi `resolve_styles_test.go`.
 
-mod support;
+use crate::support;
 
 use support::cascade_vars::CYAN;
 use support::{add, cascade, chain, computed, css, env};

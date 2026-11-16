@@ -3,10 +3,8 @@
 //! draws it holds (docs/perf/baseline-2026-11-10.md, finding 1: a
 //! submit costs about 70 µs on ANV).
 
-#[path = "support/surface.rs"]
-mod support;
-#[path = "support/tooltip.rs"]
-mod tooltip;
+use crate::support_surface as support;
+use crate::support_tooltip as tooltip;
 
 use std::cell::RefCell;
 use std::rc::Rc;

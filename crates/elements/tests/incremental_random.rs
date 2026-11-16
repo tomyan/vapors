@@ -9,7 +9,7 @@
 //! flex column and under a grid (`parent_pages`), whose rows with
 //! margins are replayed through their own record (M10c).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
