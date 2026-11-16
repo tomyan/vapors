@@ -31,6 +31,8 @@ const fn winners(sheets: &'static [(SheetRef, u64)]) -> KeyWinners {
         base: &[],
         conditional: &[],
         shareable: true,
+        // the first sheet is the key's own in every test here
+        own: Some(0),
     }
 }
 
@@ -141,4 +143,24 @@ fn a_global_key_whose_own_global_sheet_is_absent_is_refused() {
 
     // Then
     assert!(refusal.contains("its own sheet"), "{refusal}");
+}
+
+#[test]
+fn a_global_key_passes_when_another_components_global_sheet_is_absent() {
+    // Given: its own sheet added by its mount; a sibling fixture's not
+    let own = "corpus/fixtures/x.wisp";
+    let sheets = vec![
+        (SheetRef::Global(own), sheet_hash(CARD)),
+        (SheetRef::Global("corpus/fixtures/y.wisp"), 7),
+    ];
+    let winners: &'static KeyWinners = Box::leak(Box::new(winners(sheets.leak())));
+    let key: &'static StyleKey = Box::leak(Box::new(StyleKey {
+        scope: None,
+        ..key(winners)
+    }));
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_global_style(own, CARD);
+
+    // Then
+    assert_eq!(doc.check_compiled_sheets(key), Ok(()));
 }
