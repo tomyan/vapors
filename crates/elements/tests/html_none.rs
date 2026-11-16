@@ -18,7 +18,7 @@
 //! button gives only `RootWebArea` (the document, which this tree has no
 //! node for); shown, it gives the text and the button.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,7 +1,7 @@
 //! A `calc()` with a % term that does not evaluate at layout refuses the
 //! update, naming the element and the property it was declared for.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals};
 

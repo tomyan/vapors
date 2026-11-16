@@ -3,7 +3,7 @@
 //! offers the text its max-content width back through the button's
 //! padding, which can lose an ulp (`vapors_text::fits`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_dom::NodeId;

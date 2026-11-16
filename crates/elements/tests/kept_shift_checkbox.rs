@@ -3,7 +3,7 @@
 //! checked checkbox is painted again; an unchecked one shifts
 //! (`kept_shift.rs`, IU3 3c-3e).
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::Dom;

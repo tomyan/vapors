@@ -4,7 +4,7 @@
 //! an element takes the id, likewise. Proven by the model mirror held
 //! against the document after every take.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

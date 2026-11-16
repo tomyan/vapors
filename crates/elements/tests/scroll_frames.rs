@@ -4,7 +4,7 @@
 //! shows. A debug build checks every update's frames and each
 //! element's frame against a fresh paint (`kept_paint_check.rs`).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

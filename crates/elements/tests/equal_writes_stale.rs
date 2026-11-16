@@ -1,7 +1,7 @@
 //! The `current_*` reads the `_if_changed` setters make refuse a removed
 //! node by naming the read, as the other calls do.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_dom::Dom;

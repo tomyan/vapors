@@ -2,10 +2,8 @@
 //! frame at its deadline, stops drawing it on the frame after the event
 //! that hides it, and draws a frame with no tooltip as the painter
 //! alone draws it.
-#[path = "support/surface.rs"]
-mod support;
-#[path = "support/tooltip.rs"]
-mod tooltip;
+use crate::support_surface as support;
+use crate::support_tooltip as tooltip;
 
 use std::cell::RefCell;
 use std::rc::Rc;

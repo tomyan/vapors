@@ -4,7 +4,7 @@
 //! so the layout calls do not grow with the rows. Each case also
 //! matches a full update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

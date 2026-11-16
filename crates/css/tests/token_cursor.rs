@@ -1,6 +1,6 @@
 //! The character cursor (`src/token/cursor.rs`): input preprocessing.
 
-mod support;
+use crate::support;
 
 use support::tokenizer::ident;
 use vapors_css::token::tokenize;

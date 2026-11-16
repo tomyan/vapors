@@ -8,7 +8,7 @@
 //! only document order says which element an id names. The counts are `AxTakeCounts`;
 //! `a11y_mirror_scaling.rs` holds them across page sizes.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

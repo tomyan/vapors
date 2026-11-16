@@ -4,8 +4,7 @@
 //! handle renders it once more, a renderer unmounted after the first
 //! frame is handed back, and a failed frame closes the app's handles.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

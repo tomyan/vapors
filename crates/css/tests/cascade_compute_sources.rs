@@ -5,7 +5,7 @@
 //! a parent's computed value is already absolute, so a child takes it
 //! without resolving it against its own font size.
 
-mod support;
+use crate::support;
 
 use support::css_at;
 

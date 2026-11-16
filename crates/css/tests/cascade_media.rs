@@ -1,6 +1,6 @@
 //! Media query lists (`src/cascade/media.rs`). Translated from sumi `media_test.go`.
 
-mod support;
+use crate::support;
 
 use support::cascade_media::{BLACK, RED, color_under};
 use support::{env, refusal};

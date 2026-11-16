@@ -7,7 +7,7 @@
 //! (`LaneFrameScrollingChild`). Each case matches a full update and
 //! draws as the whole scene does.
 
-mod support;
+use crate::support;
 
 use support::lane_page::{HeaderList, assert_drawn_afresh, header_list};
 use support::narrow_list::ROWS;

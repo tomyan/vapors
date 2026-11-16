@@ -6,7 +6,7 @@
 //! update gives; so does a row appended into a freed slot, which the
 //! clip tree puts among its parent's dependents in slot order.
 
-mod support;
+use crate::support;
 
 use support::splice_page::{
     SPLICED, assert_declined, inserted, matches_full, order, page, updated,

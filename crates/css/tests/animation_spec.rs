@@ -1,6 +1,6 @@
 //! Specs from a computed style (`src/animation/spec.rs`). Translated from sumi `transition_parse_test.go` and `animation_parse_test.go`.
 
-mod support;
+use crate::support;
 
 use support::animation_specs::{animations_of, property, transitions_of};
 use support::chain;

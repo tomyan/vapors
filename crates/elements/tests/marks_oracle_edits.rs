@@ -4,7 +4,7 @@
 //! fails without its mark. Each page is updated at the viewport it was
 //! built at, since a viewport change marks everything.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

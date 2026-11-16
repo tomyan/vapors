@@ -2,7 +2,7 @@
 //! paint fixture compares with Chromium: what a clip takes from hit
 //! testing, and how `html` and `body` pass theirs to the viewport.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::NodeId;

@@ -4,8 +4,7 @@
 //! cleared after the frame, and the frame asks for another, which draws
 //! the field's ancestors without `:focus-within`.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

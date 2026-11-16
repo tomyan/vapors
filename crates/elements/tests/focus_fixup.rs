@@ -25,7 +25,7 @@
 //!
 //! Rerun Chromium's side: `node scripts/chromium-focus-fixup.mjs`.
 
-mod support;
+use crate::support;
 
 use support::fixup::{typed_in, update_and_settle};
 use support::text_page::{Page, type_text, value};

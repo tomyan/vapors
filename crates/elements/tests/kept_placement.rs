@@ -5,7 +5,7 @@
 //! A debug build also places every box afresh and compares
 //! (`placement_check.rs`), so a box left out panics there too.
 
-mod support;
+use crate::support;
 
 use support::scroll_list::list;
 use support::{document, element, text, viewport};

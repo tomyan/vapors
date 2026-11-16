@@ -5,10 +5,7 @@
 //! attribute, the snippet or the tag, naming the tag, the prop and the
 //! component's file, with a declaration that compiles.
 
-#[path = "common/build.rs"]
-mod build;
-#[path = "common/props.rs"]
-mod props;
+use crate::common_props as props;
 
 use props::refusals;
 

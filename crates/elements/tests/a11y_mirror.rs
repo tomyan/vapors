@@ -3,7 +3,7 @@
 //! that a take holds only the nodes whose record changed since the last,
 //! and nothing when none did. A take before an update is refused.
 
-mod support;
+use crate::support;
 
 use support::mirror::{labels, node_of, step, taken_model};
 use support::roles_page::page;

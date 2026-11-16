@@ -5,8 +5,7 @@
 //! checked against the colours each row must show: a painter that kept
 //! nothing batches the same way, so it would not tell.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_dom::Dom;

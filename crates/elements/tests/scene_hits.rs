@@ -5,7 +5,7 @@
 //! anchors to the scene anchor and its HTML ancestors, and gives the
 //! cursor.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

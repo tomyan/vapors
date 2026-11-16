@@ -5,7 +5,7 @@
 //! `focusout` and stays the active element; on return it gets `focus`
 //! and `focusin`.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

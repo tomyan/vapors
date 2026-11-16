@@ -4,8 +4,7 @@
 //! bindings become signals, so holes reading them are patched in
 //! place when a row's item or index changes.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, at, generated_with, refusal};
 

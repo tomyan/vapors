@@ -3,8 +3,7 @@
 //! `{expr}` hole is its own text node with its own effect, and mixed
 //! content keeps source order.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, at, generated, generated_with};
 

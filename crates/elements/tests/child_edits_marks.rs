@@ -4,7 +4,7 @@
 //! children go in in DOM order whatever order they were inserted in
 //! (H2). Each case also matches a full update.
 
-mod support;
+use crate::support;
 
 use support::narrow_list::{List, ROWS, VIEW, list, row};
 use support::oracle::assert_matches_full;

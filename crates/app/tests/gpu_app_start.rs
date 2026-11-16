@@ -3,8 +3,7 @@
 //! it builds every pipeline, mounts the surface renderers and uploads
 //! the glyph atlas's new page (sizes: `gpu_app_start_sizes.rs`).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::start_rig::{rig, start, start_for};
 use support::{RED, app_frame, pixel};

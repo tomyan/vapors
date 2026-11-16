@@ -4,7 +4,7 @@
 //! translucent values refused until C5; a sink's error refuses the
 //! update; nothing reported once the anchor leaves the tree.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

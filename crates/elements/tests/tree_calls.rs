@@ -1,7 +1,7 @@
 //! The generated code's calls on a Document: they build the tree, and a
 //! call the tree cannot honour panics naming the call.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_dom::Dom;

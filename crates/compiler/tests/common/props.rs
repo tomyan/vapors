@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use crate::build::{dirs, write};
+use crate::common_build::{dirs, write};
 use vapors_compiler::CompileError;
 use vapors_compiler::build::{Compiled, compile_dir_into};
 

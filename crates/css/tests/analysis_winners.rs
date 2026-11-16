@@ -3,8 +3,7 @@
 //! `build-time-styles.md` section 1 classifies it. Values and sharing:
 //! `analysis_winners_values.rs`.
 
-#[path = "support/winners.rs"]
-mod support;
+use crate::support_winners as support;
 
 use support::{constant, longhand, page};
 use vapors_css::analysis::{Constancy, Place, Winner};

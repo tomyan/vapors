@@ -4,10 +4,10 @@
 //! counters are reported, and the result checked by the correctness
 //! oracle (`support::oracle`) against a full recomputation. Counts
 //! only: timings belong to the baseline in docs/plans/iu1.md.
-//! `cargo nextest run -p vapors-elements --test sparse_updates
+//! `cargo nextest run -p vapors-elements --test tests sparse_updates::
 //! --no-capture` prints the table.
 
-mod support;
+use crate::support;
 
 use support::oracle::assert_matches_full;
 use support::rows_page::{EDITS, Edit, RowsPage, rows_page, rows_viewport};
@@ -173,7 +173,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
 }
 
 const FIX: &str = "update EXPECTED or EXPECTED_WALKS and docs/plans/iu1.md; reproduce: \
-    cargo nextest run -p vapors-elements --test sparse_updates --no-capture";
+    cargo nextest run -p vapors-elements --test tests sparse_updates:: --no-capture";
 
 #[test]
 fn a_hundred_rows_update_sparsely_and_match_a_full_update() {

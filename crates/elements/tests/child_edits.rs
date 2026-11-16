@@ -6,7 +6,7 @@
 //! before (`child_edits_declined.rs`). Each case also matches a full
 //! update.
 
-mod support;
+use crate::support;
 
 use support::narrow_list::{ROWS, VIEW, list, row};
 use support::oracle::assert_matches_full;

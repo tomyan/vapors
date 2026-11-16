@@ -4,7 +4,7 @@
 //! refused naming the site; two keys with different literal values
 //! keep their own computed styles; the three names are the cascade's.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, StyleKey};

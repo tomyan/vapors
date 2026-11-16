@@ -1,6 +1,6 @@
 //! Special value types (`src/syntax/special.rs`): fonts, shadows, transforms, filters, easing.
 
-mod support;
+use crate::support;
 
 use support::property_values::{accepts, accepts_as};
 use support::refusal;

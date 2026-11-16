@@ -2,8 +2,7 @@
 //! `SurfaceFrame::work` is added to `FrameCounts::surfaces`
 //! (docs/plans/3d-2.md decision 8), on the frames it renders.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, bare_document, update};
 use vapors_app::{FrameCounts, SurfaceError, SurfaceFrame, SurfaceRenderer};

@@ -2,8 +2,7 @@
 //! `max_buffer_size` refuses the frame with `PaintError::Arena`, naming
 //! the pipeline, and the painter takes the refusal off the encoder.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, document, update};
 use vapors_app::PaintError;

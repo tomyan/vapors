@@ -5,8 +5,7 @@
 //! `codegen_bind_this_refusals.rs`; inside `{for}`:
 //! `codegen_bind_this_rows.rs`.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, at, generated_with};
 

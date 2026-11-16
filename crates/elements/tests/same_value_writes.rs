@@ -2,7 +2,7 @@
 //! changed and what the next update redoes. Characterisation of today's
 //! behaviour, recorded in docs/design/incremental-contracts.md.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId, PropertyValue};

@@ -4,7 +4,7 @@
 //! visits none; a lane that is not framed is placed with its starts
 //! added back, and a scroll container's range counts its lane's starts.
 
-mod support;
+use crate::support;
 
 use support::narrow_list::{List, ROWS, VIEW, list};
 use support::oracle::assert_matches_full;

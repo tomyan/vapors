@@ -1,6 +1,6 @@
 //! `calc()` evaluation (`src/value/calc_eval.rs`). Translated from sumi `calc_test.go`, in px.
 
-mod support;
+use crate::support;
 
 use support::value_calc::{context, eval};
 use vapors_css::value::parse_calc_text;

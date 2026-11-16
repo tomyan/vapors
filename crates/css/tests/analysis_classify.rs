@@ -5,8 +5,7 @@
 //! forms, state names and `Depends` text are in
 //! `analysis_classify_scoped.rs`.
 
-#[path = "support/classify.rs"]
-mod support;
+use crate::support_classify as support;
 
 use support::{CARD, classified, depends};
 use vapors_css::analysis::{KeyFacts, Match};

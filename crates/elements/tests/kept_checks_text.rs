@@ -4,7 +4,7 @@
 //! its children, so a parent whose children changed is checked in
 //! constant time (`insert_checks_rows.rs`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals_at, text, viewport};
 use vapors_dom::Dom;

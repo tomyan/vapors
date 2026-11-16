@@ -5,10 +5,8 @@
 //! renders every frame; a renderer that fills a backing larger than its
 //! panel paints only inside the panel, and under UI painted after it.
 //! Resizing and `FrameCounts` are in `gpu_app_two_panels_resize.rs`.
-#[path = "support/panels.rs"]
-mod panels;
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_panels as panels;
+use crate::support_surface as support;
 
 use panels::{OVERSIZED, Panels};
 use support::{BLUE, RED, WHITE, pixel};

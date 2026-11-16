@@ -5,7 +5,7 @@
 //! them in order (`support::mirror::Model`); a node that changes
 //! parent or place is `a11y_mirror_reparent.rs`.
 
-mod support;
+use crate::support;
 
 use support::mirror::{labels, node_of, step, taken_model};
 use support::roles_page::button;
