@@ -275,9 +275,12 @@ const SIBLINGS: &str = ":global(.card + .card) { color: green; }";
 /// blocking sheet in the cascade or not.
 fn shared(blocking_mounted: bool) -> (usize, usize) {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(OWN, CARD);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     if blocking_mounted {
-        doc.add_style("cards/other.wisp", SIBLINGS);
+        doc.add_style(vapors_dom::CompiledSheet::for_tests(
+            "cards/other.wisp",
+            SIBLINGS,
+        ));
     }
     let (body, key) = (doc.body(), blocked_key());
     for _ in 0..2 {
