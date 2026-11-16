@@ -32,7 +32,16 @@ impl ClipTree {
             self.parent.named("tree.parent"),
             self.depth.named("tree.depth"),
             self.dependents.named("tree.dependents"),
+            self.longest_group(),
         ]
+    }
+
+    /// The longest slot's group of dependents: name, length, capacity.
+    #[cfg(test)]
+    fn longest_group(&self) -> (&'static str, usize, usize) {
+        let longest = self.dependents.iter().max_by_key(|group| group.len());
+        let (len, capacity) = longest.map_or((0, 0), |group| (group.len(), group.capacity()));
+        ("tree.dependents.longest", len, capacity)
     }
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
@@ -63,6 +72,7 @@ impl ClipTree {
             self.parent[slot] = Some(parent);
             self.depth[slot] = self.depth[parent] + 1;
             let group = &mut self.dependents[parent];
+            crate::slot_list::reserve(group, group.len() + 1);
             let at = group.partition_point(|&dependent| dependent < slot);
             group.insert(at, slot);
         }
@@ -143,9 +153,13 @@ fn parents_and_depths(boxes: &[LayoutBox]) -> (Vec<Option<usize>>, Vec<usize>) {
     (parent, depth)
 }
 
-/// Each slot's dependents, in slot order.
+/// Each slot's dependents, in slot order, each group made at its length.
 fn grouped(parent: &[Option<usize>]) -> Vec<Vec<usize>> {
-    let mut dependents = vec![Vec::new(); parent.len()];
+    let mut counts = vec![0; parent.len()];
+    for &above in parent.iter().flatten() {
+        counts[above] += 1;
+    }
+    let mut dependents: Vec<Vec<usize>> = counts.into_iter().map(Vec::with_capacity).collect();
     for (slot, above) in parent.iter().enumerate() {
         if let Some(above) = *above {
             dependents[above].push(slot);

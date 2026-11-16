@@ -4,7 +4,7 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, rowed_instances};
+use crate::instanced::{Instanced, instance_bytes, rowed_instances};
 use crate::quads::rgba;
 use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
@@ -12,6 +12,13 @@ use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 pub struct ShadowPipeline(Instanced);
 
 impl ShadowPipeline {
+    /// Four-float attributes an instance holds.
+    const VEC4S: u32 = 7;
+
+    /// Bytes per instance in a draw's or a kept buffer: the attributes and
+    /// the row index after them (`instanced.rs`).
+    pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
+
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
@@ -20,7 +27,7 @@ impl ShadowPipeline {
             format,
             "shadows",
             &RowOffsets::shader(include_str!("shadows.wgsl")),
-            7,
+            Self::VEC4S,
         ))
     }
 
@@ -44,7 +51,7 @@ impl ShadowPipeline {
     /// past the table ([`RowOffsets::CAPACITY`]).
     #[must_use]
     pub fn bytes_in_rows(shadows: &[Shadow], rows: &[u32]) -> Vec<u8> {
-        rowed_instances(("shadows", 7), (shadows, rows), instance)
+        rowed_instances(("shadows", Self::VEC4S as usize), (shadows, rows), instance)
     }
 
     /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,

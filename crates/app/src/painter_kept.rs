@@ -199,7 +199,8 @@ impl Pipelines<'_> {
 }
 
 /// `shift`, for a shape or mesh batch, which is batched in one frame
-/// (`framed_batches_rows.rs`): drawn at that frame's shift, with no rows.
+/// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
+/// frame's shift, with no rows.
 ///
 /// # Panics
 ///
@@ -210,7 +211,7 @@ fn unrowed(shift: vapors_renderer::Shift, rows: &[u32]) -> vapors_renderer::Shif
         rows.is_empty(),
         "a shape or mesh batch spans {} items' rows, and its pipeline takes no table of row \
          offsets: shapes and meshes in a lane row are batched in the row's frame \
-         (vapors-elements framed_batches_rows.rs); reproduce with `cargo xtask test`",
+         (vapors-elements framed_batches.rs `resolved`); reproduce with `cargo xtask test`",
         rows.len()
     );
     shift

@@ -5,7 +5,7 @@
 //! Chromium draws an edge), so each instance's quad is grown by a
 //! device pixel past the shape for the outer half's fragments.
 
-use crate::instanced::{Instanced, rowed_instances};
+use crate::instanced::{Instanced, instance_bytes, rowed_instances};
 use crate::{ClosedFormShape, GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws closed-form shapes. Create once per target
@@ -13,6 +13,15 @@ use crate::{ClosedFormShape, GpuWork, KeptRange, RowOffsets, Shift, Target};
 pub struct ClosedFormPipeline(Instanced);
 
 impl ClosedFormPipeline {
+    /// Four-float attributes an instance holds.
+    const VEC4S: u32 = 5;
+
+    /// Bytes per instance in a draw's or a kept buffer: the attributes and
+    /// the row index after them (`instanced.rs`), which
+    /// `closed_forms_2d.wgsl` does not read: closed forms are never
+    /// batched across a lane's rows (`unrowed` in the app's painter).
+    pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
+
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
@@ -24,7 +33,7 @@ impl ClosedFormPipeline {
                 include_str!("closed_forms_2d.wgsl"),
                 include_str!("closed_forms_shared.wgsl")
             ),
-            5,
+            Self::VEC4S,
         ))
     }
 
@@ -40,9 +49,11 @@ impl ClosedFormPipeline {
     /// each, never across a lane's rows, so the shader reads no row.
     #[must_use]
     pub fn bytes(shapes: &[ClosedFormShape]) -> Vec<u8> {
-        rowed_instances(("closed forms", 5), (shapes, &[]), |shape| {
-            shape.instance().to_vec()
-        })
+        rowed_instances(
+            ("closed forms", Self::VEC4S as usize),
+            (shapes, &[]),
+            |shape| shape.instance().to_vec(),
+        )
     }
 
     /// Writes `bytes` ([`ClosedFormPipeline::bytes`] of a run) into the

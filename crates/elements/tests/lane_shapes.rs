@@ -1,9 +1,10 @@
 //! Shapes in the rows of a framed lane (`docs/plans/splice-layout.md`
 //! section 11.2, 4f; option (b) of the fold): a step that paints a shape
 //! or a mesh is batched in its row's own frame, as the shape and mesh
-//! pipelines take no table of row offsets; the rows' other steps still
-//! share batches across the lane. Kept batches match a fresh batching
-//! after a scroll and an insert (the debug check in `kept_batches`).
+//! pipelines take no table of row offsets. As batches keep paint order,
+//! the lane's batch is cut at each such row: here each row's background
+//! is a lane batch of one row. Kept batches match a fresh batching after
+//! a scroll and an insert (the debug check in `kept_batches`).
 
 mod support;
 

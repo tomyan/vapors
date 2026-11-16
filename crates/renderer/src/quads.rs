@@ -4,13 +4,20 @@
 
 use vapors_scene::{Color, Quad};
 
-use crate::instanced::{Instanced, rowed_instances};
+use crate::instanced::{Instanced, instance_bytes, rowed_instances};
 use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
 
 /// A pipeline that draws quads. Create once per target format.
 pub struct QuadPipeline(Instanced);
 
 impl QuadPipeline {
+    /// Four-float attributes an instance holds.
+    const VEC4S: u32 = 8;
+
+    /// Bytes per instance in a draw's or a kept buffer: the attributes and
+    /// the row index after them (`instanced.rs`).
+    pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
+
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
@@ -19,7 +26,7 @@ impl QuadPipeline {
             format,
             "quads",
             &RowOffsets::shader(include_str!("quads.wgsl")),
-            8,
+            Self::VEC4S,
         ))
     }
 
@@ -44,7 +51,7 @@ impl QuadPipeline {
     /// past the table ([`RowOffsets::CAPACITY`]).
     #[must_use]
     pub fn bytes_in_rows(quads: &[Quad], rows: &[u32]) -> Vec<u8> {
-        rowed_instances(("quads", 8), (quads, rows), instance)
+        rowed_instances(("quads", Self::VEC4S as usize), (quads, rows), instance)
     }
 
     /// Writes `bytes` ([`QuadPipeline::bytes`] of a run) into the kept buffer,

@@ -28,6 +28,13 @@ pub(crate) type FramedHit = (usize, (NodeId, BoxRect));
 /// A hit test asks only the frames that can show at its point
 /// (`Frames::meeting`: the scroll frames whose clip meets it, the lane
 /// frames whose row meets it through the lane, section 11.2).
+///
+/// Exempt from the quarter-growth rule (`slot_list.rs`): the two maps
+/// double, as a hash map's buckets are a power of two, so neither can
+/// grow by a quarter; the growth test reports only the longest frame's
+/// list, which does. The label map holds an entry a step with hits, at
+/// most one a slot. Retired when hits are kept by slot (a `SlotList`)
+/// rather than by label.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct KeptHits {
     by_frame: FxHashMap<usize, Vec<(Label, FramedHit)>>,

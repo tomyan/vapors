@@ -15,7 +15,7 @@ use crate::{GpuWork, KeptRange, MeshShape, Retained, Shift, Target, WorkCounter}
 
 /// Bytes per item: [`MeshShape::instance`]'s floats, each draw's slice
 /// of the kept buffer, which `meshes_setup.rs` reads at stride 0.
-pub(crate) const INSTANCE_BYTES: u64 = (crate::mesh_shape::INSTANCE_FLOATS * 4) as u64;
+pub(crate) const INSTANCE_BYTES: u64 = MeshPipeline::INSTANCE_BYTES as u64;
 
 /// A pipeline that draws mesh items. Create once per target format.
 pub struct MeshPipeline {
@@ -28,6 +28,9 @@ pub struct MeshPipeline {
 }
 
 impl MeshPipeline {
+    /// Bytes per item in the kept buffer: [`MeshShape::instance`]'s floats.
+    pub const INSTANCE_BYTES: usize = crate::mesh_shape::INSTANCE_FLOATS * 4;
+
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {

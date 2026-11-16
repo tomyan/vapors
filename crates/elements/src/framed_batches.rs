@@ -75,8 +75,9 @@ pub(crate) struct Resolved {
 /// together; a positioned descendant's paint later, and the lookup is
 /// then made again. A step in a lane row that paints a shape is batched
 /// in the row's own frame: the shape and mesh pipelines take no table
-/// of row offsets (option (b) of the fold; the flat scene's transform
-/// table, F2, retires the per-row draws this costs).
+/// of row offsets (option (b) of the fold). It cuts the lane's run
+/// there, so a lane whose rows paint shapes draws a batch or more a row;
+/// the flat scene's transform table (F2) retires that.
 fn resolved(steps: impl Iterator<Item = Step>, (boxes, frames): Sources<'_>) -> Vec<Resolved> {
     let mut last = LastSeen::default();
     let resolve = |step| {

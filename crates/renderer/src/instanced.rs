@@ -46,9 +46,7 @@ impl Instanced {
         );
         let layout = bind_group_layout(device);
         let floats = u64::from(vec4s) * 16;
-        // the row index padded to 16 bytes: kept instances are whole
-        // 16-byte rows (retained.rs)
-        let stride = floats + 16;
+        let stride = instance_bytes(vec4s) as u64;
         let row = wgpu::VertexAttribute {
             format: wgpu::VertexFormat::Uint32,
             offset: floats,
@@ -211,6 +209,13 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
+/// Bytes per instance of `vec4s` four-float attributes: the attributes and
+/// the row index after them, padded to 16 bytes, as kept instances are
+/// whole 16-byte rows (`retained.rs`).
+pub(crate) const fn instance_bytes(vec4s: u32) -> usize {
+    (vec4s as usize + 1) * 16
+}
+
 /// Little-endian bytes of `floats`: a pipeline's instances with no row
 /// index (the mesh pipeline's and the scene's closed forms' own layouts,
 /// `meshes.rs`, `closed_forms_3d.rs`).
@@ -245,8 +250,9 @@ pub(crate) const VIEW_SIZE: usize = 16 + RowOffsets::CAPACITY * 8;
 ///
 /// When `rows` is neither empty nor one index an item, when an index is
 /// past the [`RowOffsets`] table (the shader would read it clamped,
-/// silently), or when an item's floats are not `vec4s` four-float
-/// attributes.
+/// silently), when an item's floats are not `vec4s` four-float
+/// attributes, or when the bytes built are not [`instance_bytes`] an
+/// item, the stride the pipeline reads them at.
 pub(crate) fn rowed_instances<T>(
     (label, vec4s): (&str, usize),
     (items, rows): (&[T], &[u32]),
@@ -265,6 +271,14 @@ pub(crate) fn rowed_instances<T>(
         bytes.extend(rows.get(at).copied().unwrap_or(0).to_le_bytes());
         bytes.extend([0; 12]);
     }
+    #[allow(clippy::cast_possible_truncation)] // a handful of vec4s
+    let instance = instance_bytes(vec4s as u32);
+    assert_eq!(
+        bytes.len(),
+        items.len() * instance,
+        "{label}: instances built at other than the {instance} bytes the pipeline reads \
+         (instanced.rs `instance_bytes`)"
+    );
     bytes
 }
 

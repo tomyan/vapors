@@ -53,8 +53,8 @@ pub(crate) struct RunBytes {
 /// shape run's entries from `shapes`; shadow and quad items each in its
 /// row of `rows` (none for a batch in one frame). Images and surfaces,
 /// drawn an item at a time, carry their row in the shift; shapes and
-/// meshes are batched in their row's own frame (`framed_batches_rows.rs`),
-/// so they have no rows.
+/// meshes are batched in their row's own frame (vapors-elements
+/// `framed_batches.rs` `resolved`), so they have no rows.
 ///
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.

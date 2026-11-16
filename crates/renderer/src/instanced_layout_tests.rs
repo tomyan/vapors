@@ -39,3 +39,29 @@ fn each_instanced_shaders_table_starts_after_the_head_and_holds_the_capacity() {
         assert_eq!(rows_layout(source, "view"), (head, pairs), "{name}.wgsl");
     }
 }
+
+#[test]
+fn the_closed_form_shader_reads_no_rows() {
+    // Given: the 2D closed-form shader, whose instances carry a row
+    // index no row table moves: closed forms are never batched across a
+    // lane's rows (`unrowed` in the app's painter, vapors-elements
+    // `framed_batches.rs` `resolved`), and draw with `RowOffsets::NONE`
+    let source = concat!(
+        include_str!("closed_forms_2d.wgsl"),
+        include_str!("closed_forms_shared.wgsl")
+    );
+    let module = naga::front::wgsl::parse_str(source).expect("parses");
+
+    // When
+    let mut globals = module.global_variables.iter().map(|(_, global)| global);
+    let view = globals.find(|global| global.name.as_deref() == Some("view"));
+    let ty = &module.types[view.expect("the uniform").ty];
+
+    // Then: its view uniform has no table of row offsets, so a table
+    // passed to it would be ignored, not read
+    let naga::TypeInner::Struct { members, .. } = &ty.inner else {
+        panic!("view is not a struct");
+    };
+    let names: Vec<_> = members.iter().filter_map(|m| m.name.as_deref()).collect();
+    assert_eq!(names, ["size", "shift"], "closed_forms_2d.wgsl");
+}
