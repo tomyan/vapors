@@ -67,6 +67,7 @@ fn measure(
 ///
 /// # Errors
 /// A recorded phase that is not in [`PHASES`]: the judge does not know it.
+#[cfg(test)] // the tests' reading of one size; `scaling_kinds` reads any kind
 pub(crate) fn at_size(rows: usize, samples: &Samples, known: &[&str]) -> Result<AtSize, String> {
     medians(rows, kept_counts(rows, samples)?, known)
 }

@@ -482,19 +482,24 @@ phase, in instructions and times. What is missing:
   holds when its row in the finish-line table shows the times from
   such a run.
   The harness (lead, 2026-11-16: built before B1b, as the baseline B1b
-  to B3b are each measured against): `cargo xtask quiet 20 --
-  scripts/first-frame-runs.sh <dir>` builds release, the shipped
-  profile, on a clean tree, waits for the load, and keeps three runs'
-  outputs verbatim with a log; `scripts/first-frame-table.sh` makes the
-  tables (median of the runs' medians per size: mount, first frame and
-  its phases in µs; median instructions per phase) and refuses a run of
-  a dirty tree or another revision, another profile, a software
-  adapter, or a 1-minute load of 1.5 or more at its start or end. The
-  Mount workload never calls `App::start` (`sampler_start.rs`,
-  `Apps::NewEachFrame`), so its first frame holds what a start would
-  do before frame 0: the painter, its pipelines and the first update.
-  "Mount and first frame" is therefore the wait from the mount to the
-  first frame's submit.
+  to B3b are each measured against; reworked in review of #428):
+  `vapors-perf --first-frame <rows>` mounts the Mount page, starts its
+  app (`App::start`, which builds the pipelines and runs the first
+  update, timed to the GPU's idle) and draws frame 0 (timed to submit
+  and to the GPU's idle), in one process, as a user's launch is, on a
+  named Mesa shader cache. `cargo xtask quiet 30 --
+  scripts/first-frame-runs.sh <dir>` builds release (the shipped
+  profile, for times) and judged (codegen-units 1, for instructions
+  that compare across revisions) on a clean tree, then at each size runs
+  three cold-and-warm pairs on release (a new, empty cache, then the
+  same cache) and three judged runs, waiting for the load before each,
+  each under a deadline, and checks each run's revision against HEAD.
+  `scripts/first-frame-table.sh` tables them (the median of the runs;
+  "mount to frame 0 idle" is each run's own sum, then its median) and
+  refuses a line it does not know, a file whose content disagrees with
+  its name, another revision, a dirty one, a software adapter, a load of
+  1.5 or more at a run's start or end, or a size without three runs of
+  each.
 - **The build-time part shown by the harness.** The Mount report gains
   `winners: compiled N, runtime N, foreign N` beside #240's styles
   line, with `winners_runtime` 0 asserted in `gpu_mount_frames` and

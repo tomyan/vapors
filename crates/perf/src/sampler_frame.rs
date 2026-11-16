@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use vapors_platform::{Frame, Next};
 use vapors_renderer::WRITE_PHASE;
 
-use super::start::{Apps, BuiltSince};
+use super::start::BuiltSince;
 use super::{FRAME_DEADLINE, INTERVAL, Measured, PhaseTakes, Sampler};
 use crate::gpu_time::{GpuClock, wait};
 use crate::run::Workload;
@@ -23,12 +23,12 @@ impl Sampler<'_> {
         &mut self,
         workload: &mut dyn Workload,
         texture: &wgpu::Texture,
-        (index, apps): (usize, Apps),
+        index: usize,
         gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Measured, String> {
         let since = self.prepared(workload, index)?;
         let (next, started, took, counted) = self.timed(workload, texture, index, gpu_clock)?;
-        since.refuse_any(index, apps)?;
+        since.refuse_any(index)?;
         // frame-to-idle ends here, before the harness's own bookkeeping;
         // gpu_judged_frames.rs holds it at or above the frame's GPU time
         wait(&self.gpu.device, FRAME_DEADLINE)?;

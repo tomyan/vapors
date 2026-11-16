@@ -17,10 +17,16 @@ pub const JUDGED: &str = "judged";
 /// The profile, as each report's header states it.
 #[must_use]
 pub fn header() -> String {
-    if BUILT == JUDGED {
-        format!("{BUILT} (release, codegen-units 1, no override the build could see)")
+    header_for(BUILT)
+}
+
+/// The header for a build with the profile `built`.
+#[must_use]
+pub fn header_for(built: &str) -> String {
+    if built == JUDGED {
+        format!("{built} (release, codegen-units 1, no override the build could see)")
     } else {
-        format!("{BUILT} (not the judged profile)")
+        format!("{built} (not the judged profile)")
     }
 }
 

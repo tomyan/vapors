@@ -1,12 +1,13 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
 //! [--only <substring>] [--instructions] [--off-path] [--scaling all|<change>] [--mount]
-//! [--mount-memory <rows>] [--scene-run [racer|one-scene]]`, 200 and 20 by default
+//! [--mount-memory <rows>] [--first-frame <rows>] [--scene-run [racer|one-scene]]`, 200 and 20 by default
 //! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, WorkloadSet, options};
 use vapors_perf::build_profile;
+use vapors_perf::first_frame_run;
 use vapors_perf::frame_kinds::sections;
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::instructions_check::checked_counter;
@@ -48,6 +49,7 @@ fn run() -> Result<(), String> {
         scaling,
         mount,
         mount_memory,
+        first_frame,
         scene_run,
     } = options;
     if let Some(kind) = scene_run {
@@ -63,17 +65,16 @@ fn run() -> Result<(), String> {
         println!("{}", mount_memory::run_child(&gpu, rows)?.line());
         return Ok(());
     }
+    if let Some(rows) = first_frame {
+        let open = || {
+            let gpu = gpu_with(FEATURES);
+            print_adapter(&gpu);
+            gpu
+        };
+        return first_frame_run::run(open, rows);
+    }
     if mount {
-        let gpu = gpu_with(FEATURES);
-        println!("Revision: {}", scene_run::REVISION);
-        print_adapter(&gpu);
-        print_counts(
-            &build_profile::shipped_header(build_profile::BUILT),
-            settings,
-        );
-        mount_run::run(&gpu, settings)?;
-        println!("Load average at the end: {}", load());
-        return Ok(());
+        return mount_run::run();
     }
     if let Some(changes) = scaling {
         let gpu = gpu_with(FEATURES);
@@ -119,14 +120,11 @@ fn run() -> Result<(), String> {
 
 fn print_setup(gpu: &vapors_gpu_harness::Gpu, settings: Settings) {
     print_adapter(gpu);
-    print_counts(&build_profile::header(), settings);
-}
-
-/// The profile as `profile` states it, the counts and the load.
-fn print_counts(profile: &str, settings: Settings) {
     println!(
-        "Profile: {profile}; scale 1; warmup {}; runs {}",
-        settings.warmup, settings.runs
+        "Profile: {}; scale 1; warmup {}; runs {}",
+        build_profile::header(),
+        settings.warmup,
+        settings.runs
     );
     println!("Load average at the start: {}\n", load());
 }
