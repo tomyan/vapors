@@ -9,8 +9,8 @@ nodes, and no frame over 16.7 ms across a 60 s run. Order of work item
 Sections 1 to 6 were read from the code at 7d1fe84 as a plan; section
 0 is updated to main at dcfae109 (2026-11-16). Line counts per PR are
 estimates. Every number is cited or marked "to be measured". Sections 1
-to 4 follow the recommendation of each open decision in section 5;
-where another option would change a row, the decision says which.
+to 4 follow section 5's decisions, which Tom took on 2026-11-12, each
+as recommended; the options are kept there as the record.
 
 ## 0. Where things stand (2026-11-16, main at dcfae109)
 
