@@ -30,6 +30,7 @@ mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
 mod compiled_rules;
+mod compiled_shareable;
 mod sizes;
 mod styles;
 mod surface;

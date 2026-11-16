@@ -5,6 +5,7 @@
 //! does not.
 
 mod compiled_mount_order;
+mod compiled_sharing;
 mod compiled_winners;
 mod rust_sheets_refused;
 mod support;

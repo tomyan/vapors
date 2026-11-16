@@ -95,6 +95,7 @@ fn every_keyed_row_element_takes_its_style_from_compiled_winners_at_any_count() 
 
         // Then: one computed style per share key, each from compiled
         // winners; none by the full cascade
+        assert!(counts.styles_computed > 0, "{rows} rows: {counts:?}");
         assert_eq!(
             counts.winners_compiled, counts.styles_computed,
             "{rows} rows: {counts:?}"

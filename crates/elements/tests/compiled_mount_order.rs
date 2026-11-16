@@ -110,3 +110,38 @@ fn a_tie_between_two_components_sheets_goes_to_the_one_mounted_later_in_either_o
     assert_eq!(blue_then_red, vec!["rgb(255 0 0)"; 2]);
     assert_eq!(counts.winners_compiled, 2, "{counts:?}");
 }
+
+/// The (shared, unshareable) counts of each update of two `tie_red`
+/// spans, before and after `sibling_rule` (`.tie + .tie`) mounts.
+fn sharing_before_and_after_a_sibling_rule() -> [(usize, usize, usize); 2] {
+    use vapors_compiler_examples::sibling_rule::{SiblingRule, SiblingRuleProps};
+    use vapors_compiler_examples::tie_red::{TieRed, TieRedProps};
+    let doc = Rc::new(RefCell::new(document()));
+    let (root, body) = (doc.borrow().root(), doc.borrow().body());
+    let _spans = [(); 2].map(|()| TieRed::mount(&doc, body, TieRedProps::default()));
+    let counts = |doc: &Rc<RefCell<vapors_elements::Document>>| {
+        doc.borrow_mut()
+            .update(viewport(200.0, 100.0))
+            .expect("updates");
+        let counts = doc.borrow().update_counts();
+        (
+            counts.styles_shared,
+            counts.styles_unshareable,
+            counts.winners_runtime,
+        )
+    };
+    let before = counts(&doc);
+    let _rule = SiblingRule::mount(&doc, root, SiblingRuleProps::default());
+    [before, counts(&doc)]
+}
+
+#[test]
+fn a_sibling_rule_mounted_after_the_first_update_stops_the_spans_sharing() {
+    // When
+    let [before, after] = sharing_before_and_after_a_sibling_rule();
+
+    // Then: the sharing answer is decided again for the new sheet, from
+    // compiled winners, and held against the rules in every build
+    assert_eq!(before, (1, 0, 0));
+    assert_eq!(after, (0, 2, 0));
+}

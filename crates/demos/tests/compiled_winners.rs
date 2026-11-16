@@ -4,6 +4,8 @@
 
 use vapors_elements::Viewport;
 
+/// The Save button (toasts.rs's tests).
+const SAVE: [u32; 2] = [530, 21];
 const VIEWPORT: Viewport = Viewport {
     width: 640.0,
     height: 400.0,
@@ -16,12 +18,19 @@ fn the_toasts_demo_takes_its_keyed_styles_from_compiled_winners() {
     let demo = vapors_demos::find("toasts").expect("a demo");
     let document = vapors_demos::document(&demo).document;
 
-    // When
-    let updated = document.borrow_mut().update(VIEWPORT).map(drop);
-    updated.unwrap_or_else(|errors| panic!("toasts was refused: {errors:#?}"));
+    let update = || {
+        let updated = document.borrow_mut().update(VIEWPORT).map(drop);
+        updated.unwrap_or_else(|errors| panic!("toasts was refused: {errors:#?}"));
+    };
+    update();
+
+    // When Save raises a toast, so the list's row keys (`.toast`,
+    // `.message`, `.dismiss`) are restyled too
+    vapors_demos::click(&document, SAVE);
+    update();
 
     // Then
     let counts = document.borrow().update_counts();
     assert_eq!(counts.winners_runtime, 0, "{counts:?}");
-    assert!(counts.winners_compiled > 0, "{counts:?}");
+    assert!(counts.winners_compiled >= 3, "{counts:?}");
 }

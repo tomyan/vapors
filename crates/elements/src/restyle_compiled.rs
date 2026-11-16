@@ -84,7 +84,7 @@ impl Document {
     /// The key's rules in this `Kept`, made and checked on its first
     /// element, with whether another crate's sheet reaches it; or the
     /// key's refusal, for every element of it.
-    fn compiled_key(
+    pub(crate) fn compiled_key(
         &mut self,
         key: &'static StyleKey,
         winners: &KeyWinners,
@@ -169,7 +169,7 @@ impl Document {
     }
 
     /// Refuses every later element of `key` in this `Kept`.
-    fn refuse_key(&mut self, key: &StyleKey, why: &str) {
+    pub(crate) fn refuse_key(&mut self, key: &StyleKey, why: &str) {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.compiled.insert(address, Err(why.to_owned()));

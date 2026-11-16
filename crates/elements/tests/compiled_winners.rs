@@ -238,69 +238,6 @@ fn a_sheet_registered_with_other_text_refuses_the_element() {
     );
 }
 
-/// A key whose winners say sheet `blocking` (another component's,
-/// named "cards/other.wisp") blocks sharing.
-fn blocked_key() -> &'static StyleKey {
-    let sheets = vec![
-        (
-            SheetRef::UserAgent,
-            sheet_hash(vapors_css::user_agent::TEXT),
-        ),
-        (SheetRef::Scope(OWN), sheet_hash(CARD)),
-        (SheetRef::Scope("cards/other.wisp"), sheet_hash(SIBLINGS)),
-    ];
-    let mut conditional = user_agent_rules();
-    conditional.extend([
-        RuleRef { sheet: 1, rule: 0 },
-        RuleRef { sheet: 1, rule: 1 },
-        RuleRef { sheet: 2, rule: 0 },
-    ]);
-    let winners = Box::leak(Box::new(KeyWinners {
-        sheets: sheets.leak(),
-        base: &[],
-        conditional: conditional.leak(),
-        blocked_by: &[2],
-        own: Some(1),
-    }));
-    Box::leak(Box::new(StyleKey {
-        winners: Winners::Compiled(winners),
-        ..*key(0, sheet_hash(CARD))
-    }))
-}
-
-/// A rule reading siblings, which blocks sharing.
-const SIBLINGS: &str = ":global(.card + .card) { color: green; }";
-
-/// The share counts of two elements of the blocked key, with the
-/// blocking sheet in the cascade or not.
-fn shared(blocking_mounted: bool) -> (usize, usize) {
-    let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
-    if blocking_mounted {
-        doc.add_style(vapors_dom::CompiledSheet::for_tests(
-            "cards/other.wisp",
-            SIBLINGS,
-        ));
-    }
-    let (body, key) = (doc.body(), blocked_key());
-    for _ in 0..2 {
-        let node = doc.create_keyed_element(key);
-        doc.insert_before(body, node, None);
-    }
-    if let Some(errors) = doc.update(VIEWPORT).err() {
-        panic!("{errors:?}");
-    }
-    let counts = doc.update_counts();
-    (counts.styles_shared, counts.styles_unshareable)
-}
-
-#[test]
-fn a_key_shares_while_the_sheet_its_winners_name_as_blocking_is_not_in_the_cascade() {
-    // Then: (shared, unshareable)
-    assert_eq!(shared(false), (1, 0));
-    assert_eq!(shared(true), (0, 2));
-}
-
 #[test]
 fn a_global_keys_winners_that_disagree_with_the_cascade_refuse_its_first_element() {
     // Given: a global component's key, its sheet registered by name

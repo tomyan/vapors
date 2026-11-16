@@ -3,7 +3,7 @@
 //! each sheet they reference found in the cascade by its name, each rule
 //! by its place in its sheet.
 
-use vapors_css::cascade::{CompiledRules, ComputedStyle, Environment, unshareable};
+use vapors_css::cascade::{CompiledRules, ComputedStyle, Environment};
 use vapors_dom::{DeclarationRef, KeyWinners, RuleRef, SheetRef, StyleKey};
 
 use super::Sheets;
@@ -136,36 +136,11 @@ impl Sheets {
     /// Whether a sheet the key does not reference has a candidate rule
     /// for it: another crate's (check 2), counted in `winners_foreign`.
     pub(crate) fn foreign_reaches(&self, key: &StyleKey, referenced: &[usize]) -> bool {
-        self.cascade
-            .foreign_reaches(key.tag, &classes_of(key), referenced)
-    }
-
-    /// Whether `key`'s elements may share by its compiled winners: no
-    /// sheet in the cascade that they name as blocking, and no rule of a
-    /// sheet they do not reference (another crate's), blocks it.
-    pub(crate) fn compiled_shareable(&self, key: &StyleKey, winners: &KeyWinners) -> bool {
-        let mut referenced: Vec<usize> = (winners.sheets.iter())
-            .filter_map(|&(sheet, _)| self.index_of(sheet))
-            .collect();
-        referenced.sort_unstable();
-        let classes = classes_of(key);
-        let mut foreign = self
-            .cascade
-            .foreign_rules_for_key(key.tag, &classes, &referenced);
-        let blocked = (winners.blocked_by.iter()).any(|&sheet| {
-            self.index_of(winners.sheets[usize::from(sheet)].0)
-                .is_some()
-        });
-        !blocked && !foreign.any(|rule| unshareable(rule).is_some())
-    }
-
-    /// Whether `key`'s elements may share by the rules any of them can
-    /// match.
-    pub(crate) fn runtime_shareable(&self, key: &StyleKey) -> bool {
-        let classes = classes_of(key);
-        !self
-            .rules_for_key(key.tag, &classes)
-            .any(|rule| unshareable(rule).is_some())
+        self.cascade.foreign_reaches(
+            key.tag,
+            &super::compiled_shareable::classes_of(key),
+            referenced,
+        )
     }
 
     /// The computed style of `node` from `compiled`.
@@ -183,9 +158,4 @@ impl Sheets {
                 error,
             })
     }
-}
-
-/// A key's literal classes and toggles: every class its elements can have.
-fn classes_of(key: &StyleKey) -> Vec<&'static str> {
-    key.classes.iter().chain(key.toggles).copied().collect()
 }
