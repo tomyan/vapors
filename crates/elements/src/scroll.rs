@@ -7,7 +7,7 @@ use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
-use crate::layout::{Content, LayoutBox};
+use crate::layout::{Content, Lanes, LayoutBox};
 
 /// The offsets, by scroll container, and the containers scrolled
 /// since the last update.
@@ -65,7 +65,7 @@ impl Offsets {
     /// in CSS pixels rounded to whole device pixels at `scale`.
     pub(crate) fn settle(
         &mut self,
-        boxes: &[LayoutBox],
+        (boxes, lanes): (&[LayoutBox], &Lanes),
         scrolls: &dyn Fn(usize) -> bool,
         scale: f32,
     ) -> Vec<[f32; 2]> {
@@ -78,7 +78,7 @@ impl Offsets {
                 if !scrolls(index) {
                     return [0.0, 0.0];
                 }
-                let offset = self.clamped(node, boxes, index);
+                let offset = self.clamped(node, (boxes, lanes), index);
                 kept.insert(node, offset);
                 applied(offset.at, scale)
             })
@@ -95,14 +95,14 @@ impl Offsets {
     pub(crate) fn settle_box(
         &mut self,
         node: NodeId,
-        (boxes, index): (&[LayoutBox], usize),
+        (boxes, lanes, index): (&[LayoutBox], &Lanes, usize),
         scale: f32,
     ) -> ([f32; 2], bool) {
         let was = self
             .by_node
             .get(&node)
             .map(|o| (bits(o.settled), o.settled_alpha));
-        let offset = self.clamped(node, boxes, index);
+        let offset = self.clamped(node, (boxes, lanes), index);
         self.by_node.insert(node, offset);
         let now = (bits(offset.settled), offset.settled_alpha);
         (applied(offset.at, scale), was != Some(now))
@@ -128,8 +128,8 @@ impl Offsets {
         self.by_node == other.by_node
     }
 
-    fn clamped(&self, node: NodeId, boxes: &[LayoutBox], index: usize) -> Offset {
-        let max = range(boxes, index);
+    fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
+        let max = range(laid, index);
         let at = self.get(node).unwrap_or_default();
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
@@ -196,10 +196,10 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its padding box. Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
 /// counts, so the larger of the two is taken.
-fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
     let (border, padding) = (layout.border, layout.padding);
-    let end = content_end(boxes, index);
+    let end = content_end((boxes, lanes), index);
     let inner = [
         layout.size.width - border.left - border.right,
         layout.size.height - border.top - border.bottom,
@@ -213,17 +213,22 @@ fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
 }
 
 /// How far box `index`'s in-flow children reach, margins included, from
-/// its padding box's corner.
-fn content_end(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+/// its padding box's corner, each where Taffy puts it.
+fn content_end((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let border = boxes[index].layout.border;
-    let in_flow = boxes[index].children.iter().map(|&child| &boxes[child]);
+    let in_flow = boxes[index].children.iter().copied();
     in_flow
-        .filter(|child| child.style.position != taffy::Position::Absolute)
-        .map(|child| child.layout)
-        .fold([0.0_f32, 0.0_f32], |end, at| {
+        .filter(|&child| boxes[child].style.position != taffy::Position::Absolute)
+        .map(|child| {
+            (
+                lanes.taffy_location(child, &boxes[child].layout),
+                boxes[child].layout,
+            )
+        })
+        .fold([0.0_f32, 0.0_f32], |end, (location, at)| {
             [
-                end[0].max(at.location.x + at.size.width + at.margin.right - border.left),
-                end[1].max(at.location.y + at.size.height + at.margin.bottom - border.top),
+                end[0].max(location.x + at.size.width + at.margin.right - border.left),
+                end[1].max(location.y + at.size.height + at.margin.bottom - border.top),
             ]
         })
 }

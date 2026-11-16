@@ -46,10 +46,11 @@ impl ProjectiveClosedForms {
     }
 
     /// The instance bytes of `shapes`, as [`ProjectiveClosedForms::record`]
-    /// reads them: the page's.
+    /// reads them: the page's floats, without the row index the page's
+    /// instanced layout puts after them (`instanced.rs`).
     #[must_use]
     pub fn bytes(shapes: &[ClosedFormShape]) -> Vec<u8> {
-        crate::ClosedFormPipeline::bytes(shapes)
+        crate::instanced::float_bytes(shapes.iter().flat_map(ClosedFormShape::instance))
     }
 
     /// Draws the instances in `instances` (bytes of

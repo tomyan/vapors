@@ -6,23 +6,23 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::{KeptRange, Shift};
+use vapors_renderer::{KeptRange, RowOffsets, Shift};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
-use crate::draw::{RenderTarget, Vertices, vertex_bytes};
-use crate::draw_icon::{IconDraw, icon_quads};
+use crate::draw::{RenderTarget, Vertices, rowed_vertex_bytes};
+use crate::draw_icon::{IconDraw, icon_quads_counted};
 use crate::pipeline::{BlendParams, TextPipeline};
-use crate::quads::{TextDraw, quads};
+use crate::quads::{TextDraw, quads_counted};
 
 /// `floats` built with `pins` taken, the pins marked with the atlas
 /// generation the build ended at. A failed build fails in its first
 /// pass, before any pin is taken.
-fn built(
+fn built<T>(
     atlas: &GlyphAtlas,
-    floats: Result<Vec<f32>, AtlasError>,
+    floats: Result<T, AtlasError>,
     pins: &mut AtlasPins,
-) -> Result<Vec<f32>, AtlasError> {
+) -> Result<T, AtlasError> {
     pins.generation = atlas.generation();
     floats
 }
@@ -38,9 +38,29 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         texts: &[TextDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
+        Self::text_bytes_in_rows(atlas, texts, &[])
+    }
+
+    /// As [`TextPipeline::text_bytes`], text `i`'s vertices in row
+    /// `rows[i]` of the batch's row offsets (`vapors_renderer::RowOffsets`),
+    /// or every text in row 0 for an empty `rows`.
+    ///
+    /// # Errors
+    ///
+    /// As [`TextPipeline::text_bytes`].
+    ///
+    /// # Panics
+    ///
+    /// When `rows` is neither empty nor one row a text inside the table.
+    pub fn text_bytes_in_rows(
+        atlas: &mut GlyphAtlas,
+        texts: &[TextDraw<'_>],
+        rows: &[u32],
+    ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
-        let floats = quads(atlas, texts, Some(&mut pins));
-        Ok((vertex_bytes(&built(atlas, floats, &mut pins)?), pins))
+        let counted = quads_counted(atlas, texts, Some(&mut pins));
+        let (floats, vertices) = built(atlas, counted, &mut pins)?;
+        Ok((rowed_vertex_bytes(&floats, (&vertices, rows)), pins))
     }
 
     /// The vertex bytes of `icons` as [`TextPipeline::draw_icons`] draws
@@ -53,9 +73,28 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
+        Self::icon_bytes_in_rows(atlas, icons, &[])
+    }
+
+    /// As [`TextPipeline::icon_bytes`], icon `i`'s vertices in row
+    /// `rows[i]`, or every icon in row 0 for an empty `rows`.
+    ///
+    /// # Errors
+    ///
+    /// As [`TextPipeline::icon_bytes`].
+    ///
+    /// # Panics
+    ///
+    /// When `rows` is neither empty nor one row an icon inside the table.
+    pub fn icon_bytes_in_rows(
+        atlas: &mut GlyphAtlas,
+        icons: &[IconDraw<'_>],
+        rows: &[u32],
+    ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
-        let floats = icon_quads(atlas, icons, Some(&mut pins));
-        Ok((vertex_bytes(&built(atlas, floats, &mut pins)?), pins))
+        let counted = icon_quads_counted(atlas, icons, Some(&mut pins));
+        let (floats, vertices) = built(atlas, counted, &mut pins)?;
+        Ok((rowed_vertex_bytes(&floats, (&vertices, rows)), pins))
     }
 
     /// Writes `bytes` ([`TextPipeline::text_bytes`] or
@@ -97,13 +136,34 @@ impl TextPipeline {
         params: BlendParams,
         shift: Shift,
     ) {
+        self.draw_kept_in_rows(
+            target,
+            atlas,
+            (kept, pins),
+            (params, (shift, &RowOffsets::NONE)),
+        );
+    }
+
+    /// As [`TextPipeline::draw_kept`], each vertex moved by its row's
+    /// offset in `rows` as well.
+    ///
+    /// # Panics
+    ///
+    /// As [`TextPipeline::draw_kept`].
+    pub fn draw_kept_in_rows(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        (kept, pins): (&KeptRange, &AtlasPins),
+        (params, moved): (BlendParams, (Shift, &RowOffsets)),
+    ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(
             built, now,
             "text: kept bytes built at atlas generation {built} drawn at {now}; build them again \
              when the generation moves on (draw_kept.rs); reproduce with `cargo xtask test`"
         );
-        let Some(params) = self.prepare(target, atlas, (params, shift)) else {
+        let Some(params) = self.prepare(target, atlas, (params, moved)) else {
             return;
         };
         self.record_draw(target, Vertices::Kept(kept), params);

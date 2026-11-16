@@ -128,7 +128,19 @@ fn starts_from_gives_each_later_child_with_its_start() {
         .map(|&handle| (handle, tree.start(handle)))
         .collect();
     assert_eq!(from, expected);
-    assert_eq!(tree.starts_from(handles[59]).len(), 1);
+}
+
+#[test]
+fn handles_from_gives_each_later_child_in_order() {
+    // Given: more children than one leaf holds
+    let (tree, handles) = appended(60);
+
+    // When
+    let from = tree.handles_from(handles[37]);
+
+    // Then: handle 37 on, in order
+    assert_eq!(from, handles[37..].to_vec());
+    assert_eq!(tree.handles_from(handles[59]), vec![handles[59]]);
 }
 
 #[test]

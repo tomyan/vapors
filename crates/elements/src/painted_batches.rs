@@ -44,10 +44,22 @@ impl Painted {
     /// (`kept_batches_check.rs`).
     #[cfg(debug_assertions)]
     fn assert_batches_hold(&self, kept: &KeptBatched, view: Rect) {
-        let scene = self.scene();
-        crate::kept_batches_check::assert_same(kept, &scene.framed_batches(view));
-        let page = scene.batches(view);
+        crate::kept_batches_check::assert_same(kept, &self.fresh_batches(view));
+        let page = self.scene().batches(view);
         crate::kept_batches_check::assert_on_page(kept, &self.frames, &page);
+    }
+
+    /// The scene batched afresh for `view` in its frames, each framed
+    /// lane's rows in the slots the kept batches gave them: what the kept
+    /// batches must equal.
+    #[must_use]
+    pub fn fresh_batches(&self, view: Rect) -> crate::FramedBatched {
+        let slots = self
+            .kept_batches
+            .borrow()
+            .as_ref()
+            .map(|kept| kept.slots().clone());
+        self.scene().framed_batches(view, slots.unwrap_or_default())
     }
 
     /// What the kept batches are sorted and made from.

@@ -69,7 +69,8 @@ struct Steps {
 impl Steps {
     fn of(boxes: &[Option<KeptBox>]) -> Self {
         let places = boxes.len();
-        let drawn = DrawnSteps::of(&steps(boxes), boxes);
+        let steps = steps(boxes);
+        let drawn = DrawnSteps::of((&steps, &crate::paint_labels::afresh(steps.len())), boxes);
         let extents = Extents::of(&drawn, places, boxes);
         Self {
             drawn,
@@ -104,8 +105,9 @@ fn made(kept: &mut KeptBatches, steps: &Steps, boxes: &[Option<KeptBox>]) -> Bat
 /// Batching every item of `boxes` afresh.
 fn afresh(boxes: &[Option<KeptBox>]) -> Batched {
     let steps = steps(boxes);
-    let drawn = DrawnSteps::of(&steps, boxes);
-    crate::SceneView::new(&steps, &drawn, on_page(boxes)).batches(VIEW)
+    let labels = crate::paint_labels::afresh(steps.len());
+    let drawn = DrawnSteps::of((&steps, &labels), boxes);
+    crate::SceneView::new((&steps, &labels), &drawn, on_page(boxes)).batches(VIEW)
 }
 
 /// Slot `slot` painted again as `part`, and its steps and the kept
@@ -117,11 +119,11 @@ fn painted_again(
 ) {
     boxes[slot] = part;
     steps.drawn.patch([slot].into_iter(), boxes);
-    let placed: Vec<(usize, Step)> = steps.drawn.places_of(slot).collect();
+    let labelled: Vec<(u64, Step)> = steps.drawn.labels_of(slot).collect();
     steps
         .extents
-        .patch(&placed, (&steps.drawn, steps.places), boxes);
-    kept.patch(placed.into_iter(), steps.sources(boxes));
+        .patch(&labelled, (&steps.drawn, steps.places), boxes);
+    kept.patch(labelled.into_iter(), steps.sources(boxes));
 }
 
 #[test]
@@ -136,8 +138,11 @@ fn the_kept_batches_hold_the_shown_steps_and_count_the_hidden_ones_culled() {
     // When
     let (mut kept, steps) = kept_batches(&boxes);
 
-    // Then
-    assert_eq!(kept.shown(), [(0, Step::Box(0)), (2, Step::Box(2))]);
+    // Then: those steps shown, in paint order
+    let shown = kept.shown();
+    let steps_shown: Vec<Step> = shown.iter().map(|&(_, step)| step).collect();
+    assert_eq!(steps_shown, [Step::Box(0), Step::Box(2)]);
+    assert!(shown[0].0 < shown[1].0, "shown out of order: {shown:?}");
     assert_eq!(made(&mut kept, &steps, &boxes), afresh(&boxes));
     assert_eq!(made(&mut kept, &steps, &boxes).culled, 3);
 }

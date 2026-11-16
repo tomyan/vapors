@@ -93,3 +93,16 @@ fn assert_close(actual: &[f32], expected: &[f32]) {
         assert!((a - e).abs() < 1e-6, "{actual:?} vs {expected:?}");
     }
 }
+
+#[test]
+#[should_panic(expected = "a draw's entries 0..2 run past the 1 placed")]
+fn draws_holding_more_entries_than_were_placed_are_refused() {
+    let glyph = AtlasGlyph {
+        page: PageKind::Coverage,
+        rect: [0, 0, 4, 2],
+        left: 0,
+        top: 0,
+        notdef: false,
+    };
+    crate::quads::vertices_per_draw(&[glyph], [2].into_iter());
+}
