@@ -5,12 +5,17 @@
 
 use vapors_css::sheet_hash::sheet_hash;
 use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey, Winners};
-use vapors_elements::{Document, SheetHash};
+use vapors_elements::{Document, SheetHash, Viewport};
 use vapors_text::FontSystem;
 
 // with the newlines a `<style>` section's text has
 const CARD: &str = "\n.card { color: red; }\n";
 const OWN: &str = "cards/card.wisp";
+const VIEWPORT: Viewport = Viewport {
+    width: 200.0,
+    height: 100.0,
+    scale: 1.0,
+};
 
 const fn key(winners: &'static KeyWinners) -> StyleKey {
     StyleKey {
@@ -38,7 +43,7 @@ const fn winners(sheets: &'static [(SheetRef, u64)]) -> KeyWinners {
 
 fn document_with_card() -> Document {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(OWN, CARD);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     doc
 }
 
@@ -67,7 +72,10 @@ fn a_scope_whose_sheet_was_refused_is_absent_from_the_cascade() {
     let mut doc = Document::new(FontSystem::bundle_only());
 
     // When: the sheet does not parse
-    doc.add_style(OWN, ".card { color: red;");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        OWN,
+        ".card { color: red;",
+    ));
 
     // Then
     assert_eq!(doc.sheet_hash(SheetRef::Scope(OWN)), SheetHash::Absent);
@@ -118,7 +126,10 @@ fn a_key_whose_own_scope_is_absent_is_refused_as_two_names_for_one_sheet() {
     static WINNERS: KeyWinners = winners(&[(SheetRef::Scope(OWN), 1)]);
     static KEY: StyleKey = key(&WINNERS);
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style("cards//card.wisp", CARD);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "cards//card.wisp",
+        CARD,
+    ));
 
     // When
     let refusal = doc.check_compiled_sheets(&KEY).expect_err("refused");
@@ -159,7 +170,7 @@ fn a_global_key_passes_when_another_components_global_sheet_is_absent() {
         ..key(winners)
     }));
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_global_style(own, CARD);
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(own, CARD));
 
     // Then
     assert_eq!(doc.check_compiled_sheets(key), Ok(()));
@@ -169,8 +180,11 @@ fn a_global_key_passes_when_another_components_global_sheet_is_absent() {
 fn a_scope_and_a_global_sheet_of_one_name_are_held_apart() {
     // Given: one name, two kinds, two texts
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(OWN, CARD);
-    doc.add_global_style(OWN, ".card { color: blue; }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(
+        OWN,
+        ".card { color: blue; }",
+    ));
 
     // Then
     let registered = |text| SheetHash::Registered(sheet_hash(text));
@@ -178,5 +192,41 @@ fn a_scope_and_a_global_sheet_of_one_name_are_held_apart() {
     assert_eq!(
         doc.sheet_hash(SheetRef::Global(OWN)),
         registered(".card { color: blue; }")
+    );
+}
+
+#[test]
+fn a_registered_sheet_whose_text_does_not_hash_as_claimed_is_refused_naming_it() {
+    // Given: a sheet claiming the hash of other text
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let forged = vapors_dom::CompiledSheet::for_tests_hashed(OWN, CARD, sheet_hash(".x {}"));
+
+    // When
+    doc.add_style(forged);
+    let refused = format!("{:?}", doc.update(VIEWPORT).err().expect("refused"));
+
+    // Then: refused, and not in the cascade
+    assert!(refused.contains("cards/card.wisp"), "{refused}");
+    assert!(
+        refused.contains("for text that hashes otherwise"),
+        "{refused}"
+    );
+    assert_eq!(doc.sheet_hash(SheetRef::Scope(OWN)), SheetHash::Absent);
+}
+
+#[test]
+fn a_registered_sheet_whose_text_hashes_as_claimed_is_added() {
+    // When
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_style(vapors_dom::CompiledSheet::for_tests_hashed(
+        OWN,
+        CARD,
+        sheet_hash(CARD),
+    ));
+
+    // Then
+    assert_eq!(
+        doc.sheet_hash(SheetRef::Scope(OWN)),
+        SheetHash::Registered(sheet_hash(CARD))
     );
 }

@@ -608,6 +608,15 @@ below as the record of what was weighed.
    `controls.css`, `root.css`, `placement.css`); they move to compiled
    style-only components in the touche PR that bumps vapors past R1b
    (tomyan/touche#198).
+   **Closing the other doors (review of #433, M1; lead's option (a)):**
+   `Dom::add_style` and `Dom::add_global_style` take a
+   `vapors_dom::CompiledSheet`, made only through the hidden
+   `CompiledSheet::__compiled(name, text, hash)` the generated mount
+   calls; the tree refuses one whose text does not hash as it claims,
+   naming it, and `cargo xtask lint` refuses `__compiled` outside the
+   code that defines and emits it (`[imports.__compiled]`). The gap that
+   remains is hand-written code naming the hidden constructor, with text
+   it hashes itself: visible in review and in the lint, not prevented.
 3. **Ancestors above a component's root.** (a) First version: any
    selector with an ancestor compound is conditional and tested at run
    time. (b) Index every mount site of each component in the crate and

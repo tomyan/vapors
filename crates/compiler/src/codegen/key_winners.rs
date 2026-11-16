@@ -11,7 +11,7 @@ use std::fmt::Write;
 use vapors_css::analysis::{KeyWinners, Match, Place, SheetId, Winner};
 use vapors_css::cascade::{INLINE_SHEET, PRESENTATION_SHEET, unshareable};
 
-use super::shell::in_crate;
+use super::shell_sheet::in_crate;
 use crate::styles::{Analysis, ElementStyles};
 
 /// A component's analysis, with each of its sheets' hash, by element
@@ -215,7 +215,7 @@ fn sheet_ref(id: &SheetId, own: Option<&str>) -> String {
 
 /// `hash` as a hex literal in groups of four digits, as clippy's
 /// `unreadable_literal` asks of the generated code.
-fn hash_literal(hash: u64) -> String {
+pub(super) fn hash_literal(hash: u64) -> String {
     let hex = format!("{hash:016x}");
     let groups: Vec<&str> = (0..4).map(|group| &hex[group * 4..group * 4 + 4]).collect();
     format!("0x{}", groups.join("_"))

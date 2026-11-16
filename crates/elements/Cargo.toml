@@ -39,6 +39,7 @@ tracing.workspace = true
 [dev-dependencies]
 vapors-signals.workspace = true
 vapors-compiler-examples.workspace = true
+vapors-dom = { workspace = true, features = ["test-support"] }
 serde_json.workspace = true
 
 [lints]

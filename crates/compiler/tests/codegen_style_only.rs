@@ -13,7 +13,10 @@ fn a_style_only_component_registers_its_sheet_and_builds_nothing() {
     let code = generated("<style>\n:global(body) { margin: 0; }\n</style>\n");
 
     // Then
-    assert_has(&code, "dom.borrow_mut().add_style(SCOPE, STYLE);");
+    assert_has(
+        &code,
+        "dom.borrow_mut().add_style(vapors_dom::CompiledSheet::__compiled(SCOPE, STYLE,",
+    );
     assert_lacks(&code, "create_keyed_element");
     assert_lacks(&code, "create_element");
 }

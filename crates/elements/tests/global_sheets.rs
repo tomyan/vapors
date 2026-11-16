@@ -29,7 +29,7 @@ fn a_global_sheet_styles_unscoped_elements_and_hashes_as_registered() {
     let mut doc = document_with_paragraph();
 
     // When
-    doc.add_global_style(SHEET, CARD);
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(SHEET, CARD));
     doc.update(VIEWPORT).expect("updates");
 
     // Then
@@ -49,11 +49,11 @@ fn a_global_sheet_styles_unscoped_elements_and_hashes_as_registered() {
 fn a_second_mounts_registration_of_the_same_sheet_restyles_nothing() {
     // Given
     let mut doc = document_with_paragraph();
-    doc.add_global_style(SHEET, CARD);
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(SHEET, CARD));
     doc.update(VIEWPORT).expect("updates");
 
     // When
-    doc.add_global_style(SHEET, CARD);
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(SHEET, CARD));
     doc.update(VIEWPORT).expect("updates");
 
     // Then
@@ -64,11 +64,17 @@ fn a_second_mounts_registration_of_the_same_sheet_restyles_nothing() {
 fn another_text_under_the_same_name_is_refused_once_naming_two_versions_of_the_crate() {
     // Given
     let mut doc = document_with_paragraph();
-    doc.add_global_style(SHEET, CARD);
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(SHEET, CARD));
 
     // When: mounted twice more with the other text
-    doc.add_global_style(SHEET, "\np { color: blue; }\n");
-    doc.add_global_style(SHEET, "\np { color: blue; }\n");
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(
+        SHEET,
+        "\np { color: blue; }\n",
+    ));
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(
+        SHEET,
+        "\np { color: blue; }\n",
+    ));
     let errors = doc.update(VIEWPORT).err().expect("refused");
 
     // Then
@@ -84,7 +90,10 @@ fn a_global_sheet_holding_global_selectors_is_refused() {
     let mut doc = document_with_paragraph();
 
     // When
-    doc.add_global_style(SHEET, ":global(p) { color: blue; }");
+    doc.add_global_style(vapors_dom::CompiledSheet::for_tests(
+        SHEET,
+        ":global(p) { color: blue; }",
+    ));
     let refused = format!("{:?}", doc.update(VIEWPORT).err().expect("refused"));
 
     // Then
