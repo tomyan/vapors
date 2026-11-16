@@ -1,9 +1,11 @@
 //! A keyed element's style from its key's compiled winners
 //! (`docs/plans/build-time-styles.md`, row B3a): check 1 and the rules
 //! resolved once per key per `Kept`, then each element computed from
-//! them (`Cascade::compute_compiled`). The first element of each key in
-//! each `Kept` is also computed by the full cascade in every build, and
-//! a difference refuses it; in debug builds every element is.
+//! them (`Cascade::compute_compiled`). In every build, the first element
+//! of each key in each conditional state (its states, toggles and the
+//! attributes a sheet selects: the share key's inputs but its parent) is
+//! also computed by the full cascade, and a difference refuses that key
+//! for the rest of the `Kept`; debug builds compare every element.
 
 use std::rc::Rc;
 
@@ -13,15 +15,13 @@ use vapors_dom::{KeyWinners, NodeId, StyleKey, Winners};
 use crate::Viewport;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::style::Counted;
+use crate::style::{Counted, ShareKey};
 use crate::update::environment;
 
-/// A key's rules in this `Kept`, and whether its first element was
-/// verified against the full cascade.
+/// A key's rules in this `Kept`.
 pub(crate) struct CompiledKey {
     rules: Rc<CompiledRules>,
     foreign: bool,
-    verified: bool,
 }
 
 impl Document {
@@ -42,14 +42,25 @@ impl Document {
                 return self.counted_full(node, viewport, |c| &mut c.winners_component_tag);
             }
         };
-        let (rules, foreign, verified) = self.compiled_key(key, winners)?;
+        let (rules, foreign) = self.compiled_key(key, winners)?;
         let style = self.compute_from(node, &rules, viewport)?;
         self.counts.winners_compiled += 1;
         self.counts.winners_foreign += usize::from(foreign);
-        if !verified || cfg!(debug_assertions) {
-            self.verify(node, key, &style, (viewport, verified))?;
+        let first = self.first_in_state(node, key);
+        if first || self.compare_every_element {
+            self.verify(node, key, &style, (viewport, first))?;
         }
         Ok(style)
+    }
+
+    /// The test's switch to the release path: only the first element of
+    /// each key in each state is compared, as in a release build.
+    /// RELAXED: no test tier builds release, so the release path is
+    /// reached by this switch in a debug build; retired when a tier runs
+    /// the elements tests on the release profile.
+    #[doc(hidden)]
+    pub fn verify_as_release(&mut self) {
+        self.compare_every_element = false;
     }
 
     fn counted_full(
@@ -63,28 +74,24 @@ impl Document {
     }
 
     /// The key's rules in this `Kept`, made and checked on its first
-    /// element; with whether another crate's sheet reaches it and
-    /// whether its first element was verified.
+    /// element, with whether another crate's sheet reaches it; or the
+    /// key's refusal, for every element of it.
     fn compiled_key(
         &mut self,
         key: &'static StyleKey,
         winners: &KeyWinners,
-    ) -> Result<(Rc<CompiledRules>, bool, bool), ElementError> {
+    ) -> Result<(Rc<CompiledRules>, bool), ElementError> {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_ref().expect("restyle sets it");
-        if let Some(found) = kept.shared.compiled.get(&address) {
-            let found = found
-                .as_ref()
-                .map_err(|why| ElementError::Refused(why.clone()))?;
-            return Ok((Rc::clone(&found.rules), found.foreign, found.verified));
+        if !kept.shared.compiled.contains_key(&address) {
+            let made = self.make_compiled(key, winners);
+            let kept = self.kept.as_mut().expect("restyle sets it");
+            kept.shared.compiled.insert(address, made);
         }
-        let made = self.make_compiled(key, winners);
-        let kept = self.kept.as_mut().expect("restyle sets it");
-        let made = kept.shared.compiled.entry(address).or_insert(made);
-        let made = made
-            .as_ref()
-            .map_err(|why| ElementError::Refused(why.clone()))?;
-        Ok((Rc::clone(&made.rules), made.foreign, made.verified))
+        let kept = self.kept.as_ref().expect("restyle sets it");
+        let found = kept.shared.compiled[&address].as_ref();
+        let found = found.map_err(|why| ElementError::Refused(why.clone()))?;
+        Ok((Rc::clone(&found.rules), found.foreign))
     }
 
     fn make_compiled(&self, key: &StyleKey, winners: &KeyWinners) -> Result<CompiledKey, String> {
@@ -94,7 +101,6 @@ impl Document {
         Ok(CompiledKey {
             rules: Rc::new(rules),
             foreign,
-            verified: false,
         })
     }
 
@@ -113,49 +119,51 @@ impl Document {
         Ok(kept.styles.alloc(style))
     }
 
-    /// `style` against the full cascade's: on the key's first element a
-    /// difference refuses it, in every build; on a later one (debug
-    /// builds only) it panics, as the shared-style oracle does.
+    /// Whether `node` is the first element of `key` in its conditional
+    /// state this `Kept`; it is noted as seen.
+    fn first_in_state(&mut self, node: NodeId, key: &'static StyleKey) -> bool {
+        let state = ShareKey {
+            parent: 0,
+            ..self.share_key(node, key)
+        };
+        let kept = self.kept.as_mut().expect("restyle sets it");
+        kept.shared.verified.insert(state)
+    }
+
+    /// `style` against the full cascade's: on the first element of a
+    /// state a difference refuses the key for the rest of the `Kept`, in
+    /// every build; on a later one (debug builds) it panics, as the
+    /// shared-style oracle does.
     fn verify(
         &mut self,
         node: NodeId,
         key: &StyleKey,
         style: &Counted,
-        (viewport, verified): (Viewport, bool),
+        (viewport, first): (Viewport, bool),
     ) -> Result<(), ElementError> {
         let full = self.compute_own(node, viewport)?;
-        let same = **full == **style;
-        let differing = || crate::restyle_check::differing_property(Some(style), &full);
-        if !verified {
-            self.mark_verified(key);
-            if !same {
-                return Err(ElementError::Refused(format!(
-                    "{} (key at {}): its style from its compiled winners differs from the cascade's: \
-                     {}; fix: rebuild the crate that compiled it with this vapors-css; reproduce: \
-                     mount it after a clean build",
-                    self.describe(node),
-                    key.site,
-                    differing()
-                )));
-            }
+        if **full == **style {
+            return Ok(());
         }
-        assert!(
-            same,
+        let why = format!(
             "{} (key at {}): its style from its compiled winners differs from the cascade's: {}; \
-             vapors_css::analysis and the cascade disagree on this key. Reproduce with the \
-             failing test",
+             vapors_css::analysis and the cascade disagree on this key, or it was compiled with \
+             another vapors-css; fix: rebuild its crate with this vapors-css, else report the \
+             analysis; reproduce: `cargo run -p vapors-compiler --bin wisp-check -- --styles \
+             <its .wisp>` prints the compiler's winners for the site",
             self.describe(node),
             key.site,
-            differing()
+            crate::restyle_check::differing_property(Some(style), &full)
         );
-        Ok(())
+        assert!(first, "{why}");
+        self.refuse_key(key, &why);
+        Err(ElementError::Refused(why))
     }
 
-    fn mark_verified(&mut self, key: &StyleKey) {
+    /// Refuses every later element of `key` in this `Kept`.
+    fn refuse_key(&mut self, key: &StyleKey, why: &str) {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_mut().expect("restyle sets it");
-        if let Some(Ok(found)) = kept.shared.compiled.get_mut(&address) {
-            found.verified = true;
-        }
+        kept.shared.compiled.insert(address, Err(why.to_owned()));
     }
 }

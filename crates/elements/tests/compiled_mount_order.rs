@@ -63,3 +63,45 @@ fn a_compiled_page_takes_every_keyed_style_from_its_winners() {
         "{counts:?}"
     );
 }
+
+/// The colour of each `span.tie`, after mounting `tie_red` then `tie_blue`,
+/// or the reverse: each component's own rule and the other's, of equal
+/// specificity, tie on both spans, and the later sheet wins.
+fn tie(red_first: bool) -> (Vec<String>, UpdateCounts) {
+    use vapors_compiler_examples::tie_blue::{TieBlue, TieBlueProps};
+    use vapors_compiler_examples::tie_red::{TieRed, TieRedProps};
+    let doc = Rc::new(RefCell::new(document()));
+    let body = doc.borrow().body();
+    let red = || TieRed::mount(&doc, body, TieRedProps::default());
+    let blue = || TieBlue::mount(&doc, body, TieBlueProps::default());
+    let (_red, _blue) = if red_first {
+        (red(), blue())
+    } else {
+        let b = blue();
+        (red(), b)
+    };
+    doc.borrow_mut()
+        .update(viewport(200.0, 100.0))
+        .expect("updates");
+    let doc = doc.borrow();
+    let colour = |node| {
+        let style = doc.computed_style(node).expect("styled");
+        style.get_by_name("color").expect("a longhand").to_css()
+    };
+    (
+        doc.children(body).into_iter().map(colour).collect(),
+        doc.update_counts(),
+    )
+}
+
+#[test]
+fn a_tie_between_two_components_sheets_goes_to_the_one_mounted_later_in_either_order() {
+    // When
+    let (red_then_blue, counts) = tie(true);
+    let (blue_then_red, _) = tie(false);
+
+    // Then: both spans, each from compiled winners
+    assert_eq!(red_then_blue, vec!["rgb(0 0 255)"; 2]);
+    assert_eq!(blue_then_red, vec!["rgb(255 0 0)"; 2]);
+    assert_eq!(counts.winners_compiled, 2, "{counts:?}");
+}

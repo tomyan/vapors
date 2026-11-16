@@ -116,7 +116,7 @@ impl Document {
 
     /// The share key of `node`: its template key, its parent's kept
     /// style, its states, its toggles and its selected attributes.
-    fn share_key(&self, node: NodeId, key: &'static StyleKey) -> ShareKey {
+    pub(crate) fn share_key(&self, node: NodeId, key: &'static StyleKey) -> ShareKey {
         let data = self
             .arena
             .get(node, "restyle")

@@ -27,18 +27,6 @@ pub struct CompiledRules {
 }
 
 impl Cascade {
-    /// The index among this cascade's rules of rule `rule` of the sheet
-    /// added `sheet`-th; `None` when there is no such rule.
-    #[must_use]
-    pub fn rule_index(&self, sheet: usize, rule: usize) -> Option<usize> {
-        let of_sheet = self
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, r)| r.sheet == sheet);
-        of_sheet.map(|(index, _)| index).nth(rule)
-    }
-
     /// Whether a sheet not in `referenced` has a rule that is a
     /// candidate for elements of `tag` with `classes`.
     #[must_use]
