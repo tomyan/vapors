@@ -25,9 +25,10 @@ const MESH_BYTES: u64 = 80;
 const GEOMETRY_BYTES: u64 = 24 * 16 + 36 * 4 + 4 * 16 + 6 * 4;
 
 /// Frame 0's surface work: the geometry, four mesh uniforms, the
-/// camera's 64 bytes, and 112 more outside the scene renderer (measured
-/// 2026-11-14; not derived): 1112 in all.
-const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 64 + 112;
+/// camera's 80 bytes (its view-projection and the backing's size,
+/// `vapors_renderer::projective`), and 112 more outside the scene
+/// renderer (measured 2026-11-14; not derived): 1128 in all.
+const FIRST_FRAME_BYTES: u64 = GEOMETRY_BYTES + 4 * MESH_BYTES + 80 + 112;
 
 /// The target's size: at 320x200 the HUD covers the middle of the
 /// scene, where the script rests the pointer, and the script refuses.

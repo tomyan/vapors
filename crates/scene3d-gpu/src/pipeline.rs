@@ -1,5 +1,6 @@
-//! The scene's pipeline and its two bind group layouts: the camera's
-//! view-projection (group 0) and a mesh's slot (group 1, a dynamic
+//! The scene's pipeline on the scene pass's two bind group layouts,
+//! `vapors_renderer::projective`'s, which the shapes drawn in the pass
+//! share: the camera (group 0) and a node's slot (group 1, a dynamic
 //! offset into one buffer).
 
 use vapors_app::SURFACE_FORMAT;
@@ -8,57 +9,36 @@ use vapors_scene3d::VERTEX_BYTES;
 /// The depth buffer's format.
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
-/// Bytes in the camera uniform: one 4x4 `f32` matrix.
-pub(crate) const CAMERA_BYTES: u64 = 64;
-
-/// Bytes in a mesh uniform: its world matrix and its colour.
-pub(crate) const MESH_BYTES: u64 = 80;
+pub(crate) use vapors_renderer::projective::{CAMERA_BYTES, NODE_BYTES as MESH_BYTES};
+use vapors_renderer::projective::{PROJECTIVE_WGSL, ProjectiveLayouts};
 
 /// What `mount` builds once.
 pub(crate) struct Pipeline {
     pub(crate) render: wgpu::RenderPipeline,
-    pub(crate) camera_layout: wgpu::BindGroupLayout,
-    pub(crate) mesh_layout: wgpu::BindGroupLayout,
+    pub(crate) layouts: ProjectiveLayouts,
 }
 
 impl Pipeline {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
-        let camera_layout = uniform_layout(device, "scene3d camera", false, CAMERA_BYTES);
-        let mesh_layout = uniform_layout(device, "scene3d mesh", true, MESH_BYTES);
+        let layouts = ProjectiveLayouts::new(device);
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene3d"),
-            bind_group_layouts: &[Some(&camera_layout), Some(&mesh_layout)],
+            bind_group_layouts: &[Some(&layouts.camera), Some(&layouts.node)],
             immediate_size: 0,
         });
-        let shader =
-            vapors_renderer::pipelines::shader_module(device, wgpu::include_wgsl!("shader.wgsl"));
+        let source = [PROJECTIVE_WGSL, include_str!("shader.wgsl")].concat();
+        let shader = vapors_renderer::pipelines::shader_module(
+            device,
+            wgpu::ShaderModuleDescriptor {
+                label: Some("scene3d"),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            },
+        );
         Self {
             render: render_pipeline(device, &layout, &shader),
-            camera_layout,
-            mesh_layout,
+            layouts,
         }
     }
-}
-
-fn uniform_layout(
-    device: &wgpu::Device,
-    label: &str,
-    has_dynamic_offset: bool,
-    bytes: u64,
-) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some(label),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset,
-                min_binding_size: wgpu::BufferSize::new(bytes),
-            },
-            count: None,
-        }],
-    })
 }
 
 fn render_pipeline(

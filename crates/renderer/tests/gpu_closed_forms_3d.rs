@@ -9,8 +9,8 @@ mod page;
 mod scene;
 
 use glam::{Mat4, Vec3};
-use page::{SIDE, circle, coverage, coverage_on, rect, scaled, white};
-use scene::{coverage_3d, downsampled, pixel_camera, pixels_3d};
+use page::{SIDE, circle, coverage, rect, scaled, white};
+use scene::{coverage_3d, cpu_coverage_8x, pixel_camera, pixels_3d, rounded_rect_distance};
 use vapors_renderer::ClosedFormShape;
 use vapors_shapes::Geometry;
 
@@ -87,18 +87,6 @@ fn turned_plane(degrees: f32) -> (Mat4, Mat4) {
     (view_projection, world)
 }
 
-/// The worst pixel difference of `fine` (8x) box-filtered against
-/// `drawn`, and each one's covered area.
-fn against_8x(drawn: &[f32], fine: &[f32]) -> (f32, f32, f32) {
-    let reference = downsampled(fine, SIDE, 8);
-    let worst = drawn
-        .iter()
-        .zip(&reference)
-        .map(|(d, r)| (d - r).abs())
-        .fold(0.0, f32::max);
-    (worst, drawn.iter().sum(), reference.iter().sum())
-}
-
 /// A circle and a stroked rect with round corners in shape units under
 /// `transform`, which a test scales.
 fn circle_and_frame(transform: impl Fn(f32) -> [f32; 6], scale: f32) -> Vec<ClosedFormShape> {
@@ -112,48 +100,47 @@ fn circle_and_frame(transform: impl Fn(f32) -> [f32; 6], scale: f32) -> Vec<Clos
     ]
 }
 
+/// Whether shape point `p` is in `circle_and_frame`'s shapes: the
+/// circle, or the stroke 4 wide centred on the rounded rect's outline.
+fn in_circle_and_frame(p: [f32; 2]) -> bool {
+    let in_circle = (p[0] + 6.0).hypot(p[1] - 4.0) <= 12.0;
+    let on_frame = rounded_rect_distance(p, [4.0, -14.0], [14.0, 10.0], 3.0).abs() <= 2.0;
+    in_circle || on_frame
+}
+
 #[test]
-fn gpu_a_plane_at_60_degrees_is_as_close_to_an_8x_drawing_as_the_page_is() {
+fn gpu_a_plane_at_60_degrees_keeps_its_edges_where_a_cpu_drawing_puts_them() {
     // Given the shapes on a plane turned 60 degrees, plane units of 1/20
-    // a shape unit (about 12.9 device pixels a plane unit there), and on
-    // the page squashed the same way, the y scale halved by the turn
-    let (view_projection, world) = turned_plane(60.0);
-    let plane = |_| scaled(0.05);
-    let page = |scale: f32| {
-        [
-            0.65 * scale,
-            0.0,
-            0.0,
-            0.32 * scale,
-            16.0 * scale,
-            16.0 * scale,
-        ]
-    };
+    // a shape unit (about 12.9 device pixels a plane unit there)
+    let camera = turned_plane(60.0);
+    let shapes = circle_and_frame(|_| scaled(0.05), 1.0);
 
-    // When each is drawn, and again at 8x
-    let scene = circle_and_frame(plane, 1.0);
-    let scene_8x = coverage_3d(SIDE * 8, &scene, view_projection, world);
-    let (scene_worst, ours, theirs) = against_8x(
-        &coverage_3d(SIDE, &scene, view_projection, world),
-        &scene_8x,
-    );
-    let page_8x = coverage_on(SIDE * 8, &circle_and_frame(page, 8.0));
-    let (page_worst, ..) = against_8x(&coverage_on(SIDE, &circle_and_frame(page, 1.0)), &page_8x);
+    // When drawn, and on the CPU at 8 x 8 samples a pixel
+    let drawn = coverage_3d(SIDE, &shapes, camera.0, camera.1);
+    let oracle = cpu_coverage_8x(SIDE, &in_circle_and_frame, scaled(0.05), camera);
 
-    // Then the projection adds no more than 0.03 to the page's own
-    // difference from a box filter (its ramp, and corners tighter than a
-    // pixel), and covers the same area
+    // Then within what was measured on 2026-11-16 (D1's review round):
+    // worst pixel 0.153, area 143.59 against 142.83 (0.53%), each bound
+    // that plus one sample of the oracle's 64 (0.016 of a pixel).
+    // Screen-linear interpolation of the shape position
+    // (`@interpolate(linear)`) gives a worst of 1 and 2% more area
+    let worst = drawn
+        .iter()
+        .zip(&oracle)
+        .map(|(d, o)| (d - o).abs())
+        .fold(0.0, f32::max);
+    let (ours, theirs) = (drawn.iter().sum::<f32>(), oracle.iter().sum::<f32>());
     assert!(
         theirs > 40.0,
         "the shapes are in view: {theirs} pixels covered"
     );
     assert!(
-        scene_worst <= page_worst + 0.03,
-        "a pixel differs from the 8x drawing by {scene_worst}; the page's worst is {page_worst}"
+        worst <= 0.17,
+        "a pixel differs from the CPU drawing by {worst}"
     );
     assert!(
-        (ours - theirs).abs() <= theirs * 0.01,
-        "covered area {ours}, the 8x drawing's {theirs}"
+        (ours - theirs).abs() <= theirs * 0.0075,
+        "covered area {ours}, the CPU drawing's {theirs}"
     );
 }
 

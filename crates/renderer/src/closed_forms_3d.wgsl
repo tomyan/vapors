@@ -1,59 +1,34 @@
 // The scene's vertex stage for closed-form shapes (the rest is
-// closed_forms_shared.wgsl; docs/plans/decal.md section 2): the
-// instance's affine transform takes shape units to a node's plane, z = 0,
-// and the node's world matrix and the camera's view-projection take the
-// plane to clip space. The fragment stage is the page's: it reads the
-// distance's rate across the screen from the derivatives of the
-// shape-unit position, which under a projection is interpolated
-// perspective-correct, so they are the local Jacobian.
-
-// The camera's view-projection and the target's size in device pixels.
-struct Camera {
-    view_projection: mat4x4<f32>,
-    size: vec2<f32>,
-}
-
-// A node's slot: its world matrix; the colour is a mesh's, unread here.
-struct Node {
-    world: mat4x4<f32>,
-    colour: vec4<f32>,
-}
-
-@group(0) @binding(0) var<uniform> camera: Camera;
-@group(1) @binding(0) var<uniform> node: Node;
-
-// A clip w at or under this is at or behind the camera: the corner gets
-// no padding, and the rasteriser clips the triangle where it crosses.
-const NEAR_W: f32 = 1e-6;
-
-// The plane point of shape-unit `local` under the instance's affine.
-fn on_plane(instance: Instance, local: vec2<f32>) -> vec2<f32> {
-    let m = instance.linear;
-    return vec2(m.x * local.x + m.z * local.y, m.y * local.x + m.w * local.y) + instance.shift.xy;
-}
+// closed_forms_shared.wgsl and projective.wgsl; docs/plans/decal.md
+// section 2): the instance's affine transform takes shape units to a
+// node's plane, z = 0, and the node's world matrix and the camera's
+// view-projection take the plane to clip space. The fragment stage is
+// the page's: it reads the distance's rate across the screen from the
+// derivatives of the shape-unit position, which under a projection is
+// interpolated perspective-correct. Taken across a 2x2 quad, those
+// derivatives are the local Jacobian with an error of second order in
+// the quad's size: exact under an affine map, and here within the
+// bounds tests/gpu_closed_forms_3d.rs measured against a CPU drawing.
 
 // The padding in shape units along x and y that moves each edge of the
 // box MARGIN device pixels out at `local`, as the page's `padding` does
-// with the screen Jacobian there in place of the affine's: the columns
-// are the screen motion per shape unit along x and along y. Lines stay
-// lines on a plane, so an edge padded at both its corners stays at
-// least the smaller margin from the shape.
-fn projective_padding(instance: Instance, to_clip: mat4x4<f32>, local: vec2<f32>) -> vec2<f32> {
-    let clip = to_clip * vec4(on_plane(instance, local), 0.0, 1.0);
-    if (clip.w <= NEAR_W) {
+// with the screen Jacobian there in place of the affine's. Lines stay
+// lines on a plane, so an edge padded at both its corners stays about
+// the smaller margin from the shape: to first order, since each pad is
+// set from the Jacobian at the unpadded corner (a plane within a tenth
+// of a degree of edge-on can leave 0.3 px, D1 review L2; there the shape
+// is a sub-pixel sliver).
+fn projective_padding(instance: Instance, local: vec2<f32>) -> vec2<f32> {
+    let j = screen_jacobian(instance.linear, instance.shift.xy, local);
+    // Edge-on, the columns are parallel and the pad unbounded. The ratio
+    // is the sine of the angle between them, independent of the view
+    // box's scale: under 1e-6 the plane is within 6e-5 degrees of
+    // edge-on, a sliver under a millionth of the shape's width on screen.
+    let det = abs(j.x * j.w - j.y * j.z);
+    if (det <= 1e-6 * length(j.xy) * length(j.zw)) {
         return vec2(0.0);
     }
-    let to_screen = camera.size * vec2(0.5, -0.5) / (clip.w * clip.w);
-    let per_x = to_screen * (to_clip[0].xy * clip.w - clip.xy * to_clip[0].w);
-    let per_y = to_screen * (to_clip[1].xy * clip.w - clip.xy * to_clip[1].w);
-    let m = instance.linear;
-    let along_x = per_x * m.x + per_y * m.y;
-    let along_y = per_x * m.z + per_y * m.w;
-    let det = abs(along_x.x * along_y.y - along_x.y * along_y.x);
-    if (det <= 1e-12) {
-        return vec2(0.0);
-    }
-    return MARGIN * vec2(length(along_y), length(along_x)) / det;
+    return MARGIN * vec2(length(j.zw), length(j.xy)) / det;
 }
 
 @vertex
@@ -61,9 +36,8 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     let box = local_box(instance);
     let at = quad_corner(vertex);
     let corner = mix(box.xy, box.zw, at);
-    let to_clip = camera.view_projection * node.world;
-    let pad = projective_padding(instance, to_clip, corner);
+    let pad = projective_padding(instance, corner);
     let local = corner + (at * 2.0 - 1.0) * pad;
-    let position = to_clip * vec4(on_plane(instance, local), 0.0, 1.0);
+    let position = to_clip() * vec4(on_plane(instance.linear, instance.shift.xy, local), 0.0, 1.0);
     return vertex_out(instance, local, position);
 }

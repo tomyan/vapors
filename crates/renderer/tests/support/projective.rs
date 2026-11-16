@@ -5,7 +5,7 @@
 // each test crate including this uses a part of it
 #![allow(dead_code)]
 
-use glam::{Mat4, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::projective::ProjectiveLayouts;
 use vapors_renderer::{
@@ -37,8 +37,7 @@ pub fn coverage_3d(
     world: Mat4,
 ) -> Vec<f32> {
     let black = Color::from_rgba8(0, 0, 0, 255);
-    let pixels = pixels_3d(side, shapes, (view_projection, world), black);
-    pixels.chunks(4).map(|p| f32::from(p[0]) / 255.0).collect()
+    reds(&pixels_3d(side, shapes, (view_projection, world), black))
 }
 
 /// The RGBA bytes of `shapes` drawn as [`coverage_3d`] draws them, over
@@ -46,8 +45,31 @@ pub fn coverage_3d(
 pub fn pixels_3d(
     side: u32,
     shapes: &[ClosedFormShape],
+    camera: (Mat4, Mat4),
+    background: Color,
+) -> Vec<u8> {
+    let bytes = ProjectiveClosedForms::bytes(shapes);
+    scene_pixels(
+        side,
+        camera,
+        background,
+        |gpu, layouts, formats, pass, bound| {
+            let pipeline = ProjectiveClosedForms::new(&gpu.device, layouts, formats);
+            let instances = buffer(gpu, wgpu::BufferUsages::VERTEX, &bytes);
+            pipeline.record(pass, bound, instances.slice(..), &WorkCounter::default());
+        },
+    )
+}
+
+/// The RGBA bytes of a `side` square target cleared to `background`,
+/// after `draw` records into a scene pass on it under `view_projection`
+/// and a node at `world`.
+pub fn scene_pixels<'a>(
+    side: u32,
     (view_projection, world): (Mat4, Mat4),
     background: Color,
+    draw: impl FnOnce(&Gpu, &ProjectiveLayouts, ScenePassFormats, &mut wgpu::RenderPass<'_>, Bound<'_>)
+    + 'a,
 ) -> Vec<u8> {
     let gpu = gpu();
     let target = clear(&gpu.device, &gpu.queue, side, side, background);
@@ -57,13 +79,7 @@ pub fn pixels_3d(
         depth: DEPTH,
         bias: wgpu::DepthBiasState::default(),
     };
-    let pipeline = ProjectiveClosedForms::new(&gpu.device, &layouts, formats);
     let groups = bind_groups(&gpu, &layouts, side, view_projection, world);
-    let instances = buffer(
-        &gpu,
-        wgpu::BufferUsages::VERTEX,
-        &ProjectiveClosedForms::bytes(shapes),
-    );
     let colour = target.create_view(&wgpu::TextureViewDescriptor::default());
     let depth = depth_view(&gpu, side);
     let mut encoder = gpu
@@ -76,15 +92,27 @@ pub fn pixels_3d(
             node: &groups.1,
             offset: 0,
         };
-        pipeline.record(
-            &mut pass,
-            bound,
-            instances.slice(..),
-            &WorkCounter::default(),
-        );
+        draw(&gpu, &layouts, formats, &mut pass, bound);
     }
     gpu.queue.submit([encoder.finish()]);
     read_rgba8(&gpu.device, &gpu.queue, &target)
+}
+
+/// The red channel of RGBA `pixels`, 0 to 1: coverage, white over black.
+pub fn reds(pixels: &[u8]) -> Vec<f32> {
+    pixels.chunks(4).map(|p| f32::from(p[0]) / 255.0).collect()
+}
+
+/// Where plane point `q` lands on a `side` square target, device pixels
+/// (+Y down), under `view_projection` and `world`.
+pub fn on_screen(side: u32, (view_projection, world): (Mat4, Mat4), q: [f32; 2]) -> [f32; 2] {
+    let clip = view_projection * world * glam::Vec4::new(q[0], q[1], 0.0, 1.0);
+    #[allow(clippy::cast_precision_loss)] // test sizes are small
+    let side = side as f32;
+    [
+        (clip.x / clip.w * 0.5 + 0.5) * side,
+        (0.5 - clip.y / clip.w * 0.5) * side,
+    ]
 }
 
 /// `fine` (a square image `factor` times `side` wide) averaged down to
@@ -133,7 +161,7 @@ fn bind_groups(
     (group(&layouts.camera, &camera), group(&layouts.node, &node))
 }
 
-fn buffer(gpu: &Gpu, usage: wgpu::BufferUsages, bytes: &[u8]) -> wgpu::Buffer {
+pub fn buffer(gpu: &Gpu, usage: wgpu::BufferUsages, bytes: &[u8]) -> wgpu::Buffer {
     let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
         size: bytes.len() as u64,
@@ -190,4 +218,68 @@ fn begin<'e>(
         occlusion_query_set: None,
         multiview_mask: None,
     })
+}
+
+/// Each pixel's coverage of the shape `inside` says (shape units), on a
+/// `side` square target, drawn on the CPU: each of 8 x 8 sample points a
+/// pixel is cast as a ray onto the node's plane (z = 0 in the node's
+/// space) through the inverse of `camera`, taken back through the
+/// inverse of `affine` (shape units to plane units) and tested. An
+/// oracle that shares no code with the GPU stages.
+pub fn cpu_coverage_8x(
+    side: u32,
+    inside: &dyn Fn([f32; 2]) -> bool,
+    affine: [f32; 6],
+    (view_projection, world): (Mat4, Mat4),
+) -> Vec<f32> {
+    let to_plane = (view_projection * world).inverse();
+    let shape_at = |hit: Vec3| inside(unaffine(affine, [hit.x, hit.y]));
+    let sample = |[x, y]: [f32; 2]| {
+        let ndc = [x / to_f32(side) * 2.0 - 1.0, 1.0 - y / to_f32(side) * 2.0];
+        let near = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 0.0));
+        let far = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 1.0));
+        let along = near.z / (near.z - far.z);
+        (0.0..=1.0).contains(&along) && shape_at(near + (far - near) * along)
+    };
+    (0..side * side)
+        .map(|at| {
+            let [left, top] = [to_f32(at % side), to_f32(at / side)];
+            let offset = |k: u32| (to_f32(k) + 0.5) / 8.0;
+            let hits = (0..64)
+                .filter(|k| sample([left + offset(k % 8), top + offset(k / 8)]))
+                .count();
+            to_f32(u32::try_from(hits).expect("at most 64")) / 64.0
+        })
+        .collect()
+}
+
+/// A test-sized count as `f32`: exact below 2^24.
+pub fn to_f32(count: u32) -> f32 {
+    f32::from(u16::try_from(count).expect("a test size under 65,536"))
+}
+
+/// The centre of pixel `at` (row by row) of a `side` square target.
+pub fn pixel_centre(at: usize, side: u32) -> [f32; 2] {
+    let at = u32::try_from(at).expect("a test image");
+    [to_f32(at % side) + 0.5, to_f32(at / side) + 0.5]
+}
+
+/// Plane point `plane` taken back through `affine` (matrix(a, b, c, d,
+/// e, f), shape units to plane units) to shape units.
+fn unaffine(affine: [f32; 6], plane: [f32; 2]) -> [f32; 2] {
+    let [xx, xy, yx, yy, dx, dy] = affine;
+    let det = xx * yy - xy * yx;
+    let (u, v) = (plane[0] - dx, plane[1] - dy);
+    [(yy * u - yx * v) / det, (xx * v - xy * u) / det]
+}
+
+/// The signed distance from `p` to a rect at `origin` of `size` with
+/// circular corners of `radius`, negative inside.
+pub fn rounded_rect_distance(p: [f32; 2], origin: [f32; 2], size: [f32; 2], radius: f32) -> f32 {
+    let half = [size[0] / 2.0, size[1] / 2.0];
+    let q = [
+        (p[0] - origin[0] - half[0]).abs() - half[0] + radius,
+        (p[1] - origin[1] - half[1]).abs() - half[1] + radius,
+    ];
+    q[0].max(0.0).hypot(q[1].max(0.0)) + q[0].max(q[1]).min(0.0) - radius
 }

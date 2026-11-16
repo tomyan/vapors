@@ -1,21 +1,24 @@
 // Closed-form shapes, the part shared by the page's vertex stage
-// (closed_forms_2d.wgsl) and the scene's (closed_forms_3d.wgsl): a rect with round corners or an ellipse, in
-// its own units, under an affine transform to device pixels; filled, or
-// stroked centred on the outline. Coverage is 0.5 minus the signed
-// distance to the outline in device pixels, clamped: 0.5 on the
-// outline, the ramp half a pixel either side of it, as Chromium draws
-// an edge. Each quad is the shape's box grown by one device pixel each
-// way, so the outer half of the ramp has fragments. Output is
-// non-premultiplied sRGB, blended by the pipeline.
+// (closed_forms_2d.wgsl) and the scene's (closed_forms_3d.wgsl): a rect
+// with round corners or an ellipse, in its own units, under a transform
+// to device pixels (an affine on the page; a plane's projection in the
+// scene); filled, or stroked centred on the outline. Coverage is 0.5
+// minus the signed distance to the outline in device pixels, clamped:
+// 0.5 on the outline, the ramp half a pixel either side of it, as
+// Chromium draws an edge. Each quad is the shape's box grown by one
+// device pixel each way, so the outer half of the ramp has fragments.
+// Output is non-premultiplied sRGB, blended by the pipeline.
 //
 // The distance is taken in the shape's units and divided by its rate
 // of change across the screen: its gradient there, worked out in the
 // shape's units (a unit vector), carried to the screen by the
-// derivatives of the shape-unit position, which is affine in screen
-// space and so has exact derivatives. The distance's own derivatives
-// would not do: it has a kink where its nearest edge changes (a rect's
-// diagonals and centre line, a circle's centre), and a 2x2 quad across
-// the kink would read it as flat.
+// derivatives of the shape-unit position. On the page that position is
+// affine in screen space, so its derivatives are exact; under the
+// scene's projection they are the local Jacobian to second order
+// (closed_forms_3d.wgsl). The distance's own derivatives would not do:
+// it has a kink where its nearest edge changes (a rect's diagonals and
+// centre line, a circle's centre), and a 2x2 quad across the kink would
+// read it as flat.
 
 struct Instance {
     @location(0) linear: vec4<f32>,  // a, b, c, d of matrix(a, b, c, d, e, f)
