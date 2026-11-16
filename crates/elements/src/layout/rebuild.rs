@@ -112,10 +112,11 @@ fn rebuild_owners(
 /// owner is lent before any is settled: an owner can sit in a shallow
 /// owner's kept child.
 ///
-/// An owner whose children were edited in place has another children
-/// list than its box before, so it is changed: only the subtrees of the
-/// children it inserted (`roots`) are lent, O(edits), not its kept
-/// children, which keep their own caches (4h).
+/// An owner whose children were edited in place, inserting or removing
+/// a box, has another children list than its box before (asserted in
+/// debug builds), so it is changed: only the subtrees of the children it
+/// inserted (`roots`) are lent, O(edits), not its kept children, which
+/// keep their own caches (4h).
 fn lend_owners(
     placed: &mut Placed,
     (owners, slots, roots): (&[NodeId], &[usize], &[InsertedRoots]),
@@ -150,11 +151,28 @@ fn lend_owner(
     let Some(roots) = roots else {
         return lend_subtree(placed, slot, taken, may_keep);
     };
+    #[cfg(debug_assertions)]
+    assert_children_differ(placed, slot, taken);
     let visits = roots
         .iter()
         .map(|&root| lend_subtree(placed, root, taken, may_keep).1)
         .sum();
     (false, visits)
+}
+
+/// Panics, naming the slot, when the owner at `slot`, edited in place
+/// and so reported changed without its children compared, has the same
+/// children as the box taken from its slot: its edits inserted and
+/// removed no box, and the owner should have been lent as before.
+#[cfg(debug_assertions)]
+fn assert_children_differ(placed: &Placed, slot: usize, taken: &Taken) {
+    let before = taken.boxes.get(&slot).map(|(_, old)| &old.children);
+    assert!(
+        before != Some(&placed.boxes[slot].children),
+        "the owner in slot {slot}, edited in place, has the children its box had: it is \
+         reported changed for edits that inserted and removed no box (layout/rebuild.rs \
+         `put_owner`); reproduce with `cargo xtask test`"
+    );
 }
 
 /// Builds each owner's boxes into `placed`: the slots the built boxes
@@ -207,7 +225,10 @@ fn put_owner(
         }
         Build::Edited(edits) => {
             let (built, roots) = placed.put_edited(source, (owner.node, edits), taken);
-            (built, Some(roots))
+            // edits that insert and remove no box (a `display: none` child,
+            // empty text) leave the children as they were: lent as before
+            let boxed = !edits.inserted.is_empty() || !edits.removed.is_empty();
+            (built, boxed.then_some(roots))
         }
         Build::Full => {
             let built = placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken);

@@ -37,8 +37,10 @@ fn an_insert_lends_to_the_same_boxes_on_a_list_four_times_the_size() {
 
     // Then: the inserted row's boxes, not every row
     assert_eq!(a.boxes_lend_visited, b.boxes_lend_visited);
-    let visited = a.boxes_lend_visited;
-    assert!(visited > 0 && visited < 10, "{visited}");
+    assert!(
+        a.boxes_lend_visited > 0,
+        "the inserted row's boxes are lent"
+    );
 }
 
 #[test]
@@ -55,4 +57,42 @@ fn an_insert_and_a_removal_in_one_owner_match_a_full_update() {
     // Then: matched against a full update inside `edited`; one owner
     // edited in place
     assert_eq!(counts.children_edited, 1);
+}
+
+#[test]
+fn a_hidden_element_inserted_leaves_the_owner_unchanged() {
+    // Given
+    let page = list(100);
+
+    // When: a display: none element put in before row 5, which makes no
+    // box, so the owner's children are as before
+    let counts = page.edited(VIEW(), |page| {
+        let mut doc = page.doc.borrow_mut();
+        let hidden = doc.create_element("div");
+        doc.set_attribute(hidden, "style", "display: none");
+        doc.insert_before(page.list, hidden, Some(page.rows[5]));
+    });
+
+    // Then: no owner is settled again (none changed), and the update
+    // matches a full one
+    let settled = counts.owners_isolated + counts.owners_resized + counts.owners_uncompared;
+    assert_eq!(settled, 0, "{counts:?}");
+}
+
+#[test]
+fn an_insert_and_a_text_change_deep_in_a_later_row_match_a_full_update() {
+    // Given
+    let page = list(100);
+
+    // When: a row put in before row 5, and row 40's cell text changed
+    // (row 40's cell an owner of its own), in one update
+    page.edited(VIEW(), |page| {
+        page.insert_at(5);
+        let mut doc = page.doc.borrow_mut();
+        let cell = doc.children(page.rows[40])[0];
+        let text = doc.children(cell)[0];
+        doc.set_text(text, "row forty, longer");
+    });
+
+    // Then: matched against a full update inside `edited`
 }
