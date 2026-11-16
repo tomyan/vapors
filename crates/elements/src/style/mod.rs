@@ -19,6 +19,7 @@ pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
+mod rust_sheets;
 mod scene_appearance;
 mod scene_used;
 mod scrollbar;
@@ -76,6 +77,8 @@ pub(crate) struct Sheets {
     scopes: std::collections::HashMap<String, String>,
     /// Each global component sheet added, by name, with its text.
     globals: std::collections::HashMap<String, String>,
+    /// Rust-added sheets against analysed elements (`rust_sheets`).
+    rust: rust_sheets::RustSheets,
     refused: Vec<ElementError>,
 }
 
@@ -89,6 +92,7 @@ impl Sheets {
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
             globals: std::collections::HashMap::new(),
+            rust: rust_sheets::RustSheets::default(),
             refused: Vec::new(),
         }
     }

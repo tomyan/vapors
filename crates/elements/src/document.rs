@@ -144,16 +144,19 @@ impl Document {
     }
 
     /// Adds a global author stylesheet, after those already added.
-    /// `name` is how errors refer to it.
+    /// `name` is how errors refer to it. Refused once an analysed
+    /// element (one made from a key with compiled winners) exists, and
+    /// such an element is refused in a document holding one
+    /// (build-time-styles.md, decision 2).
     ///
     /// # Errors
     ///
-    /// The CSS crate's refusal, with line and column; the sheet is not
-    /// added.
+    /// An analysed element exists, naming it and the fix; or the CSS
+    /// crate's refusal, with line and column. The sheet is not added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
         self.note_change();
         self.dirty.everything();
-        self.sheets.add_author(name, text)
+        self.sheets.add_rust(name, text)
     }
 
     /// Whether `node` is in the document (created and not removed).

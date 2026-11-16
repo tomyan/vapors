@@ -15,8 +15,13 @@ impl Dom for Document {
     }
 
     fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
-        self.arena
-            .insert(Node::new(Kind::Element(Element::keyed(key))))
+        let node = self
+            .arena
+            .insert(Node::new(Kind::Element(Element::keyed(key))));
+        if let Some(refusal) = self.sheets.keyed_refusal(key) {
+            self.refuse(node, format!("create_keyed_element: {refusal}"));
+        }
+        node
     }
 
     fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
