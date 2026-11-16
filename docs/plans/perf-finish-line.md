@@ -5,7 +5,10 @@ vapors work until every property below holds, measured. The comparative
 benchmark, the website and outside funding applications wait for it.
 
 Each property is measured by `crates/perf` (`vapors-perf`) in a release
-build on the dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
+build, its `--scaling` growth checks in the judged profile (release with
+one codegen unit, since 2026-11-16; the per-row ceilings were set again
+then, `docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"), on the
+dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
 three runs, medians, and recorded in `docs/perf/`. A property holds when
 the harness shows it, not when the code is believed to do it.
 
@@ -20,7 +23,7 @@ Tom, 2026-11-13: properties 1 to 8 end this iteration; property 9 is the next it
 | 3 | Inserting or removing a row | about the cost of an edit | redoes paint order, chains and clips over the whole tree | splice step (below) |
 | 4 | Scrolling a long list | no repaint; kept paint shifted | every moved box painted again | IU3 3c-3e |
 | 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
-| 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
+| 6 | Idle | no update work and no frames drawn | measured 2026-11-13 (`--scaling Idle`, idle row): the rows page left alone 10 s asks for 0 frames and does 0 updates at 1,000, 3,000 and 10,000 rows, settled after 2 frames. Headless, so a wake from a timer, a GPU scope or a readback is not seen (retired by a waker model in the harness); the update with no change 2.57 ms before the idle fix | IU3 3b, the idle fix |
 | 7 | First frame of a large page | the winning declarations for each template element worked out at build time (computed values still depend on viewport, scale and font size), and constant shapes once the shape table (item 8) lands; time measured and published | not measured | the build-time analysis; shapes by the shape table (Tom, 2026-11-12) |
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | measured (`vapors-perf-memory`, docs/perf/memory-per-element-2026-11-14.md): 4 styles for 65,538 elements; 11.4 KB per element, flat, 1.66 times layout's, with #327 and #333 | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | a minimal test scene (a few 3D objects, an SVG decal on one, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
@@ -42,9 +45,9 @@ mount, pipeline creation and first uploads.
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
-cargo build --release -p vapors-perf
+cargo build --profile judged -p vapors-perf
 for change in Idle Text FlexText Class HoveredClass; do
-  ./target/release/vapors-perf 60 10 --scaling $change || echo "$change grows"
+  ./target/judged/vapors-perf 60 10 --scaling $change || echo "$change grows"
 done
 ```
 
@@ -55,6 +58,17 @@ It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
+`--scaling Idle` then measures property 6 itself (`crates/perf/src/idle.rs`):
+the rows page at each size is left alone for 10 s of the app's clock after
+it settles, driven as the platform would drive it (a frame per 16 ms after
+`Next::Continue`, one at a `WaitUntil` deadline, none after `Next::Wait`,
+and refused past the frames a 60 Hz display shows in the interval), and
+the run fails naming the size, the frames it asked for and the updates
+that did work, unless both are zero. Headless, nothing can wake the app, so
+a timer's, a GPU scope's or a readback's frame is not seen, as the pass
+line says; a waker model in the harness retires that. On 2026-11-13: 0 and
+0 at every size, settled after 2 frames (the mount's frame changes the
+document, the second draws it).
 At 1657b27 every one of the four failed
 (docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
 (2026-11-12) Text and Idle pass, and Class and HoveredClass failed only

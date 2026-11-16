@@ -52,7 +52,10 @@ code sets it.
   the two is required. A button holding a named image takes the
   image's `aria-label` into its name from content, as Chromium does.
 - `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
-- Children: `<path>` elements and whitespace only.
+- `fill`, `stroke` and `stroke-width`, which its paths inherit (see
+  `<path>`).
+- Children: `<path>`, `<rect>` and `<circle>` elements and whitespace
+  only.
 - CSS: sized by its attributes only, so `width`, `height`, `min-*` and
   `max-*` in CSS are refused (in Chromium the attributes are
   presentation hints that CSS overrides one axis at a time; vapors
@@ -78,20 +81,66 @@ code sets it.
   (`C`) and quadratic (`Q`) curves are stroked as arcs are (zeno
   flattens both); the smooth forms `S` and `T` are refused naming the
   fix until docs/plans/svg-support.md V1.
-- `fill="none"`: required (SVG's default fill is black).
-- `stroke="currentColor"`: required.
-- `stroke-width`: a positive number in viewBox units; 1 when absent, as
-  in SVG.
+- `fill`, `stroke` and `stroke-width`: presentation attributes. They
+  are the CSS properties of their names, ranked below every author rule
+  as in Chromium, so a rule can give them instead (one-scene S4a; on the
+  `<svg>` they are inherited by its paths). The stroke width is in
+  viewBox units, written as a number or in px; 1 when nothing gives
+  one, as in SVG. A bound one (`fill={..}`) is refused at build time.
+- Which route draws the paths (`svg_route.rs`): the icon route below,
+  while every path has no fill (SVG's default fill is black, so write
+  `fill="none"`), a stroke in its own colour (`stroke="currentColor"`)
+  that is its svg's, and a width above zero. Otherwise the whole svg
+  is drawn as shapes (one-scene S4a): each path's fill, then its
+  stroke, a shape item each from the document's run-time shape cache,
+  coverage on the GPU after the transform, the fill rule nonzero, the
+  viewBox fitted and centred in the laid-out content box (SVG's
+  default `xMidYMid meet`). After layout and before paint, a shape
+  reaching outside the viewBox is refused naming its path by index and
+  why the svg is on the shapes route, since an svg's content is not
+  clipped yet; a path with no fill and no
+  stroke (or one of no width) paints nothing and is refused. Moving
+  icons onto shapes is the brief's open question (one-scene 1.1).
 - Nothing else: no `class`, `style`, `transform`, caps or joins. Joins
   are miter with limit 4 and caps butt, SVG's defaults.
-- CSS: a `color` different from its svg's, `display: none`, and a
-  `visibility` different from its svg's are refused. Paint strokes
-  every path of an icon in the svg's colour and shows them with the
-  svg's visibility, so a path styled otherwise would not be drawn as
+- CSS: `display: none` and a `visibility` different from its svg's are
+  refused. A `color` of its own takes the svg to shapes, where each
+  path is drawn in its own colours. Both routes show every path with
+  the svg's visibility, so a path shown otherwise would not be drawn as
   styled.
 
-touche's Dictate icon also uses `<rect rx>`; it is written as a path
-when that button moves, rather than widening the subset.
+`<rect>` and `<circle>` (one-scene S4b):
+
+- `<rect>`: `x` and `y` (0 when absent), `width` and `height`
+  (required, 0 or more), `rx` and `ry` (0 or more; one given stands
+  for both, and each is clamped to half its side, as SVG 2 says).
+  `<circle>`: `cx` and `cy` (0 when absent), and `r` (required, 0 or
+  more). A width, height or r of exactly 0 draws nothing, as in SVG 2
+  and Chromium. That is not a refusal, so a bound size can reach 0
+  (an empty progress bar).
+- Each number is a bare number in viewBox units. A unit, a percentage
+  or a negative size or radius is refused. `fill`, `stroke` and
+  `stroke-width` work as on `<path>`. Anything else is refused:
+  `transform`, `class`, a `class:` directive, a binding, or a listener
+  (a shape has no box to hit). `bind:this` is taken.
+- What the template writes literally is refused at build time, naming
+  the file and line. A bound value, or one set by `set_attribute`, is
+  refused at update time. Both read through `vapors_shapes::refusal`
+  and `not_taken`.
+- Each is drawn on the shapes route only, so an svg holding one is
+  drawn as shapes.
+  - A rect is written as the path SVG 2 gives it. A circle is written
+    as two half arcs, where SVG has four quarter arcs; these fill and
+    stroke alike until dashes or markers are built.
+  - The shape classifier reads the path back as a closed form (a rect
+    with square, round or elliptical corners, or a circle), so it is
+    never tessellated. A pill and a full ellipse, whose sides are 0
+    long, are closed forms too.
+  - One cache slot is held for each distinct shape, at every scale.
+  - A `<path>` written as exactly a rect's outline is the same closed
+    form.
+- Messages name a shape by its tag and its index among the svg's
+  shapes, counting from 1: "rect 2" is the second shape, a rect.
 
 ## Layout
 
@@ -164,7 +213,8 @@ numbers. Its `path` children are not boxes.
   snapped content box in device pixels and draws with `ICON_BLEND`
   (gamma 1, contrast 0), which the text shader makes a plain blend.
 - Built in 2b: an svg's `Icon` is built with its box
-  (`elements::svg_paint`), stroke width 1 when absent. Paint pushes
+  (`elements::svg_paint`), each path's stroke width from its used
+  style. Paint pushes
   `Item::Icon` with an `IconId` that `Painted::icon` resolves, the
   colour the svg's used `color`, and none when the svg is not
   `visibility: visible`. Consecutive icons under one clip are one

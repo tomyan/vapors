@@ -38,12 +38,9 @@ pub(super) fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
         own.scene.push(*item);
     }
     let (outline, thumb) = (Scene::new(), Scene::new());
-    Some(KeptBox {
-        from,
-        own,
-        outline,
-        thumb,
-    })
+    let mut kept = KeptBox::new(from, own, outline);
+    kept.set_thumb(thumb);
+    Some(kept)
 }
 
 /// Each slot's own step, in slot order, and those that draw.

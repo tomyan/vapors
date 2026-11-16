@@ -122,7 +122,8 @@ pub(super) fn element_box(source: &Source<'_>, node: NodeId) -> (LayoutBox, Opti
         (natural, source.images.of(source.arena, node).cloned()),
         checked.is_some(),
     );
-    own.icon = crate::svg_paint::icon(source.arena, node);
+    own.icon = crate::svg_paint::icon(source.arena, source.used, node);
+    own.svg_shapes = crate::svg_shapes::of(source.arena, source.used, node);
     own.surface = crate::surfaces::name(source.arena, node).map(Into::into);
     own.range = range;
     own.checked = checked;

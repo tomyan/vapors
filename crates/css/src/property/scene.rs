@@ -146,6 +146,11 @@ const GROUPS: &[Group] = &[
     },
     Group {
         readers: NONE,
+        instead: "a mesh is drawn in its `color`; `fill`, `stroke` and `stroke-width` paint an svg's paths",
+        longhands: "fill stroke stroke-width",
+    },
+    Group {
+        readers: NONE,
         instead: "a scene anchor has no box, so it is no container; use `@media`",
         longhands: "container-name container-type",
     },

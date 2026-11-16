@@ -1,7 +1,7 @@
 //! What a scene render refuses, each naming the fix.
 
 use std::fmt;
-use vapors_scene3d::{GeometryId, NodeId, SceneError, StoreError};
+use vapors_scene3d::{CameraError, GeometryId, NodeId, SceneError, StoreError};
 
 /// A frame the scene renderer cannot draw.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +47,17 @@ pub enum FrameError {
 impl From<StoreError> for FrameError {
     fn from(error: StoreError) -> Self {
         Self::Store(error)
+    }
+}
+
+impl From<CameraError> for FrameError {
+    fn from(error: CameraError) -> Self {
+        match error {
+            CameraError::Store(error) => Self::Store(error),
+            CameraError::NotCamera(node) => Self::ActiveCameraNotCamera(node),
+            CameraError::Projection(error) => Self::Projection(error),
+            CameraError::NotFinite(node) => Self::CameraNotFinite(node),
+        }
     }
 }
 

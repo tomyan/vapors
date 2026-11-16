@@ -36,6 +36,15 @@ pub(crate) struct KeptHits {
 }
 
 impl KeptHits {
+    /// The longest frame's list of hits: name, length, capacity (the
+    /// growth test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        let longest = self.by_frame.values().max_by_key(|list| list.len());
+        let (len, capacity) = longest.map_or((0, 0), |list| (list.len(), list.capacity()));
+        vec![("hits.by_frame", len, capacity)]
+    }
+
     /// The hits of `scene`'s parts, in painting order.
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
         let mut hits = Self::default();
@@ -76,6 +85,7 @@ impl KeptHits {
     fn put(&mut self, label: Label, hits: impl Iterator<Item = FramedHit>) {
         for hit in hits {
             let list = self.by_frame.entry(hit.0).or_default();
+            crate::slot_list::reserve(list, list.len() + 1);
             let at = list.partition_point(|&(labelled, _)| labelled <= label);
             list.insert(at, (label, hit));
             self.frames.insert(label, hit.0);

@@ -20,8 +20,9 @@ use vapors_scene3d::{Transform, Vec3};
 const SIZE: u32 = 64;
 /// A mesh node's uniform: its world matrix and colour, 20 floats.
 const MESH_BYTES: u64 = 80;
-/// The camera's view-projection, 16 floats.
-const CAMERA_BYTES: u64 = 64;
+/// The camera's view-projection, 16 floats, and the backing's size, 2
+/// floats padded to 4 (`vapors_renderer::projective`).
+const CAMERA_BYTES: u64 = 80;
 /// The `--tint` token's colour, which both meshes take.
 const RED: [u8; 4] = [255, 0, 0, 255];
 /// The token's colour under `html.night`.

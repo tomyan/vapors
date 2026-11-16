@@ -8,6 +8,7 @@
 
 pub mod args;
 pub mod args_off_path;
+pub mod build_profile;
 pub mod circuit;
 pub mod driver;
 pub mod element_memory;
@@ -19,6 +20,8 @@ pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
 pub mod heap_phases;
+pub mod idle;
+pub mod idle_run;
 pub mod instruction_samples;
 pub mod instructions;
 pub mod instructions_check;

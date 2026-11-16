@@ -3,6 +3,7 @@
 //! top-left of the target, y down.
 
 use crate::Color;
+use crate::shape::Shape;
 
 /// An axis-aligned rectangle in device pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -150,6 +151,8 @@ pub enum Item {
         /// Where it is drawn: the element's content box.
         rect: Rect,
     },
+    /// A shape from the shape table (`shape.rs`).
+    Shape(Shape),
     /// A text run, its layout origin at `origin` (device pixels).
     Text {
         /// Which run.
@@ -174,8 +177,12 @@ pub struct Scene {
 impl Scene {
     /// An empty scene.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            clips: Vec::new(),
+            clip: None,
+        }
     }
 
     /// Appends `item`, over everything before it, under the current

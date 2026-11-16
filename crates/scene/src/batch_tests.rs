@@ -54,6 +54,8 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Images(images) => ('i', images.len()),
             Run::Surfaces(surfaces) => ('g', surfaces.len()),
             Run::Icons(icons) => ('v', icons.len()),
+            Run::Shapes(shapes) => ('h', shapes.len()),
+            Run::Meshes(meshes) => ('m', meshes.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);

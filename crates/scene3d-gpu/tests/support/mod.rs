@@ -57,7 +57,7 @@ impl Fixture {
         let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
         self.meshes
             .borrow_mut()
-            .geometry(positions, vec![0, 1, 2, 0, 2, 3])
+            .geometry(positions, vec![0, 1, 2, 0, 2, 3], vec![1.0; 4])
             .unwrap()
     }
 

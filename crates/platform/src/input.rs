@@ -35,11 +35,12 @@ pub struct Input {
 impl Input {
     /// No fingers down, no pointer position and no size yet.
     pub fn new() -> Self {
+        let started = Instant::now();
         Self {
             pointer: None,
             size: None,
-            gestures: Gestures::new(),
-            started: Instant::now(),
+            gestures: Gestures::starting(started),
+            started,
             scale: 1.0,
             modifiers: ModifiersState::empty(),
             clicks: crate::clicks::Clicks::default(),
@@ -140,6 +141,11 @@ impl Input {
             Event::PointerMoved { x, y } => self.pointer = Some([*x, *y]),
             Event::PointerLeft => self.pointer = None,
             Event::Touch { id, phase, x, y } => {
+                // RELAXED: the time this touch is handled, not the touch's
+                // own (winit 0.30 gives none, rust-windowing/winit#1194).
+                // The velocity tracker's 40 ms and 80 ms stop rules then
+                // measure handling gaps as well as a stopped finger
+                // (`velocity_tracker.rs`). Retired by #403.
                 let now = self.started.elapsed();
                 return self.gestures.touch(*id, *phase, *x, *y, now);
             }

@@ -9,7 +9,7 @@ use crate::{RendererLog, Resource};
 use std::collections::HashMap;
 use std::rc::Rc;
 use vapors_app::SurfaceFrame;
-use vapors_scene3d::{Geometry, GeometryId, Vec3};
+use vapors_scene3d::{Geometry, GeometryId};
 
 /// One piece's buffers.
 pub(crate) struct Uploaded {
@@ -33,43 +33,20 @@ impl GpuGeometry {
     }
 
     /// Uploads each piece `nodes` name that this renderer has not,
-    /// reading it through `find`.
-    ///
-    /// # Errors
-    ///
-    /// [`FrameError::GeometryMissing`] when `find` has no data for a
-    /// piece not yet uploaded; nothing is uploaded then.
-    pub(crate) fn upload_missing<'a>(
-        &mut self,
-        frame: &SurfaceFrame<'_>,
-        nodes: &[MeshNode],
-        find: impl Fn(GeometryId) -> Option<&'a Geometry>,
-    ) -> Result<(), FrameError> {
-        for (id, geometry) in self.missing(nodes, find)? {
+    /// reading it through each node's handle.
+    pub(crate) fn upload_missing(&mut self, frame: &SurfaceFrame<'_>, nodes: &[MeshNode]) {
+        for (id, geometry) in self.missing(nodes) {
             let uploaded = Tracked::new(upload(frame, geometry), &self.log, Resource::Geometry);
             self.uploaded.insert(id, uploaded);
         }
-        Ok(())
     }
 
     /// The pieces `nodes` name that are not uploaded, with their data.
-    fn missing<'a>(
-        &self,
-        nodes: &[MeshNode],
-        find: impl Fn(GeometryId) -> Option<&'a Geometry>,
-    ) -> Result<HashMap<GeometryId, &'a Geometry>, FrameError> {
-        let mut missing = HashMap::new();
-        for mesh in nodes
-            .iter()
+    fn missing<'a>(&self, nodes: &'a [MeshNode]) -> HashMap<GeometryId, &'a Geometry> {
+        (nodes.iter())
             .filter(|mesh| !self.uploaded.contains_key(&mesh.geometry))
-        {
-            let geometry = find(mesh.geometry).ok_or(FrameError::GeometryMissing {
-                node: mesh.node,
-                geometry: mesh.geometry,
-            })?;
-            missing.insert(mesh.geometry, geometry);
-        }
-        Ok(missing)
+            .map(|mesh| (mesh.geometry, mesh.handle.geometry()))
+            .collect()
     }
 
     /// Drops the buffers of each piece `held` says its `Meshes` released,
@@ -94,13 +71,17 @@ impl GpuGeometry {
     }
 }
 
-fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
-    let positions: Vec<u8> = geometry
-        .positions()
-        .iter()
-        .flat_map(Vec3::to_array)
+/// Each vertex's position's three floats, then its shade
+/// ([`vapors_scene3d::VERTEX_BYTES`] a vertex).
+fn vertex_bytes(geometry: &Geometry) -> Vec<u8> {
+    (geometry.positions().iter().zip(geometry.shades()))
+        .flat_map(|(position, shade)| position.extend(*shade).to_array())
         .flat_map(f32::to_le_bytes)
-        .collect();
+        .collect()
+}
+
+fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
+    let positions = vertex_bytes(geometry);
     let indices: Vec<u8> = geometry
         .indices()
         .iter()

@@ -7,13 +7,22 @@
 //! drawn, though its surfaces are refused as they would be in view.
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
+use vapors_renderer::{
+    ClosedFormPipeline, ImagePipeline, MeshEntries, MeshPipeline, QuadPipeline, ShadowPipeline,
+    Target, clear_target,
+};
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
+
+use crate::shape_store::ShapeStore;
 
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
     shadows: ShadowPipeline,
     quads: QuadPipeline,
+    closed_forms: ClosedFormPipeline,
+    meshes: MeshPipeline,
+    mesh_entries: MeshEntries,
+    shapes: ShapeStore,
     text: TextPipeline,
     atlas: GlyphAtlas,
     images: ImagePipeline,
@@ -70,6 +79,10 @@ impl ScenePainter {
         Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
+            closed_forms: ClosedFormPipeline::new(device, format),
+            meshes: MeshPipeline::new(device, format),
+            mesh_entries: MeshEntries::new(device),
+            shapes: ShapeStore::with_buffer_limit(device.limits().max_buffer_size),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
@@ -83,12 +96,17 @@ impl ScenePainter {
         })
     }
 
+    /// The shapes the scene's shape items name, to register tables in.
+    pub fn shapes_mut(&mut self) -> &mut ShapeStore {
+        &mut self.shapes
+    }
+
     /// Clears `target` to the canvas colour and draws the scene over it.
     ///
     /// # Errors
     ///
-    /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
-    /// the frame is then incomplete.
+    /// [`PaintError`] when a glyph, a `gpu-surface` or a shape cannot be
+    /// drawn; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_target(target, painted.canvas());
         self.paint(target, painted)
@@ -118,7 +136,8 @@ impl ScenePainter {
         self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
-    /// Each run of the scene, in order, under its clip. A refused frame
+    /// Each run of the scene, in order, under its clip, after taking
+    /// the document's new run-time shapes. A refused frame
     /// still ends the surfaces' frame: those it did not paint are inactive.
     /// It drops no texture, and its counts hold the bind groups still kept.
     /// Every frame releases the kept bytes of the batches it did not draw.
@@ -128,7 +147,13 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
-        let runs = self.paint_runs(target, painted);
+        let taken = self.shapes.take_from(painted, &mut self.mesh_entries);
+        let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
+        self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
+        self.counts.meshes += uploaded;
+        let runs = taken
+            .map_err(PaintError::Shape)
+            .and_then(|()| self.paint_runs(target, painted));
         self.surfaces.end_frame();
         if runs.is_ok() {
             self.textures.end_frame();

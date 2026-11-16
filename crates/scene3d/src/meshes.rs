@@ -5,7 +5,7 @@ use crate::MeshError;
 use glam::Vec3;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Weak;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::GeometryHandle;
@@ -31,6 +31,9 @@ impl fmt::Display for GeometryId {
 pub struct Geometry {
     positions: Vec<Vec3>,
     indices: Vec<u32>,
+    shades: Vec<f32>,
+    /// The positions' least and greatest corner, worked out once.
+    bounds: (Vec3, Vec3),
 }
 
 impl Geometry {
@@ -44,6 +47,20 @@ impl Geometry {
     #[must_use]
     pub fn indices(&self) -> &[u32] {
         &self.indices
+    }
+
+    /// The box holding every position: its least and greatest corner,
+    /// in the mesh node's local space.
+    #[must_use]
+    pub fn bounds(&self) -> (Vec3, Vec3) {
+        self.bounds
+    }
+
+    /// Each position's shade, from 0 to 1: the fraction of the node's
+    /// colour the vertex is drawn in (one-scene D4).
+    #[must_use]
+    pub fn shades(&self) -> &[f32] {
+        &self.shades
     }
 }
 
@@ -66,11 +83,17 @@ pub struct Meshes {
     held: HashMap<u64, Held>,
 }
 
-/// A held piece and the claim its handles share.
+/// A held piece, shared with its handles.
 #[derive(Debug)]
 struct Held {
-    geometry: Geometry,
-    claim: Weak<GeometryId>,
+    geometry: Rc<Geometry>,
+}
+
+/// Whether a handle still holds `geometry`: the `Meshes` holds one
+/// reference, and each [`GeometryHandle`] (the application's, a mesh
+/// node's) one more.
+fn held_by_a_handle(geometry: &Rc<Geometry>) -> bool {
+    Rc::strong_count(geometry) > 1
 }
 
 impl Meshes {
@@ -84,31 +107,43 @@ impl Meshes {
         }
     }
 
-    /// Validates triangles and holds them for upload. A triangle whose
-    /// indices repeat, or whose corners are collinear, is allowed and
-    /// draws nothing.
+    /// Validates triangles, with a shade for each position, and holds
+    /// them for upload. A triangle whose indices repeat, or whose corners
+    /// are collinear, is allowed and draws nothing.
     ///
     /// # Errors
     ///
     /// [`MeshError`]: no positions, fewer than 3, no indices, an index count
     /// that is not a multiple of 3, an index past the positions, a
-    /// position that is NaN or infinite, or a position or index buffer
-    /// past WebGPU's default `maxBufferSize` (256 MiB), the limit every
-    /// adapter supports.
+    /// position that is NaN or infinite, not one shade per position, a
+    /// shade outside 0 to 1, or a vertex or index buffer past WebGPU's
+    /// default `maxBufferSize` (256 MiB), the limit every adapter supports.
     pub fn geometry(
         &mut self,
         positions: Vec<Vec3>,
         indices: Vec<u32>,
+        shades: Vec<f32>,
     ) -> Result<GeometryHandle, MeshError> {
         crate::mesh_error::check(&positions, &indices)?;
+        crate::mesh_error::check_shades(&shades, positions.len())?;
         let id = GeometryId {
             meshes: self.id,
             index: self.issued,
         };
         self.issued += 1;
-        let (handle, claim) = GeometryHandle::claim(id);
-        let geometry = Geometry { positions, indices };
-        self.held.insert(id.index, Held { geometry, claim });
+        let bounds = (positions.iter())
+            .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(low, high), p| {
+                (low.min(*p), high.max(*p))
+            });
+        let geometry = Geometry {
+            positions,
+            indices,
+            shades,
+            bounds,
+        };
+        let geometry = Rc::new(geometry);
+        let handle = GeometryHandle::claim(id, &geometry);
+        self.held.insert(id.index, Held { geometry });
         Ok(handle)
     }
 
@@ -125,7 +160,7 @@ impl Meshes {
         if id.meshes != self.id {
             return None;
         }
-        self.held.get(&id.index).map(|held| &held.geometry)
+        self.held.get(&id.index).map(|held| &*held.geometry)
     }
 
     /// Whether this store holds `id`'s piece: issued here and not
@@ -141,7 +176,7 @@ impl Meshes {
         let meshes = self.id;
         let mut released = Vec::new();
         self.held.retain(|&index, held| {
-            let claimed = held.claim.strong_count() > 0;
+            let claimed = held_by_a_handle(&held.geometry);
             if !claimed {
                 released.push(GeometryId { meshes, index });
             }
@@ -165,3 +200,7 @@ mod tests;
 #[cfg(test)]
 #[path = "meshes_release_tests.rs"]
 mod release_tests;
+
+#[cfg(test)]
+#[path = "meshes_shades_tests.rs"]
+mod shades_tests;

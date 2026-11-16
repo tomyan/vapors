@@ -51,7 +51,10 @@ impl Default for LayoutOptions {
 pub struct LineInfo {
     /// The bytes of the text on this line, trailing whitespace included.
     pub text_range: Range<usize>,
-    /// Baseline y, unsnapped.
+    /// Baseline y, device pixels from the layout's top, as Blink places
+    /// it (`baseline.rs`): the line's top, unsnapped, plus the primary
+    /// font's rounded ascent and the floored half-leading; Parley's own
+    /// when the layout's baseline rule is unresolvable.
     pub baseline: f32,
     /// The line box's top, device pixels.
     pub top: f32,

@@ -39,12 +39,7 @@ pub(super) fn painting(at: BoxRect) -> Painting {
 }
 
 pub(super) fn kept(mut painting: Painting, at: BoxRect) -> KeptBox {
-    KeptBox {
-        from: from(at),
-        own: Part::take(&mut painting),
-        outline: Scene::new(),
-        thumb: Scene::new(),
-    }
+    KeptBox::new(from(at), Part::take(&mut painting), Scene::new())
 }
 
 pub(super) fn shift_of(kept: &KeptBox, to: BoxFrom) -> Option<Shift> {

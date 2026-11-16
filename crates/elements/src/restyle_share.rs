@@ -130,7 +130,10 @@ impl Document {
     }
 
     /// The attributes of `attributes` a sheet selects, but `class` and
-    /// the scope attribute, which the template key fixes.
+    /// the scope attribute, which the template key fixes. The SVG
+    /// presentation attributes, which set styles, are fixed by the key
+    /// too: `StyleKey::refusal` refuses setting them on a keyed svg or
+    /// path, so they are literals of the key.
     fn selected_attributes(
         &self,
         attributes: &BTreeMap<String, String>,

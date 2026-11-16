@@ -40,7 +40,7 @@ fn two_divs() -> (Document, NodeId) {
 
 /// Each slot's kept stacking after the last update.
 fn kept(doc: &Document) -> Vec<Option<Stacking>> {
-    doc.painted().expect("painted").stackings.0.clone()
+    doc.painted().expect("painted").stackings.0.to_vec()
 }
 
 /// The slots whose stacking differs between `before` and `after`, with
@@ -97,8 +97,8 @@ fn kept_stackings_that_differ_from_fresh_ones_are_refused_naming_the_slot() {
         z: Some(1),
         ..Stacking::default()
     };
-    let kept = Stackings(vec![Some(Stacking::default()), Some(raised)]);
-    let fresh = Stackings(vec![Some(Stacking::default()), Some(Stacking::default())]);
+    let kept = Stackings(vec![Some(Stacking::default()), Some(raised)].into());
+    let fresh = Stackings(vec![Some(Stacking::default()), Some(Stacking::default())].into());
 
     // When
     kept.assert_matches(&fresh);

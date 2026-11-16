@@ -94,6 +94,34 @@ pub fn hash_bytes(bytes: &[u8]) -> u64 {
     })
 }
 
+/// The paint canonical `bytes` begin with, as [`Canonical::of`] wrote
+/// it: what a closed form is drawn with, read back from the one place
+/// that holds it.
+///
+/// # Errors
+/// Bytes that do not begin with a paint prefix (`F`, `E`, or `S` and a
+/// finite width above zero), naming the first byte.
+pub fn paint_of(bytes: &[u8]) -> Result<Paint, String> {
+    match bytes {
+        [b'F', ..] => Ok(Paint::Fill(FillRule::NonZero)),
+        [b'E', ..] => Ok(Paint::Fill(FillRule::EvenOdd)),
+        [b'S', a, b, c, d, ..] => {
+            let width = f32::from_le_bytes([*a, *b, *c, *d]);
+            if width.is_finite() && width > 0.0 {
+                Ok(Paint::Stroke { width })
+            } else {
+                Err(format!(
+                    "the canonical bytes stroke at width {width}, not a finite number above zero"
+                ))
+            }
+        }
+        _ => Err(format!(
+            "the canonical bytes begin {:?}, not a paint (F, E, or S and a width)",
+            bytes.get(..5.min(bytes.len())).unwrap_or_default()
+        )),
+    }
+}
+
 fn write_paint(site: &str, paint: Paint, out: &mut Vec<u8>) -> Result<(), String> {
     match paint {
         Paint::Fill(FillRule::NonZero) => out.push(b'F'),

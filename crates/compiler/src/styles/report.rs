@@ -5,7 +5,7 @@
 use std::fmt::Write;
 
 use vapors_css::analysis::{Constancy, Match, Place, SheetId, Winner};
-use vapors_css::cascade::INLINE_SHEET;
+use vapors_css::cascade::{INLINE_SHEET, PRESENTATION_SHEET};
 use vapors_css::property::PropertyId;
 
 use super::{Analysis, ElementStyles, Resolved};
@@ -151,10 +151,14 @@ fn describe(winner: &Winner, analysis: &Analysis) -> String {
     }
 }
 
-/// `sheet:rule:declaration`, or `style:declaration` for the literal `style`.
+/// `sheet:rule:declaration`, `style:declaration` for the literal
+/// `style`, or `presentation:declaration` for a presentation attribute.
 fn at(place: Place, analysis: &Analysis) -> String {
     if place.sheet == INLINE_SHEET {
         return format!("style:{}", place.declaration);
+    }
+    if place.sheet == PRESENTATION_SHEET {
+        return format!("presentation:{}", place.declaration);
     }
     format!(
         "{}:{}:{}",

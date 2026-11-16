@@ -23,7 +23,7 @@ fn undrawable(site: &'static str) -> ShapeEntry {
             size: [0.0, 1.0],
             radius: [0.0; 2],
         },
-        ..entry(site, b"rect")
+        ..entry(site, b"Frect")
     }
 }
 
@@ -40,8 +40,8 @@ fn refused(table: &ShapeTable) -> TableError {
 fn an_entry_is_found_by_the_index_its_element_names() {
     // Given
     let table = table(vec![
-        entry("a.wisp:3", b"M0 0L1 1"),
-        entry("a.wisp:9", b"M0 0L2 2"),
+        entry("a.wisp:3", b"FM0 0L1 1"),
+        entry("a.wisp:9", b"FM0 0L2 2"),
     ]);
 
     // When
@@ -56,7 +56,7 @@ fn an_entry_is_found_by_the_index_its_element_names() {
 #[test]
 fn an_index_past_the_end_is_refused_naming_the_crate() {
     // When
-    let error = table(vec![entry("a.wisp:3", b"M0 0L1 1")])
+    let error = table(vec![entry("a.wisp:3", b"FM0 0L1 1")])
         .entry(ShapeIndex::new(1))
         .expect_err("past the end");
 
@@ -72,8 +72,8 @@ fn a_table_of_distinct_drawable_entries_passes_the_check() {
     // When, Then
     assert_eq!(
         table(vec![
-            entry("a.wisp:3", b"M0 0L1 1"),
-            entry("b.wisp:4", b"M0 0L2 2"),
+            entry("a.wisp:3", b"FM0 0L1 1"),
+            entry("b.wisp:4", b"FM0 0L2 2"),
         ])
         .check(),
         Ok(())
@@ -84,8 +84,14 @@ fn a_table_of_distinct_drawable_entries_passes_the_check() {
 #[test]
 fn an_entry_that_cannot_be_drawn_is_refused_naming_crate_and_site() {
     // Given
-    let first = table(vec![undrawable("b.wisp:7"), entry("a.wisp:3", b"M0 0L1 1")]);
-    let last = table(vec![entry("a.wisp:3", b"M0 0L1 1"), undrawable("b.wisp:7")]);
+    let first = table(vec![
+        undrawable("b.wisp:7"),
+        entry("a.wisp:3", b"FM0 0L1 1"),
+    ]);
+    let last = table(vec![
+        entry("a.wisp:3", b"FM0 0L1 1"),
+        undrawable("b.wisp:7"),
+    ]);
 
     // When, Then
     for table in [first, last] {
@@ -101,7 +107,7 @@ fn an_entry_that_cannot_be_drawn_is_refused_naming_crate_and_site() {
 fn an_entry_with_no_site_or_no_bytes_is_refused() {
     // When, Then
     assert_eq!(
-        refused(&table(vec![entry("", b"M0 0L1 1")])).reason,
+        refused(&table(vec![entry("", b"FM0 0L1 1")])).reason,
         "the site is empty; an entry names where its shape was written"
     );
     assert_eq!(
@@ -115,7 +121,7 @@ fn a_hash_that_is_not_its_bytes_hash_is_refused_naming_both() {
     // Given
     let wrong = ShapeEntry {
         hash: 0xabc,
-        ..entry("a.wisp:3", b"M0 0L1 1")
+        ..entry("a.wisp:3", b"FM0 0L1 1")
     };
 
     // When
@@ -127,7 +133,7 @@ fn a_hash_that_is_not_its_bytes_hash_is_refused_naming_both() {
         error.reason,
         format!(
             "carries hash 0xabc but its canonical bytes hash to {:#x}",
-            hash_bytes(b"M0 0L1 1")
+            hash_bytes(b"FM0 0L1 1")
         )
     );
 }
@@ -161,9 +167,9 @@ fn another_format_or_an_empty_crate_name_is_refused_before_the_entries() {
 fn the_same_shape_twice_is_refused_as_the_emitters_bug() {
     // When
     let error = refused(&table(vec![
-        entry("a.wisp:3", b"M0 0L1 1"),
-        entry("b.wisp:4", b"M0 0L2 2"),
-        entry("c.wisp:5", b"M0 0L1 1"),
+        entry("a.wisp:3", b"FM0 0L1 1"),
+        entry("b.wisp:4", b"FM0 0L2 2"),
+        entry("c.wisp:5", b"FM0 0L1 1"),
     ]));
 
     // Then
@@ -180,10 +186,10 @@ fn one_hash_for_two_shapes_is_refused_naming_both_sites() {
     // Given: a collision, which the hash check in front of this path
     // keeps out of `check` unless it is genuine, so the refusal is
     // tested on its own
-    let earlier = entry("a.wisp:3", b"M0 0L1 1");
+    let earlier = entry("a.wisp:3", b"FM0 0L1 1");
     let entry = ShapeEntry {
         hash: earlier.hash,
-        ..entry("c.wisp:5", b"M0 0L2 2")
+        ..entry("c.wisp:5", b"FM0 0L2 2")
     };
 
     // When
@@ -207,4 +213,13 @@ fn a_shape_id_is_its_registry_index() {
     // Then
     assert_eq!(id.index(), 7);
     assert!(ShapeId::new(3) < id);
+}
+
+#[test]
+fn an_entry_whose_bytes_begin_with_no_paint_is_refused() {
+    // When, Then: the store reads a closed form's paint from the bytes
+    assert_eq!(
+        refused(&table(vec![entry("a.wisp:3", b"M0 0L1 1")])).reason,
+        "the canonical bytes begin [77, 48, 32, 48, 76], not a paint (F, E, or S and a width)"
+    );
 }

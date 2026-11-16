@@ -1,0 +1,61 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Timestamp queries: true
+Revision: 06b0c9449c6d
+Shader cache: docs/perf/scene-run-f0-2026-11-14/cache-2, 1 entries at the start (warm)
+Frames: 3750, every one judged, no warmup; load average at the start 0.86
+
+vapors: racer ready
+Start-up (App::start, before frame 0, not judged): 17320.9 µs
+
+### racer, one scene, 60 s
+
+Frames 3750 (3750 planned); over 16.7 ms to idle: 0. Load average (1 minute) at the start 0.86, at the end 0.71.
+
+| time | median µs | p99 µs | max µs |
+|---|---|---|---|
+| frame (CPU) | 2116.6 | 2527.6 | 4727.1 |
+| GPU time | 5120.3 | 5385.6 | 5975.0 |
+| frame to idle | 7069.7 | 7482.4 | 8425.6 |
+
+| per frame | median | max |
+|---|---|---|
+| draw calls | 25 | 25 |
+| buffer bytes | 5888 | 34336 |
+| texture bytes (atlas pages and images) | 0 | 49668 |
+
+| first frames | CPU µs | GPU µs | to idle µs |
+|---|---|---|---|
+| 0 | 3742.8 | 4443.3 | 6652.1 |
+| 1 | 1051.5 | 4474.3 | 5768.2 |
+| 2 | 752.8 | 4457.3 | 5448.4 |
+| 3 | 705.0 | 4489.0 | 5521.7 |
+| 4 | 768.4 | 4536.3 | 5500.3 |
+| 5 | 731.8 | 4488.7 | 5415.0 |
+| 6 | 834.5 | 4495.1 | 5576.9 |
+| 7 | 805.6 | 4475.2 | 5405.9 |
+| 8 | 768.8 | 4452.3 | 5504.6 |
+| 9 | 618.2 | 4464.2 | 5462.0 |
+| 10 | 665.4 | 4438.9 | 5353.9 |
+| 11 | 816.1 | 4448.4 | 5401.7 |
+| 12 | 883.7 | 4441.2 | 5613.5 |
+| 13 | 897.0 | 4436.9 | 5456.9 |
+| 14 | 1090.1 | 4470.6 | 5751.7 |
+| 15 | 1110.8 | 4514.3 | 5838.1 |
+| 16 | 1423.4 | 4501.3 | 5968.3 |
+| 17 | 1782.9 | 4468.9 | 6361.5 |
+| 18 | 2271.6 | 4424.9 | 6616.5 |
+| 19 | 2445.5 | 4406.6 | 6647.3 |
+
+The 10 slowest frames to idle:
+
+frame 1534 at 24.544 s, changes []: to idle 8425.6 µs, CPU 4727.1 µs, GPU 5038.4 µs; phases (µs) accessibility 0.9, batches 37.9, draw 2963.3, encode 398.7, input 1.0, layout 1263.7, paint 219.6, record 0.6, style 123.7, submit 368.5, tasks 0.4, tick 0.3, update 1630.2, write 311.4; draw calls 25, buffer bytes 16960, texture bytes 31794, restyled 4, scene items 24; surfaces: draw calls 1, buffer bytes 0
+frame 1535 at 24.560 s, changes []: to idle 8164.9 µs, CPU 3506.1 µs, GPU 5011.2 µs; phases (µs) accessibility 0.9, batches 35.7, draw 1877.1, encode 388.6, input 0.9, layout 1186.3, paint 208.0, record 0.5, style 120.7, submit 355.5, tasks 0.4, tick 0.4, update 1537.4, write 187.9; draw calls 25, buffer bytes 16768, texture bytes 0, restyled 4, scene items 23; surfaces: draw calls 1, buffer bytes 0
+frame 3069 at 49.104 s, changes []: to idle 8142.9 µs, CPU 3360.9 µs, GPU 5067.9 µs; phases (µs) accessibility 0.9, batches 37.4, draw 1782.0, encode 373.9, input 0.9, layout 1089.9, paint 221.4, record 0.6, style 115.7, submit 351.3, tasks 0.4, tick 0.3, update 1449.1, write 176.1; draw calls 25, buffer bytes 16960, texture bytes 0, restyled 4, scene items 24; surfaces: draw calls 1, buffer bytes 0
+frame 3070 at 49.120 s, changes []: to idle 8063.9 µs, CPU 3471.5 µs, GPU 4976.5 µs; phases (µs) accessibility 0.8, batches 35.8, draw 1858.8, encode 381.8, input 1.0, layout 1168.3, paint 211.2, record 0.5, style 119.0, submit 369.5, tasks 0.5, tick 0.4, update 1520.9, write 188.4; draw calls 25, buffer bytes 16768, texture bytes 0, restyled 4, scene items 23; surfaces: draw calls 1, buffer bytes 0
+frame 1907 at 30.512 s, changes []: to idle 7867.9 µs, CPU 2767.4 µs, GPU 5183.3 µs; phases (µs) accessibility 1.3, batches 53.0, draw 1573.4, encode 369.6, input 1.2, layout 883.4, paint 161.2, record 0.6, style 53.7, submit 345.5, tasks 0.5, tick 0.4, update 1124.8, write 44.0; draw calls 25, buffer bytes 5760, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+frame 3729 at 59.664 s, changes []: to idle 7727.1 µs, CPU 2893.2 µs, GPU 5556.2 µs; phases (µs) accessibility 0.9, batches 41.2, draw 1954.8, encode 603.8, input 1.3, layout 672.2, paint 120.9, record 0.7, style 47.4, submit 455.4, tasks 0.4, tick 0.3, update 863.2, write 73.9; draw calls 25, buffer bytes 5888, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+frame 2347 at 37.552 s, changes []: to idle 7648.1 µs, CPU 3138.1 µs, GPU 5101.9 µs; phases (µs) accessibility 1.1, batches 55.4, draw 2057.6, encode 582.8, input 1.4, layout 782.4, paint 149.3, record 0.7, style 44.0, submit 462.1, tasks 0.6, tick 0.4, update 1004.8, write 83.5; draw calls 25, buffer bytes 5888, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+frame 2345 at 37.520 s, changes []: to idle 7573.8 µs, CPU 2580.0 µs, GPU 5085.2 µs; phases (µs) accessibility 1.1, batches 47.4, draw 1601.8, encode 371.1, input 1.3, layout 673.8, paint 157.3, record 0.5, style 44.9, submit 337.0, tasks 0.6, tick 0.6, update 903.9, write 44.2; draw calls 25, buffer bytes 5760, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+frame 3701 at 59.216 s, changes []: to idle 7561.9 µs, CPU 2611.4 µs, GPU 5134.5 µs; phases (µs) accessibility 0.9, batches 43.4, draw 1649.9, encode 417.7, input 1.1, layout 679.6, paint 123.7, record 0.5, style 58.3, submit 393.0, tasks 0.5, tick 0.4, update 885.1, write 65.2; draw calls 25, buffer bytes 5888, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+frame 2353 at 37.648 s, changes []: to idle 7559.9 µs, CPU 3054.8 µs, GPU 5073.0 µs; phases (µs) accessibility 1.2, batches 59.1, draw 1925.4, encode 450.3, input 1.4, layout 779.4, paint 184.2, record 0.6, style 50.8, submit 443.5, tasks 0.6, tick 0.6, update 1045.9, write 72.5; draw calls 25, buffer bytes 5888, texture bytes 0, restyled 0, scene items 7; surfaces: draw calls 1, buffer bytes 0
+

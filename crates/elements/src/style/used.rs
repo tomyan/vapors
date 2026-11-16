@@ -35,6 +35,8 @@ pub(crate) struct Used {
     pub(crate) scrollbar: super::Scrollbar,
     /// How its track and thumb are drawn, when it is a range (3-E3a).
     pub(crate) parts: super::Parts,
+    /// `fill`, `stroke` and `stroke-width`, which an svg's paths read.
+    pub(crate) svg: super::SvgPaint,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -121,6 +123,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         background: reader.read(BACKGROUND_COLOR, color, Color::default()),
         decoration,
         cursor: reader.read(CURSOR, cursor, Cursor::Default),
+        svg: super::svg_paint_style::svg_paint(&mut reader, text.color),
         visible: super::values::visible(&mut reader),
         takes_pointer: super::values::takes_pointer(&mut reader),
     };
@@ -159,6 +162,7 @@ impl Used {
             z_index,
             scrollbar,
             parts,
+            svg,
         } = self;
         [
             ("layout", *layout == other.layout),
@@ -172,6 +176,7 @@ impl Used {
             ("z_index", *z_index == other.z_index),
             ("scrollbar", *scrollbar == other.scrollbar),
             ("parts", *parts == other.parts),
+            ("svg", *svg == other.svg),
         ]
         .into_iter()
         .find(|(_, same)| !same)

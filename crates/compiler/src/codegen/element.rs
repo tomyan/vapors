@@ -16,7 +16,9 @@ impl Emitter<'_> {
         let var = self.fresh(&element.tag);
         for attribute in &element.attributes.0 {
             super::attribute_refusals::refuse_misleading(self.source, attribute)?;
+            super::paint_attributes::refuse_paint(self.source, &element.tag, attribute)?;
         }
+        super::basic_shape_attributes::refuse_basic_shape(self.source, element)?;
         self.emit_keyed_create(element, &var)?;
         self.attach(&var, place);
         for attribute in element.attributes.iter() {

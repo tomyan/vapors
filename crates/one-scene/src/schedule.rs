@@ -4,7 +4,9 @@
 //! toggling its cube's `lit` class; and changes the page makes itself
 //! from its time signal: the group turning every frame, the third cube
 //! hidden in every other 5 s span, the night token on in every other
-//! 15 s span.
+//! 15 s span. And the pointer resting over the cubes in every other 10 s
+//! span, where the group's `:hover` (docs/plans/css-for-3d.md C4) colours
+//! the middle cube.
 
 use std::time::Duration;
 
@@ -27,6 +29,9 @@ const GONE_SPAN: Duration = Duration::from_secs(5);
 /// The span the night token is off, then on, in turn.
 const NIGHT_SPAN: Duration = Duration::from_secs(15);
 
+/// The span the pointer rests elsewhere, then over the cubes, in turn.
+const POINTER_SPAN: Duration = Duration::from_secs(10);
+
 /// How fast the group turns, in radians a second.
 const TURN_RATE: f32 = 0.5;
 
@@ -38,6 +43,13 @@ pub const CUBE_COLOURS: [[u8; 3]; CUBES] =
 
 /// A lit cube's `color` (`.lit`).
 pub const LIT: [u8; 3] = [0xf1, 0xc4, 0x0f];
+
+/// The cube the group's hover colours (`.spin:hover .two`): the middle.
+pub const HOVER_CUBE: usize = 1;
+
+/// [`HOVER_CUBE`]'s `color` while the group is hovered
+/// (`.spin:hover .two`), which wins over `.lit`.
+pub const GROUP_HOVER: [u8; 3] = [0xe6, 0x7e, 0x22];
 
 /// The ground's `color`, the `--tint` token by day and by night.
 pub const GROUND: [u8; 3] = [0x3b, 0x4a, 0x3f];
@@ -53,6 +65,8 @@ pub struct Expected {
     pub gone: bool,
     /// Whether the night token is on.
     pub night: bool,
+    /// Whether the pointer rests over the cubes.
+    pub hovered: bool,
 }
 
 /// The frame clock's time at `frame`.
@@ -82,6 +96,12 @@ pub fn night(time: Duration) -> bool {
     span_odd(time, NIGHT_SPAN)
 }
 
+/// Whether the pointer rests over the cubes at `time`.
+#[must_use]
+pub fn pointing(time: Duration) -> bool {
+    span_odd(time, POINTER_SPAN)
+}
+
 /// The group's turn about +Y at `time`, in radians.
 #[must_use]
 pub fn turn(time: Duration) -> f32 {
@@ -104,6 +124,7 @@ pub fn expected(frame: usize) -> Expected {
         lit,
         gone: gone(time),
         night: night(time),
+        hovered: pointing(time),
     }
 }
 
@@ -117,10 +138,10 @@ impl Expected {
     /// Cube `cube`'s colour and whether it is shown.
     #[must_use]
     pub fn cube(&self, cube: usize) -> ([u8; 3], bool) {
-        let colour = if self.lit[cube] {
-            LIT
-        } else {
-            CUBE_COLOURS[cube]
+        let colour = match (cube == HOVER_CUBE && self.hovered, self.lit[cube]) {
+            (true, _) => GROUP_HOVER,
+            (false, true) => LIT,
+            (false, false) => CUBE_COLOURS[cube],
         };
         (colour, !(cube == CUBES - 1 && self.gone))
     }
@@ -140,6 +161,10 @@ pub fn changes_at(frame: usize) -> Vec<String> {
             .then(|| format!("cube 3 {}", if now.gone { "hidden" } else { "shown" })),
         (before.night != now.night)
             .then(|| format!("night {}", if now.night { "on" } else { "off" })),
+        (before.hovered != now.hovered).then(|| {
+            let place = if now.hovered { "over" } else { "off" };
+            format!("pointer {place} the cubes")
+        }),
     ];
     click
         .into_iter()

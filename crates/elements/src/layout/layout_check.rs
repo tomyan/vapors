@@ -45,7 +45,7 @@ pub(crate) fn check_layout_against_fresh(
 /// lane's layout is compared with Taffy's block layout.
 fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed {
     let fresh = Placed {
-        boxes: build(source, root),
+        boxes: build(source, root).into(),
         slots: Slots::default(),
         lanes: super::lane_set::SharedLanes::default(),
     };

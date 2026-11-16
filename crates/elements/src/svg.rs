@@ -19,38 +19,25 @@ pub(crate) fn is(arena: &Arena, node: NodeId, tag: &str) -> bool {
         .is_some_and(|element| element.tag == tag)
 }
 
+/// The elements of an svg that draw: a path, and the basic shapes.
+pub(crate) const SHAPE_TAGS: [&str; 3] = ["path", "rect", "circle"];
+
+/// Whether `node` is one of [`SHAPE_TAGS`].
+pub(crate) fn is_shape(arena: &Arena, node: NodeId) -> bool {
+    arena
+        .get(node, "svg")
+        .element()
+        .is_some_and(|element| SHAPE_TAGS.contains(&element.tag.as_str()))
+}
+
 /// `text` as a positive, finite number with no unit; `None` otherwise.
 pub(crate) fn positive(text: &str) -> Option<f32> {
     number(text).filter(|n| *n > 0.0)
 }
 
-/// `token` as a CSS `<number>`, finite as an f32; `None` otherwise.
-/// `f32::from_str` also takes `16.`, `1.e1` and `inf`, which Chromium
-/// drops from a `width` or `viewBox`, so the shape is checked first.
-fn number(token: &str) -> Option<f32> {
-    if !is_css_number(token) {
-        return None;
-    }
-    token.parse::<f32>().ok().filter(|n| n.is_finite())
-}
-
-/// Whether `token` is `[+-]? (digits | digits? '.' digits)
-/// ([eE] [+-]? digits)?`.
-fn is_css_number(token: &str) -> bool {
-    let unsigned = token.strip_prefix(['+', '-']).unwrap_or(token);
-    let (mantissa, exponent) = match unsigned.split_once(['e', 'E']) {
-        Some((mantissa, exponent)) => (mantissa, Some(exponent)),
-        None => (unsigned, None),
-    };
-    let mantissa_ok = match mantissa.split_once('.') {
-        Some((whole, fraction)) => (whole.is_empty() || digits(whole)) && digits(fraction),
-        None => digits(mantissa),
-    };
-    mantissa_ok && exponent.is_none_or(|e| digits(e.strip_prefix(['+', '-']).unwrap_or(e)))
-}
-
-fn digits(text: &str) -> bool {
-    !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())
+/// `token` as a CSS `<number>`, finite as an f32 (`vapors_shapes::css_number`).
+pub(crate) fn number(token: &str) -> Option<f32> {
+    vapors_shapes::css_number(token)
 }
 
 /// A `viewBox`'s numbers, separated by whitespace and at most one comma
@@ -100,6 +87,29 @@ pub(crate) fn layout_style(arena: &Arena, node: NodeId, style: &Style) -> Style 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_shapes_are_the_svg_elements_the_cascade_paints_less_svg() {
+        // Then: the cascade's list is the one answer (#391 review, L3)
+        assert_eq!(SHAPE_TAGS[..], vapors_css::cascade::SVG_TAGS[1..]);
+    }
+
+    #[test]
+    fn a_basic_shape_takes_the_paint_the_cascade_reads() {
+        // Then
+        assert_eq!(
+            vapors_shapes::PAINT_ATTRIBUTES,
+            vapors_css::cascade::PRESENTATION_ATTRIBUTES
+        );
+        for tag in ["rect", "circle"] {
+            let all = vapors_shapes::allowed(tag).expect("a basic shape");
+            assert_eq!(
+                all[all.len() - 3..],
+                vapors_css::cascade::PRESENTATION_ATTRIBUTES,
+                "{tag}"
+            );
+        }
+    }
 
     #[test]
     fn a_view_box_takes_whitespace_and_single_commas() {

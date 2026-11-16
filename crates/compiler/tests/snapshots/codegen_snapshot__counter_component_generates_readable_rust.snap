@@ -1,6 +1,5 @@
 ---
 source: crates/compiler/tests/codegen_snapshot.rs
-assertion_line: 16
 expression: code
 ---
 // Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
@@ -29,12 +28,18 @@ static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]
 pub struct CounterProps {}
-/// `Counter`: its signals, and what `unmount` removes.
+/// `Counter`: its signals, and what `unmount` removes. Dropping it
+/// disposes its signals and effects, unless the component that mounted
+/// it as a child owns it (`owned_by_parent`).
+#[must_use = "dropping a top-level component disposes its effects; keep it or call unmount"]
 pub struct Counter {
     /// `count`, declared in `<script>`.
     pub count: Signal<i32>,
     owner: Owner,
     roots: Vec<Root>,
+    /// False once its parent's generated code took it as its child
+    /// (`owned_by_parent`): its owner then goes with the parent's.
+    disposes_on_drop: bool,
 }
 impl Counter {
     /// Mounts the component at the end of `parent`.
@@ -69,6 +74,7 @@ impl Counter {
         let CounterProps {} = props;
         dom.borrow_mut().add_style(SCOPE, STYLE);
         dom.borrow_mut().declare_events(&Self::events());
+        let disposes_on_drop = true;
         let owner = Owner::new();
         let (count, roots) = owner
             .with(|| {
@@ -113,7 +119,12 @@ impl Counter {
                 dom.borrow_mut().append(button0, text3);
                 (count, roots)
             });
-        Counter { count, owner, roots }
+        Counter {
+            count,
+            owner,
+            roots,
+            disposes_on_drop,
+        }
     }
     /// The events this component type dispatches itself, its child
     /// components' included, which `mount` declares to the tree.
@@ -150,6 +161,22 @@ impl Counter {
         self.owner.dispose();
         for node in nodes {
             dom.borrow_mut().remove(node);
+        }
+    }
+}
+impl Counter {
+    /// Marks this component as its parent's child: its owner is a child
+    /// of the parent's and is disposed with it, so dropping this struct
+    /// disposes nothing. Called by the parent's generated code.
+    pub fn owned_by_parent(mut self) -> Self {
+        self.disposes_on_drop = false;
+        self
+    }
+}
+impl Drop for Counter {
+    fn drop(&mut self) {
+        if self.disposes_on_drop && !std::thread::panicking() {
+            self.owner.dispose();
         }
     }
 }

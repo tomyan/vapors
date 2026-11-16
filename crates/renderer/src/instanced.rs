@@ -211,6 +211,13 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
+/// Little-endian bytes of `floats`: a pipeline's instances with no row
+/// index (the mesh pipeline's and the scene's closed forms' own layouts,
+/// `meshes.rs`, `closed_forms_3d.rs`).
+pub(crate) fn float_bytes(floats: impl IntoIterator<Item = f32>) -> Vec<u8> {
+    floats.into_iter().flat_map(f32::to_le_bytes).collect()
+}
+
 /// The viewport uniform's bytes for a pipeline that draws one item a
 /// draw (images): its size and `shift`, two floats each; an item's row
 /// offset is in its shift.

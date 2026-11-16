@@ -25,7 +25,7 @@ pub const PATH: &[(&str, &str)] = &[
 
 /// `attributes` with `changes` applied: a value replaces, an empty one
 /// removes.
-fn changed<'a>(
+pub fn changed<'a>(
     attributes: &[(&'a str, &'a str)],
     changes: &[(&'a str, &'a str)],
 ) -> Vec<(&'a str, &'a str)> {

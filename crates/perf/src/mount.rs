@@ -194,11 +194,6 @@ impl Workload for Mount {
         )
     }
 
-    /// Each frame is a new app's first: no later frame reads a time back.
-    fn times_gpu(&self) -> bool {
-        false
-    }
-
     fn timing(&self) -> FrameTiming {
         self.page
             .as_ref()

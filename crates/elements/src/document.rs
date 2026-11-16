@@ -31,6 +31,8 @@ pub struct Document {
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
+    /// The link a followed click asks to open (`link.rs`).
+    pub(crate) navigation: Option<crate::link::Navigation>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
     /// Each number field's last committed number and value (`number_committed`).
@@ -57,14 +59,21 @@ pub struct Document {
     pub(crate) counts: crate::UpdateCounts,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
-    /// Whether scroll thumbs are drawn now.
-    pub(crate) thumbs_shown: bool,
+    /// How opaque scroll thumbs are drawn now, 0 (hidden) to 255.
+    pub(crate) thumb_alpha: u8,
     /// The images `img` elements show, by name.
     pub(crate) images: crate::images::Images,
     /// What the a11y mirror keeps between takes (R6).
     pub(crate) ax: crate::a11y_mirror_state::AxMirror,
     /// Each watched mesh anchor's appearance sink (`scene_sinks`).
     pub(crate) sinks: crate::node_map::NodeMap<vapors_dom::AppearanceSink>,
+    /// Each watched scene anchor's hit source (`scene_hits`).
+    pub(crate) scene_hits: crate::scene_hits::SceneHits,
+    /// The run-time shapes its items name and which elements use them
+    /// (one-scene S4a), shared with each `Painted` so the painter takes
+    /// the slots that changed. Per document: S5b's process registry
+    /// issues table `ShapeId`s, and this run-time range stays apart.
+    pub(crate) shapes: std::rc::Rc<std::cell::RefCell<crate::document_shapes::DocumentShapes>>,
 }
 
 impl Document {
@@ -89,6 +98,7 @@ impl Document {
             settle: crate::focus_fixup::Settle::default(),
             window: crate::focus_window::Window::Focused,
             space_on: None,
+            navigation: None,
             shortcut_modifier: crate::ShortcutModifier::default(),
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
@@ -101,10 +111,14 @@ impl Document {
             checks: crate::kept_checks::KeptChecks::default(),
             counts: crate::UpdateCounts::default(),
             scroll: crate::scroll::Offsets::default(),
-            thumbs_shown: true,
+            thumb_alpha: u8::MAX,
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
             sinks: crate::node_map::NodeMap::default(),
+            scene_hits: crate::scene_hits::SceneHits::default(),
+            shapes: std::rc::Rc::new(std::cell::RefCell::new(
+                crate::document_shapes::DocumentShapes::new(),
+            )),
         }
     }
 
@@ -113,7 +127,8 @@ impl Document {
     /// pointer's hover and active state, or a scroll. An app that redraws on change
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
-        std::mem::replace(&mut self.changes.since_asked, false)
+        // a refused scene hit is due in the next update (`scene_hit`)
+        std::mem::replace(&mut self.changes.since_asked, false) || self.hit_refusals_pending()
     }
 
     /// The `html` element.

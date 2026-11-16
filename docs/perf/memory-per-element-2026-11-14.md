@@ -99,6 +99,107 @@ own time at this size. If it shows in insert's instructions once the
 splice step makes inserts cheap, chunked storage for the box list (as
 `blocks.rs`, #288) is the follow-up.
 
+## Every per-slot list grown by a quarter (slot_list.rs)
+
+The 56.4 MB paint left on the first insert was the kept boxes' list
+(`painted.kept_boxes`, one `Option<KeptBox>` of 424 bytes a slot:
+48.6 MB for 114,690 slots, a slot for each of the 65,538 elements and
+49,152 text runs, about 740 bytes per element), sized exactly by the first paint and doubled
+by an insert that adds four boxes. The placement's six lists, the clip
+lists, the clip tree's two, the stackings and the style slots did the
+same. Each now grows by a quarter, as the box list does:
+
+| one row added at 16,384 rows | bytes the insert leaves |
+|---|---|
+| main at 06b0c94 | 110,180,323 |
+| every per-slot list by a quarter | 58,483,505 |
+
+The page itself is unchanged: 12,887 bytes per element on main and
+12,863 with this change (the slope from 4,096 to 16,384 rows; main's
+layout per element rose to 8,193 bytes since #333's 6,859, from the
+work merged in between).
+
+What the 58.5 MB is, from each list's capacity in bytes before and
+after the insert (a print added for the run, not kept):
+
+| list | grown by |
+|---|---|
+| layout's box list (159.6 MB → 199.6 MB) | 39.9 MB |
+| the kept boxes, `painted.kept_boxes` (48.6 MB → 60.8 MB) | 12.2 MB |
+| the other 13 lists (placement, clips, clip tree, stackings, layout's keys) | 5.0 MB |
+| total of the lists | 57.1 MB |
+
+The live heap grew 55.9 MB in that run, less than the lists' 57.1 MB:
+their growth is all of it, and the insert freed about 1.2 MB elsewhere
+(not located). The kept hits and style slots did not grow: an insert
+gathers the hits again, exactly, and the style slots had slack left.
+A list never shrinks, and a quarter of 65,538 slots is room for about
+4,096 more rows of four boxes before any of them grows again.
+
+Not measured: the time of many single-row adds, quarter growth against
+doubling. A list of n slots grown by a quarter grows again after n/4
+more slots, where doubled it grows after n, so over many adds it
+copies about four times as many entries (n/(1.25 - 1) against
+n/(2 - 1)); at 16,384 rows each growth of the box list
+copies about 160 MB. Not measured either: that copy's cost on wasm.
+One-run wall times are left out of the table: they were taken at
+different loads and do not compare.
+
+At about 740 bytes per element, the kept boxes' list is the next per-element
+target after layout's boxes (taken below).
+
+## A kept box's outline, thumbs and rarer entries boxed apart
+
+A kept box's slot (`Option<KeptBox>`) was 424 bytes: what it was made
+from (64), its own part (216: a scene and six lists) and two more
+scenes, outline and thumbs (72 each). Most boxes have no outline or
+thumbs, and no inline element's rect, range track or text origin. Those
+five now sit in two boxes made only when one of them has entries
+(`kept_box.rs` `Marks`, `kept_part.rs` `Rare`). Cursors stay in the
+slot: every element paints its cursor, `auto` included. A slot is now
+224 bytes (`kept_box_size_tests.rs`).
+
+Main at 854ccb8 against this change, the first two rows from `cargo run
+--release -p vapors-perf --bin vapors-perf-memory -- --rows 16384`, the
+third from `... -- --add-row --rows 16384`:
+
+| | main | boxed apart |
+|---|---|---|
+| total bytes per element | 12,941 | 12,591 |
+| paint bytes per element | 2,158 | 1,808 |
+| one row added at 16,384 rows, bytes left | 58,483,505 | 52,749,105 |
+
+Paint fell by 22,938,000 bytes at 16,384 rows: 114,690 slots (elements
+and text runs) of 200 bytes less each, which is 350 bytes per element.
+
+Paint's instructions on the rows page (`cargo run --release -p
+vapors-perf -- 60 10 --scaling <change>`, median per frame, the same to
+within 0.1% between runs):
+
+| change | paint at 10,000 rows: main | boxed apart | per extra row, 3000 to 10,000: main | boxed apart |
+|---|---|---|---|---|
+| Insert, insert frames | 123,437,530 | 120,896,863 | 12,512.7 | 12,258.6 |
+| Insert, remove frames | 123,428,526 | 120,888,470 | 12,510.5 | 12,256.5 |
+| Class, add frames | 58,013 | 56,047 | 0.1 | 0.1 |
+| Class, remove frames | 57,423 | 55,562 | 0.1 | 0.1 |
+| Scroll | 13,386 | 13,312 | 0.0 | 0.0 |
+
+The first version cost Insert about 150 instructions more per row: a
+shifted box's checks and move walked its own scene and outline as one
+chained iterator, and the outline now came through an `Option`. Two
+plain loops, the outline's skipped when there is none (`kept_shift.rs`),
+make Insert's paint about 260 instructions per row cheaper than main.
+Scroll's paint then took 52 instructions a frame more than main's.
+Spans around each step of `paint_partial` (a run not kept) put every
+step at or under main's, so the 52 were in how the steps compiled
+together: with the outline and thumbs accessors and `scene_of` always
+inlined, Scroll's paint is 74 instructions a frame under main's.
+
+A scroll container keeps its marks box once its thumbs are painted,
+while they are hidden and shown again, so a touch that toggles them
+allocates and frees no box per container; a repaint of its box makes
+it afresh (`kept_box_marks_tests.rs`).
+
 ## A dropped page (#353)
 
 Live bytes after a settled 10,000-row page is dropped, three times in

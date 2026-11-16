@@ -29,7 +29,8 @@ pub struct ClassifiedRule {
 }
 
 /// Where a declaration is: its sheet (`INLINE_SHEET` for the literal
-/// `style`), rule and declaration index.
+/// `style`, `PRESENTATION_SHEET` for a presentation attribute), rule
+/// and declaration index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Place {
     /// Index into the sheets given to [`analyse`], or `INLINE_SHEET`.
@@ -115,6 +116,7 @@ pub fn analyse(
     let mut rules = Vec::new();
     let mut shareable = true;
     let mut slots = Slots::default();
+    slots.consider_presentation(&presentation(facts)?);
     for (index, sheet) in sheets.iter().enumerate() {
         for rule in rule_indices_for_key(sheet.rules, facts.tag, &classes) {
             let classified = classify_in(sheet, rule, index, facts);
@@ -131,6 +133,19 @@ pub fn analyse(
         custom,
         shareable,
     })
+}
+
+/// The key's literal presentation attributes as declarations, by the
+/// cascade's own reading of them.
+fn presentation(facts: &KeyFacts<'_>) -> Result<Vec<Declaration>, String> {
+    let attribute = |name: &str| {
+        facts
+            .literal_attributes
+            .iter()
+            .find(|(written, _)| *written == name)
+            .map(|(_, value)| *value)
+    };
+    crate::cascade::declarations_of(facts.tag, attribute).map_err(|e| e.message)
 }
 
 /// At most one `own` sheet per origin: the user-agent sheet and the

@@ -49,6 +49,16 @@ https = "8446"
 # threshold = "12"
 # deadline_minutes = "10"
 
+[targets]
+# The most a worktree's build directory may hold, in GB, before every
+# build xtask starts is refused, naming the command that empties it
+# (xtask/src/target_cap.rs). Counted: the files in deps/ and examples/,
+# and incremental/ to cargo's depth, under each target/<profile> and
+# target/<triple>/<profile>; build/, .fingerprint/ and tmp/ are not, so
+# the whole directory can be larger. The 80 is CLAUDE.md's (Builds): the
+# lead's per-target limit, set after the disk filled on 2026-11-09.
+max_gb = "80"
+
 [files]
 # The file-length rule's hard limit (the `files` step of `lint` and `ci`).
 # The guideline of about 200 is `[quality] file_lines` below; a file

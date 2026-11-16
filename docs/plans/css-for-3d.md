@@ -605,6 +605,57 @@ at the mesh, naming the declaration where it has one. Risk 2's note is
 built: `wisp-check` prints a note for each `<Mesh>` that no rule of its
 file, nor its literal `style`, can colour (`scene_notes.rs`).
 
+C4 as built (C4a to C4c): C4a is `vapors_scene3d::pick`
+(`docs/scene3d.md`, Picking, with its cost against mesh count). C4b
+routes hits in vapors-elements, which does not know the scene:
+`Dom::watch_hits(scene anchor, surface name, source)` keeps a source per
+`scene` anchor, one per surface. When `Painted::hit` lands on that
+`gpu-surface`, `Document::hit` asks the source with the point from the
+surface's content box, the box's size, and `takes(anchor)`
+(`pointer-events: auto` and `visibility: visible`, read from the
+anchor's `SceneUsed`, inherited as for HTML). The anchor answered is the
+target of every pointer path (hover, press, events, touch, tap,
+capture), so `:hover` and `:active` go on it and its ancestors through
+`set_flag_chain`. Pointer events bubble from the anchor up its parents:
+the mesh anchor, its group anchors, the scene anchor, then the scene
+anchor's HTML ancestors (in the example, `.stage` and `body`); the
+surface element is not on that path, as the scene anchor is its sibling,
+not its child. Where the source answers no node, the surface is the
+target, as it is over the surface's border (the source is not asked
+there) and while the source asks about an anchor added since the last
+update. A source's error, an answer outside its scene or one that does
+not take the pointer, a question about a node that is no anchor of the
+scene, and a surface whose box cannot be read leave the surface the
+target and are refused by the next update (once per message), which
+`take_changed` makes due. `cursor` over a scene anchor is its
+`SceneUsed` cursor. `Dom::hits_moved(scene anchor)` makes the next
+update test the hover again when the pointer is over that surface or
+one of the scene's anchors, and does nothing otherwise; a still scene
+under a still pointer tests nothing. The document does the same itself
+when a watched scene, or a part of one holding the hovered anchor, is
+removed, and when a restyle changes whether one of its anchors takes
+the pointer, since an anchor has no box for the changed hits to name.
+`Document::cursor` and the hover each ask the source, so a pointer move
+over a scene asks twice.
+
+C4c: `<Scene>` watches its hits on its surface before its children
+mount. Its source runs `pick`, skipping every mesh whose anchor does
+not take the pointer, and answers the picked node's anchor; a mesh the
+application added to the scene (no anchor) blocks the pointer and is
+answered as nothing, so the surface is the target. A refused pick is
+its error. Each transform write calls `hits_moved`.
+`<Scene>` takes no `meshes` prop (lead decision, 2026-11-15): a
+`GeometryHandle` shares its piece's `Geometry` with the `Meshes`
+(`Rc`), which holds it while `held_by_a_handle` (a strong count above
+its own one) says so, so `pick` reads each node's triangles through
+its handle and no prop can be forgotten. The other required props,
+still `Option`s refused at mount, are issue #392. The one-scene
+example's group is `.spin`, and `.spin:hover .two` colours the middle
+cube while its script rests the pointer over the middle of the surface
+(every other 10 s); `confirm` and a pixel test hold it. The renderer
+uploads each piece through the node's handle too, so `pick` and the
+frame read the same triangles.
+
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
 per-style appearance slot with `Instances` (D7); keyframe animations on

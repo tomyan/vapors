@@ -17,13 +17,16 @@ try {
  // Model the separate visual-viewport height reported as Android's browser bars appear.
  for(const height of [650,780,600]) {
   await page.evaluate(h=>{Object.defineProperty(visualViewport,'height',{configurable:true,get:()=>h});visualViewport.dispatchEvent(new Event('resize'));},height);
-  await page.waitForFunction(h=>Math.abs(document.querySelector('canvas').getBoundingClientRect().height-h)<1,height,{timeout:2000});
-  await page.waitForFunction(h=>{const s=JSON.parse(document.querySelector('#status').textContent);return Object.values(s.targets).every(([x,y,w,height])=>y>=0&&y+height<=h+1);},height);
+  // The demo bar (crates/web-demo/src/bar.rs), once shown, takes its height off the canvas.
+  await page.waitForFunction(h=>{const bar=document.getElementById('demo-bar');const taken=bar&&!bar.hidden?bar.offsetHeight:0;return Math.abs(document.querySelector('canvas').getBoundingClientRect().height-(h-taken))<1;},height,{timeout:2000});
+  await page.waitForFunction(()=>{const s=JSON.parse(document.querySelector('#status').textContent);const c=document.querySelector('canvas').getBoundingClientRect().height;return Object.values(s.targets).every(([x,y,w,height])=>y>=0&&y+height<=c+1);});
   const s=await state();records.push({visualHeight:height,state:s});
   await page.screenshot({path:`${output}/viewport-${height}.png`});
  }
  const s=await state();const [x,y,w,h]=s.targets.gas;const cdp=await page.context().newCDPSession(page);
- await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:x+w/2,y:y+h/2}]});
+ // targets are the canvas's coordinates; the demo bar puts the canvas lower
+ const [cx,cy]=await page.evaluate(()=>{const r=document.querySelector('canvas').getBoundingClientRect();return [r.left,r.top];});
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:cx+x+w/2,y:cy+y+h/2}]});
  await page.waitForFunction(()=>JSON.parse(document.querySelector('#status').textContent).speed>10);
  // A real main-thread stall reproduces the previous >250ms pause path.
  await page.evaluate(()=>{const end=performance.now()+400;while(performance.now()<end){};});

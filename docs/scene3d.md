@@ -41,7 +41,7 @@ the field; nothing is clamped.
 ```rust
 let scene = Rc::new(RefCell::new(Scene::new()));
 let meshes = Rc::new(RefCell::new(Meshes::new()));
-let square = meshes.borrow_mut().geometry(positions, indices)?; // a GeometryHandle
+let square = meshes.borrow_mut().geometry(positions, indices, shades)?; // a GeometryHandle
 let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
 let surface = app.mount("view", Box::new(renderer))?;
 ```
@@ -52,11 +52,20 @@ let surface = app.mount("view", Box::new(renderer))?;
   node's id is refused (`StoreError::Stale`), never another node's.
 - The root names the active camera by `CameraHandle`; none, two, or an
   unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
-- `Meshes::geometry` validates triangles and returns a
+- `Meshes::geometry(positions, indices, shades)` takes a shade from 0
+  to 1 for each position (one-scene D4, row R1): the vertex is drawn
+  in that fraction of the node's colour (multiplied on the
+  sRGB-encoded channels, as the racer's baked shades were; not linear
+  light), so one CSS colour gives a
+  shaded solid without lights or normals; the shade does not follow
+  the camera. Not one shade per position, or one outside 0 to 1, is
+  refused; there is no default. It validates triangles and returns a
   `GeometryHandle`: a counted claim, cloned to share and not `Copy`
   (lead decision (B), 2026-11-14). A mesh node holds a clone in
   `NodeKind::Mesh`, so a piece is held while the application keeps a
-  handle or any mesh node names it. Once the last handle is dropped,
+  handle or any mesh node names it. A handle shares the piece itself
+  (`GeometryHandle::geometry`), so `pick` reads a node's triangles
+  through its handle and needs no `Meshes` (lead decision, C4c). Once the last handle is dropped,
   `Meshes::release_unclaimed` releases it; each render runs that sweep
   and drops the renderer's buffers for every released piece
   (`RendererLog::made` and `freed` of `Resource::Geometry` count them). A
@@ -74,7 +83,8 @@ let surface = app.mount("view", Box::new(renderer))?;
 ## What a frame does
 
 `SceneRenderer::render` runs `Scene::update`, uploads each piece of
-geometry a mesh names that this renderer has not uploaded, writes the
+geometry a mesh names that this renderer has not uploaded (16 bytes a
+vertex: position and shade), writes the
 uniform slot (80 bytes: world matrix and colour) of each mesh whose
 world version changed since this renderer wrote it, writes the camera
 (64 bytes) when it changed, and draws each mesh, depth-tested. Every
@@ -82,6 +92,55 @@ upload, write and draw goes through `SurfaceFrame::work`, so
 `FrameCounts::surfaces` holds them. An idle frame writes nothing; a
 moved node writes its subtree's slots; a recoloured mesh writes its
 own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
+
+## Picking
+
+`pick(scene, PickAt { point, size }, skip)` returns the nearest
+visible mesh under a surface point, or `None`
+(`vapors-scene3d/src/pick.rs`). It casts a ray from the active camera
+through the point, using the same view-projection the renderer draws
+with (`Scene::view_projection`). It tests the ray against each mesh's
+bounds in the mesh's own space, then tests the triangles of each mesh
+whose bounds the ray enters. Only hits between the near and far planes
+count. Hidden meshes and those `skip` returns true for are passed over.
+Of meshes hit at exactly the same depth, the first in draw order
+(parents before children) wins, which is the one the renderer's `Less`
+depth test shows. A point outside the surface (`0..=size` on each axis)
+picks nothing.
+
+It refuses (`PickError`): a size that is not finite and positive, a
+point that is not finite, no resolvable active camera, a projection
+refused at the surface's aspect, a camera whose view-projection or its
+inverse is not finite, and a visible mesh whose world matrix has no
+finite inverse.
+
+How often it runs: once per pointer move over the surface (twice with
+`Document::cursor`, which asks again), and once per update while the
+pointer rests over a scene in which a node moved, since each transform
+write calls `Dom::hits_moved` and that update tests the hover again.
+A scene animated every frame under a resting pointer is picked once a
+frame: in the one-scene example (4 meshes) that is under 2.2 µs a frame
+(the 10-mesh row below, every triangle tested); at 10,000 meshes, up
+to 2.1 ms a frame (the p95 of the last row). Each moving node also
+borrows the document once a frame for `hits_moved`, which returns
+after checking the hovered element. A still scene, or a pointer away
+from it, picks nothing. Cost grows linearly with mesh count. Figures from `cargo run --release -p vapors-scene3d
+--example pick_cost`, on an i5-10500T at load average 1.0, 2026-11-14:
+the lowest median and lowest 95th percentile per row over six runs of
+200 picks each, unit cubes of 12 triangles in a column:
+
+| Meshes | Bounds tests only (ray misses all): median, p95 | Every triangle tested (ray enters all): median, p95 |
+|---|---|---|
+| 10 | 0.87 µs, 0.88 µs | 2.2 µs, 2.2 µs |
+| 100 | 5.9 µs, 6.0 µs | 18 µs, 19 µs |
+| 1,000 | 55 µs, 55 µs | 182 µs, 188 µs |
+| 10,000 | 573 µs, 608 µs | 1.89 ms, 2.09 ms |
+
+That is about 57 ns a mesh for the bounds test and about 130 ns more
+for each mesh whose 12 triangles are tested. There is no spatial index,
+so every mesh's bounds are tested on every pick. The finiteness checks
+and the length-relative parallel test cost 10 to 20% over the first
+version, measured side by side.
 
 ## In a template
 

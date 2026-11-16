@@ -15,7 +15,7 @@ impl DocumentInput {
     pub(super) fn window_focus(&mut self, document: &Rc<RefCell<Document>>, focused: bool) {
         if !focused {
             self.held = super::route::Held::default();
-            self.touch.forget();
+            self.touch.forget(vapors_platform::Instant::now());
         }
         Document::window_focus(document, focused);
     }
@@ -28,6 +28,7 @@ impl DocumentInput {
                 Document::pointer_moved(document, point);
             }
             Action::Press(point, clicks, modifiers) => {
+                self.touch.stop_fling();
                 Document::pointer_pressed_with(document, point, clicks, modifiers);
             }
             Action::Release(point, modifiers) => {
@@ -45,28 +46,29 @@ impl DocumentInput {
             Action::DoubleTap(_) => {}
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
+                self.touch.stop_fling();
                 let now = vapors_platform::Instant::now();
                 self.wheel
                     .scroll(&mut document.borrow_mut(), point, delta, now);
             }
             Action::TouchDown(id, point) => {
-                self.touch.down(id, point);
+                self.touch.down(id, point, vapors_platform::Instant::now());
                 Document::touch_pressed(document, id, point);
             }
             Action::TouchMove(id, point) => Document::touch_moved(document, id, point),
             Action::Pan(delta) => self.pan(document, delta),
+            Action::Fling(velocity, at) => self.released(&document.borrow(), velocity, at),
             Action::TouchUp(id, point) => {
-                self.touch.up(id);
+                self.touch.up(id, vapors_platform::Instant::now());
                 Document::touch_released(document, id, point);
             }
             Action::TouchCancel(id, point) => {
-                self.touch.up(id);
+                self.touch.up(id, vapors_platform::Instant::now());
                 Document::touch_cancelled(document, id, point);
             }
         }
-        document
-            .borrow_mut()
-            .set_thumbs_shown(self.touch.thumbs_shown());
+        self.touch
+            .draw_thumbs(&mut document.borrow_mut(), vapors_platform::Instant::now());
     }
 }
 
@@ -75,7 +77,11 @@ impl DocumentInput {
     /// which holds the RELAXED ownership rule and cancels the touches).
     fn pan(&mut self, document: &Rc<RefCell<Document>>, delta: [f32; 2]) {
         if Document::touch_panned(document) {
-            self.touch.pan(&mut document.borrow_mut(), delta);
+            self.touch.pan(
+                &mut document.borrow_mut(),
+                delta,
+                vapors_platform::Instant::now(),
+            );
         }
     }
 }

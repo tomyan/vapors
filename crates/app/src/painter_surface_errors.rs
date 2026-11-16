@@ -72,6 +72,7 @@ pub(super) fn describe(error: &PaintError, f: &mut fmt::Formatter<'_>) -> fmt::R
             limit,
         } => too_large(f, surface, [*width, *height], *limit),
         PaintError::Renderer { surface, error } => renderer(f, surface, error),
+        PaintError::Shape(error) => fmt::Display::fmt(error, f),
     }
 }
 

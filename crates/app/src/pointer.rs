@@ -6,7 +6,7 @@
 //! nothing more there. A wheel scrolls
 //! where the pointer is. A touch is a pointer of its own (3-E1b) and
 //! clicks only as its tap, so one tap is one click; its down and up
-//! also bound a gesture whose pans scroll.
+//! also bound a gesture whose pans scroll and whose fling coasts.
 
 use vapors_elements::{Modifiers, Point};
 use vapors_platform::{Event, TouchPhase};
@@ -34,6 +34,9 @@ pub(crate) enum Action {
     TouchMove(u64, Point),
     /// The fingers moved: scroll by this delta (CSS pixels).
     Pan([f32; 2]),
+    /// The gesture's finger lifted moving: fling at this velocity (CSS
+    /// pixels per second, the way the scroll moves) from this time.
+    Fling([f32; 2], vapors_platform::Instant),
     /// A finger (by id) lifted at a point; the last ends the gesture.
     TouchUp(u64, Point),
     /// The platform took a finger (by id) at a point.
@@ -63,6 +66,7 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
+        Event::Fling { vx, vy, at } => Some(Action::Fling([-vx / scale, -vy / scale], *at)),
         Event::Touch { id, phase, x, y } => Some(touch(*id, *phase, css(*x, *y))),
         _ => None,
     }

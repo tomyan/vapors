@@ -112,7 +112,7 @@ fn allocate(
     });
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("scene3d mesh slots"),
-        layout: &pipeline.mesh_layout,
+        layout: &pipeline.layouts.node,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {

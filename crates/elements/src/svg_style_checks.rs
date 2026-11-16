@@ -2,8 +2,10 @@
 //! on an `svg`, CSS sizes (it is sized by its attributes only), being
 //! inline (inline-block content, not built), percentage padding
 //! (`layout::replaced` reads lengths only) and a border-radius (no
-//! rounded clip); on a `path`, a colour, `display` or visibility of its
-//! own, since all of an icon's paths are drawn in its svg's.
+//! rounded clip); on a `path`, `display` or visibility of its own,
+//! since all of an svg's paths are shown with it, and paint that draws
+//! nothing (no fill, and no stroke or one of no width). Which route
+//! draws the paths is `svg_route`'s.
 
 use vapors_dom::NodeId;
 
@@ -20,7 +22,7 @@ pub(crate) fn reasons(arena: &Arena, node: NodeId, used: &UsedMap) -> Vec<String
     }
     let parent = arena.get(node, "svg_style_checks").parent;
     match parent.and_then(|parent| used.get(&parent)) {
-        Some(svg) if crate::svg::is(arena, node, "path") => path(own, svg),
+        Some(svg) if crate::svg::is_shape(arena, node) => path(own, svg),
         _ => Vec::new(),
     }
 }
@@ -64,17 +66,28 @@ fn relative_padding(style: &taffy::Style) -> bool {
 
 fn path(own: &Used, svg: &Used) -> Vec<String> {
     let mut found = Vec::new();
-    if own.text.color != svg.text.color {
-        found.push("has a color of its own, and every path of an icon is stroked in its svg's color; set color on the svg instead".to_owned());
-    }
     if own.layout.display == taffy::Display::None {
         found.push(
-            "has display: none, and an icon draws every one of its paths; remove the path instead"
+            "has display: none, and an svg draws every one of its paths; remove the path instead"
                 .to_owned(),
         );
     }
     if own.visible != svg.visible {
-        found.push("has a visibility of its own, and an icon's paths are shown with their svg; set visibility on the svg instead".to_owned());
+        found.push("has a visibility of its own, and an svg's paths are shown with their svg; set visibility on the svg instead".to_owned());
+    }
+    if crate::svg_route::paints_nothing(own) {
+        found.push(format!(
+            "paints nothing: it has no fill, and {}; give it a fill or a stroke, or remove it",
+            no_stroke(own)
+        ));
     }
     found
+}
+
+fn no_stroke(own: &Used) -> String {
+    if own.svg.stroke.is_none() {
+        "no stroke".to_owned()
+    } else {
+        format!("a stroke-width of {}", own.svg.stroke_width)
+    }
 }

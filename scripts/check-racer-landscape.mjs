@@ -23,7 +23,9 @@ try {
     }
     await page.screenshot({path:`${output}/${width}-paused.png`});
     const [x,y,w,h]=paused.targets.gas;
-    await page.mouse.move(x+w/2,y+h/2); await page.mouse.down();
+    // targets are the canvas's coordinates; the demo bar puts the canvas lower
+    const [cx,cy]=await page.evaluate(()=>{const r=document.querySelector('canvas').getBoundingClientRect();return [r.left,r.top];});
+    await page.mouse.move(cx+x+w/2,cy+y+h/2); await page.mouse.down();
     await page.waitForFunction(()=>JSON.parse(document.querySelector('#status').textContent).speed>20);
     await page.screenshot({path:`${output}/${width}-driving.png`});
     await page.mouse.up();

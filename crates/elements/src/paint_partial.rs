@@ -53,7 +53,7 @@ pub(crate) fn paint_partial(
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
     crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
-    let shown_last = kept.then_some(painted.from.thumbs_shown);
+    let shown_last = kept.then_some(painted.from.thumb_alpha);
     let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
     let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
     let mut repaint = Repaint::new(boxes, rects, &order);
@@ -125,7 +125,7 @@ fn dropped(again: &[(usize, BoxFrom)], changed: &ChangedSlots, len: usize, paint
         }
     }
     let past = len.min(painted.kept_boxes.len());
-    let past: Vec<KeptBox> = painted.kept_boxes.drain(past..).flatten().collect();
+    let past: Vec<KeptBox> = painted.kept_boxes.drain_from(past).flatten().collect();
     for gone in past {
         gone.drop_from(painted);
     }

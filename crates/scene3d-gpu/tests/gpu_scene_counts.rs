@@ -13,10 +13,12 @@ use vapors_scene3d_gpu::SceneRenderer;
 
 /// A mesh node's uniform: its world matrix and colour, 20 floats.
 const MESH_BYTES: u64 = 80;
-/// The camera's view-projection, 16 floats.
-const CAMERA_BYTES: u64 = 64;
-/// The test square: 4 positions of 3 floats and 6 `u32` indices.
-const SQUARE_BYTES: u64 = 4 * 12 + 6 * 4;
+/// The camera's view-projection, 16 floats, and the backing's size, 2
+/// floats padded to 4 (`vapors_renderer::projective`).
+const CAMERA_BYTES: u64 = 80;
+/// The test square: 4 vertices of 4 floats (position and shade) and 6
+/// `u32` indices.
+const SQUARE_BYTES: u64 = 4 * 16 + 6 * 4;
 
 /// Two squares sharing one piece of geometry, a camera, and a renderer
 /// that has drawn them once; the first square's node, and that frame's work.

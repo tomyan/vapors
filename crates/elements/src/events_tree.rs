@@ -151,15 +151,21 @@ pub(crate) fn deliver(
 
 /// `click` on `target`, bubbling, with its default action around it:
 /// a checkbox flips before the listeners run and fires `input` and
-/// `change` after them, unless one prevented the click (`checkbox`);
-/// other elements have none yet (a label's and a link's come with
-/// them). Nothing for a target no longer in the document.
+/// `change` after them, unless one prevented the click (`checkbox`); a
+/// link on the click's path is followed after them, unless one
+/// prevented it (`link.rs`); a label's comes with labels. Nothing for a
+/// target no longer in the document.
 pub(crate) fn dispatch_click(document: &Rc<RefCell<Document>>, target: NodeId, event: Event) {
     let Some(target) = document.borrow().still_in(target) else {
         return;
     };
     let was = crate::checkbox::before_click(document, target);
+    let link = crate::link::on_path(document, target);
+    let modifiers = event.modifiers();
     let prevented = dispatch_bubbling(document, target, event);
+    if let Some(link) = link.filter(|_| !prevented) {
+        crate::link::follow(document, link, modifiers);
+    }
     if let Some(was) = was {
         crate::checkbox::after_click(document, target, was, prevented);
     }

@@ -61,7 +61,9 @@ impl ImageView {
             Event::Character(text) => self.key(text),
             // the releases of what is held happen outside and never come
             Event::WindowFocus { focused: false } => self.steering = Steering::default(),
+            // the image view pans without momentum
             Event::Key { .. }
+            | Event::Fling { .. }
             | Event::Tap { .. }
             | Event::OpenRequested
             | Event::Paste

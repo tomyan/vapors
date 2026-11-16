@@ -18,6 +18,8 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub use vapors_pixels as pixels;
 
 mod frames;
+mod listed;
+pub use listed::{DEMOS, Kind, Listed, listed, neighbours, stepped};
 mod later;
 mod mounts;
 pub use mounts::register_thumbnails;
@@ -59,19 +61,18 @@ pub struct Demo {
 /// The demo shown when the page has no `?demo=`.
 pub const INDEX: &str = "index";
 
-/// The demo named `name`.
+/// The elements demo named `name`, or the index.
 ///
 /// # Errors
-/// An unknown name, listing the names there are.
+/// An unknown name, listing the names in [`DEMOS`].
 pub fn find(name: &str) -> Result<Demo, String> {
-    let demos = all();
-    let names: Vec<&str> = demos.iter().map(|d| d.name).collect();
-    demos
+    all()
         .into_iter()
         .find(|demo| demo.name == name)
         .ok_or_else(|| {
+            let names: Vec<&str> = DEMOS.iter().map(|demo| demo.name).collect();
             format!(
-                "no demo is called `{name}`; the demos are {}, and image",
+                "no demo is called `{name}`; the demos are {}",
                 names.join(", ")
             )
         })

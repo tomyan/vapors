@@ -34,12 +34,9 @@ fn kept(own: bool, outline: bool, thumb: bool) -> KeptBox {
     };
     let mut own_part = Part::default();
     own_part.scene = scene(own);
-    KeptBox {
-        from,
-        own: own_part,
-        outline: scene(outline),
-        thumb: scene(thumb),
-    }
+    let mut kept = KeptBox::new(from, own_part, scene(outline));
+    kept.set_thumb(scene(thumb));
+    kept
 }
 
 /// Slot 0 with a scroll thumb, slot 1 inside it, then their outlines.

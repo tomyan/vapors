@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use super::inline::{INLINE_SHEET, INLINE_SPECIFICITY};
+use super::presentation::{PRESENTATION_SHEET, PRESENTATION_SPECIFICITY};
 use super::{CascadeRule, Environment, Origin};
 use crate::Position;
 use crate::ast::{ComponentValue, Declaration};
@@ -58,21 +59,68 @@ pub(crate) struct Winners<'a> {
     pub(crate) custom: BTreeMap<&'a str, Candidate<&'a [ComponentValue]>>,
 }
 
-/// The winners among the rules that match `element`, and the
-/// declarations of its `style` attribute (`inline`).
+/// The declarations attached to an element rather than matched: its
+/// presentation attributes and its `style` attribute.
+#[derive(Clone, Copy)]
+pub(crate) struct Attached<'a> {
+    pub(crate) presentation: &'a [Declaration],
+    pub(crate) inline: &'a [Declaration],
+}
+
+/// The winners among the element's presentation attributes, the rules
+/// that match `element`, and the declarations of its `style`
+/// attribute. Presentation attributes go first, so an author rule of
+/// equal standing (`*`) beats them by coming later.
 pub(crate) fn winners<'a, E: Element>(
     rules: impl Iterator<Item = &'a CascadeRule>,
     element: &E,
     env: &Environment,
-    inline: &'a [Declaration],
+    attached: Attached<'a>,
 ) -> Winners<'a> {
     let mut winners = Winners {
         longhands: vec![None; PROPERTIES.len()],
         custom: BTreeMap::new(),
     };
+    winners.consider_attached(attached.presentation, PRESENTATION);
     for rule in rules {
+        winners.consider_rule(rule, element, env);
+    }
+    winners.consider_attached(attached.inline, INLINE);
+    winners
+}
+
+/// Where the presentation attributes stand: author normal,
+/// specificity 0, first, so an author rule of equal standing beats
+/// them by coming later.
+const PRESENTATION: Standing = Standing {
+    rank: 1,
+    specificity: PRESENTATION_SPECIFICITY,
+    order: 0,
+    sheet: PRESENTATION_SHEET,
+};
+
+/// Where the `style` attribute stands: above every selector, last.
+const INLINE: Standing = Standing {
+    rank: 1,
+    specificity: INLINE_SPECIFICITY,
+    order: usize::MAX,
+    sheet: INLINE_SHEET,
+};
+
+impl<'a> Winners<'a> {
+    /// Each of `declarations`, attached to the element, at `standing`,
+    /// ranked author normal or author important as each says.
+    fn consider_attached(&mut self, declarations: &'a [Declaration], standing: Standing) {
+        for decl in declarations {
+            let rank = rank(Origin::Author, decl.important);
+            self.consider(decl, Standing { rank, ..standing });
+        }
+    }
+
+    /// Each declaration of `rule`, when it matches `element`.
+    fn consider_rule<E: Element>(&mut self, rule: &'a CascadeRule, element: &E, env: &Environment) {
         if !rule.conditions.hold(element, env) || !matches(&rule.rule.selector, element) {
-            continue;
+            return;
         }
         let specificity = rule.rule.selector.specificity();
         for decl in &rule.rule.declarations {
@@ -82,22 +130,10 @@ pub(crate) fn winners<'a, E: Element>(
                 order: rule.order,
                 sheet: rule.sheet,
             };
-            winners.consider(decl, standing);
+            self.consider(decl, standing);
         }
     }
-    for decl in inline {
-        let standing = Standing {
-            rank: rank(Origin::Author, decl.important),
-            specificity: INLINE_SPECIFICITY,
-            order: usize::MAX,
-            sheet: INLINE_SHEET,
-        };
-        winners.consider(decl, standing);
-    }
-    winners
-}
 
-impl<'a> Winners<'a> {
     /// Let one declaration compete for the properties it sets.
     fn consider(&mut self, decl: &'a Declaration, standing: Standing) {
         let Standing {

@@ -5,6 +5,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod hits;
 pub mod keyed;
 pub mod rows;
 
@@ -27,14 +28,17 @@ pub struct Signals {
     pub shown: Signal<bool>,
 }
 
+/// The page is the first field, so it is dropped (and disposed) first,
+/// while the app runs; a preference since its nodes' removal takes a
+/// closed loop or an unmounted renderer as nothing to draw again.
 pub struct Rig {
+    pub page: ScenePage,
     pub doc: Rc<RefCell<Document>>,
     pub app: ElementsApp,
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
     pub log: Rc<RendererLog>,
-    pub page: ScenePage,
     pub signals: Signals,
 }
 
@@ -117,13 +121,13 @@ impl Rig {
         let body = doc.borrow().body();
         let page = ScenePage::mount(&doc, body, props);
         Self {
+            page,
             doc,
             app,
             scene,
             meshes,
             surface,
             log,
-            page,
             signals,
         }
     }
@@ -135,6 +139,6 @@ pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryHandle {
     let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
     meshes
         .borrow_mut()
-        .geometry(positions, vec![0, 1, 2, 0, 2, 3])
+        .geometry(positions, vec![0, 1, 2, 0, 2, 3], vec![1.0; 4])
         .unwrap()
 }

@@ -28,6 +28,8 @@ pub struct DocumentInput {
     /// Where the pointer last moved, in CSS pixels; `None` before.
     pointer: Option<Point>,
     touch: crate::touch_scroll::TouchScroll,
+    /// The touch thumbs' fade at the last frame (`advance_fling`).
+    thumbs: crate::thumb_fade::Phase,
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last reported; `None` once the host showed its own.
     cursor: Option<Cursor>,
@@ -54,6 +56,7 @@ impl DocumentInput {
         Self {
             pointer: None,
             touch: crate::touch_scroll::TouchScroll::default(),
+            thumbs: crate::thumb_fade::Phase::Hidden,
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
             held: route::Held::default(),
@@ -128,6 +131,7 @@ impl DocumentInput {
         platform: &Platform,
     ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
+        let (flinging, fading) = (self.flinging(), self.touch_thumbs_fading());
         if let Some(action) = action {
             self.act(document, action);
         }
@@ -143,7 +147,10 @@ impl DocumentInput {
         }
         self.paste_if(document, event, platform);
         self.tooltip_event(&document.borrow(), event, action, Instant::now());
-        let changed = document.borrow_mut().take_changed();
+        // a fling or a thumb fade the event started needs a frame to move
+        // on: a first touch on nothing painted changes nothing else (#413)
+        let started = (!flinging && self.flinging()) || (!fading && self.touch_thumbs_fading());
+        let changed = document.borrow_mut().take_changed() || started;
         let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);
@@ -182,12 +189,16 @@ fn point_of(action: Action) -> Option<Point> {
         | Action::TouchMove(_, p)
         | Action::TouchUp(_, p)
         | Action::TouchCancel(_, p) => Some(p),
-        Action::Leave | Action::Pan(_) => None,
+        Action::Leave | Action::Pan(_) | Action::Fling(..) => None,
     }
 }
 
 #[path = "document_input_act.rs"]
 mod act;
+#[path = "document_input_fling.rs"]
+mod fling;
+pub(crate) use fling::curve_carries;
+pub use fling::{CURVE_SPEED_LIMIT, FlingError, MAX_FLING_SPEED};
 #[path = "document_input_keys.rs"]
 mod keys;
 use keys::key;

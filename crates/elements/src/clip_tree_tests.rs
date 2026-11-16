@@ -5,9 +5,9 @@ use super::ClipTree;
 fn freeing_a_slot_missing_from_its_parents_group_is_refused() {
     // Given: slot 1's parent is 0, whose group does not hold it
     let mut tree = ClipTree {
-        parent: vec![None, Some(0)],
-        depth: vec![0, 1],
-        dependents: vec![Vec::new(), Vec::new()],
+        parent: vec![None, Some(0)].into(),
+        depth: vec![0, 1].into(),
+        dependents: vec![Vec::new(), Vec::new()].into(),
     };
 
     // When
@@ -18,9 +18,9 @@ fn freeing_a_slot_missing_from_its_parents_group_is_refused() {
 fn freeing_a_slot_and_its_parent_together_leaves_both_groups_empty() {
     // Given: 0 above 1 above 2
     let mut tree = ClipTree {
-        parent: vec![None, Some(0), Some(1)],
-        depth: vec![0, 1, 2],
-        dependents: vec![vec![1], vec![2], Vec::new()],
+        parent: vec![None, Some(0), Some(1)].into(),
+        depth: vec![0, 1, 2].into(),
+        dependents: vec![vec![1], vec![2], Vec::new()].into(),
     };
 
     // When: 1 freed before its child 2
@@ -28,5 +28,5 @@ fn freeing_a_slot_and_its_parent_together_leaves_both_groups_empty() {
 
     // Then
     assert!(tree.dependents.iter().all(Vec::is_empty), "{tree:?}");
-    assert_eq!(tree.parent, [None, None, None]);
+    assert_eq!(*tree.parent, [None, None, None]);
 }

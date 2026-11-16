@@ -3,34 +3,42 @@
 //! lives, the application's and the one each mesh node naming it holds
 //! (`NodeKind::Mesh`), and releases it at its next sweep
 //! ([`Meshes::release_unclaimed`](crate::Meshes::release_unclaimed))
-//! once the last is dropped.
+//! once the last is dropped. The handle shares the piece itself, so
+//! what reads a node's triangles on the CPU ([`crate::pick`]) needs no
+//! `Meshes` (lead decision, C4c: a mistake made impossible rather than
+//! refused).
 
 use std::fmt;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
-use crate::GeometryId;
+use crate::{Geometry, GeometryId};
 
 /// A shared, counted claim on one piece of geometry: clone it to share
 /// it, drop it to give it up. Not `Copy`: a copy would claim nothing.
 #[derive(Clone)]
 pub struct GeometryHandle {
     id: GeometryId,
-    claim: Rc<GeometryId>,
+    geometry: Rc<Geometry>,
 }
 
 impl GeometryHandle {
-    /// A first handle to `id`, and what its `Meshes` keeps to see when
-    /// the last handle is dropped.
-    pub(crate) fn claim(id: GeometryId) -> (Self, Weak<GeometryId>) {
-        let claim = Rc::new(id);
-        let watch = Rc::downgrade(&claim);
-        (Self { id, claim }, watch)
+    /// A first handle to `geometry`, issued as `id`, sharing what its
+    /// `Meshes` keeps.
+    pub(crate) fn claim(id: GeometryId, geometry: &Rc<Geometry>) -> Self {
+        let geometry = Rc::clone(geometry);
+        Self { id, geometry }
     }
 
     /// The piece's id, which renderers key their buffers by.
     #[must_use]
     pub fn id(&self) -> GeometryId {
         self.id
+    }
+
+    /// The piece's triangles.
+    #[must_use]
+    pub fn geometry(&self) -> &Geometry {
+        &self.geometry
     }
 }
 
@@ -44,8 +52,12 @@ impl Eq for GeometryHandle {}
 
 impl fmt::Debug for GeometryHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let claims = Rc::strong_count(&self.claim);
-        write!(f, "GeometryHandle({}, {claims} handles)", self.id)
+        let references = Rc::strong_count(&self.geometry);
+        write!(
+            f,
+            "GeometryHandle({}, {references} references: each handle's, and its Meshes' while it holds the piece)",
+            self.id
+        )
     }
 }
 

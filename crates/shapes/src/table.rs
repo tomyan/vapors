@@ -19,7 +19,7 @@ pub use crate::table_error::TableError;
 /// by a compiler with another format is refused at the merge: equal
 /// canonical bytes must mean equal geometry across crates (D3), and a
 /// changed flattening tolerance or tessellator changes this number.
-pub const TABLE_FORMAT: u32 = 1;
+pub const TABLE_FORMAT: u32 = 3;
 
 /// One crate's shapes, emitted by the compiler as a `static`.
 #[derive(Debug)]
@@ -43,7 +43,7 @@ pub struct ShapeEntry {
     /// recomputes it.
     pub hash: u64,
     /// What is drawn.
-    pub geometry: Geometry,
+    pub geometry: Geometry<'static>,
 }
 
 impl ShapeTable {
@@ -189,6 +189,7 @@ fn check_entry(entry: &ShapeEntry) -> Result<(), String> {
             entry.hash
         ));
     }
+    crate::canonical::paint_of(entry.canonical)?;
     check_geometry(&entry.geometry)
 }
 

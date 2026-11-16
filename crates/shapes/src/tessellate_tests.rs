@@ -3,7 +3,7 @@
 //! tolerance or width and a shape without area are refused naming it.
 
 use super::*;
-use crate::mesh::{FAR_EDGE, check_mesh};
+use crate::mesh_check::check_mesh;
 
 const FILL: Paint = Paint::Fill(FillRule::NonZero);
 const TOLERANCE: f32 = 0.05;
@@ -25,8 +25,8 @@ fn refused(data: &str, paint: Paint, tolerance: f32) -> String {
 fn area(mesh: &Mesh) -> f32 {
     mesh.triangles
         .iter()
-        .map(|[a, b, c]| {
-            let (p, q, r) = (a.position, b.position, c.position);
+        .map(|t| {
+            let [p, q, r] = t.corners.map(|c| c.position);
             ((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])).abs() / 2.0
         })
         .sum()
@@ -36,10 +36,8 @@ fn area(mesh: &Mesh) -> f32 {
 fn outline_edges(mesh: &Mesh) -> usize {
     mesh.triangles
         .iter()
-        .flat_map(|t| t.iter().flat_map(|v| v.edges))
-        .filter(|d| *d != FAR_EDGE)
-        .count()
-        / 3
+        .map(|t| (0..3).filter(|&edge| t.on_outline(edge)).count())
+        .sum()
 }
 
 #[test]
@@ -66,7 +64,7 @@ fn a_stroked_line_is_a_quad_of_its_width() {
     let ys: Vec<f32> = mesh
         .triangles
         .iter()
-        .flat_map(|t| t.iter().map(|v| v.position[1]))
+        .flat_map(|t| t.corners.iter().map(|c| c.position[1]))
         .collect();
     assert!(ys.iter().all(|y| (y.abs() - 1.0).abs() < 1e-5), "{ys:?}");
 }
@@ -90,7 +88,7 @@ fn a_filled_circle_of_arcs_covers_its_area_within_the_flattening() {
     let furthest = mesh
         .triangles
         .iter()
-        .flat_map(|t| t.iter().map(|v| v.position))
+        .flat_map(|t| t.corners.iter().map(|c| c.position))
         .map(|p| ((p[0] - 8.0).powi(2) + (p[1] - 8.0).powi(2)).sqrt())
         .fold(0.0f32, f32::max);
     assert!(furthest < 6.0 + 0.005, "{furthest}");
@@ -108,7 +106,7 @@ fn an_arc_sweeps_in_the_direction_its_flag_says() {
     let ys = |m: &Mesh| -> Vec<f32> {
         m.triangles
             .iter()
-            .flat_map(|t| t.iter().map(|v| v.position[1]))
+            .flat_map(|t| t.corners.iter().map(|c| c.position[1]))
             .collect()
     };
     assert!(ys(&over).iter().all(|y| *y <= 1e-5), "{:?}", ys(&over));

@@ -13,6 +13,9 @@ rust-version = "1.99"
 # Test scratch directories that delete themselves; /tmp is a tmpfs whose
 # inodes ran out on 2026-11-02.
 tempfile = "3.27.0"
+# Compile-fail fixtures: a test that a program must not compile (a
+# dropped top-level component's mount, refused by #[must_use]).
+trybuild = "1.0.122"
 clap = { version = "4", features = ["derive"] }
 wgpu = "30"
 # wgpu's shader front end, for the tests that read a shader's layout
@@ -106,6 +109,16 @@ cognitive_complexity = "warn"
 # in its #44 (26 GB to 8.7 GB for a full build).
 [profile.dev]
 debug = "line-tables-only"
+
+# Judged performance runs (`vapors-perf --scaling`, `cargo xtask
+# scaling`, the nightly judge): release with one codegen unit, so a judged
+# number does not move with how the compiler splits the code. lane3
+# measured on 2026-11-15 that 16 units moved Insert's layout by about 64
+# per row with no change in behaviour, where 1 unit showed 2.4.
+# `crates/perf/src/build_profile.rs` refuses a judged run built otherwise.
+[profile.judged]
+inherits = "release"
+codegen-units = 1
 
 # Test builds only: the 3000-row kept_shift tests spend their time in
 # debug-build code and hit nextest's 60 s limit under load; measured in the PR.

@@ -12,12 +12,15 @@ fn path_attributes_outside_the_subset_are_refused_naming_the_fix() {
     for (changes, says) in [
         (&[("d", "")][..], &["<path>", "d", "required"][..]),
         (&[("d", "M2 8S1 1 2 2")][..], &["<path>", "byte 4"]),
-        (&[("fill", "")][..], &["fill=\"none\""]),
-        (&[("fill", "red")][..], &["fill=\"none\""]),
-        (&[("stroke", "")][..], &["stroke=\"currentColor\""]),
-        (&[("stroke", "#fff")][..], &["stroke=\"currentColor\""]),
-        (&[("stroke-width", "0")][..], &["stroke-width", "positive"]),
-        (&[("stroke-width", "1px")][..], &["stroke-width", "no unit"]),
+        (&[("stroke", "")][..], &["paints nothing", "no stroke"]),
+        (
+            &[("stroke-width", "0")][..],
+            &["paints nothing", "stroke-width of 0"],
+        ),
+        (
+            &[("stroke-width", "thick")][..],
+            &["stroke-width attribute", "\"thick\""],
+        ),
         (
             &[("transform", "scale(2)")][..],
             &["transform", "not in the icon subset"],
@@ -59,8 +62,7 @@ fn a_path_outside_an_svg_is_refused() {
 #[test]
 fn a_path_styled_apart_from_its_svg_is_refused() {
     for (css, says) in [
-        ("color: red;", &["<path>", "color"][..]),
-        ("display: none;", &["<path>", "display"]),
+        ("display: none;", &["<path>", "display"][..]),
         ("visibility: hidden;", &["<path>", "visibility"]),
     ] {
         // Given

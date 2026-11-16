@@ -51,8 +51,12 @@ pub struct Stats {
 /// # Errors
 ///
 /// sccache missing, or its server unable to start or answer, or one
-/// running with another local cache size.
+/// running with another local cache size; or the worktree's build
+/// directory over its cap (`target_cap.rs`).
 pub fn apply(command: &mut Command) -> Result<(), String> {
+    // the cap first: it needs no server, and an over-full disk can be
+    // why one would not start
+    crate::target_cap::check()?;
     ready()?;
     command.envs(ENV);
     Ok(())

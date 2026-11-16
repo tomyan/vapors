@@ -84,6 +84,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ),
     ("cursor", Read),
     ("display", Read),
+    ("fill", Read),
     ("filter", Deferred("F3")),
     ("flex-basis", Read),
     ("flex-direction", Read),
@@ -137,9 +138,14 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("row-gap", Read),
     ("scrollbar-color", Read),
     ("scrollbar-width", Read),
+    ("stroke", Read),
+    ("stroke-width", Read),
     ("text-align", Read),
     ("text-decoration", Deferred("a slice after F2c")),
     ("top", Read),
+    // lifting this: svgs on the shapes route are flattened for the
+    // viewport's scale only (`svg_shapes_paint.rs`); pass the transformed
+    // scale there too
     ("transform", Deferred("a slice after F2c")),
     ("transition-delay", Deferred("a slice after F2c")),
     ("transition-duration", Deferred("a slice after F2c")),

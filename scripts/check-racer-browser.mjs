@@ -20,7 +20,10 @@ async function open(viewport){
  await until(page,()=>document.querySelector('#error').textContent||document.querySelector('#status').textContent.startsWith('{'));
  assert.equal(await page.locator('#error').innerText(),'');return page;
 }
-async function click(page,name){const s=await state(page);const [x,y,w,h]=s.targets[name];await page.mouse.click(x+w/2,y+h/2);}
+// Targets are the canvas's coordinates (the racer's document); the demo bar
+// (crates/web-demo/src/bar.rs) puts the canvas below the top of the page.
+const canvasAt=page=>page.evaluate(()=>{const r=document.querySelector('canvas').getBoundingClientRect();return [r.left,r.top];});
+async function click(page,name){const s=await state(page);const [x,y,w,h]=s.targets[name];const [cx,cy]=await canvasAt(page);await page.mouse.click(cx+x+w/2,cy+y+h/2);}
 async function capture(page,name){await page.screenshot({path:`${RACER_EVIDENCE}/${name}.png`});}
 try {
  const page=await open({width:1100,height:720});
@@ -55,7 +58,8 @@ try {
   for(const name of ['left','right','gas','brake','toggle','restart','tune']){
    const [x,y,w,h]=s.targets[name];assert(w>=44&&h>=44);assert(x>=0&&x+w<=width&&y>=0&&y+h<=700);
   }
-  const point=(name,id)=>{const [x,y,w,h]=s.targets[name];return {x:x+w/2,y:y+h/2,id};};
+  const [cx,cy]=await canvasAt(phone);
+  const point=(name,id)=>{const [x,y,w,h]=s.targets[name];return {x:cx+x+w/2,y:cy+y+h/2,id};};
   const cdp=await phone.context().newCDPSession(phone);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point('gas',1)]});
   await until(phone,()=>JSON.parse(document.querySelector('#status').textContent).speed>10);

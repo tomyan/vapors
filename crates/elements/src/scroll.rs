@@ -24,6 +24,10 @@ struct Offset {
     at: [f32; 2],
     max: [f32; 2],
     settled: [[f32; 2]; 2],
+    /// How opaque its own thumbs are drawn, 0 to 255 (`thumb.rs`), and
+    /// as last settled.
+    alpha: u8,
+    settled_alpha: u8,
 }
 
 impl Offsets {
@@ -37,6 +41,23 @@ impl Offsets {
         self.by_node
             .get(&node)
             .map(|offset| (offset.at, offset.max))
+    }
+
+    /// How opaque `node`'s own thumbs are drawn, 0 (hidden) to 255.
+    pub(crate) fn alpha(&self, node: NodeId) -> u8 {
+        self.by_node.get(&node).map_or(0, |offset| offset.alpha)
+    }
+
+    /// Draws `node`'s own thumbs at `alpha` from the next update, which
+    /// settles and repaints them as a scroll does; whether it changed
+    /// (false when `node` is not a scroll container).
+    pub(crate) fn set_alpha(&mut self, node: NodeId, alpha: u8) -> bool {
+        let Some(offset) = self.by_node.get_mut(&node).filter(|o| o.alpha != alpha) else {
+            return false;
+        };
+        offset.alpha = alpha;
+        self.scrolled.push(node);
+        true
     }
 
     /// Clamps the offsets to the laid-out `boxes`, where `scrolls` says
@@ -69,18 +90,22 @@ impl Offsets {
 
     /// Clamps the offset of `node`, the scroll container in box `index`
     /// of `boxes`, and returns it as `settle` does; and whether the
-    /// offset or the range, unrounded, differs from when it was last
-    /// settled (exact), which moves its thumbs.
+    /// offset or the range, unrounded, or its thumbs' alpha differs from
+    /// when it was last settled (exact), which repaints its thumbs.
     pub(crate) fn settle_box(
         &mut self,
         node: NodeId,
         (boxes, lanes, index): (&[LayoutBox], &Lanes, usize),
         scale: f32,
     ) -> ([f32; 2], bool) {
-        let was = self.by_node.get(&node).map(|offset| bits(offset.settled));
+        let was = self
+            .by_node
+            .get(&node)
+            .map(|o| (bits(o.settled), o.settled_alpha));
         let offset = self.clamped(node, (boxes, lanes), index);
         self.by_node.insert(node, offset);
-        (applied(offset.at, scale), was != Some(bits(offset.settled)))
+        let now = (bits(offset.settled), offset.settled_alpha);
+        (applied(offset.at, scale), was != Some(now))
     }
 
     /// Drops the offset of `node`, which no longer scrolls.
@@ -107,10 +132,13 @@ impl Offsets {
         let max = range(laid, index);
         let at = self.get(node).unwrap_or_default();
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
+        let alpha = self.alpha(node);
         Offset {
             at,
             max,
             settled: [at, max],
+            alpha,
+            settled_alpha: alpha,
         }
     }
 

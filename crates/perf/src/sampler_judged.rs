@@ -3,14 +3,11 @@
 //! time from the app's own timer, read back in the frame after it.
 
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use vapors_platform::Start;
-use vapors_renderer::pipelines::{Built, built};
-
-use super::{FRAME_DEADLINE, Measured, Sampler};
+use super::start::Apps;
+use super::{Measured, Sampler};
 use crate::gpu_reading::frame_gpu_time;
-use crate::gpu_time::wait;
 use crate::run::{Counts, Workload};
 
 /// One frame of the run, as it is judged and reported.
@@ -68,12 +65,11 @@ impl Sampler<'_> {
             return Err("a judged run of 0 frames judges nothing; give it at least one".into());
         }
         let texture = self.texture(workload.size());
-        let start_up = self.start(workload, texture.format())?;
+        let start_up = self.begin(workload, texture.format(), Apps::Started)?;
         let (mut kept, mut waiting) = (Vec::with_capacity(frames), None);
         for index in 0..=frames {
-            let before = built();
-            let measured = self.frame(workload, &texture, index, None)?;
-            nothing_built(index, built().since(before))?;
+            // `frame` refuses one that built a pipeline
+            let measured = self.frame(workload, &texture, (index, Apps::Started), None)?;
             if let Some((before, counts)) = waiting.take() {
                 kept.push(judged(
                     before,
@@ -91,44 +87,6 @@ impl Sampler<'_> {
             frames: kept,
         })
     }
-
-    /// The app's start on this GPU for textures of `format`, timed to
-    /// the GPU's idle after it.
-    fn start(
-        &self,
-        workload: &mut dyn Workload,
-        format: wgpu::TextureFormat,
-    ) -> Result<Duration, String> {
-        let (width, height) = workload.size();
-        let start = Start {
-            adapter: &self.gpu.adapter,
-            device: &self.gpu.device,
-            queue: &self.gpu.queue,
-            format,
-            width,
-            height,
-            scale_factor: 1.0,
-        };
-        let started = Instant::now();
-        let app = workload.app();
-        app.start(&start)
-            .map_err(|error| format!("App::start, before frame 0: {error}"))?;
-        wait(&self.gpu.device, FRAME_DEADLINE)?;
-        Ok(started.elapsed())
-    }
-}
-
-/// Refuses frame `index` when it built a pipeline or shader module:
-/// every one is built in `App::start`, before frame 0 (one-scene F0).
-fn nothing_built(index: usize, built: Built) -> Result<(), String> {
-    if built.is_none() {
-        return Ok(());
-    }
-    Err(format!(
-        "frame {index} built {} render pipelines and {} shader modules through \
-         vapors_renderer::pipelines; fix: build them in App::start, before frame 0",
-        built.pipelines, built.shader_modules
-    ))
 }
 
 /// Frame `index`, kept once its GPU reading `gpu` has come back: a

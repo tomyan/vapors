@@ -5,8 +5,9 @@
 //! the same and the width. Measuring and painting ask for layouts, and
 //! only a run that changed is shaped or broken again. A hit needs the
 //! whole key equal, not only its hash.
-//! A start-aligned run at a width its max-content layout fits in takes
-//! that layout: its lines and glyphs would be the same. Justify is
+//! A start-aligned run at a width its max-content layout fits in, as
+//! the line breaker judges it (`vapors_text::fits`), takes that
+//! layout: its lines and glyphs would be the same. Justify is
 //! left out deliberately, to be conservative. Runs with a negative or
 //! NaN letter spacing are left out too. A reused layout differs from a
 //! fresh one in parley's `layout_max_advance` (`f32::MAX`) and in each
@@ -43,7 +44,7 @@
 
 use std::rc::Rc;
 
-use vapors_text::{Align, FontSystem, Layout, Shaped};
+use vapors_text::{Align, FontSystem, Layout, Shaped, fits};
 
 use super::inline::InlineRun;
 #[cfg(test)]
@@ -82,6 +83,11 @@ impl TextCache {
         let shaped = self.shaped_run(fonts, scale, run, key.shape());
         self.built += 1;
         let layout = Rc::new(shaped.lay_out(width, run.style.align));
+        // one answer with inline_check.rs, which refuses every line the
+        // text crate cannot place as Blink does before it is laid out
+        if let Some(why) = layout.baseline_refusal() {
+            panic!("a run inline_check.rs let through cannot be placed as Blink places it: {why}");
+        }
         self.layouts.insert(key, Rc::clone(&layout));
         layout
     }
@@ -108,9 +114,10 @@ impl TextCache {
     /// entries holding one layout would each count as a holder of the
     /// other, and a sweep would never drop either. The conditions: the
     /// run is start-aligned, so its lines do not move within the width,
-    /// and no line is wider than `width`, so none breaks. The layout's
-    /// `layout_max_advance` and each line's `inline_max_coord` are those
-    /// of the max-content layout, not of one built at `width`.
+    /// and every line fits `width` (`vapors_text::fits`), so none
+    /// breaks. The layout's `layout_max_advance` and each line's
+    /// `inline_max_coord` are those of the max-content layout, not of
+    /// one built at `width`.
     fn unwrapped(&mut self, run: &InlineRun, key: &Key, width: Option<f32>) -> Option<Rc<Layout>> {
         let width = width?;
         if !reusable(run) {
@@ -153,12 +160,6 @@ fn reusable(run: &InlineRun) -> bool {
     matches!(run.style.align, Align::Start)
         && spacing(&run.style)
         && run.spans.iter().all(|span| spacing(&span.style))
-}
-
-/// Whether a line `content` wide fits `available`. A NaN or infinite
-/// number on either side does not fit, so it is laid out, not reused.
-fn fits(content: f32, available: f32) -> bool {
-    content.is_finite() && available.is_finite() && content <= available
 }
 
 #[cfg(test)]

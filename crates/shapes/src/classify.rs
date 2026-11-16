@@ -1,6 +1,7 @@
 //! The classifier (docs/plans/one-scene.md 1.2): a path that is
-//! exactly an axis-aligned rectangle, or two arcs forming one circle or
-//! ellipse, is drawn as a closed form; every other path is a mesh.
+//! exactly an axis-aligned rectangle, square-cornered or rounded
+//! (`classify_round`), or two arcs forming one circle or ellipse, is
+//! drawn as a closed form; every other path is a mesh.
 //! Only exact forms are taken: a shape the closed form would draw
 //! differently from the path is a path, which the tessellator draws
 //! exactly, so nothing here is refused.
@@ -15,12 +16,15 @@ use crate::segment::Segment;
 /// What a path is drawn as.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Classified {
-    /// An axis-aligned rectangle with square corners.
+    /// An axis-aligned rectangle, its corners square or rounded.
     Rect {
         /// Its top-left corner.
         origin: [f32; 2],
         /// Width and height, both above zero.
         size: [f32; 2],
+        /// Corner radii `rx`, `ry`: both zero, or both above zero and
+        /// at most half the side.
+        radius: [f32; 2],
     },
     /// An ellipse; a circle when the radii are equal.
     Ellipse {
@@ -39,6 +43,9 @@ pub fn classify(path: &IconPath, paint: Paint) -> Classified {
     let segments = path.segments();
     if let Some(corners) = rect_corners(segments, paint) {
         return rect(corners);
+    }
+    if let Some(round) = crate::classify_round::round_rect(segments, paint) {
+        return round;
     }
     if let Some((from, radii, to)) = circle_arcs(segments) {
         return ellipse(from, radii, to);
@@ -82,7 +89,11 @@ fn rect(corners: [Point; 4]) -> Classified {
         return Classified::Path;
     }
     let origin = [p0.x.min(p2.x), p0.y.min(p2.y)];
-    Classified::Rect { origin, size }
+    Classified::Rect {
+        origin,
+        size,
+        radius: [0.0, 0.0],
+    }
 }
 
 /// Whether the four sides are axis-aligned and alternate.
@@ -175,7 +186,8 @@ fn ellipse(from: Point, [rx, ry]: [f32; 2], to: Point) -> Classified {
     } else {
         return Classified::Path;
     };
-    if offset > TOLERANCE * scale {
+    // a radius the closed-form check refuses stays a path
+    if offset > TOLERANCE * scale || rx.min(ry) < crate::geometry::MIN_RADIUS {
         return Classified::Path;
     }
     let centre = [f32::midpoint(from.x, to.x), f32::midpoint(from.y, to.y)];

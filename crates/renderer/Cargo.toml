@@ -12,9 +12,16 @@ publish = false
 tracing.workspace = true
 wgpu.workspace = true
 vapors-scene.workspace = true
+# The closed-form pipeline draws the shapes crate's checked geometry
+# (closed_form_shape.rs), so what can be drawn has one answer.
+vapors-shapes.workspace = true
 
 [dev-dependencies]
 naga.workspace = true
+# matrices for the scene-pass shape tests (tests/support/projective.rs):
+# the scene's own projection, so the tests see the matrices it draws with
+glam.workspace = true
+vapors-scene3d.workspace = true
 vapors-gpu-harness.workspace = true
 pollster.workspace = true
 

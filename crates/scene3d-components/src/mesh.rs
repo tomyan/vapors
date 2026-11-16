@@ -77,6 +77,10 @@ impl Mesh {
         );
         let sink = appearance_sink(mounted.placement.clone());
         dom.borrow_mut().watch_appearance(mounted.anchor, sink);
+        let (placement, anchor) = (&mounted.placement, mounted.anchor);
+        mounted
+            .owner
+            .with(|| placement.hits.name(placement.node, anchor));
         Self { mounted }
     }
 }

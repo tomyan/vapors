@@ -38,9 +38,19 @@ fn every_kind_of_change_is_named_in_the_frame_it_is_due() {
     // Then
     assert_eq!(names(125), "click light 1");
     assert_eq!(names(313), "cube 3 hidden");
-    assert_eq!(names(625), "click light 2, cube 3 shown");
+    assert_eq!(
+        names(625),
+        "click light 2, cube 3 shown, pointer over the cubes"
+    );
+    assert_eq!(
+        names(1250),
+        "click light 1, cube 3 shown, pointer off the cubes"
+    );
     assert_eq!(names(938), "cube 3 hidden, night on");
-    assert_eq!(names(1875), "click light 3, cube 3 shown, night off");
+    assert_eq!(
+        names(1875),
+        "click light 3, cube 3 shown, night off, pointer over the cubes"
+    );
     assert_eq!(names(1), "");
 }
 
@@ -49,4 +59,56 @@ fn the_group_turns_with_the_clock() {
     // Then
     assert!(turn(Duration::ZERO).abs() < f32::EPSILON);
     assert!((turn(Duration::from_secs(2)) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn the_pointer_rests_over_the_cubes_in_every_other_ten_seconds() {
+    // Given
+    let at = |millis| pointing(Duration::from_millis(millis));
+
+    // When
+    let (before, opened, closed, again) = (at(9_999), at(10_000), at(20_000), at(30_000));
+
+    // Then
+    assert_eq!((before, opened, closed, again), (false, true, false, true));
+}
+
+#[test]
+fn the_hovered_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
+    // Given: frame 1100 (17.6 s) is in the pointer's window, light 2
+    // lit by the click at frame 1000
+    let now = expected(1100);
+
+    // When
+    let middle = now.cube(HOVER_CUBE);
+
+    // Then
+    assert!(now.hovered && now.lit[HOVER_CUBE]);
+    assert_eq!(middle, (GROUP_HOVER, true));
+}
+
+#[test]
+fn a_lit_cube_the_hover_does_not_colour_keeps_its_lit_colour() {
+    // Given: light 1, lit at frame 875, in the window at frame 1100
+    let now = expected(1100);
+
+    // When
+    let first = now.cube(0);
+
+    // Then
+    assert!(now.hovered && now.lit[0]);
+    assert_eq!(first.0, LIT);
+}
+
+#[test]
+fn outside_the_window_the_lit_middle_cube_is_lit() {
+    // Given: frame 500 (8 s), light 2 lit at frame 250
+    let now = expected(500);
+
+    // When
+    let middle = now.cube(HOVER_CUBE);
+
+    // Then
+    assert!(!now.hovered);
+    assert_eq!(middle.0, LIT);
 }

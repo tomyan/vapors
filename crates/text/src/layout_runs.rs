@@ -4,6 +4,7 @@
 use parley::Alignment;
 use vapors_scene::Color;
 
+use crate::baseline::{BaselineRule, line_shift};
 use crate::layout_types::{Align, Glyph, GlyphRun};
 
 pub(crate) fn run_offset(line: &parley::Line<'_, Color>, run: &parley::Run<'_, Color>) -> f32 {
@@ -13,19 +14,23 @@ pub(crate) fn run_offset(line: &parley::Line<'_, Color>, run: &parley::Run<'_, C
         .sum()
 }
 
-pub(crate) fn glyph_runs(layout: &parley::Layout<Color>) -> Vec<GlyphRun> {
+/// Each line's glyph runs, moved onto the baseline `rule` gives the line
+/// (`baseline.rs`); left on Parley's when the rule is unresolvable.
+pub(crate) fn glyph_runs(layout: &parley::Layout<Color>, rule: &BaselineRule) -> Vec<GlyphRun> {
     layout
         .lines()
         .flat_map(|line| {
-            line.items().filter_map(|item| match item {
-                parley::PositionedLayoutItem::GlyphRun(run) => Some(glyph_run(&run)),
+            let shift = line_shift(&line, rule, 1.0).unwrap_or(0.0);
+            line.items().filter_map(move |item| match item {
+                parley::PositionedLayoutItem::GlyphRun(run) => Some(glyph_run(&run, shift)),
                 parley::PositionedLayoutItem::InlineBox(_) => None,
             })
         })
         .collect()
 }
 
-fn glyph_run(run: &parley::GlyphRun<'_, Color>) -> GlyphRun {
+/// `run`'s glyphs, moved down by `shift` onto the line's baseline.
+fn glyph_run(run: &parley::GlyphRun<'_, Color>, shift: f32) -> GlyphRun {
     let inner = run.run();
     GlyphRun {
         font: inner.font().clone(),
@@ -42,7 +47,7 @@ fn glyph_run(run: &parley::GlyphRun<'_, Color>) -> GlyphRun {
             .map(|g| Glyph {
                 id: g.id,
                 x: g.x,
-                y: g.y,
+                y: g.y + shift,
                 advance: g.advance,
             })
             .collect(),

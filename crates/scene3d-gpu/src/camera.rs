@@ -1,15 +1,16 @@
-//! The active camera's view-projection: one uniform every mesh draws
-//! through, written only when it changed.
+//! The active camera's view-projection and the backing's size in device
+//! pixels (`vapors_renderer::projective`'s camera uniform): one uniform
+//! every mesh draws through, written only when it changed.
 
 use crate::FrameError;
 use crate::pipeline::{CAMERA_BYTES, Pipeline};
 use vapors_app::{SurfaceFrame, SurfaceSize};
-use vapors_scene3d::{Mat4, NodeKind, Scene};
+use vapors_scene3d::{Mat4, Scene};
 
 pub(crate) struct CameraUniform {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    written: Option<Mat4>,
+    written: Option<(Mat4, SurfaceSize)>,
 }
 
 impl CameraUniform {
@@ -22,7 +23,7 @@ impl CameraUniform {
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene3d camera"),
-            layout: &pipeline.camera_layout,
+            layout: &pipeline.layouts.camera,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: buffer.as_entire_binding(),
@@ -35,21 +36,25 @@ impl CameraUniform {
         }
     }
 
-    /// Writes `view_projection` through `frame.work` unless it is the one
-    /// last written.
+    /// Writes `view_projection` and the backing's size through
+    /// `frame.work` unless they are the ones last written.
     pub(crate) fn write(&mut self, frame: &SurfaceFrame<'_>, view_projection: Mat4) {
-        if self.written == Some(view_projection) {
+        let now = (view_projection, frame.size);
+        if self.written == Some(now) {
             return;
         }
+        #[allow(clippy::cast_precision_loss)] // texture sizes are at most 2^14
+        let size = [frame.size.width as f32, frame.size.height as f32, 0.0, 0.0];
         let bytes: Vec<u8> = view_projection
             .to_cols_array()
             .into_iter()
+            .chain(size)
             .flat_map(f32::to_le_bytes)
             .collect();
         frame
             .work
             .write_buffer(frame.queue, &self.buffer, 0, &bytes);
-        self.written = Some(view_projection);
+        self.written = Some(now);
     }
 
     pub(crate) fn bind_group(&self) -> &wgpu::BindGroup {
@@ -57,21 +62,11 @@ impl CameraUniform {
     }
 }
 
-/// World space to clip space through the active camera: its projection
-/// for the backing's aspect, times the inverse of its world matrix.
+/// World space to clip space through the active camera at the
+/// backing's aspect ([`Scene::view_projection`], which `pick` uses too).
 /// `scene` must be updated.
 pub(crate) fn view_projection(scene: &Scene, size: SurfaceSize) -> Result<Mat4, FrameError> {
-    let camera = scene.active_camera()?;
-    let NodeKind::Camera { projection, .. } = scene.kind(camera)? else {
-        return Err(FrameError::ActiveCameraNotCamera(camera));
-    };
     #[allow(clippy::cast_precision_loss)] // texture sizes are at most 2^14
     let aspect = size.width as f32 / size.height as f32;
-    let view = scene.world(camera)?.inverse();
-    let view_projection = projection.matrix(aspect)? * view;
-    if view_projection.is_finite() {
-        Ok(view_projection)
-    } else {
-        Err(FrameError::CameraNotFinite(camera))
-    }
+    Ok(scene.view_projection(aspect)?)
 }

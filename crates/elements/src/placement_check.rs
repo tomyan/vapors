@@ -45,10 +45,10 @@ impl Before {
     pub(crate) fn of(scroll: &Offsets, kept: &Placement) -> Self {
         Self {
             scroll: scroll.clone(),
-            rects: kept.rects.clone(),
-            paddings: kept.paddings.clone(),
-            offsets: kept.offsets.clone(),
-            framed: kept.framed.clone(),
+            rects: kept.rects.to_vec(),
+            paddings: kept.paddings.to_vec(),
+            offsets: kept.offsets.to_vec(),
+            framed: kept.framed.to_vec(),
         }
     }
 }

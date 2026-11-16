@@ -208,5 +208,7 @@ fn a_key_placed_twice_is_refused() {
     Slots::default().place(built);
 }
 
+#[path = "slots_capacity_tests.rs"]
+mod capacity_tests;
 #[path = "slots_root_tests.rs"]
 mod root;

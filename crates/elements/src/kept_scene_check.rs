@@ -97,7 +97,7 @@ fn unnamed(item: Item) -> Item {
             surface: SurfaceId(0),
             rect,
         },
-        Item::Shadow(_) | Item::Quad(_) => item,
+        Item::Shadow(_) | Item::Quad(_) | Item::Shape(_) => item,
     }
 }
 

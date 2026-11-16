@@ -10,8 +10,11 @@ use super::standing::{Slot, Standing};
 use super::value::is_constant;
 use super::winners::{ClassifiedRule, Constancy, Place, Winner};
 use crate::ast::Declaration;
-use crate::cascade::{INLINE_SHEET, INLINE_SPECIFICITY, Origin, initial, is_parent_relative, rank};
+use crate::cascade::{
+    INLINE_SHEET, INLINE_SPECIFICITY, Origin, PRESENTATION_SHEET, initial, is_parent_relative, rank,
+};
 use crate::property::{PROPERTIES, PropertyId, Specified, contains_var};
+use crate::selector::Specificity;
 
 pub(super) struct Slots {
     longhands: Vec<Slot<Specified>>,
@@ -49,6 +52,26 @@ impl Slots {
                 declaration,
             };
             self.consider(decl, standing, place, always);
+        }
+    }
+
+    /// The key's presentation attributes: author normal, specificity 0
+    /// and no order, so every author rule of equal standing beats them,
+    /// as `collect::winners` ranks them by considering them first.
+    pub(super) fn consider_presentation(&mut self, presentation: &[Declaration]) {
+        for (declaration, decl) in presentation.iter().enumerate() {
+            let standing = Standing {
+                rank: rank(Origin::Author, false),
+                specificity: Specificity::default(),
+                sheet: PRESENTATION_SHEET,
+                order: None,
+            };
+            let place = Place {
+                sheet: PRESENTATION_SHEET,
+                rule: 0,
+                declaration,
+            };
+            self.consider(decl, standing, place, true);
         }
     }
 

@@ -130,7 +130,7 @@ impl Document {
     }
 
     /// The field's used text style, once styled.
-    fn text_style(&self, node: NodeId) -> Option<TextStyle> {
+    pub(crate) fn text_style(&self, node: NodeId) -> Option<TextStyle> {
         let kept = self.kept.as_ref()?;
         kept.used.get(&node).map(|used| used.text)
     }

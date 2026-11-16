@@ -71,6 +71,13 @@ pub(super) const SECOND_HALF: &[PropertyDef] = &[
     def("row-gap", false, "normal", GAP),
     def("scrollbar-color", true, "auto", "auto | <color> <color>"),
     def("scrollbar-width", false, "auto", "auto | thin | none"),
+    def("stroke", true, "none", "none | <color>"),
+    def(
+        "stroke-width",
+        true,
+        "1px",
+        "<length [0,inf]> | <number [0,inf]>",
+    ),
     def(
         "text-align",
         true,

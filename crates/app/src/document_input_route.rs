@@ -10,7 +10,8 @@
 //!   or cancel, so a drag that leaves the document still ends there; a
 //!   press or touch-down on the host takes the document's focus away, as
 //!   a click outside a page's control blurs it;
-//! - a pan goes where its gesture's first touch-down went;
+//! - a pan, and the fling at its end, go where its gesture's first
+//!   touch-down went;
 //! - a tap and the wheel go by hit at their own position;
 //! - keys and typed text go to the document while one of its elements
 //!   has focus, and a key's up goes where its down went (as a press's
@@ -128,7 +129,7 @@ impl DocumentInput {
             Action::TouchUp(id, p) | Action::TouchCancel(id, p) => {
                 self.held.touches.remove(&id).unwrap_or_else(|| by_hit(p))
             }
-            Action::Pan(_) => self.held.gesture.unwrap_or(Route::Host),
+            Action::Pan(_) | Action::Fling(..) => self.held.gesture.unwrap_or(Route::Host),
         })
     }
 }

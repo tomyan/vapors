@@ -72,6 +72,14 @@ pub enum Call {
     WatchAppearance {
         node: NodeId,
     },
+    /// The source is not kept: a recording hit tests nothing.
+    WatchHits {
+        node: NodeId,
+        surface: String,
+    },
+    HitsMoved {
+        node: NodeId,
+    },
     AddStyle {
         scope: String,
         css: String,
