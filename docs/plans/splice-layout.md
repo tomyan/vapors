@@ -1244,7 +1244,15 @@ The slices:
 - **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
   is kept in blocks, as the extents index's entries are (`blocks.rs`),
   so a removal or insert moves one block. Accepted when `paint` is
-  within 2% across sizes on remove frames too.
+  within 2% across sizes on remove frames too. The same chunked shape
+  would retire the box rebuild's floor after 4h: an insert or removal
+  in an owner edited in place still moves the tail of its box's
+  children vector (`Vec::insert` and `remove` in `put_edited`), about 8
+  bytes a row, roughly 0.25 instructions a row on the judged profile;
+  everything else in Insert's layout is flat after 4h's change to
+  placement chaining (#443) and to the children edit (positions through
+  the lane, the changed run derived from the edits, the children moved,
+  not cloned). Recorded, not built.
 - **4k. Rows of fractional height framed.** A row's frame shift is its
   start in device pixels rounded as an item's edge is (half up), and the
   row's items are painted from that whole origin, so a row is snapped

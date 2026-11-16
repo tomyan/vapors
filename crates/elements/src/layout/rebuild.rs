@@ -33,6 +33,7 @@ impl KeptBoxes {
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> (Placed, Rebuilt) {
         self.mark_text_marks(source.text_marks.as_ref());
+        self.placed.scanned.set(0);
         let marks = std::mem::take(&mut self.marks);
         let every =
             marks.all || self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits();
@@ -97,12 +98,14 @@ fn rebuild_owners(
     let mut taken = take_owners(placed, owners, &slots);
     let (put, roots) = put_owners(placed, source, owners, &mut taken);
     placed.free_taken(&taken);
-    let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
+    let derived = std::mem::take(&mut taken.reshaped);
+    let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, (&taken, derived));
     rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let (changed, visits) = lend_owners(placed, (&nodes, &slots, &roots), &taken, may_keep);
     rebuilt.to_chain = to_chain(placed, source, (owners, &slots, &roots));
     rebuilt.lend_visits = visits;
+    rebuilt.children_scanned += placed.scanned.get();
     placed.drop_lanes();
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
     rebuilt
@@ -167,7 +170,10 @@ fn lend_owner(
 /// removed no box, and the owner should have been lent as before.
 #[cfg(debug_assertions)]
 fn assert_children_differ(placed: &Placed, slot: usize, taken: &Taken) {
-    let before = taken.boxes.get(&slot).map(|(_, old)| &old.children);
+    let before = taken
+        .old_children
+        .get(&slot)
+        .or_else(|| taken.boxes.get(&slot).map(|(_, old)| &old.children));
     assert!(
         before != Some(&placed.boxes[slot].children),
         "the owner in slot {slot}, edited in place, has the children its box had: it is \

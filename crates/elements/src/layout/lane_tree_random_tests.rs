@@ -44,6 +44,13 @@ fn check_starts<S: Summary>(
     }
     let order: Vec<Handle> = children.iter().map(|&(h, _)| h).collect();
     assert_eq!(tree.handles(), order, "seed {seed}, step {step}");
+    for (index, &handle) in order.iter().enumerate() {
+        assert_eq!(
+            tree.rank(handle),
+            index,
+            "seed {seed}, step {step}, rank of child {index}"
+        );
+    }
 }
 
 /// One edit: an insert at `at` (half the time), a remove, or a resize.

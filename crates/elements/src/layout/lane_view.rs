@@ -23,6 +23,12 @@ pub(super) trait LaneView {
     fn children_between(&self, from: f64, to: f64) -> Vec<(usize, f64)>;
     /// The children from the one in `slot` on, in order.
     fn children_from(&self, slot: usize) -> Vec<usize>;
+    /// The child in `slot`'s index among the lane's children; `None`
+    /// when the lane does not hold it. O(log n) (`LaneTree::rank`).
+    fn index_of(&self, slot: usize) -> Option<usize>;
+    /// How many children the lane holds: a lane over a run of its
+    /// container's children holds fewer than the container.
+    fn len(&self) -> usize;
     /// Calls `each` with the children from the one in `slot` on, in
     /// order, each with its `frame_offset`: one fold to reach it, then
     /// one step a child, allocating nothing.
@@ -62,6 +68,14 @@ impl<K: LaneKind> LaneView for Lane<K> {
 
     fn children_from(&self, slot: usize) -> Vec<usize> {
         Lane::children_from(self, slot)
+    }
+
+    fn index_of(&self, slot: usize) -> Option<usize> {
+        Some(self.tree.rank(*self.handles.get(&slot)?))
+    }
+
+    fn len(&self) -> usize {
+        self.tree.len()
     }
 
     fn each_offset_from(&self, slot: usize, each: &mut dyn FnMut(usize, f64)) {

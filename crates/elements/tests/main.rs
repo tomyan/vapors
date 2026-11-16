@@ -119,6 +119,7 @@ mod lane_batches;
 mod lane_block;
 mod lane_block_stale;
 mod lane_chain;
+mod lane_children;
 mod lane_drift;
 mod lane_flex;
 mod lane_flex_heights;

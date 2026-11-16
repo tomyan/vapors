@@ -119,6 +119,7 @@ impl Document {
         self.counts.boxes_built = built.count();
         self.counts.children_edited = built.edits.edited;
         self.counts.boxes_lend_visited = built.lend_visits;
+        self.counts.children_scanned = built.children_scanned;
         self.counts.children_edits_declined = built.edits.declined;
         self.counts.children_edit_decline = built.edits.decline;
         debug_assert!(

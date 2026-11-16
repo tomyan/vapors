@@ -98,6 +98,8 @@ impl<S: Summary> LaneTree<S> {
         };
         let right = self.alloc(right);
         self.adopt(right);
+        self.resize(node);
+        self.resize(right);
         let parent = match self.nodes[node].parent {
             Some(parent) => parent,
             None => self.new_root(node),
@@ -161,6 +163,7 @@ impl<S: Summary> LaneTree<S> {
             sums: vec![self.fold_of(node)],
         };
         let root = self.alloc(root);
+        self.resize(root);
         self.nodes[node].parent = Some(root);
         self.root = root;
         root

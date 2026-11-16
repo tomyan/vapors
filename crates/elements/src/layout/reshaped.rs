@@ -8,7 +8,7 @@ use super::boxes::LayoutBox;
 use super::slots::Taken;
 
 /// A slot whose box has other children than the box taken from it.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Reshaped {
     pub(crate) slot: usize,
     /// The children at the start and at the end that are the same
@@ -35,6 +35,33 @@ pub(super) fn reshaped(boxes: &[LayoutBox], slot: usize, taken: &Taken) -> Optio
         shared,
         old_between,
     })
+}
+
+/// Panics, naming the slot, when `run`, derived from an owner's edits,
+/// is not the run a compare of its old and new children finds (debug
+/// builds keep the old children, `Taken::old_children`).
+#[cfg(debug_assertions)]
+pub(super) fn assert_derived(boxes: &[LayoutBox], run: &Reshaped, taken: &Taken) {
+    let old = taken.old_children.get(&run.slot).unwrap_or_else(|| {
+        panic!(
+            "the edited owner in slot {} kept no old children to check",
+            run.slot
+        )
+    });
+    let new = &boxes[run.slot].children;
+    let shared = Shared::of(old, new);
+    let compared = Reshaped {
+        slot: run.slot,
+        shared,
+        old_between: old[shared.head..old.len() - shared.tail].to_vec(),
+    };
+    assert_eq!(
+        run, &compared,
+        "the run of slot {}'s children its edits changed, derived from their places, differs \
+         from a compare of its old and new children (layout/slots_edit_places.rs \
+         `reshaped_by`); reproduce with `cargo xtask test`",
+        run.slot
+    );
 }
 
 /// How many children at the start and at the end the old and new lists

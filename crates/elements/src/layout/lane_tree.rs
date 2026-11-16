@@ -70,6 +70,12 @@ pub(crate) struct LaneTree<S> {
     leaf_of: Vec<Slot>,
     free_handles: Vec<u32>,
     pub(super) gap: f64,
+    /// By node, the handles under it: its children in a leaf, its
+    /// children's sizes summed in an inner node (`refold`, `split`), so a
+    /// child's place in the lane is found in O(log n) (`rank`). Kept
+    /// apart from `Node`, whose size the hot walks over it are
+    /// compiled for.
+    pub(super) sizes: Vec<usize>,
 }
 
 impl<S: Summary> LaneTree<S> {
@@ -86,6 +92,7 @@ impl<S: Summary> LaneTree<S> {
             leaf_of: Vec::new(),
             free_handles: Vec::new(),
             gap,
+            sizes: Vec::new(),
         }
     }
 
@@ -147,6 +154,52 @@ impl<S: Summary> LaneTree<S> {
         S::start_of(&self.before(handle), &self.summary(handle), self.gap)
     }
 
+    /// How many children the lane holds.
+    pub(crate) fn len(&self) -> usize {
+        self.size(self.root)
+    }
+
+    /// How many children come before `handle`'s: its index in the lane.
+    pub(crate) fn rank(&self, handle: Handle) -> usize {
+        let (mut node, mut rank) = self.locate(handle);
+        while let Some(parent) = self.nodes[node].parent {
+            let at = self.child_at(parent, node);
+            let before = &self.nodes[parent].children[..at];
+            rank += before
+                .iter()
+                .map(|&child| self.size(child as usize))
+                .sum::<usize>();
+            node = parent;
+        }
+        rank
+    }
+
+    /// The handles under `node`, from its children.
+    pub(super) fn size_of(&self, node: usize) -> usize {
+        let node = &self.nodes[node];
+        if node.leaf {
+            return node.children.len();
+        }
+        node.children
+            .iter()
+            .map(|&child| self.size(child as usize))
+            .sum()
+    }
+
+    /// The handles under `node`, as last worked out.
+    pub(super) fn size(&self, node: usize) -> usize {
+        self.sizes.get(node).copied().unwrap_or(0)
+    }
+
+    /// Notes `node`'s size from its children.
+    pub(super) fn resize(&mut self, node: usize) {
+        let size = self.size_of(node);
+        if self.sizes.len() <= node {
+            self.sizes.resize(node + 1, 0);
+        }
+        self.sizes[node] = size;
+    }
+
     /// The children before `handle`'s, folded.
     pub(super) fn before(&self, handle: Handle) -> S {
         let (mut node, at) = self.locate(handle);
@@ -189,11 +242,14 @@ impl<S: Summary> LaneTree<S> {
         self.refold(node);
     }
 
-    /// Each ancestor of `node` given its child's new fold.
+    /// `node` given its size, and each ancestor its child's new fold and
+    /// its own size.
     fn refold(&mut self, mut node: usize) {
+        self.resize(node);
         while let Some(parent) = self.nodes[node].parent {
             let at = self.child_at(parent, node);
             self.nodes[parent].sums[at] = self.fold(&self.nodes[node].sums);
+            self.resize(parent);
             node = parent;
         }
     }

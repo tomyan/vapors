@@ -162,6 +162,10 @@ pub struct UpdateCounts {
     /// rebuilt box with the box taken from its slot (`Lender::lend_from`);
     /// 0 when every box was built.
     pub boxes_lend_visited: usize,
+    /// Child entries the narrowed rebuild searched or compared one by one:
+    /// where an owner's lane holds every child, its edits are found
+    /// through it in O(log n) and none is counted (4h).
+    pub children_scanned: usize,
     /// Scroll containers whose range the placement walk measured from
     /// their content (4g): those laid out or built again; a container
     /// that only scrolled is clamped to the range it kept.
