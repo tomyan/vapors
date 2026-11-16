@@ -171,13 +171,14 @@ impl<K: LaneKind> Lane<K> {
     }
 
     /// The children whose box or overflow meets `from..=to`, CSS pixels
-    /// from the container's border box top, by slot.
-    pub(super) fn children_between(&self, from: f64, to: f64) -> Vec<usize> {
+    /// from the container's border box top, by slot, each with its start
+    /// from the lane's top plus that top (as `frame_offset` gives it).
+    pub(super) fn children_between(&self, from: f64, to: f64) -> Vec<(usize, f64)> {
         let top = self.facts.top;
-        let handles = self.tree.between(from - top, to - top);
-        handles
+        let starts = self.tree.between_starts(from - top, to - top);
+        starts
             .into_iter()
-            .map(|handle| self.slots[&handle])
+            .map(|(handle, start)| (self.slots[&handle], top + start))
             .collect()
     }
 

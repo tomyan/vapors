@@ -82,8 +82,14 @@ impl Lanes {
 
     /// The children of the lane container in `container` whose box or
     /// overflow meets `from..=to`, CSS pixels from its border box top,
-    /// by slot; none when it has no lane.
-    pub(crate) fn children_between(&self, container: usize, from: f64, to: f64) -> Vec<usize> {
+    /// by slot, each with its offset (`frame_offset`); none when it has no
+    /// lane.
+    pub(crate) fn children_between(
+        &self,
+        container: usize,
+        from: f64,
+        to: f64,
+    ) -> Vec<(usize, f64)> {
         let lane = self.lane(container);
         lane.map_or_else(Vec::new, |lane| lane.children_between(from, to))
     }

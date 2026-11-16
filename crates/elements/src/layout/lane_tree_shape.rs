@@ -50,20 +50,34 @@ impl<S: Summary> LaneTree<S> {
     /// The children whose border box or overflow meets `from..=to`
     /// along the axis, in tree order: O(log n) plus those children and
     /// their nodes' siblings.
+    #[cfg(test)]
     pub(crate) fn between(&self, from: f64, to: f64) -> Vec<Handle> {
+        let starts = self.between_starts(from, to);
+        starts.into_iter().map(|(handle, _)| handle).collect()
+    }
+
+    /// As [`LaneTree::between`], each child with its start: worked out on
+    /// the way down, so the children meeting a view cost no fold each.
+    pub(crate) fn between_starts(&self, from: f64, to: f64) -> Vec<(Handle, f64)> {
         let mut out = Vec::new();
         self.collect(self.root, S::default(), (from, to), &mut out);
         out
     }
 
-    fn collect(&self, node: usize, mut left: S, (from, to): (f64, f64), out: &mut Vec<Handle>) {
+    fn collect(
+        &self,
+        node: usize,
+        mut left: S,
+        (from, to): (f64, f64),
+        out: &mut Vec<(Handle, f64)>,
+    ) {
         let node = &self.nodes[node];
         for (&child, sum) in node.children.iter().zip(&node.sums) {
             let start = S::start_of(&left, sum, self.gap);
             let bounds = sum.bounds();
             if start + bounds.low <= to && start + bounds.reach >= from {
                 if node.leaf {
-                    out.push(self.handle(child));
+                    out.push((self.handle(child), start));
                 } else {
                     self.collect(child as usize, left, (from, to), out);
                 }

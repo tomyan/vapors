@@ -18,8 +18,9 @@ pub(super) trait LaneView {
     /// layout holds its relative offset alone; `None` before its first
     /// write, the layout holding Taffy's value then.
     fn written_start(&self, slot: usize) -> Option<f64>;
-    /// The children whose box or overflow meets `from..=to`.
-    fn children_between(&self, from: f64, to: f64) -> Vec<usize>;
+    /// The children whose box or overflow meets `from..=to`, each with
+    /// its offset (`frame_offset`).
+    fn children_between(&self, from: f64, to: f64) -> Vec<(usize, f64)>;
     /// The children from the one in `slot` on, in order.
     fn children_from(&self, slot: usize) -> Vec<usize>;
     /// Calls `each` with the children from the one in `slot` on, in
@@ -55,7 +56,7 @@ impl<K: LaneKind> LaneView for Lane<K> {
         Lane::frame_offset(self, slot)
     }
 
-    fn children_between(&self, from: f64, to: f64) -> Vec<usize> {
+    fn children_between(&self, from: f64, to: f64) -> Vec<(usize, f64)> {
         Lane::children_between(self, from, to)
     }
 

@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use vapors_scene::Rect;
 
 use super::super::Frames;
+use super::LaneBase;
 
 /// How far each framed lane's children's ink reaches past their boxes,
 /// the most seen: a history, which a paint made afresh does not have,
@@ -26,24 +27,61 @@ impl Frames {
     /// pixels on the page: the children of each framed lane in it whose
     /// box or overflow meets the view as it falls in the frame, a device
     /// pixel wider each way (`LaneTree::between`, O(log children +
-    /// shown) per lane).
+    /// shown) per lane). One search a lane: each child's start comes from
+    /// the same walk, and its frame, made from the lane's template, goes
+    /// in the memo, so no later read of it folds the lane (4f-2b).
     pub(crate) fn lane_frames_meeting(&self, frame: usize, view: Rect) -> Vec<usize> {
-        let (Some(containers), Some(shared)) =
-            (self.lanes.by_parent.get(&frame), &self.lanes.shared)
-        else {
+        let Some(containers) = self.lanes.by_parent.get(&frame) else {
             return Vec::new();
         };
         let in_frame = self.view_in(frame, view);
-        let scale = f64::from(self.scale);
-        let lanes = shared.borrow();
-        let meeting = |container: &usize| {
-            let origin = f64::from(self.lanes.bases[container].origin);
-            let [above, below] = self.lane_ink.0.get(container).copied().unwrap_or_default();
-            let from = (f64::from(in_frame.top) - 1.0) / scale - origin - f64::from(below);
-            let to = (f64::from(in_frame.bottom) + 1.0) / scale - origin + f64::from(above);
-            lanes.children_between(*container, from, to)
-        };
+        let meeting = |&container: &usize| self.lane_rows_meeting(container, in_frame);
         containers.iter().flat_map(meeting).collect()
+    }
+
+    /// The children of the framed lane of `container` meeting `in_frame`,
+    /// the view in its parent frame, each child's frame memoised.
+    fn lane_rows_meeting(&self, container: usize, in_frame: Rect) -> Vec<usize> {
+        let Some(shared) = &self.lanes.shared else {
+            return Vec::new();
+        };
+        let base = self.lanes.bases[&container];
+        let (from, to) = self.lane_interval(container, base, in_frame);
+        let template = self.lane_template(base, self.at(base.parent));
+        let rows = shared.borrow().children_between(container, from, to);
+        let memoise = |(slot, offset): (usize, f64)| {
+            let at = self.lane_child_at(template, base, offset);
+            self.lanes.memo.borrow_mut().insert(slot, at);
+            #[cfg(debug_assertions)]
+            self.assert_memoised_folds(slot, at);
+            slot
+        };
+        rows.into_iter().map(memoise).collect()
+    }
+
+    /// CSS pixels from `container`'s border box top that `in_frame`
+    /// covers, a device pixel wider each way and widened by the ink noted
+    /// past its rows.
+    fn lane_interval(&self, container: usize, base: LaneBase, in_frame: Rect) -> (f64, f64) {
+        let (scale, origin) = (f64::from(self.scale), f64::from(base.origin));
+        let [above, below] = self.lane_ink.0.get(&container).copied().unwrap_or_default();
+        let from = (f64::from(in_frame.top) - 1.0) / scale - origin - f64::from(below);
+        let to = (f64::from(in_frame.bottom) + 1.0) / scale - origin + f64::from(above);
+        (from, to)
+    }
+
+    /// Panics, naming the frame, when `at`, made from the search's start,
+    /// is not the frame a fold of the lane gives: two answers to where a
+    /// row is.
+    #[cfg(debug_assertions)]
+    fn assert_memoised_folds(&self, slot: usize, at: super::super::FrameAt) {
+        let folded = self.resolved_afresh(slot);
+        assert!(
+            folded == at,
+            "lane frame {slot} from the search's start is {at:?}, the lane's fold gives \
+             {folded:?}: `LaneTree::between_starts` and `start` disagree (layout/lane_tree*.rs); \
+             reproduce with `cargo xtask test`"
+        );
     }
 
     /// Notes that ink in a child of the framed lane container
@@ -64,3 +102,7 @@ impl Frames {
         self.lane_ink = std::mem::take(&mut from.lane_ink);
     }
 }
+
+#[cfg(test)]
+#[path = "frames_lane_meeting_tests.rs"]
+mod tests;
