@@ -14,9 +14,9 @@ use std::collections::{HashMap, HashSet};
 use vapors_css::Position;
 use vapors_css::cascade::{ComputedStyle, INLINE_SHEET, PRESENTATION_SHEET};
 use vapors_css::property::PropertyId;
-use vapors_dom::{DeclarationRef, KeyWinners, PropertyRef, SheetRef, StyleKey};
+use vapors_dom::{DeclarationRef, KeyWinners, PropertyRef, StyleKey};
 
-use super::{Sheets, USER_AGENT_SHEET};
+use super::Sheets;
 
 /// Where the cascade's sheets hold a declaration: (sheet, position), or
 /// the inline or presentation sheet by itself.
@@ -52,12 +52,7 @@ impl Sheets {
     /// Each of `winners.sheets` as its index in the cascade, `None` when
     /// absent.
     fn cascade_sheets(&self, winners: &KeyWinners) -> Vec<Option<usize>> {
-        let index = |sheet| match sheet {
-            SheetRef::UserAgent => Some(USER_AGENT_SHEET),
-            SheetRef::Scope(name) | SheetRef::Global(name) => {
-                self.names.iter().position(|held| held == name)
-            }
-        };
+        let index = |sheet| self.held(sheet).map(|held| held.index);
         winners
             .sheets
             .iter()

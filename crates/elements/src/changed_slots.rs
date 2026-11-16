@@ -23,10 +23,18 @@ pub(crate) struct ChangedSlots {
     /// The scroll containers whose offset as applied changed: their
     /// frames' shifts change, and no slot moves (`frames.rs`).
     pub(crate) offsets_moved: Vec<usize>,
+    /// Each lane whose children may start elsewhere, with its first such
+    /// child (`layout/written.rs`): a framed one's frames shift, and no
+    /// slot moves (`frames_lane.rs`).
+    pub(crate) started: Vec<(usize, usize)>,
     /// The scroll containers whose offset or range, unrounded, differs
     /// from when it was last settled (exact): their thumbs move, even
     /// when no slot is built or moved and no offset as applied moved.
     pub(crate) scroll_states: Vec<usize>,
+    /// A lane's children became frames of their own or stopped being
+    /// (`Placed::reframed`): scroll containers in them are in other
+    /// frames, so the scroll frames are made afresh (`paint_frames.rs`).
+    pub(crate) reframed: bool,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are
     /// spliced (`order_splice.rs`) or walked again (`kept_order.rs`).
@@ -37,7 +45,7 @@ pub(crate) struct ChangedSlots {
     pub(crate) shape_changed: bool,
     /// The rebuilt slots whose children differ from the box each
     /// replaced, with the children it had: what the order splice reads.
-    pub(crate) reshaped: Vec<(usize, Vec<usize>)>,
+    pub(crate) reshaped: Vec<crate::layout::Reshaped>,
     /// What patching the stackings found: a rebuilt slot's stacking
     /// changed, or a freed slot held one other than the default.
     pub(crate) stackings: Patched,
@@ -54,7 +62,9 @@ impl ChangedSlots {
             every: false,
             moved: Vec::new(),
             offsets_moved: Vec::new(),
+            started: Vec::new(),
             scroll_states: Vec::new(),
+            reframed: false,
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
@@ -71,7 +81,9 @@ impl ChangedSlots {
             freed: rebuilt.freed,
             moved: Vec::new(),
             offsets_moved: Vec::new(),
+            started: Vec::new(),
             scroll_states: Vec::new(),
+            reframed: false,
             shape_changed: true,
             reshaped: Vec::new(),
             stackings: Patched {

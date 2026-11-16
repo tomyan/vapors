@@ -64,7 +64,10 @@ impl BoxTree<'_> {
         Ok(())
     }
 
-    /// The `children` of the lane laid out again, their leaves set.
+    /// The `children` of the lane laid out again, their leaves set; each
+    /// whose leaf changed noted as moved. Later starts fold from the
+    /// leaves alone, so a child laid out to the leaf it had (a label
+    /// grown in width) starts no later child elsewhere.
     fn lay_out_again<K: LaneKind>(
         &mut self,
         children: Vec<usize>,
@@ -73,8 +76,11 @@ impl BoxTree<'_> {
     ) -> Result<(), LaneDecline> {
         for child in children {
             let leaf = self.leaf_of(child, c, lane)?;
-            lane.tree.set(lane.handle(child), leaf);
-            lane.moved.push(child);
+            let handle = lane.handle(child);
+            if lane.tree.summary(handle) != leaf {
+                lane.tree.set(handle, leaf);
+                lane.moved.push(child);
+            }
         }
         Ok(())
     }
@@ -88,6 +94,10 @@ impl BoxTree<'_> {
         lane: &mut Lane<K>,
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
+        // as paint asks it (`UsedStyle::scrolls`): `overflow: hidden`
+        // clips but makes no scroll frame, so it does not decline
+        let scrolls = self.boxes[slot].style.overflow.x == taffy::Overflow::Scroll;
+        lane.facts.note(slot, &layout, self.scale, scrolls);
         lane.pending.insert(slot, layout);
         if K::reads_heights(&self.boxes[slot].style) {
             lane.height_readers.insert(slot);
@@ -103,7 +113,7 @@ impl BoxTree<'_> {
 /// from the stale slots, whichever are fewer, so a lane of a few
 /// children under many restyled rows, or a long list with a few, costs
 /// the fewer; and the height `readers` when the bases changed.
-fn again(
+pub(super) fn again(
     stale: &FxHashSet<usize>,
     handles: &FxHashMap<usize, Handle>,
     readers: Option<&FxHashSet<usize>>,

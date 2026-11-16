@@ -87,6 +87,7 @@ fixtures![
     image_paint::ImagePaint,
     images::Images,
     inline_text::InlineText,
+    lane_list_paint::LaneListPaint,
     names::Names,
     number::Number,
     outline_paint::OutlinePaint,

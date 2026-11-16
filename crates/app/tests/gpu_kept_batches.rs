@@ -98,7 +98,8 @@ fn gpu_a_box_whose_background_changes_writes_only_its_batch() {
 
     // Then
     assert_eq!((counts.batches_written, counts.batches_kept), (1, 4));
-    assert_eq!(counts.quads.buffer_bytes, 128);
+    // one quad's instance: eight vec4s and its row index, padded
+    assert_eq!(counts.quads.buffer_bytes, 144);
     assert_eq!([pixel(&pixels, 4, 4), pixel(&pixels, 28, 4)], [RED, BLUE]);
 }
 
@@ -113,8 +114,8 @@ fn gpu_a_batch_no_longer_drawn_has_its_bytes_released() {
     classed(&mut doc, 2, "c gone");
     let (pixels, counts) = drawn(&mut rig, &doc);
 
-    // Then: its quad's 128 bytes are gone
-    assert_eq!(counts.retained_bytes, before.retained_bytes - 128);
+    // Then: its quad's 144 bytes are gone
+    assert_eq!(counts.retained_bytes, before.retained_bytes - 144);
     assert_eq!(pixel(&pixels, 28, 4), WHITE);
 }
 
