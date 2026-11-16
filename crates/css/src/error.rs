@@ -4,7 +4,7 @@
 use std::fmt;
 
 /// A position in the stylesheet text, both 1-based.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Position {
     /// Line, starting at 1.
     pub line: u32,

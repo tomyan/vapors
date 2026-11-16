@@ -143,6 +143,15 @@ impl Cascade {
         self.rules.iter().map(|r| &r.rule)
     }
 
+    /// Rule `rule` of the sheet added `sheet`-th (the first `user_agent`
+    /// or `author` call is 0), as `Stylesheet::rules` held it: `add`
+    /// keeps every rule of a sheet, in order.
+    #[must_use]
+    pub fn sheet_rule(&self, sheet: usize, rule: usize) -> Option<&Rule> {
+        let of_sheet = self.rules.iter().filter(|r| r.sheet == sheet);
+        of_sheet.map(|r| &r.rule).nth(rule)
+    }
+
     pub(crate) fn candidate_rules<E: Element>(
         &self,
         element: &E,

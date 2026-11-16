@@ -61,6 +61,7 @@ fn parse_text(path: &str, text: &str, styles: Styles) -> Result<ast::Component, 
         name,
         path: path.to_string(),
         scope: Some(path.to_string()),
+        global_sheet: None,
         text: text.to_string(),
         script: sections.script,
         style: sections.style,
@@ -110,24 +111,38 @@ pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileErr
 /// # Errors
 /// As [`parse_file`]; and a file not under `root`, naming both.
 pub fn parse_file_under(path: &Path, root: &Path) -> Result<ast::Component, CompileError> {
+    let relative = relative_name(path, root)?;
+    let mut component = parse_file(path)?;
+    component.scope = Some(relative);
+    Ok(component)
+}
+
+/// [`parse_file_global`], its sheet named by its path under `root`.
+///
+/// # Errors
+/// As [`parse_file_global`]; and a file not under `root`, naming both.
+pub fn parse_file_global_under(path: &Path, root: &Path) -> Result<ast::Component, CompileError> {
+    let relative = relative_name(path, root)?;
+    let mut component = parse_file_global(path)?;
+    component.global_sheet = Some(relative);
+    Ok(component)
+}
+
+/// `path` under `root`, `/`-separated: the same on every machine.
+fn relative_name(path: &Path, root: &Path) -> Result<String, CompileError> {
     let relative = path.strip_prefix(root).map_err(|_| {
         build::path_error(
             path,
             format!(
-                "is not under {}, which names its style's scope",
+                "is not under {}, which names its style's sheet",
                 root.display()
             ),
         )
     })?;
-    let mut component = parse_file(path)?;
-    component.scope = Some(
-        relative
-            .components()
-            .map(|part| part.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/"),
-    );
-    Ok(component)
+    let parts = relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy());
+    Ok(parts.collect::<Vec<_>>().join("/"))
 }
 
 /// [`compile_file`] for a component whose `<style>` the app adds as a
@@ -148,6 +163,7 @@ pub fn parse_file_global(path: &Path) -> Result<ast::Component, CompileError> {
     let text = read_source(path)?;
     let mut component = parse_text(&path.display().to_string(), &text, Styles::Global)?;
     component.scope = None;
+    component.global_sheet = Some(path.display().to_string());
     Ok(component)
 }
 
