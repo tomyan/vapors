@@ -28,21 +28,17 @@ impl Document {
         let Some(winners) = key.winners.compiled() else {
             return Ok(());
         };
-        let refusal = winners
-            .sheets
-            .iter()
-            .find_map(|&(sheet, compiled)| self.refusal(key, sheet, compiled));
+        let own = |index: usize| {
+            index == 0 && winners.sheets[0].0 == SheetRef::UserAgent
+                || winners.own.is_some_and(|own| usize::from(own) == index)
+        };
+        let mut sheets = winners.sheets.iter().enumerate();
+        let refusal = sheets
+            .find_map(|(index, &(sheet, compiled))| self.refusal(sheet, compiled, own(index)));
         refusal.map_or(Ok(()), |why| Err(format!("{}: {why}", key.site)))
     }
 
-    fn refusal(&self, key: &StyleKey, sheet: SheetRef, compiled: u64) -> Option<String> {
-        let own = match sheet {
-            SheetRef::UserAgent => true,
-            SheetRef::Scope(scope) => Some(scope) == key.scope,
-            // a global component's key has no scope, and its own sheet
-            // is the only global one its winners reference
-            SheetRef::Global(_) => key.scope.is_none(),
-        };
+    fn refusal(&self, sheet: SheetRef, compiled: u64, own: bool) -> Option<String> {
         match self.sheet_hash(sheet) {
             SheetHash::Registered(hash) if hash == compiled => None,
             SheetHash::Registered(hash) => Some(format!(

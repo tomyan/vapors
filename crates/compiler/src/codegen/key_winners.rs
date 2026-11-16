@@ -20,6 +20,10 @@ pub(crate) struct Winners<'a> {
     analysis: &'a Analysis,
     /// The component's own scope, which the generated `SCOPE` names.
     own: Option<&'a str>,
+    /// The index of the component's own sheet among the analysis'
+    /// sheets, when it has a `<style>` (`styles::analyse` puts it after
+    /// the user-agent sheet).
+    own_index: Option<usize>,
     /// `vapors_css::sheet_hash` of each of `analysis.sheets`' text.
     hashes: &'a [u64],
     at: HashMap<(usize, usize), usize>,
@@ -28,7 +32,11 @@ pub(crate) struct Winners<'a> {
 impl<'a> Winners<'a> {
     /// # Panics
     /// `hashes` not one a sheet of `analysis`: a defect in the caller.
-    pub(crate) fn new(analysis: &'a Analysis, hashes: &'a [u64], own: Option<&'a str>) -> Self {
+    pub(crate) fn new(
+        analysis: &'a Analysis,
+        hashes: &'a [u64],
+        (own, styled): (Option<&'a str>, bool),
+    ) -> Self {
         assert_eq!(
             hashes.len(),
             analysis.sheets.len(),
@@ -40,6 +48,7 @@ impl<'a> Winners<'a> {
         Self {
             analysis,
             own,
+            own_index: styled.then_some(1),
             hashes,
             at,
         }
@@ -75,7 +84,11 @@ impl<'a> Winners<'a> {
         for rule in conditional(winners) {
             let _ = write!(out, "{}, ", sheets.rule(rule.sheet, rule.rule));
         }
-        let _ = write!(out, "], shareable: {} }}", winners.shareable);
+        let own = (self
+            .own_index
+            .and_then(|index| sheets.renumbered.get(&index)))
+        .map_or_else(|| "None".to_owned(), |own| format!("Some({own})"));
+        let _ = write!(out, "], shareable: {}, own: {own} }}", winners.shareable);
         Ok(out)
     }
 }

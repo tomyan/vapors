@@ -45,6 +45,12 @@ pub struct KeyWinners {
     pub conditional: &'static [RuleRef],
     /// No candidate rule blocks sharing.
     pub shareable: bool,
+    /// The index in [`KeyWinners::sheets`] of the key's own component
+    /// sheet, scoped or global; `None` when its component has no
+    /// `<style>` or its winners reference none of it. That sheet is in
+    /// the cascade before the key's elements exist, so its absence means
+    /// the compiler and the runtime name it differently.
+    pub own: Option<u8>,
 }
 
 /// A sheet by identity, as the runtime registers it.
