@@ -69,17 +69,29 @@ fn sample_time(i: usize) -> f64 {
 /// The fraction of the distance covered at fraction `u` of the
 /// duration (`CalculateCoefficients`): the table interpolated linearly.
 pub(crate) fn spline_position(u: f64) -> f64 {
+    let Some(index) = segment(u) else {
+        return 1.0;
+    };
+    POSITIONS[index] + (u - sample_time(index)) * spline_slope(u)
+}
+
+/// The slope of the spline's segment at `u` (`velocity_coef`); zero
+/// from the end on.
+pub(crate) fn spline_slope(u: f64) -> f64 {
+    segment(u).map_or(0.0, |index| {
+        (POSITIONS[index + 1] - POSITIONS[index]) * SAMPLES_F64
+    })
+}
+
+/// The table segment `u` falls in; `None` from the end on.
+fn segment(u: f64) -> Option<usize> {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
         reason = "u is clamped to 0..1 first, so the index is 0..=100"
     )]
     let index = (u.clamp(0.0, 1.0) * SAMPLES_F64).floor() as usize;
-    if index >= SAMPLES {
-        return 1.0;
-    }
-    let (low, high) = (POSITIONS[index], POSITIONS[index + 1]);
-    low + (u - sample_time(index)) * (high - low) * SAMPLES_F64
+    (index < SAMPLES).then_some(index)
 }
 
 /// One fling's curve, from its starting velocity.
@@ -117,6 +129,18 @@ impl FlingCurve {
     #[cfg(test)]
     pub(crate) fn distance(&self) -> f64 {
         self.distance
+    }
+
+    /// The velocity at `elapsed`, CSS px/s (`curr_velocity_` along the
+    /// fling's direction): the segment's slope × distance / duration.
+    pub(crate) fn velocity_at(&self, elapsed: Duration) -> [f32; 2] {
+        let speed =
+            spline_slope(elapsed.as_secs_f64() / self.duration) * self.distance / self.duration;
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "a fling's speed, far inside f32"
+        )]
+        self.direction.map(|d| (speed * d) as f32)
     }
 
     /// The offset from the fling's start at `elapsed`, CSS px; `None`

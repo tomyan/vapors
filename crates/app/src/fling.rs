@@ -42,6 +42,9 @@ pub(crate) struct Fling {
     reached: [f32; 2],
     /// The last frame that sent a delta (`last_progress_time_`).
     last_sent: Option<Instant>,
+    /// The curve's velocity at that frame (`current_fling_parameters_
+    /// .velocity`, which the booster observes).
+    velocity: [f32; 2],
 }
 
 impl Fling {
@@ -53,12 +56,27 @@ impl Fling {
             curve,
             reached: [0.0; 2],
             last_sent: None,
+            velocity: [0.0; 2],
         }
     }
 
     /// The container it moves.
     pub(crate) fn container(&self) -> NodeId {
         self.container
+    }
+
+    /// The curve's speed at its start, CSS px/s (the first segment's
+    /// slope, within 2% of the speed it was started at).
+    #[cfg(test)]
+    pub(crate) fn starting_speed(&self) -> f32 {
+        let [x, y] = self.curve.velocity_at(std::time::Duration::ZERO);
+        x.hypot(y)
+    }
+
+    /// The velocity at the last frame that sent a delta, CSS px/s;
+    /// `None` before the first.
+    pub(crate) fn sent_velocity(&self) -> Option<[f32; 2]> {
+        self.last_sent.map(|_| self.velocity)
     }
 
     /// The fling moved on to `now`; whether it is still running.
@@ -83,6 +101,7 @@ impl Fling {
             return true;
         }
         self.last_sent = Some(now);
+        self.velocity = self.curve.velocity_at(elapsed);
         document.scroll_node_by(self.container, delta)
     }
 }

@@ -25,6 +25,8 @@ pub enum FlingError {
     /// A finger is down: Chromium starts a fling only from a gesture's
     /// end, and a finger down stops one.
     FingerDown,
+    /// Faster than [`CURVE_SPEED_LIMIT`]: the curve cannot carry it.
+    TooFast([f32; 2]),
 }
 
 impl fmt::Display for FlingError {
@@ -41,26 +43,52 @@ impl fmt::Display for FlingError {
                 f,
                 "a fling cannot start while a finger is down; start it when the last finger lifts"
             ),
+            Self::TooFast(velocity) => write!(
+                f,
+                "a fling at {velocity:?} px/s is faster than {CURVE_SPEED_LIMIT} px/s, beyond which the fling curve cannot move in 0.1 px steps"
+            ),
         }
     }
 }
 
 impl std::error::Error for FlingError {}
 
-/// Each axis of a fling's velocity is clamped to this, CSS px/s, as
-/// Chromium's `GestureDetector` clamps the release velocity to the
-/// maximum fling velocity (`ComputeCurrentVelocity(1000, max)`,
-/// `ui/events/gesture_detection/gesture_detector.cc:427`, from
-/// Android's `ViewConfiguration`). AOSP's maximum is 8000 dp/s, but the
-/// Pixel flung at 13 214 and 15 502 (010, 016; docs/plans/
-/// touch-momentum.md), so 8000 would cut those flings short: this is
-/// the measured lower bound, rounded up. Provisional until #400 reads
-/// the Pixel's real maximum.
-pub const MAX_FLING_SPEED: f32 = 16_000.0;
+/// Each axis of a lifted finger's velocity is clamped to this, CSS
+/// px/s: Android's `ViewConfiguration` maximum fling velocity, 8000 dp/s
+/// in AOSP, which Chromium's `GestureDetector` clamps the release
+/// velocity to (`ComputeCurrentVelocity(1000, max)`,
+/// `ui/events/gesture_detection/gesture_detector.cc:427`). A boost adds
+/// the previous fling's start after this clamp and is not clamped
+/// (`FlingBooster::GetVelocityForFlingStart`,
+/// `ui/events/blink/fling_booster.cc`, called from
+/// `FlingController::UpdateCurrentFlingState`). The Pixel's fastest
+/// starts, 13 264 and 15 562 (010, 016), were boosts: 4436 and 4608 on
+/// 8828 and 10 954. #400 confirms 8000 on the device.
+pub const MAX_FLING_SPEED: f32 = 8000.0;
 /// Below this speed on both axes a lifted finger does not fling, CSS
 /// px/s: Chromium's `GestureDetector` takes Android's
 /// `ViewConfiguration` minimum, 50 dp/s in AOSP.
 const MIN_FLING_SPEED: f32 = 50.0;
+
+/// The fastest fling the curve carries, CSS px/s. Beyond about
+/// 124 000 px/s the curve's distance passes 838 861 px (0.1 px × 2^23),
+/// where `f32` offsets no longer resolve the 0.1 px steps the frame
+/// loop sends (`fling.rs`); this is that, rounded down. A release is
+/// clamped far below it; only a chain of a dozen boosts at the maximum
+/// would reach it.
+pub const CURVE_SPEED_LIMIT: f32 = 100_000.0;
+
+/// Whether the curve carries a fling at `velocity`: no faster than
+/// [`CURVE_SPEED_LIMIT`]. The one test, which the start refuses by and
+/// the booster caps to.
+pub(crate) fn curve_carries(velocity: [f32; 2]) -> bool {
+    velocity[0].hypot(velocity[1]) <= CURVE_SPEED_LIMIT
+}
+
+/// `velocity` with each axis clamped to [`MAX_FLING_SPEED`].
+fn clamped(velocity: [f32; 2]) -> [f32; 2] {
+    velocity.map(|v| v.clamp(-MAX_FLING_SPEED, MAX_FLING_SPEED))
+}
 
 impl DocumentInput {
     /// The gesture's finger lifted at `at` moving at `velocity` (CSS
@@ -70,27 +98,35 @@ impl DocumentInput {
     /// it on (`DocumentInput::handle`). Its time is the platform's handling time (`velocity_tracker.rs`
     /// says why), where Chromium starts at the last scroll update's.
     pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2], at: Instant) {
-        // `fling` clamps to the maximum; the minimum is checked first, on
-        // values the clamp leaves alone
+        let velocity = clamped(velocity);
         if velocity.iter().all(|v| v.abs() <= MIN_FLING_SPEED) {
             return;
         }
         let Some(container) = self.touch.take_released() else {
             return;
         };
-        if let Err(refused) = self.fling(document, container, velocity, at) {
+        // a boost adds the last start after the clamp, unclamped, as
+        // `FlingBooster` adds it after `GestureDetector` clamps
+        let boosted = self.touch.boosted(velocity, at);
+        if let Err(refused) = self.start(document, container, boosted, at) {
+            // no fling runs, so nothing may boost from it, as Chromium
+            // resets the booster on every path that starts none
+            // (`FlingController::UpdateCurrentFlingState`)
+            self.touch.forget_boost();
             report_error(&format!("a touch fling did not start: {refused}"));
         }
     }
 
     /// `container` flung at `velocity` (CSS px/s, the way its scroll
-    /// offset moves; each axis clamped to [`MAX_FLING_SPEED`]) from
-    /// `at`, replacing a fling under way; a zero velocity starts none.
+    /// offset moves) from `at`, replacing a fling under way; a zero
+    /// velocity starts none. It is not a touch's release, so it is not
+    /// clamped to [`MAX_FLING_SPEED`], boosts nothing and is not boosted.
     ///
     /// # Errors
     ///
-    /// [`FlingError`] when the velocity is not finite, `container` is
-    /// not a scroll container, or a finger is down; nothing changes.
+    /// [`FlingError`] when the velocity is not finite or faster than
+    /// [`CURVE_SPEED_LIMIT`], `container` is not a scroll container, or
+    /// a finger is down; nothing changes.
     pub fn fling(
         &mut self,
         document: &Document,
@@ -101,13 +137,28 @@ impl DocumentInput {
         if !velocity.iter().all(|v| v.is_finite()) {
             return Err(FlingError::UnreadableVelocity(velocity));
         }
-        if document.scroll_offset(container).is_none() {
-            return Err(FlingError::NotAScroller(container));
-        }
         if self.touch.finger_down() {
             return Err(FlingError::FingerDown);
         }
-        let velocity = velocity.map(|v| v.clamp(-MAX_FLING_SPEED, MAX_FLING_SPEED));
+        self.start(document, container, velocity, at)?;
+        self.touch.forget_boost();
+        Ok(())
+    }
+
+    /// The fling of `container` at `velocity` from `at` starts.
+    fn start(
+        &mut self,
+        document: &Document,
+        container: NodeId,
+        velocity: [f32; 2],
+        at: Instant,
+    ) -> Result<(), FlingError> {
+        if !curve_carries(velocity) {
+            return Err(FlingError::TooFast(velocity));
+        }
+        if document.scroll_offset(container).is_none() {
+            return Err(FlingError::NotAScroller(container));
+        }
         if let Some(curve) = FlingCurve::new(velocity) {
             self.touch.fling(Fling::new(container, curve, at));
         }

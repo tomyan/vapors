@@ -15,7 +15,7 @@ impl DocumentInput {
     pub(super) fn window_focus(&mut self, document: &Rc<RefCell<Document>>, focused: bool) {
         if !focused {
             self.held = super::route::Held::default();
-            self.touch.forget();
+            self.touch.forget(vapors_platform::Instant::now());
         }
         Document::window_focus(document, focused);
     }
@@ -52,18 +52,18 @@ impl DocumentInput {
                     .scroll(&mut document.borrow_mut(), point, delta, now);
             }
             Action::TouchDown(id, point) => {
-                self.touch.down(id, point);
+                self.touch.down(id, point, vapors_platform::Instant::now());
                 Document::touch_pressed(document, id, point);
             }
             Action::TouchMove(id, point) => Document::touch_moved(document, id, point),
             Action::Pan(delta) => self.pan(document, delta),
             Action::Fling(velocity, at) => self.released(&document.borrow(), velocity, at),
             Action::TouchUp(id, point) => {
-                self.touch.up(id);
+                self.touch.up(id, vapors_platform::Instant::now());
                 Document::touch_released(document, id, point);
             }
             Action::TouchCancel(id, point) => {
-                self.touch.up(id);
+                self.touch.up(id, vapors_platform::Instant::now());
                 Document::touch_cancelled(document, id, point);
             }
         }

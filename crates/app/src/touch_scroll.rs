@@ -5,13 +5,16 @@
 //! also keeps the input mode for scroll thumbs: shown while a mouse is
 //! in use, and on touch shown by each scroll, the gesture's or its
 //! fling's, then faded (`thumb_fade.rs`). A fling (`fling.rs`) runs
-//! until it ends or a finger goes down.
+//! until it ends or a finger goes down, and the booster
+//! (`fling_booster.rs`) watches the gestures and flings for a fling to
+//! boost.
 
 use vapors_dom::NodeId;
 use vapors_elements::{Document, Point};
 use vapors_platform::Instant;
 
 use crate::fling::Fling;
+use crate::fling_booster::{FlingBooster, Observed};
 use crate::thumb_fade::{Phase, ThumbFades};
 
 /// The gesture under way.
@@ -30,17 +33,22 @@ pub(crate) struct TouchScroll {
     fling: Option<Fling>,
     /// Each container's touch thumbs' fade, kept across gestures.
     fades: ThumbFades,
+    booster: FlingBooster,
 }
 
 impl TouchScroll {
-    /// Finger `id` went down at `at` (CSS pixels); the first finger
-    /// stops a fling and starts a gesture there.
-    pub(crate) fn down(&mut self, id: u64, at: Point) {
+    /// Finger `id` went down at `at` (CSS pixels) at `now`; the first
+    /// finger stops a fling and starts a gesture there.
+    pub(crate) fn down(&mut self, id: u64, at: Point, now: Instant) {
         if self.fingers.is_empty() {
+            if self.fling.is_some() {
+                self.booster.observe(Observed::FlingCancel, now);
+            }
             *self = Self {
                 down: Some(at),
                 touching: true,
                 fades: std::mem::take(&mut self.fades),
+                booster: std::mem::take(&mut self.booster),
                 ..Self::default()
             };
         }
@@ -55,10 +63,14 @@ impl TouchScroll {
         if self.latched.is_none() {
             let Some(at) = self.down else { return false };
             self.latched = document.scroll_target(at, delta);
+            if self.latched.is_some() {
+                self.booster.observe(Observed::ScrollBegin, now);
+            }
         }
         let Some(container) = self.latched else {
             return false;
         };
+        self.booster.observe(Observed::ScrollUpdate(delta), now);
         let moved = document.scroll_node_by(container, delta);
         if moved {
             self.fades.scrolled(container, now);
@@ -66,32 +78,36 @@ impl TouchScroll {
         moved
     }
 
-    /// Finger `id` lifted or was taken away; the gesture ends when no
-    /// finger is left down.
-    pub(crate) fn up(&mut self, id: u64) {
+    /// Finger `id` lifted or was taken away at `now`; the gesture ends
+    /// when no finger is left down.
+    pub(crate) fn up(&mut self, id: u64, now: Instant) {
         let Some(at) = self.fingers.iter().position(|f| *f == id) else {
             return;
         };
         self.fingers.remove(at);
         if self.fingers.is_empty() {
-            self.end_gesture();
+            self.end_gesture(now);
         }
     }
 
-    /// Every finger was taken away at once (the window lost focus); a
-    /// fling runs on.
-    pub(crate) fn forget(&mut self) {
-        self.end_gesture();
+    /// Every finger was taken away at once (the window lost focus) at
+    /// `now`; a fling runs on.
+    pub(crate) fn forget(&mut self, now: Instant) {
+        self.end_gesture(now);
     }
 
-    /// No gesture: the input mode and a fling are kept, and the
-    /// container the gesture scrolled, for its fling.
-    fn end_gesture(&mut self) {
+    /// No gesture: the input mode, a fling and the booster are kept, and
+    /// the container the gesture scrolled, for its fling.
+    fn end_gesture(&mut self, now: Instant) {
+        if self.latched.is_some() {
+            self.booster.observe(Observed::ScrollEnd, now);
+        }
         *self = Self {
             touching: self.touching,
             fades: std::mem::take(&mut self.fades),
             released: self.latched,
             fling: self.fling.take(),
+            booster: std::mem::take(&mut self.booster),
             ..Self::default()
         };
     }
@@ -150,14 +166,41 @@ impl TouchScroll {
         self.fling = Some(fling);
     }
 
+    /// The velocity a touch fling released at `velocity` at `now` starts
+    /// at, boosted or not (`FlingBooster::start`).
+    pub(crate) fn boosted(&mut self, velocity: [f32; 2], now: Instant) -> [f32; 2] {
+        self.booster.observe(Observed::FlingStart, now);
+        self.booster.start(velocity, now)
+    }
+
+    /// The running fling's speed at its start.
+    #[cfg(test)]
+    pub(crate) fn fling_starting_speed(&self) -> Option<f32> {
+        self.fling.as_ref().map(Fling::starting_speed)
+    }
+
+    /// What the booster would boost the next fling by.
+    #[cfg(test)]
+    pub(crate) fn boost_from(&self) -> [f32; 2] {
+        self.booster.previous_start()
+    }
+
+    /// A fling not from a touch: nothing to boost from or into.
+    pub(crate) fn forget_boost(&mut self) {
+        self.booster.reset();
+    }
+
     /// Whether a finger is down.
     pub(crate) fn finger_down(&self) -> bool {
         !self.fingers.is_empty()
     }
 
-    /// The wheel scrolled or a button went down: the fling stops.
+    /// The wheel scrolled or a button went down: the fling stops, and
+    /// nothing boosts from it (`FlingController::StopFling` resets the
+    /// booster).
     pub(crate) fn stop_fling(&mut self) {
         self.fling = None;
+        self.booster.reset();
     }
 
     /// Whether a fling is running.
@@ -175,8 +218,16 @@ impl TouchScroll {
         if document.scroll_offset(fling.container()) != before {
             self.fades.scrolled(fling.container(), now);
         }
+        // as `ObserveProgressFling`, only once a delta was sent: until
+        // then the booster keeps the start velocity
+        if let Some(velocity) = fling.sent_velocity() {
+            self.booster.progress(velocity);
+        }
         if !running {
+            // a fling that ended, or met the edge, boosts nothing
+            // (`ProgressFling` and `StopFlingingIfNecessary` reset it)
             self.fling = None;
+            self.booster.reset();
         }
         running
     }
@@ -185,3 +236,15 @@ impl TouchScroll {
 #[cfg(test)]
 #[path = "touch_scroll_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "touch_scroll_thumb_tests.rs"]
+mod thumb_tests;
+
+#[cfg(test)]
+#[path = "touch_scroll_boost_tests.rs"]
+mod boost_tests;
+
+#[cfg(test)]
+#[path = "touch_scroll_chain_tests.rs"]
+mod chain_tests;

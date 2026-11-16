@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_dom::NodeId;
+use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 use vapors_platform::{Event, Instant, Platform, TouchPhase};
 
@@ -94,7 +94,7 @@ fn a_fling_after_a_gesture_that_scrolled_nothing_starts_nothing() {
 }
 
 #[test]
-fn a_fling_faster_than_16000_px_a_second_coasts_as_16000_does() {
+fn a_fling_faster_than_8000_px_a_second_coasts_as_8000_does() {
     // Given three flicks lifted at one instant, at, over and under the
     // maximum, each drawn 3 ms after the lift
     let lift = Instant::now();
@@ -106,7 +106,7 @@ fn a_fling_faster_than_16000_px_a_second_coasts_as_16000_does() {
     };
 
     // When
-    let (max, over, under) = (moved(-16_000.0), moved(-50_000.0), moved(-15_000.0));
+    let (max, over, under) = (moved(-8000.0), moved(-50_000.0), moved(-7000.0));
 
     // Then: on one clock the clamped fling moves exactly as the maximum
     // does; 1000 px/s slower moves at least half of 1000 px/s × 3 ms less
@@ -134,4 +134,83 @@ fn a_second_fling_for_one_gesture_starts_nothing() {
 
     // Then
     assert!(!input.flinging());
+}
+
+#[test]
+fn a_touch_fling_is_boosted_from_and_a_programmatic_one_is_not() {
+    // Given a flick, which the next touch fling could boost from
+    let (doc, outer, mut input) = flick(80.0, -600.0, Instant::now());
+    assert_eq!(input.touch.boost_from(), [0.0, 600.0]);
+
+    // When the app flings the list itself
+    input
+        .fling(&doc.borrow(), outer, [0.0, 900.0], Instant::now())
+        .expect("starts");
+
+    // Then
+    assert_eq!(input.touch.boost_from(), [0.0, 0.0]);
+}
+
+#[test]
+fn a_boosted_release_starts_above_the_maximum_unclamped() {
+    // Given a 3000 px/s flick lifted 100 ms ago, drawn once since (about
+    // 48 px, inside the outer list's 100)
+    let lift = Instant::now()
+        .checked_sub(Duration::from_millis(100))
+        .expect("a clock past 100 ms");
+    let (doc, _, mut input) = flick(80.0, -3000.0, lift);
+    input.advance_fling(&mut doc.borrow_mut(), lift + Duration::from_millis(16));
+    let platform = Platform::detached();
+
+    // When a finger cuts the coast, drags on, and flicks at the maximum
+    for event in [
+        touch(TouchPhase::Started, 80.0),
+        touch(TouchPhase::Moved, 55.0),
+        Event::Pan { dx: 0.0, dy: -25.0 },
+        touch(TouchPhase::Ended, 55.0),
+        Event::Fling {
+            vx: 0.0,
+            vy: -8000.0,
+            at: Instant::now(),
+        },
+    ] {
+        input.give(&doc, &event, &platform).expect("placed");
+    }
+
+    // Then: the boost adds the first start after the clamp, and the
+    // fling runs at the sum, unclamped (the curve's start is within 2%)
+    assert_eq!(input.touch.boost_from(), [0.0, 11_000.0]);
+    let speed = input.touch.fling_starting_speed().expect("flinging");
+    assert!(speed > 10_500.0, "{speed}");
+}
+
+#[test]
+fn a_release_refused_leaves_nothing_to_boost_from() {
+    // Given a drag on the outer list, then the list no longer scrolls
+    // by the time its release arrives
+    let (doc, outer, _) = nested();
+    let (mut input, platform) = (DocumentInput::new(), Platform::detached());
+    for event in [
+        touch(TouchPhase::Started, 80.0),
+        touch(TouchPhase::Moved, 55.0),
+        Event::Pan { dx: 0.0, dy: -25.0 },
+        touch(TouchPhase::Ended, 55.0),
+    ] {
+        input.give(&doc, &event, &platform).expect("placed");
+    }
+    doc.borrow_mut().set_attribute(outer, "class", "tail");
+    doc.borrow_mut()
+        .update(vapors_elements::Viewport {
+            width: 200.0,
+            height: 200.0,
+            scale: 1.0,
+        })
+        .expect("updates");
+
+    // When the release is refused (NotAScroller)
+    input.released(&doc.borrow(), [0.0, 3000.0], Instant::now());
+
+    // Then no fling runs, and none can be boosted from it
+    assert!(!input.flinging());
+    assert_eq!(input.touch.boost_from(), [0.0, 0.0]);
 }
