@@ -37,19 +37,42 @@ fn to_clip() -> mat4x4<f32> {
     return camera.view_projection * node.world;
 }
 
-// The device pixels (+Y down) moved per shape unit at `local`, as a
-// linear map laid out as the page's affine (a, b, c, d: x's column, then
-// y's); zero at or behind the camera.
-fn screen_jacobian(linear: vec4<f32>, shift: vec2<f32>, local: vec2<f32>) -> vec4<f32> {
+// Shape units to clip space as three columns: clip = k[0] x + k[1] y +
+// k[2] for shape point (x, y) under the affine (`linear`, `shift`), the
+// node's world matrix and the camera. Per instance: a vertex stage works
+// it out once and passes it on flat, so a fragment needs no matrix
+// product (#424's review, L2).
+fn shape_to_clip(linear: vec4<f32>, shift: vec2<f32>) -> mat3x4<f32> {
     let m = to_clip();
-    let clip = m * vec4(on_plane(linear, shift, local), 0.0, 1.0);
+    return mat3x4(m * vec4(linear.xy, 0.0, 0.0), m * vec4(linear.zw, 0.0, 0.0), m * vec4(shift, 0.0, 1.0));
+}
+
+// The device pixels (+Y down) moved per shape unit at `local` under `k`
+// (`shape_to_clip`), as a linear map laid out as the page's affine (a,
+// b, c, d: x's column, then y's); zero at or behind the camera.
+fn jacobian_at(k: mat3x4<f32>, local: vec2<f32>) -> vec4<f32> {
+    let clip = k[0] * local.x + k[1] * local.y + k[2];
     if (clip.w <= NEAR_W) {
         return vec4(0.0);
     }
     let to_screen = camera.size * vec2(0.5, -0.5) / (clip.w * clip.w);
-    let per_x = to_screen * (m[0].xy * clip.w - clip.xy * m[0].w);
-    let per_y = to_screen * (m[1].xy * clip.w - clip.xy * m[1].w);
-    let along_x = per_x * linear.x + per_y * linear.y;
-    let along_y = per_x * linear.z + per_y * linear.w;
+    let along_x = to_screen * (k[0].xy * clip.w - clip.xy * k[0].w);
+    let along_y = to_screen * (k[1].xy * clip.w - clip.xy * k[1].w);
     return vec4(along_x, along_y);
+}
+
+// `jacobian_at` for an instance's affine, working out its columns.
+fn screen_jacobian(linear: vec4<f32>, shift: vec2<f32>, local: vec2<f32>) -> vec4<f32> {
+    return jacobian_at(shape_to_clip(linear, shift), local);
+}
+
+// Whether a screen Jacobian `j` (as `screen_jacobian` gives it) is
+// edge-on: its columns parallel, or zero behind the eye. The test is the
+// sine of the angle between the columns, independent of the view box's
+// scale: under 1e-6 the plane is within 6e-5 degrees of edge-on, a
+// sliver under a millionth of the shape's width on screen. The one
+// answer every scene stage asks.
+fn edge_on(j: vec4<f32>) -> bool {
+    let det = abs(j.x * j.w - j.y * j.z);
+    return det <= 1e-6 * length(j.xy) * length(j.zw);
 }
