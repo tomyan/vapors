@@ -62,12 +62,9 @@ impl Emitter<'_> {
     ) -> Result<(), CompileError> {
         let iterable = self.raw(&block.iterable)?;
         let key = block.key.as_ref().map(|key| self.raw(key)).transpose()?;
-        let site = format!(
-            "{}:{}",
-            self.source.path,
-            self.source.describe(block.offset)
-        );
-        self.line(format!("dom, {}, {anchor}, {site:?},", place.parent));
+        let site = format!("{}:{}", self.site_name, self.source.describe(block.offset));
+        let site = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {site:?})");
+        self.line(format!("dom, {}, {anchor}, {site},", place.parent));
         let mut read_by_items = vec![&block.iterable];
         read_by_items.extend(block.key.as_ref());
         let clones = self.clones_for(&read_by_items)?;

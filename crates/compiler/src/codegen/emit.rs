@@ -47,6 +47,8 @@ pub(crate) struct Emitter<'a> {
     /// The `StyleKey` static of each element so far (`style_key`),
     /// placed at file level by `shell::assemble`.
     pub keys: Vec<String>,
+    /// The component's file as sites name it (`Component::site_name`).
+    pub site_name: String,
     /// The styles analysis each element's `KeyWinners` is made from.
     pub winners: Option<&'a super::key_winners::Winners<'a>>,
 }
@@ -69,6 +71,7 @@ impl<'a> Emitter<'a> {
             snippets: Vec::new(),
             row_keys: Vec::new(),
             keys: Vec::new(),
+            site_name: source.path.clone(),
             winners: None,
         }
     }

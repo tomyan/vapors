@@ -64,6 +64,7 @@ fn emit_template<'a>(
 ) -> Result<Emitter<'a>, Vec<CompileError>> {
     let mut emitter = Emitter::new(source, info).with_width(width);
     emitter.winners = winners;
+    component.site_name().clone_into(&mut emitter.site_name);
     if let Some(index) = index {
         emitter = emitter.with_index(index);
     }
@@ -182,7 +183,7 @@ fn generated(
     Ok((
         format!(
             "// Generated from `{}` by vapors-compiler; edit the .wisp, not this file.\n\n{formatted}",
-            component.path
+            component.site_name()
         ),
         tags,
     ))
