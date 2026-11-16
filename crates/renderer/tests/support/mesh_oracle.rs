@@ -15,7 +15,7 @@
 use vapors_shapes::MeshTriangle;
 
 use crate::support::{
-    SIDE, contains, inside_by, outside_by, pixel_centres, segment_distance, to_device,
+    Place, SIDE, contains, inside_by, outside_by, pixel_centres, segment_distance, to_device,
 };
 
 /// Each pixel's coverage of `mesh` under `transform`, drawn on the CPU.
@@ -70,11 +70,32 @@ pub fn assert_band_matches_cpu(
     transform: [f32; 6],
     what: &str,
 ) {
+    let drawing = cpu_coverage(mesh, transform);
+    assert_band_matches(
+        coverage,
+        mesh,
+        (&|q| to_device(transform, q), DISTANCE_TOLERANCE),
+        &drawing,
+        what,
+    );
+}
+
+/// [`assert_band_matches_cpu`] with the corners placed by `place` (a map
+/// that keeps lines straight), a pixel's distance judged within
+/// `tolerance`, and `drawing` the CPU drawing under `place`.
+pub fn assert_band_matches(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    (place, tolerance): (Place<'_>, f32),
+    drawing: &[f32],
+    what: &str,
+) {
     let band = Band {
         mesh,
-        transform,
-        corners: Corners::of(mesh, transform),
-        drawing: cpu_coverage(mesh, transform),
+        place,
+        tolerance,
+        corners: Corners::of(mesh, place),
+        drawing,
     };
     let mut judged = 0;
     for (x, y, centre) in pixel_centres() {
@@ -86,16 +107,17 @@ pub fn assert_band_matches_cpu(
     }
     assert!(
         judged > 0,
-        "{what}: the band check judged no pixel: is the transform the one drawn?"
+        "{what}: the band check judged no pixel: is the placement the one drawn?"
     );
 }
 
 /// What the band check reads for one mesh.
 struct Band<'a> {
     mesh: &'a [MeshTriangle],
-    transform: [f32; 6],
+    place: Place<'a>,
+    tolerance: f32,
     corners: Corners,
-    drawing: Vec<f32>,
+    drawing: &'a [f32],
 }
 
 impl Band<'_> {
@@ -115,8 +137,8 @@ impl Band<'_> {
         let (outside, inside) = self.distances(centre);
         let by_distance = (0.5 - outside + inside).clamp(0.0, 1.0);
         let own_edges =
-            inside == 0.0 || holds_the_corner(self.mesh, self.transform, &self.corners, centre);
-        if own_edges && (drawn - by_distance).abs() > DISTANCE_TOLERANCE {
+            inside == 0.0 || holds_the_corner(self.mesh, self.place, &self.corners, centre);
+        if own_edges && (drawn - by_distance).abs() > self.tolerance {
             return Some(format!(
                 "0.5 minus its distance to the outline is {by_distance}"
             ));
@@ -129,8 +151,8 @@ impl Band<'_> {
 
     fn distances(&self, centre: [f32; 2]) -> (f32, f32) {
         (
-            outside_by(self.mesh, self.transform, centre),
-            inside_by(self.mesh, self.transform, centre),
+            outside_by(self.mesh, self.place, centre),
+            inside_by(self.mesh, self.place, centre),
         )
     }
 }
@@ -148,7 +170,7 @@ impl Corners {
     /// Each outline corner on the device, its angles taken there: under
     /// a non-uniform scale or a skew, a corner's turn on the device is
     /// not its turn in mesh units, and the shader's is the device's.
-    fn of(mesh: &[MeshTriangle], transform: [f32; 6]) -> Self {
+    fn of(mesh: &[MeshTriangle], place: Place<'_>) -> Self {
         let all = mesh
             .iter()
             .flat_map(|t| t.corners)
@@ -156,12 +178,9 @@ impl Corners {
             .map(|c| {
                 let end = |k: usize| {
                     let (n, reach) = (c.normals[k], c.reaches[k]);
-                    to_device(
-                        transform,
-                        [c.position[0] - n[1] * reach, c.position[1] + n[0] * reach],
-                    )
+                    place([c.position[0] - n[1] * reach, c.position[1] + n[0] * reach])
                 };
-                let (at, ends) = (to_device(transform, c.position), [end(0), end(1)]);
+                let (at, ends) = (place(c.position), [end(0), end(1)]);
                 (at, ends, between_normals(at, ends), c.kind > 0.0)
             })
             .collect();
@@ -224,7 +243,7 @@ fn between_normals(at: [f32; 2], ends: [[f32; 2]; 2]) -> f32 {
 /// 0.35 px inside the notch's corner, reads 1).
 fn holds_the_corner(
     mesh: &[MeshTriangle],
-    transform: [f32; 6],
+    place: Place<'_>,
     corners: &Corners,
     centre: [f32; 2],
 ) -> bool {
@@ -235,7 +254,7 @@ fn holds_the_corner(
         .map(|(c, ..)| *c)
         .collect();
     mesh.iter()
-        .map(|t| t.corners.map(|c| to_device(transform, c.position)))
+        .map(|t| t.corners.map(|c| place(c.position)))
         .filter(|t| {
             contains(*t, centre)
                 || t.iter()

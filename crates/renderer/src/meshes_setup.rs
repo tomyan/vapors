@@ -11,7 +11,7 @@ use vapors_shapes::{MeshCorner, MeshTriangle};
 /// Per triangle, at `MeshTriangle`'s own field offsets, for each corner
 /// `k` at locations `4k` to `4k + 3`: its position (two floats), its two
 /// normals (four), its kind (one) and its two reaches (two).
-const TRIANGLE: [wgpu::VertexAttribute; 12] = [
+pub(crate) const TRIANGLE: [wgpu::VertexAttribute; 12] = [
     position(0),
     normals(0),
     kind(0),
@@ -28,7 +28,7 @@ const TRIANGLE: [wgpu::VertexAttribute; 12] = [
 
 /// Per item: the linear part; translation and the inverse of the
 /// determinant; colour.
-const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+pub(crate) const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     12 => Float32x4, 13 => Float32x4, 14 => Float32x4
 ];
 
@@ -93,7 +93,13 @@ pub(crate) fn render_pipeline(
         device,
         wgpu::ShaderModuleDescriptor {
             label: Some("meshes"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("meshes.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(
+                    include_str!("meshes_2d.wgsl"),
+                    include_str!("meshes_shared.wgsl")
+                )
+                .into(),
+            ),
         },
     );
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -133,7 +139,7 @@ pub(crate) fn render_pipeline(
 }
 
 /// An entry's triangles, then the item, at stride 0.
-fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
+pub(crate) fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     [
         Some(wgpu::VertexBufferLayout {
             array_stride: crate::mesh_entries::TRIANGLE_BYTES,
