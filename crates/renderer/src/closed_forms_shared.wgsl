@@ -1,20 +1,24 @@
-// Closed-form shapes: a rect with round corners or an ellipse, in
-// its own units, under an affine transform to device pixels; filled, or
-// stroked centred on the outline. Coverage is 0.5 minus the signed
-// distance to the outline in device pixels, clamped: 0.5 on the
-// outline, the ramp half a pixel either side of it, as Chromium draws
-// an edge. Each quad is the shape's box grown by one device pixel each
-// way, so the outer half of the ramp has fragments. Output is
-// non-premultiplied sRGB, blended by the pipeline.
+// Closed-form shapes, the part shared by the page's vertex stage
+// (closed_forms_2d.wgsl) and the scene's (closed_forms_3d.wgsl): a rect
+// with round corners or an ellipse, in its own units, under a transform
+// to device pixels (an affine on the page; a plane's projection in the
+// scene); filled, or stroked centred on the outline. Coverage is 0.5
+// minus the signed distance to the outline in device pixels, clamped:
+// 0.5 on the outline, the ramp half a pixel either side of it, as
+// Chromium draws an edge. Each quad is the shape's box grown by one
+// device pixel each way, so the outer half of the ramp has fragments.
+// Output is non-premultiplied sRGB, blended by the pipeline.
 //
 // The distance is taken in the shape's units and divided by its rate
 // of change across the screen: its gradient there, worked out in the
 // shape's units (a unit vector), carried to the screen by the
-// derivatives of the shape-unit position, which is affine in screen
-// space and so has exact derivatives. The distance's own derivatives
-// would not do: it has a kink where its nearest edge changes (a rect's
-// diagonals and centre line, a circle's centre), and a 2x2 quad across
-// the kink would read it as flat.
+// derivatives of the shape-unit position. On the page that position is
+// affine in screen space, so its derivatives are exact; under the
+// scene's projection they are the local Jacobian to second order
+// (closed_forms_3d.wgsl). The distance's own derivatives would not do:
+// it has a kink where its nearest edge changes (a rect's diagonals and
+// centre line, a circle's centre), and a 2x2 quad across the kink would
+// read it as flat.
 
 struct Instance {
     @location(0) linear: vec4<f32>,  // a, b, c, d of matrix(a, b, c, d, e, f)
@@ -35,15 +39,6 @@ struct Out {
     @location(4) @interpolate(flat) radii: vec2<f32>,
 }
 
-// The target's size, and the shift of the scroll frame the instances
-// are in, added to their positions (device pixels, whole).
-struct View {
-    size: vec2<f32>,
-    shift: vec2<f32>,
-}
-
-@group(0) @binding(0) var<uniform> view: View;
-
 // How far past the shape the quad reaches, device pixels: the ramp's
 // outer half needs half; the rest is slack for the rasteriser.
 const MARGIN: f32 = 1.0;
@@ -61,30 +56,21 @@ fn local_box(instance: Instance) -> vec4<f32> {
     return vec4(lo - half_stroke, hi + half_stroke);
 }
 
-// The padding in local units along x and y that moves each edge of the
-// box MARGIN device pixels out, perpendicular to it, under any affine
-// map: an edge x = const runs along column (c, d), and moving it by p
-// along x moves it p |det| / |(c, d)| across. The CPU refuses a
-// transform with no area before it reaches here.
-fn padding(linear: vec4<f32>) -> vec2<f32> {
-    let det = abs(linear.x * linear.w - linear.y * linear.z);
-    return MARGIN * vec2(length(linear.zw), length(linear.xy)) / det;
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
+// The corner of the instance's quad a vertex is, in 0..1 each way: two
+// triangles.
+fn quad_corner(vertex: u32) -> vec2<f32> {
     var corners = array<vec2<f32>, 6>(
         vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
         vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0),
     );
-    let box = local_box(instance);
-    let pad = padding(instance.linear);
-    let local = mix(box.xy - pad, box.zw + pad, corners[vertex]);
-    let m = instance.linear;
-    let pixel = vec2(m.x * local.x + m.z * local.y, m.y * local.x + m.w * local.y) + instance.shift.xy;
-    let on_target = pixel + view.shift;
+    return corners[vertex];
+}
+
+// What the fragment stage reads of a vertex at `local` (shape units)
+// placed at `position`.
+fn vertex_out(instance: Instance, local: vec2<f32>, position: vec4<f32>) -> Out {
     var out: Out;
-    out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
+    out.position = position;
     out.local = local;
     out.params = vec3(instance.shift.z, instance.shift.w, instance.radius.y);
     out.radii = instance.radius.xz;

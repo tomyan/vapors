@@ -3244,10 +3244,12 @@ dependencies = [
 name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
+ "glam",
  "pollster",
  "tracing",
  "vapors-gpu-harness",
  "vapors-scene",
+ "vapors-scene3d",
  "vapors-shapes",
  "wgpu",
 ]

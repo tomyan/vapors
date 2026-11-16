@@ -44,20 +44,25 @@ pub fn scaled(scale: f32) -> [f32; 6] {
 
 /// Each pixel's coverage, row by row.
 pub fn coverage(shapes: &[ClosedFormShape]) -> Vec<f32> {
+    coverage_on(SIDE, shapes)
+}
+
+/// Each pixel's coverage on a `side` square target, row by row.
+pub fn coverage_on(side: u32, shapes: &[ClosedFormShape]) -> Vec<f32> {
     let gpu = gpu();
     let target = clear(
         &gpu.device,
         &gpu.queue,
-        SIDE,
-        SIDE,
+        side,
+        side,
         Color::from_rgba8(0, 0, 0, 255),
     );
     let mut pipeline = ClosedFormPipeline::new(&gpu.device, target.format());
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());
     let encoder = FrameEncoder::new(&gpu.device);
     let viewport = Size {
-        width: SIDE,
-        height: SIDE,
+        width: side,
+        height: side,
     };
     let (device, queue) = (&gpu.device, &gpu.queue);
     let on = Target {

@@ -67,7 +67,7 @@ impl ClosedFormShape {
         }))
     }
 
-    /// The five four-float attributes `closed_forms.wgsl` reads: the
+    /// The five four-float attributes `closed_forms_shared.wgsl` declares: the
     /// transform's linear part; its translation, the kind and the
     /// stroke width; the form's four numbers; rx, whether it is
     /// stroked (1) or filled (0), and ry; the colour.
