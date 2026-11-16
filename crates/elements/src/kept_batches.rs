@@ -14,8 +14,8 @@
 use vapors_scene::Rect;
 
 use crate::drawn_steps::DrawnSteps;
-use crate::frame_extents::Extents;
-use crate::framed_batches::{framed_batches, hidden_items};
+use crate::frame_extents::{Entry, Extents};
+use crate::framed_batches::{framed_batches, hidden_in};
 use crate::frames::Frames;
 use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
@@ -87,13 +87,14 @@ impl KeptBatches {
         #[cfg(test)]
         BUILDS.with(|builds| builds.set(builds.get() + 1));
         let mut shown = Vec::new();
-        let boxes = (sources.boxes, sources.frames);
         // Only the frames whose container's clip meets the view are
         // searched (`frames_nested.rs`): O(shown frames · log steps).
         for frame in frames_to_search(view, sources) {
             let in_frame = sources.frames.view_in(frame, view);
             let candidates = sources.extents.candidates(frame, in_frame);
-            let showing = candidates.filter(|e| hidden_items(e.step, boxes, view).is_none());
+            let shown_in =
+                |e: &&Entry| hidden_in(e.step, (sources.boxes, frame), in_frame).is_none();
+            let showing = candidates.filter(shown_in);
             shown.extend(showing.map(|e| (e.label, e.step, e.items)));
         }
         shown.sort_unstable_by_key(|&(label, ..)| label);

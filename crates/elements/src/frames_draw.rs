@@ -132,10 +132,10 @@ impl Painted {
     ///
     /// As [`Painted::frame_draw`].
     #[must_use]
-    pub fn row_offsets(&self, frame: BatchFrame, rows: &BatchRows) -> Vec<[f32; 2]> {
+    pub fn row_offsets(&self, frame: BatchFrame, rows: BatchRows<'_>) -> Vec<[f32; 2]> {
         match frame.0 {
             Framing::Frame(_) => Vec::new(),
-            Framing::Lane(container) => self.frames.row_offsets(container, &rows.frames),
+            Framing::Lane(container) => self.frames.row_offsets(container, rows.frames),
         }
     }
 }

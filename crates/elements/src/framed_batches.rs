@@ -16,6 +16,9 @@ use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 use crate::scene_view::frame_items;
 
+#[path = "framed_batches_arena.rs"]
+mod arena;
+pub use arena::{BatchRows, RowsOfBatches};
 #[path = "framed_batches_rows.rs"]
 mod rows;
 use rows::rows_batched;
@@ -28,26 +31,8 @@ pub struct FramedBatched {
     pub batched: Batched,
     /// Each batch's frame or lane, by its place in `batched.batches`.
     pub frames: Vec<BatchFrame>,
-    /// Each batch's rows, by its place: empty for a batch in one frame.
-    pub rows: Vec<BatchRows>,
-}
-
-/// The rows a batch over a lane's rows draws: `frames[i]` is the lane
-/// frame row `i` names, `items[j]` item `j`'s row. Both empty for a batch
-/// in one frame.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct BatchRows {
-    pub(crate) frames: Vec<usize>,
-    pub(crate) items: Vec<u32>,
-}
-
-impl BatchRows {
-    /// Each item's row, by its place in the batch's run; empty for a
-    /// batch in one frame.
-    #[must_use]
-    pub fn items(&self) -> &[u32] {
-        &self.items
-    }
+    /// Each batch's rows, by its place: none for a batch in one frame.
+    pub rows: RowsOfBatches,
 }
 
 /// The batches of `steps`' items (each entry's step by `step`) for a
@@ -109,30 +94,28 @@ impl FramedBatched {
         let group = run[0].group;
         match group.0 {
             Framing::Lane(container) => {
-                for part in rows_batched(run, (container, sources), view) {
-                    self.extend(group, part);
+                for (part, rows) in rows_batched(run, (container, sources), view) {
+                    self.extend(group, (part, Some(rows)));
                 }
             }
             Framing::Frame(frame) => {
                 let (boxes, frames) = sources;
                 let items = run.iter().flat_map(|at| frame_items(boxes, at.step).1);
                 let part = vapors_scene::batched(items, frames.view_in(frame, view));
-                self.extend(group, (part, Vec::new()));
+                self.extend(group, (part, None));
             }
         }
     }
 
-    /// `part`'s batches added, each at `frame`, with its rows (none for a
-    /// batch in one frame).
-    fn extend(&mut self, frame: BatchFrame, (part, rows): (Batched, Vec<BatchRows>)) {
+    /// `part`'s batches added, each at `frame`, with their rows (`None`
+    /// for batches in one frame).
+    fn extend(&mut self, frame: BatchFrame, (part, rows): (Batched, Option<RowsOfBatches>)) {
         let count = part.batches.len();
         self.batched.culled += part.culled;
         self.frames.extend(std::iter::repeat_n(frame, count));
-        if rows.is_empty() {
-            self.rows
-                .extend(std::iter::repeat_n(BatchRows::default(), count));
-        } else {
-            self.rows.extend(rows);
+        match rows {
+            Some(rows) => self.rows.append(&rows),
+            None => self.rows.add_unrowed(count),
         }
         self.batched.batches.extend(part.batches);
     }
@@ -142,8 +125,30 @@ impl FramedBatched {
 /// (device pixels on the page) and none is a surface (a culled surface
 /// keeps its place in a batch); `None` when one shows.
 pub(crate) fn hidden_items(step: Step, (boxes, frames): Sources<'_>, view: Rect) -> Option<u64> {
-    let (frame, items) = frame_items(boxes, step);
-    let view = frames.view_in(frame, view);
+    let frame = frame_items(boxes, step).0;
+    hidden_in(step, (boxes, frame), frames.view_in(frame, view))
+}
+
+/// As [`hidden_items`], for a step in `frame`, `in_frame` the view in that
+/// frame's coordinates and cut to its clip: what a search frame by frame
+/// works out once a frame (`KeptBatches::of`).
+///
+/// # Panics
+///
+/// In a debug build, when `step` is not in `frame`: culled in another
+/// frame's view, it would be shown or hidden wrongly.
+pub(crate) fn hidden_in(
+    step: Step,
+    (boxes, frame): (&[Option<KeptBox>], usize),
+    in_frame: Rect,
+) -> Option<u64> {
+    let (step_frame, items) = frame_items(boxes, step);
+    debug_assert_eq!(
+        step_frame, frame,
+        "a step searched in frame {frame} is in frame {step_frame}: the extents index holds it \
+         under the wrong frame (frame_extents.rs); reproduce with `cargo xtask test`"
+    );
+    let view = in_frame;
     let mut count = 0;
     for (item, clip) in items {
         let surface = matches!(item, Item::Surface { .. });

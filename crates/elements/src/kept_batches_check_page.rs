@@ -39,7 +39,7 @@ fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
         .batches
         .iter()
         .zip(&kept.frames)
-        .zip(&kept.rows);
+        .zip(kept.rows.iter());
     let on_page = batches.flat_map(|((batch, &frame), rows)| {
         let (draw, offsets) = (frames.draw(frame), row_offsets(frames, frame, rows));
         let items = run_items(&batch.run).into_iter().enumerate();
@@ -54,15 +54,15 @@ fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
 
 /// The offsets of a batch's rows, as the painter reads them; none for a
 /// batch in one frame.
-fn row_offsets(frames: &Frames, frame: BatchFrame, rows: &BatchRows) -> Vec<[f32; 2]> {
+fn row_offsets(frames: &Frames, frame: BatchFrame, rows: BatchRows<'_>) -> Vec<[f32; 2]> {
     match frame.0 {
         Framing::Frame(_) => Vec::new(),
-        Framing::Lane(container) => frames.row_offsets(container, &rows.frames),
+        Framing::Lane(container) => frames.row_offsets(container, rows.frames),
     }
 }
 
 /// The `at`th item's row's offset: none for a batch in one frame.
-fn item_offset(offsets: &[[f32; 2]], rows: &BatchRows, at: usize) -> [f32; 2] {
+fn item_offset(offsets: &[[f32; 2]], rows: BatchRows<'_>, at: usize) -> [f32; 2] {
     if rows.items.is_empty() {
         return [0.0, 0.0];
     }

@@ -1,5 +1,5 @@
 use vapors_dom::Dom;
-use vapors_elements::{BatchRows, Document, Viewport};
+use vapors_elements::{BatchRows, Document, RowsOfBatches, Viewport};
 use vapors_scene::Rect;
 use vapors_text::FontSystem;
 
@@ -83,9 +83,8 @@ fn a_batch_drawn_again_keeps_its_table_past_the_frames_end() {
     assert_eq!(tables.tables.len(), 1);
 }
 
-/// The rows of the first batch over a lane's rows on a page of 40
-/// coloured rows.
-fn lane_rows() -> BatchRows {
+/// The rows of the batches on a page of 40 coloured rows.
+fn page_rows() -> RowsOfBatches {
     let mut doc = Document::new(FontSystem::bundle_only());
     doc.add_stylesheet(
         "app.css",
@@ -102,13 +101,20 @@ fn lane_rows() -> BatchRows {
         scale: 1.0,
     };
     let painted = doc.update(view).expect("updates");
-    let kept = painted.kept_batches(Rect::new(0.0, 0.0, 10.0, 10.0));
-    let rows = kept.rows.iter().find(|rows| !rows.items().is_empty());
-    rows.expect("a batch over the rows").clone()
+    painted
+        .kept_batches(Rect::new(0.0, 0.0, 10.0, 10.0))
+        .rows
+        .clone()
+}
+
+/// The first batch over a lane's rows among `rows`.
+fn lane_rows(rows: &RowsOfBatches) -> BatchRows<'_> {
+    let lane = rows.iter().find(|rows| !rows.items().is_empty());
+    lane.expect("a batch over the rows")
 }
 
 /// A batch at a shift of 3, 5 with `rows` at `offsets`.
-fn moved<'a>(rows: &'a BatchRows, offsets: &'a [[f32; 2]]) -> Moved<'a> {
+fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
     Moved {
         shift: Shift::whole([3.0, 5.0]),
         table: RowOffsets::NONE,
@@ -123,18 +129,19 @@ fn an_item_of_a_batch_in_one_frame_is_drawn_at_the_batchs_shift() {
     let rows = BatchRows::default();
 
     // When / Then
-    assert_eq!(moved(&rows, &[]).item_shift(0), Shift::whole([3.0, 5.0]));
+    assert_eq!(moved(rows, &[]).item_shift(0), Shift::whole([3.0, 5.0]));
 }
 
 #[test]
 fn an_item_of_a_lane_batch_is_drawn_at_the_shift_and_its_rows_offset() {
     // Given
-    let rows = lane_rows();
+    let page = page_rows();
+    let rows = lane_rows(&page);
     let offsets = vec![[0.0, 2.0]; rows.items().len()];
 
     // When / Then
     assert_eq!(
-        moved(&rows, &offsets).item_shift(0),
+        moved(rows, &offsets).item_shift(0),
         Shift::whole([3.0, 7.0])
     );
 }
@@ -142,14 +149,16 @@ fn an_item_of_a_lane_batch_is_drawn_at_the_shift_and_its_rows_offset() {
 #[test]
 #[should_panic(expected = "item 0 of a lane batch has no row with an offset")]
 fn an_item_of_a_lane_batch_whose_row_has_no_offset_is_refused() {
-    let rows = lane_rows();
-    moved(&rows, &[]).item_shift(0);
+    let page = page_rows();
+    let rows = lane_rows(&page);
+    moved(rows, &[]).item_shift(0);
 }
 
 #[test]
 #[should_panic(expected = "has no row with an offset")]
 fn an_item_past_a_lane_batchs_rows_is_refused() {
-    let rows = lane_rows();
+    let page = page_rows();
+    let rows = lane_rows(&page);
     let offsets = vec![[0.0, 2.0]; rows.items().len()];
-    moved(&rows, &offsets).item_shift(rows.items().len());
+    moved(rows, &offsets).item_shift(rows.items().len());
 }

@@ -24,9 +24,11 @@ pub(super) fn batches(items: &[(Item, Option<Rect>)]) -> Batched {
 /// `batched` on the page, keyed against `was`.
 pub(super) fn keyed(batched: Batched, was: Option<&KeptBatched>) -> KeptBatched {
     let count = batched.batches.len();
+    let mut rows = crate::framed_batches::RowsOfBatches::default();
+    rows.add_unrowed(count);
     let framed = crate::framed_batches::FramedBatched {
         frames: vec![BatchFrame::frame(PAGE); count],
-        rows: vec![crate::framed_batches::BatchRows::default(); count],
+        rows,
         batched,
     };
     KeptBatched::keyed(framed, was)
@@ -170,13 +172,10 @@ fn in_row_frames(
     was: Option<&KeptBatched>,
 ) -> KeptBatched {
     let batched = batches(&[(quad(0.0, 1), None), (quad(20.0, 1), None)]);
-    let rows = crate::framed_batches::BatchRows {
-        frames: row_frames.to_vec(),
-        items: items.to_vec(),
-    };
+    let rows = crate::framed_batches::RowsOfBatches::one(&row_frames, &items);
     let framed = crate::framed_batches::FramedBatched {
         frames: vec![BatchFrame::lane(3)],
-        rows: vec![rows],
+        rows,
         batched,
     };
     KeptBatched::keyed(framed, was)

@@ -194,7 +194,7 @@ pub use edit_decline::EditDecline;
 pub use error::ElementError;
 pub use events::Point;
 pub use focus_style::Focus;
-pub use framed_batches::{BatchRows, FramedBatched};
+pub use framed_batches::{BatchRows, FramedBatched, RowsOfBatches};
 pub use frames_draw::{BatchFrame, FrameDraw};
 pub use kept_batches_keys::{BatchKey, KeptBatched};
 pub use keys::{Keystroke, Modifiers};

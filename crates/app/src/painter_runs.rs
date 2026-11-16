@@ -31,7 +31,7 @@ impl ScenePainter {
             .batches
             .iter()
             .zip(&kept.frames)
-            .zip(&kept.rows);
+            .zip(kept.rows.iter());
         for (at, (((batch, &named), rows), &key)) in batches.zip(&kept.keys).enumerate() {
             let frame = painted.frame_draw(named);
             let clip = frame.on_page(batch.clip);
@@ -53,7 +53,7 @@ impl ScenePainter {
     /// its offset in `offsets`, through the batch's kept table.
     fn moved<'a>(
         &mut self,
-        (key, rows): (BatchKey, &'a BatchRows),
+        (key, rows): (BatchKey, BatchRows<'a>),
         shift: Shift,
         offsets: &'a [[f32; 2]],
     ) -> Moved<'a> {

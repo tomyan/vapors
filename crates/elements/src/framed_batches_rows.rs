@@ -7,7 +7,7 @@
 
 use vapors_scene::{Batched, Item, ROWS_PER_BATCH, Rect};
 
-use super::{BatchRows, Resolved, Sources};
+use super::{Resolved, RowsOfBatches, Sources};
 use crate::frames_draw::view_at;
 use crate::scene_view::frame_items;
 
@@ -17,7 +17,7 @@ pub(super) fn rows_batched(
     run: &[Resolved],
     (container, (boxes, frames)): (usize, Sources<'_>),
     view: Rect,
-) -> Vec<(Batched, Vec<BatchRows>)> {
+) -> Vec<(Batched, RowsOfBatches)> {
     let template = frames.lane_template_of(container).shift;
     let mut last: Option<(usize, Row)> = None;
     let mut parts = Parts::default();
@@ -50,50 +50,61 @@ struct Row {
     offset: [f32; 2],
 }
 
-/// The parts made so far, the one being filled, each of its batched
-/// items' row frame, and the rows it holds: counted each time the row of
-/// a batched item changes, which counts a row its items return to twice
-/// (a split early, never a table overrun) and costs no set.
+/// The parts made so far, each batch with its rows; the part being
+/// filled and its batches' rows; the row of the last item batched; and
+/// the rows the part holds, counted each time that row changes, which
+/// counts a row its items return to twice (a split early, never a table
+/// overrun) and costs no set.
 #[derive(Default)]
 struct Parts {
-    done: Vec<(Batched, Vec<usize>)>,
+    done: Vec<(Batched, RowsOfBatches)>,
     part: Batched,
-    item_rows: Vec<usize>,
+    part_rows: RowsOfBatches,
+    last_row: Option<usize>,
     rows: usize,
 }
 
 impl Parts {
     /// `item` under `clip` in row frame `frame` added, culled in the
-    /// row's view; the part is closed first when a shown item would
-    /// bring it a row past [`ROWS_PER_BATCH`].
+    /// row's view (one test for the split and the batching); the part is
+    /// closed first when a shown item would bring it a row past
+    /// [`ROWS_PER_BATCH`].
     fn add(&mut self, (frame, row): (usize, Row), item: &Item, clip: Option<Rect>) {
-        let new_row = self.item_rows.last() != Some(&frame);
-        let shows = !vapors_scene::culled(item, clip, row.view) || is_surface(item);
-        if shows && new_row && self.rows == ROWS_PER_BATCH {
+        let is_culled = vapors_scene::culled(item, clip, row.view);
+        let new_row = self.last_row != Some(frame);
+        if (!is_culled || is_surface(item)) && new_row && self.rows == ROWS_PER_BATCH {
             self.close();
         }
         let in_lane = clip.map(|clip| moved(clip, row.offset));
-        if self.part.add_clipped(item, (clip, in_lane), row.view) {
-            self.rows += usize::from(self.item_rows.last() != Some(&frame));
-            self.item_rows.push(frame);
+        let batches = self.part.batches.len();
+        if self.part.add_culled(item, in_lane, is_culled) {
+            self.note_row(frame, self.part.batches.len() > batches);
+        }
+    }
+
+    /// The item just batched noted in row frame `frame`, in a new batch
+    /// when `new_batch`.
+    fn note_row(&mut self, frame: usize, new_batch: bool) {
+        if new_batch {
+            self.part_rows.start_batch();
+        }
+        self.part_rows.push_item(frame);
+        if self.last_row != Some(frame) {
+            (self.last_row, self.rows) = (Some(frame), self.rows + 1);
         }
     }
 
     /// The part being filled closed, and a new one started.
     fn close(&mut self) {
         let part = std::mem::take(&mut self.part);
-        self.done.push((part, std::mem::take(&mut self.item_rows)));
-        self.rows = 0;
+        self.done.push((part, std::mem::take(&mut self.part_rows)));
+        (self.last_row, self.rows) = (None, 0);
     }
 
     /// Every part, each batch with its rows.
-    fn finish(mut self) -> Vec<(Batched, Vec<BatchRows>)> {
+    fn finish(mut self) -> Vec<(Batched, RowsOfBatches)> {
         self.close();
-        let with_rows = |(part, item_rows): (Batched, Vec<usize>)| {
-            let rows = rows_of(&part, &item_rows);
-            (part, rows)
-        };
-        self.done.into_iter().map(with_rows).collect()
+        self.done
     }
 }
 
@@ -111,32 +122,4 @@ fn moved(clip: Rect, offset: [f32; 2]) -> Rect {
     } else {
         clip.offset(offset)
     }
-}
-
-/// Each of `part`'s batches' rows, from each batched item's row frame in
-/// order.
-fn rows_of(part: &Batched, item_rows: &[usize]) -> Vec<BatchRows> {
-    let mut items = item_rows.iter().copied();
-    let rows = |batch: &vapors_scene::Batch| batch_rows(items.by_ref().take(batch.run.len()));
-    part.batches.iter().map(rows).collect()
-}
-
-/// The rows of one batch whose items are in row frames `item_rows`: its
-/// rows numbered as they first appear in it. A row's items are mostly
-/// consecutive, so the last row is tried first, then the batch's rows
-/// (at most [`ROWS_PER_BATCH`]) in turn.
-fn batch_rows(item_rows: impl Iterator<Item = usize>) -> BatchRows {
-    let mut rows = BatchRows::default();
-    for row in item_rows {
-        let last = rows.frames.len().checked_sub(1);
-        let found = last
-            .filter(|&at| rows.frames[at] == row)
-            .or_else(|| rows.frames.iter().rposition(|&frame| frame == row));
-        let at = found.unwrap_or_else(|| {
-            rows.frames.push(row);
-            rows.frames.len() - 1
-        });
-        rows.items.push(u32::try_from(at).expect("under 2^32 rows"));
-    }
-    rows
 }

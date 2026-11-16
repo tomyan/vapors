@@ -93,29 +93,24 @@ impl Batched {
     /// each culled in a view of its own (the rows of a lane, each in its
     /// own frame's coordinates).
     pub fn add(&mut self, item: &Item, clip: Option<Rect>, view: Rect) -> bool {
-        self.add_clipped(item, (clip, clip), view)
+        self.add_culled(item, clip, culled(item, clip, view))
     }
 
-    /// As [`Batched::add`], culled under `culled_by` but batched under
-    /// `batched_under`: for an item whose clip is in its row's
-    /// coordinates (culling, in the row's view) and is drawn in the
-    /// lane's (the batch's clip, moved by the row's offset), so items of
-    /// different rows under equal clips in their rows are not batched
-    /// under one scissor.
-    pub fn add_clipped(
-        &mut self,
-        item: &Item,
-        (culled_by, batched_under): (Option<Rect>, Option<Rect>),
-        view: Rect,
-    ) -> bool {
-        if !culled(item, culled_by, view) {
-            self.push(item, batched_under, false);
+    /// As [`Batched::add`], with whether `item` is culled worked out by the
+    /// caller ([`culled`]), and batched under `clip`: for an item culled
+    /// under its clip in its row's coordinates and batched under that clip
+    /// moved into the lane's, so items of different rows under equal clips
+    /// in their rows are not batched under one scissor; and so one test
+    /// serves the caller's split and the batching.
+    pub fn add_culled(&mut self, item: &Item, clip: Option<Rect>, is_culled: bool) -> bool {
+        if !is_culled {
+            self.push(item, clip, false);
             return true;
         }
         self.culled += 1;
         let surface = matches!(item, Item::Surface { .. });
         if surface {
-            self.push(item, batched_under, true);
+            self.push(item, clip, true);
         }
         surface
     }

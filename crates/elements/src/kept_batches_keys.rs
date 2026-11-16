@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use vapors_scene::Batched;
 
-use crate::framed_batches::{BatchRows, FramedBatched};
+use crate::framed_batches::{FramedBatched, RowsOfBatches};
 use crate::frames_draw::BatchFrame;
 use crate::run_bits::same_bits;
 
@@ -53,7 +53,7 @@ pub struct KeptBatched {
     pub frames: Vec<BatchFrame>,
     /// Each batch's rows, by its place: empty for a batch in one frame
     /// (`framed_batches.rs`).
-    pub rows: Vec<BatchRows>,
+    pub rows: RowsOfBatches,
     /// Each batch's key, by its place in `batched.batches`.
     pub keys: Vec<BatchKey>,
 }
@@ -93,7 +93,7 @@ impl KeptBatched {
         };
         let (old_rows, new_rows) = (self.rows.get(was), framed.rows.get(now));
         same_bits(&old.run, &new.run)
-            && old_rows.map(BatchRows::items) == new_rows.map(BatchRows::items)
+            && old_rows.map(|rows| rows.items) == new_rows.map(|rows| rows.items)
     }
 
     /// A key for each of `batched`'s batches: `self`'s at the same place

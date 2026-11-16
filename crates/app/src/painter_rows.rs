@@ -61,7 +61,7 @@ pub(super) struct Moved<'a> {
     pub(super) shift: Shift,
     pub(super) table: RowOffsets,
     pub(super) offsets: &'a [[f32; 2]],
-    pub(super) rows: &'a BatchRows,
+    pub(super) rows: BatchRows<'a>,
 }
 
 impl Moved<'_> {
