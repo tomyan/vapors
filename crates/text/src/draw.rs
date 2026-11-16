@@ -213,7 +213,9 @@ pub(crate) fn rowed_vertex_bytes(floats: &[f32], (vertices, rows): (&[usize], &[
     assert_eq!(
         total * FLOATS_PER_VERTEX,
         floats.len(),
-        "text: the draws' vertices are the floats'"
+        "text: the draws' vertices are the floats': each draw's count is six for each \
+         inked glyph or icon mask (quads.rs `vertices_per_draw`); reproduce with `cargo xtask \
+         test`"
     );
     vapors_renderer::assert_rows("text", vertices.len(), rows);
     let mut chunks = floats.chunks(FLOATS_PER_VERTEX);
@@ -238,3 +240,7 @@ pub(crate) fn vertex_count(bytes: u64) -> u32 {
         )
     })
 }
+
+#[cfg(test)]
+#[path = "draw_tests.rs"]
+mod tests;

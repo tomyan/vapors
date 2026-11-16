@@ -292,3 +292,7 @@ pub fn assert_rows(label: &str, items: usize, rows: &[u32]) {
 #[cfg(test)]
 #[path = "instanced_layout_tests.rs"]
 mod layout_tests;
+
+#[cfg(test)]
+#[path = "instanced_tests.rs"]
+mod tests;
