@@ -3,7 +3,7 @@
 //! the tested rules and the rules of sheets the key does not reference
 //! are matched on the element.
 
-mod support;
+use crate::support;
 
 use support::cascade::{BLUE, GREEN, RED};
 use support::{chain, css};

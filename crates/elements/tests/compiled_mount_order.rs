@@ -3,7 +3,7 @@
 //! either order style their elements as the full cascade does: the
 //! debug oracle compares every element, and the styles are pinned here.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
