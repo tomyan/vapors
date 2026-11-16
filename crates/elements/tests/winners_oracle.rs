@@ -35,6 +35,7 @@ fn key(declaration: u32) -> &'static StyleKey {
         base: base.leak(),
         conditional: user_agent_rules().leak(),
         shareable: true,
+        own: Some(1),
     }));
     Box::leak(Box::new(StyleKey {
         site: "cards/card.wisp:3:1",
