@@ -41,6 +41,8 @@ fn xtask(dir: &Path, args: &[&str]) -> Output {
         .args(args)
         .current_dir(dir)
         .env("HOME", dir)
+        // the cap measures CARGO_TARGET_DIR when set, not the scratch target
+        .env_remove("CARGO_TARGET_DIR")
         .env_remove("GITHUB_ACTIONS")
         .env_remove("XTASK_GATE")
         .env_remove("GIT_DIR")

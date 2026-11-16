@@ -8,8 +8,9 @@
 //! The directory is `CARGO_TARGET_DIR` when set, else the workspace's
 //! `target/`; the workspace is the nearest directory at or above the
 //! current one holding `.config/factory.toml`, so a run from a
-//! subdirectory is capped too. A `target-dir` in `.cargo/config.toml`
-//! is refused, as it is not read here.
+//! subdirectory is capped too. A `target-dir` in the workspace's
+//! `.cargo/config.toml` is refused, as it is not read here; one in a
+//! user-level `~/.cargo/config.toml` is not detected.
 //!
 //! The size is measured cheaply, without walking the whole tree: in each
 //! `target/<profile>` and `target/<triple>/<profile>`, the files directly
