@@ -35,11 +35,11 @@ pub(crate) struct Rebuilt {
     /// The boxes lending the taken caches visited (`Lender::lend_from`).
     pub(crate) lend_visits: usize,
     /// Each owner edited in place, by slot, with the slots placement must
-    /// chain to it (`Placement::chain_children`): the children it inserted, and each other owner rebuilt
-    /// directly under it (a row restyled in the same update is an owner
-    /// of its own, and may have come into flow while the edited owner
-    /// kept it). Its kept
-    /// children keep their slots and their parent, so these alone.
+    /// chain to it (`Placement::chain_children`): the children it
+    /// inserted, and each other owner rebuilt directly under it (a row
+    /// restyled in the same update is an owner of its own, and may have
+    /// come into flow while the edited owner kept it). Its kept children
+    /// keep their slots and their parent, so these alone.
     pub(crate) to_chain: rustc_hash::FxHashMap<usize, Vec<usize>>,
 }
 
