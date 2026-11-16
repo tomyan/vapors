@@ -46,7 +46,7 @@ fn an_elements_winners_list_the_user_agent_sheet_and_its_own_by_scope_hashed_as_
         "winners: vapors_dom::Winners::Compiled(&WINNERS_DIV0)",
     );
     // the own sheet, second, marked as the key's own for check 1
-    assert_has(&code, "shareable: true, own: Some(1) }");
+    assert_has(&code, "blocked_by: &[], own: Some(1) }");
     assert_has(
         &code,
         &format!(

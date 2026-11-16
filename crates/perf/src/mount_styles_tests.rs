@@ -86,3 +86,23 @@ fn every_compiled_row_element_has_winners_whose_sheets_are_registered_and_hash_a
     }
     assert_eq!(checked, 8, "two rows of a div, two spans and a button");
 }
+
+#[test]
+fn every_keyed_row_element_takes_its_style_from_compiled_winners_at_any_count() {
+    // When
+    for rows in [300, 3000] {
+        let counts = first_update(rows);
+
+        // Then: one computed style per share key, each from compiled
+        // winners; none by the full cascade
+        assert_eq!(
+            counts.winners_compiled, counts.styles_computed,
+            "{rows} rows: {counts:?}"
+        );
+        assert_eq!(
+            counts.winners_runtime + counts.winners_component_tag,
+            0,
+            "{rows} rows"
+        );
+    }
+}

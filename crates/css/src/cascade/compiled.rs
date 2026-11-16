@@ -10,6 +10,7 @@
 use super::collect::{self, Attached};
 use super::{Cascade, ComputedStyle, Environment, compute, inline, presentation};
 use crate::Result;
+use crate::ast::Rule;
 use crate::selector::Element;
 
 /// A key's rules, as indices into a cascade's rules.
@@ -39,12 +40,27 @@ impl Cascade {
         of_sheet.map(|(index, _)| index).nth(rule)
     }
 
-    /// Whether a sheet not in `referenced` has a rule that is a
-    /// candidate for elements of `tag` with `classes`.
+    /// The rules of sheets not in `referenced` that are candidates for
+    /// elements of `tag` with `classes`: another crate's, which a key's
+    /// compiled winners did not see.
+    pub fn foreign_rules_for_key<'a>(
+        &'a self,
+        tag: &str,
+        classes: &[&str],
+        referenced: &'a [usize],
+    ) -> impl Iterator<Item = &'a Rule> + 'a {
+        let candidates = self.buckets.candidates_for_key(tag, classes).into_iter();
+        let foreign = candidates
+            .filter(move |&index| referenced.binary_search(&self.rules[index].sheet).is_err());
+        foreign.map(|index| &self.rules[index].rule)
+    }
+
+    /// Whether [`Cascade::foreign_rules_for_key`] finds any.
     #[must_use]
     pub fn foreign_reaches(&self, tag: &str, classes: &[&str], referenced: &[usize]) -> bool {
-        let mut candidates = self.buckets.candidates_for_key(tag, classes).into_iter();
-        candidates.any(|index| referenced.binary_search(&self.rules[index].sheet).is_err())
+        self.foreign_rules_for_key(tag, classes, referenced)
+            .next()
+            .is_some()
     }
 
     /// [`Cascade::compute`] from `compiled`.

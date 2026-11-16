@@ -8,7 +8,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use vapors_css::cascade::unshareable;
 use vapors_css::selector::Element as _;
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE, StyleKey};
 
@@ -97,19 +96,28 @@ impl Document {
             .map(Rc::clone)
     }
 
-    /// Whether `key`'s elements may share: decided once per `Kept` from
-    /// the rules any of them can match.
+    /// Whether `key`'s elements may share: decided once per `Kept`, from
+    /// the key's compiled winners when it has them (B3b), else from the
+    /// rules any of its elements can match.
     fn shareable(&mut self, key: &'static StyleKey) -> bool {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_mut().expect("restyle sets it");
         if let Some(decided) = kept.shared.shareable.get(&address) {
             return *decided;
         }
-        let classes: Vec<&str> = key.classes.iter().chain(key.toggles).copied().collect();
-        let decided = !self
-            .sheets
-            .rules_for_key(key.tag, &classes)
-            .any(|rule| unshareable(rule).is_some());
+        let decided = match key.winners.compiled() {
+            Some(winners) => self.sheets.compiled_shareable(key, winners),
+            None => self.sheets.runtime_shareable(key),
+        };
+        // the oracle: the compiled answer is the matched rules' answer
+        debug_assert_eq!(
+            decided,
+            self.sheets.runtime_shareable(key),
+            "the key at {} is shareable by its compiled winners but not by the rules its \
+             elements can match, or the reverse; vapors_css::analysis and the share path \
+             disagree. Reproduce with the failing test",
+            key.site
+        );
         kept.shared.shareable.insert(address, decided);
         decided
     }

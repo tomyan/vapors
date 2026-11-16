@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 
 use vapors_css::analysis::{KeyWinners, Match, Place, SheetId, Winner};
-use vapors_css::cascade::{INLINE_SHEET, PRESENTATION_SHEET};
+use vapors_css::cascade::{INLINE_SHEET, PRESENTATION_SHEET, unshareable};
 
 use super::shell::in_crate;
 use crate::styles::{Analysis, ElementStyles};
@@ -64,9 +64,24 @@ impl<'a> Winners<'a> {
         Some(self.literal_of(element))
     }
 
+    /// The analysis' sheets holding a candidate rule of the key that
+    /// blocks sharing (`vapors_css::cascade::unshareable`).
+    fn blocking(&self, winners: &KeyWinners) -> BTreeSet<usize> {
+        let blocks = |rule: &&vapors_css::analysis::ClassifiedRule| {
+            let sheet = &self.analysis.sheets[rule.sheet].1;
+            unshareable(&sheet.rules[rule.rule]).is_some()
+        };
+        winners
+            .rules
+            .iter()
+            .filter(blocks)
+            .map(|rule| rule.sheet)
+            .collect()
+    }
+
     fn literal_of(&self, element: &ElementStyles) -> Result<String, String> {
         let winners = &element.winners;
-        let sheets = Sheets::referenced(winners)?;
+        let sheets = Sheets::referenced(winners, &self.blocking(winners))?;
         let mut out = String::from("vapors_dom::KeyWinners { sheets: &[");
         for &index in &sheets.order {
             let id = sheet_ref(&self.analysis.sheets[index].0, self.own);
@@ -88,7 +103,10 @@ impl<'a> Winners<'a> {
             .own_index
             .and_then(|index| sheets.renumbered.get(&index)))
         .map_or_else(|| "None".to_owned(), |own| format!("Some({own})"));
-        let _ = write!(out, "], shareable: {}, own: {own} }}", winners.shareable);
+        let blocked = (self.blocking(winners).iter()).fold(String::new(), |out, sheet| {
+            out + &format!("{}, ", sheets.renumbered[sheet])
+        });
+        let _ = write!(out, "], blocked_by: &[{blocked}], own: {own} }}");
         Ok(out)
     }
 }
@@ -101,8 +119,9 @@ struct Sheets {
 }
 
 impl Sheets {
-    fn referenced(winners: &KeyWinners) -> Result<Self, String> {
+    fn referenced(winners: &KeyWinners, blocking: &BTreeSet<usize>) -> Result<Self, String> {
         let mut used = BTreeSet::from([0]);
+        used.extend(blocking);
         used.extend(conditional(winners).map(|rule| rule.sheet));
         used.extend(base(winners).filter_map(|(_, place)| in_rule(place)));
         let order: Vec<usize> = used.into_iter().collect();

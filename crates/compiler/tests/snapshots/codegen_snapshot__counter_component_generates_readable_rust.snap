@@ -273,7 +273,7 @@ static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
             rule: 69,
         },
     ],
-    shareable: true,
+    blocked_by: &[],
     own: Some(1),
 };
 static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {

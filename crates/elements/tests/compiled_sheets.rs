@@ -30,7 +30,7 @@ const fn winners(sheets: &'static [(SheetRef, u64)]) -> KeyWinners {
         sheets,
         base: &[],
         conditional: &[],
-        shareable: true,
+        blocked_by: &[],
         // the first sheet is the key's own in every test here
         own: Some(0),
     }

@@ -13,7 +13,7 @@ static WINNERS: KeyWinners = KeyWinners {
     sheets: &[],
     base: &[],
     conditional: &[],
-    shareable: true,
+    blocked_by: &[],
     own: None,
 };
 
