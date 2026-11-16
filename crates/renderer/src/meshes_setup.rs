@@ -93,7 +93,13 @@ pub(crate) fn render_pipeline(
         device,
         wgpu::ShaderModuleDescriptor {
             label: Some("meshes"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("meshes.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(
+                    include_str!("meshes_2d.wgsl"),
+                    include_str!("meshes_shared.wgsl")
+                )
+                .into(),
+            ),
         },
     );
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -133,7 +139,7 @@ pub(crate) fn render_pipeline(
 }
 
 /// An entry's triangles, then the item, at stride 0.
-fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
+pub(crate) fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     [
         Some(wgpu::VertexBufferLayout {
             array_stride: crate::mesh_entries::TRIANGLE_BYTES,
