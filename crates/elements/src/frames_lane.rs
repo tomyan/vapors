@@ -171,6 +171,9 @@ impl Frames {
 mod batch;
 #[path = "frames_lane_meeting.rs"]
 mod meeting;
+#[path = "frames_lane_seen.rs"]
+mod seen;
 pub(crate) use meeting::LaneInk;
+pub(crate) use seen::LaneSeen;
 #[path = "frames_lane_prime.rs"]
 mod prime;

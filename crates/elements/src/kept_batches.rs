@@ -75,10 +75,10 @@ pub(crate) struct KeptBatches {
     /// changed, or paint order was walked. The next draw sorts the
     /// steps again, keeping `batched` for its keys.
     unsorted: bool,
-    /// Each framed lane row the last search found meeting the view, and
-    /// whether its items lay wholly inside it then: what a search after
-    /// lane rows moved compares with (`kept_batches_search.rs`).
-    lane_rows: FxHashMap<usize, bool>,
+    /// Each framed lane in the view, by container, as the last search
+    /// met it: what a search after lane rows moved compares its ends with
+    /// (`kept_batches_search.rs`).
+    lanes: FxHashMap<usize, crate::frames::LaneSeen>,
 }
 
 impl KeptBatches {

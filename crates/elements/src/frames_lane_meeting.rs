@@ -41,7 +41,7 @@ impl Frames {
 
     /// The children of the framed lane of `container` meeting `in_frame`,
     /// the view in its parent frame, each child's frame memoised.
-    fn lane_rows_meeting(&self, container: usize, in_frame: Rect) -> Vec<usize> {
+    pub(super) fn lane_rows_meeting(&self, container: usize, in_frame: Rect) -> Vec<usize> {
         let Some(shared) = &self.lanes.shared else {
             return Vec::new();
         };
@@ -62,7 +62,12 @@ impl Frames {
     /// CSS pixels from `container`'s border box top that `in_frame`
     /// covers, a device pixel wider each way and widened by the ink noted
     /// past its rows.
-    fn lane_interval(&self, container: usize, base: LaneBase, in_frame: Rect) -> (f64, f64) {
+    pub(super) fn lane_interval(
+        &self,
+        container: usize,
+        base: LaneBase,
+        in_frame: Rect,
+    ) -> (f64, f64) {
         let (scale, origin) = (f64::from(self.scale), f64::from(base.origin));
         let [above, below] = self.lane_ink.0.get(&container).copied().unwrap_or_default();
         let from = (f64::from(in_frame.top) - 1.0) / scale - origin - f64::from(below);

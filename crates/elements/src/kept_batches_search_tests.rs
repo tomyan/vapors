@@ -152,3 +152,19 @@ fn a_box_taken_out_of_a_small_page_is_taken_out_of_the_steps_shown() {
     // Then: the steps shown and the items counted are a full search's
     // (the debug checks in `KeptBatches::for_view` and `culled`)
 }
+
+#[test]
+fn the_first_row_in_view_taken_out_sorts_the_steps_again() {
+    // Given
+    let (mut doc, list) = scrolled_list();
+
+    // When: the row the view's top cuts taken out, an end row the lane no
+    // longer holds
+    let top = doc.children(list)[50];
+    doc.remove(top);
+    let builds = drawn(&mut doc);
+
+    // Then: the steps were sorted again (and are a full search's: the
+    // debug check in `KeptBatches::for_view`)
+    assert_eq!(builds, 1);
+}
