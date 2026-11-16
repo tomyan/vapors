@@ -11,7 +11,7 @@ use vapors_scene::Run;
 use super::ScenePainter;
 use super::errors::PaintError;
 use super::kept::Kind as KeptKind;
-use super::region::{clipped, on_page, view};
+use super::region::{clipped, view};
 use super::rows::Moved;
 
 impl ScenePainter {
@@ -34,7 +34,7 @@ impl ScenePainter {
             .zip(&kept.rows);
         for (at, (((batch, &named), rows), &key)) in batches.zip(&kept.keys).enumerate() {
             let frame = painted.frame_draw(named);
-            let clip = on_page(batch.clip, frame);
+            let clip = frame.on_page(batch.clip);
             match clipped(target, clip).filter(|_| !batch.culled) {
                 Some(clipped) => {
                     let offsets = painted.row_offsets(named, rows);

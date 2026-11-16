@@ -12,7 +12,6 @@ use rustc_hash::FxHashMap;
 
 use super::{FrameAt, Frames};
 use prime::Primed;
-use vapors_scene::Rect;
 
 use crate::layout::{BoxRect, SharedLanes};
 
@@ -50,20 +49,6 @@ pub(crate) struct LaneFrames {
     folds: std::cell::Cell<usize>,
 }
 
-/// How far each framed lane's children's ink reaches past their boxes,
-/// the most seen: a history, which a paint made afresh does not have,
-/// so frames compare equal whatever it holds. It only widens culling,
-/// which the debug build checks against testing every step
-/// (`kept_batches_check.rs`).
-#[derive(Debug, Default)]
-pub(crate) struct LaneInk(FxHashMap<usize, [f32; 2]>);
-
-impl PartialEq for LaneInk {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
 /// The bases alone: the lanes are the boxes', and the memo is what was
 /// read.
 impl PartialEq for LaneFrames {
@@ -97,48 +82,6 @@ impl Frames {
             folds: std::cell::Cell::new(0),
         };
         changed
-    }
-
-    /// The lane frames in frame `frame` that can show in `view`, device
-    /// pixels on the page: the children of each framed lane in it whose
-    /// box or overflow meets the view as it falls in the frame, a device
-    /// pixel wider each way (`LaneTree::between`, O(log children +
-    /// shown) per lane).
-    pub(crate) fn lane_frames_meeting(&self, frame: usize, view: Rect) -> Vec<usize> {
-        let (Some(containers), Some(shared)) =
-            (self.lanes.by_parent.get(&frame), &self.lanes.shared)
-        else {
-            return Vec::new();
-        };
-        let in_frame = self.view_in(frame, view);
-        let scale = f64::from(self.scale);
-        let lanes = shared.borrow();
-        let meeting = |container: &usize| {
-            let origin = f64::from(self.lanes.bases[container].origin);
-            let [above, below] = self.lane_ink.0.get(container).copied().unwrap_or_default();
-            let from = (f64::from(in_frame.top) - 1.0) / scale - origin - f64::from(below);
-            let to = (f64::from(in_frame.bottom) + 1.0) / scale - origin + f64::from(above);
-            lanes.children_between(*container, from, to)
-        };
-        containers.iter().flat_map(meeting).collect()
-    }
-
-    /// Notes that ink in a child of the framed lane container
-    /// `container` reaches `over` past its border box, above and below,
-    /// CSS pixels: culling widens by the most noted (a box shadow, a
-    /// glyph's overhang), which can only grow until paint order is
-    /// walked, so it stays sound when the child that set it is gone.
-    pub(crate) fn note_lane_ink(&mut self, container: usize, over: [f32; 2]) {
-        let most = self.lane_ink.0.entry(container).or_default();
-        *most = [most[0].max(over[0]), most[1].max(over[1])];
-    }
-
-    /// The lane ink `from` noted, taken into frames made afresh after a
-    /// splice: the kept rows painted nothing again to note it with, and
-    /// ink only grows until a walk, so it stays sound for the rows the
-    /// splice took out.
-    pub(crate) fn take_lane_ink(&mut self, from: &mut Frames) {
-        self.lane_ink = std::mem::take(&mut from.lane_ink);
     }
 
     /// How many lane frames a fold of their lane worked out since the
@@ -196,34 +139,6 @@ impl Frames {
         self.lane_child_at(self.lane_template(base, outer), base, offset)
     }
 
-    /// The framed lane container whose child frame `frame` is, if it is
-    /// one: what batches over a lane's rows are grouped by (4f).
-    pub(crate) fn lane_container_of(&self, frame: usize) -> Option<usize> {
-        let container = self.lanes.shared.as_ref()?.borrow().container_of(frame)?;
-        self.lanes
-            .bases
-            .contains_key(&container)
-            .then_some(container)
-    }
-
-    /// Where the batches over framed lane `container`'s rows are drawn:
-    /// the frame its content is in, cut to the clip it gives its content
-    /// (`lane_template`). A row's offset from it is its frame's shift
-    /// less this one's, an exact integer (`lane_child_at`).
-    ///
-    /// # Panics
-    ///
-    /// When `container` is no framed lane container.
-    pub(crate) fn lane_template_of(&self, container: usize) -> FrameAt {
-        let base = *self.lanes.bases.get(&container).unwrap_or_else(|| {
-            panic!(
-                "a batch names lane {container}, which these frames hold no base for: a batch \
-                 kept from another paint (frames_lane.rs); reproduce with `cargo xtask test`"
-            )
-        });
-        self.lane_template(base, self.at(base.parent))
-    }
-
     /// The base of the framed lane `frame` is a child of and the
     /// child's offset in it, CSS pixels.
     fn lane_place(&self, frame: usize) -> Option<(LaneBase, f64)> {
@@ -234,5 +149,10 @@ impl Frames {
     }
 }
 
+#[path = "frames_lane_batch.rs"]
+mod batch;
+#[path = "frames_lane_meeting.rs"]
+mod meeting;
+pub(crate) use meeting::LaneInk;
 #[path = "frames_lane_prime.rs"]
 mod prime;

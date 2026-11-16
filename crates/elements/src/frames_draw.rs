@@ -47,6 +47,31 @@ pub struct FrameDraw {
     pub clip: Option<Rect>,
 }
 
+impl FrameDraw {
+    /// A batch's clip on the page, the painter's scissor: `clip`, its
+    /// clip in the frame (or a lane's template, `framed_batches_rows.rs`),
+    /// moved by the shift and cut to the frame's clip; `None` for none.
+    /// One answer for the painter and the debug check that places the
+    /// kept batches on the page (`kept_batches_check_page.rs`). Unmoved,
+    /// to the bit, by a zero shift: a key tells -0.0 from 0.0.
+    #[must_use]
+    // Exact: a zero shift is exactly zero.
+    #[allow(clippy::float_cmp)]
+    pub fn on_page(&self, clip: Option<Rect>) -> Option<Rect> {
+        let moved = |clip: Rect| {
+            if self.shift == [0.0, 0.0] {
+                clip
+            } else {
+                clip.offset(self.shift)
+            }
+        };
+        match (clip.map(moved), self.clip) {
+            (Some(clip), Some(outer)) => Some(clip.intersection(outer)),
+            (clip, outer) => clip.or(outer),
+        }
+    }
+}
+
 impl Frames {
     /// `view`, device pixels on the page, in frame `frame`'s coordinates
     /// and cut to its clip: where the frame's items can show.
@@ -114,3 +139,7 @@ impl Painted {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "frames_draw_tests.rs"]
+mod tests;
