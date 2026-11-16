@@ -170,16 +170,24 @@ impl DocumentInput {
     /// another frame. An app showing the document calls this once a
     /// frame, before the document's update.
     pub fn advance_fling(&mut self, document: &mut Document, now: Instant) -> bool {
+        self.clock.framed(now);
         let running = self.touch.advance(document, now);
         self.touch.draw_thumbs(document, now);
         self.thumbs = self.touch.thumb_phase(now);
         running
     }
 
-    /// Whether the touch thumbs are shown or fading now: a fade that has
+    /// Whether the touch thumbs are shown or fading at `now`: a fade that has
     /// frames to come.
-    pub(crate) fn touch_thumbs_fading(&self) -> bool {
-        self.touch.thumb_phase(vapors_platform::Instant::now()) != crate::thumb_fade::Phase::Hidden
+    pub(crate) fn touch_thumbs_fading(&self, now: Instant) -> bool {
+        self.touch.thumb_phase(now) != crate::thumb_fade::Phase::Hidden
+    }
+
+    /// How many events the platform stamped earlier than the last
+    /// frame's time, handled at the frame's time instead (#440).
+    #[must_use]
+    pub fn event_times_clamped(&self) -> usize {
+        self.clock.clamped()
     }
 
     /// Where the touch thumbs' fade was at the last `advance_fling`: the

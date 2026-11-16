@@ -33,13 +33,13 @@ fn moved(x: f64, y: f64) -> WindowEvent {
 fn each_press_carries_its_count_and_a_release_its_presss() {
     // Given: the pointer over the window
     let mut input = Input::new();
-    input.translate(&moved(10.0, 10.0));
+    input.translate_now(&moved(10.0, 10.0));
 
     // When: two quick presses in one place, with their releases
-    let first = input.translate(&pressing(ElementState::Pressed));
-    let lifted = input.translate(&pressing(ElementState::Released));
-    let second = input.translate(&pressing(ElementState::Pressed));
-    let lifted_again = input.translate(&pressing(ElementState::Released));
+    let first = input.translate_now(&pressing(ElementState::Pressed));
+    let lifted = input.translate_now(&pressing(ElementState::Released));
+    let second = input.translate_now(&pressing(ElementState::Pressed));
+    let lifted_again = input.translate_now(&pressing(ElementState::Released));
 
     // Then: the count on the press itself, nothing after it
     assert_eq!(first, [button(true, 1)]);
@@ -52,14 +52,14 @@ fn each_press_carries_its_count_and_a_release_its_presss() {
 fn a_press_with_no_known_pointer_place_starts_a_new_row() {
     // Given: a press near the origin, then the pointer leaves
     let mut input = Input::new();
-    input.translate(&moved(2.0, 2.0));
-    input.translate(&pressing(ElementState::Pressed));
-    input.translate(&WindowEvent::CursorLeft {
+    input.translate_now(&moved(2.0, 2.0));
+    input.translate_now(&pressing(ElementState::Pressed));
+    input.translate_now(&WindowEvent::CursorLeft {
         device_id: DeviceId::dummy(),
     });
 
     // When: a press with no place known
-    let unknown = input.translate(&pressing(ElementState::Pressed));
+    let unknown = input.translate_now(&pressing(ElementState::Pressed));
 
     // Then: the first of a new row, never close to the last
     assert_eq!(unknown, [button(true, 1)]);
@@ -69,11 +69,11 @@ fn a_press_with_no_known_pointer_place_starts_a_new_row() {
 fn a_press_carries_the_modifiers_held() {
     // Given: Alt held, as winit reports it
     let mut input = Input::new();
-    input.translate(&moved(10.0, 10.0));
+    input.translate_now(&moved(10.0, 10.0));
     input.key(Key::Modifiers(winit::keyboard::ModifiersState::ALT));
 
     // When
-    let pressed = input.translate(&pressing(ElementState::Pressed));
+    let pressed = input.translate_now(&pressing(ElementState::Pressed));
 
     // Then
     let alt = crate::event::Modifiers {
@@ -94,9 +94,9 @@ fn a_press_carries_the_modifiers_held() {
 fn a_press_of_another_button_breaks_the_row() {
     // Given: the pointer over the window, one left click
     let mut input = Input::new();
-    input.translate(&moved(10.0, 10.0));
-    input.translate(&pressing(ElementState::Pressed));
-    input.translate(&pressing(ElementState::Released));
+    input.translate_now(&moved(10.0, 10.0));
+    input.translate_now(&pressing(ElementState::Pressed));
+    input.translate_now(&pressing(ElementState::Released));
 
     // When: a right click, then a left press, all in one place and soon
     let other = |state| WindowEvent::MouseInput {
@@ -104,9 +104,9 @@ fn a_press_of_another_button_breaks_the_row() {
         state,
         button: MouseButton::Right,
     };
-    let right = input.translate(&other(ElementState::Pressed));
-    input.translate(&other(ElementState::Released));
-    let left = input.translate(&pressing(ElementState::Pressed));
+    let right = input.translate_now(&other(ElementState::Pressed));
+    input.translate_now(&other(ElementState::Released));
+    let left = input.translate_now(&pressing(ElementState::Pressed));
 
     // Then: the right press is no app event, and the left starts anew,
     // as Chromium counts only presses of one button in a row

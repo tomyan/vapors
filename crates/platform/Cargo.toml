@@ -8,6 +8,10 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+# `Platform::set_now`, for a test that drives events on its own clock
+test-support = []
+
 [dependencies]
 wgpu.workspace = true
 winit.workspace = true
