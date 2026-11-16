@@ -4,6 +4,7 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod rust_sheets_refused;
 mod support;
 
 mod a11y_act;
