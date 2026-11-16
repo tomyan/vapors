@@ -126,22 +126,33 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
     return out;
 }
 
+// How far p lies along the edge from `corner` with outward unit normal
+// m, whose edge runs `reach` along (-m.y, m.x): negative behind the
+// corner, past `abs(reach)` beyond the edge's far end.
+fn along(m: vec2<f32>, reach: f32, corner: vec2<f32>, p: vec2<f32>) -> f32 {
+    return dot(p - corner, vec2(-m.y, m.x)) * sign(reach);
+}
+
 // One line's distance at p in device pixels, inside positive: the line
 // through `corner` with outward unit normal m, whose edge runs `reach`
 // along (-m.y, m.x). Past the edge's far end the line does not limit
 // the shape: FAR, so a convex corner's other line decides and a reflex
 // corner limits nothing there.
 fn line(m: vec2<f32>, reach: f32, corner: vec2<f32>, p: vec2<f32>, t: vec4<f32>) -> f32 {
-    let along = dot(p - corner, vec2(-m.y, m.x)) * sign(reach);
-    if (along > abs(reach)) {
+    if (along(m, reach, corner, p) > abs(reach)) {
         return FAR;
     }
     return -dot(m, p - corner) / max(length(device_normal(m, t)), 1e-20);
 }
 
-// A corner's wedge distance at p in device pixels, inside positive:
-// beyond both lines of a convex corner, the device distance to the
-// corner, as the closed forms take it.
+// A corner's wedge distance at p in device pixels, inside positive. A
+// convex corner's is the nearer of its two lines, except behind the
+// corner along both its edges, where the outline's nearest point is the
+// corner itself: there it is the device distance to the corner, as the
+// closed forms take it. Outside both lines alone is not enough: beside a
+// corner that turns little, a point just outside one edge is outside the
+// other line too, extended back past the corner, and its nearest point
+// is on the edge (the Redo icon's arc join, D2's review).
 fn wedge(n: vec4<f32>, at: vec4<f32>, second_reach: f32, p: vec2<f32>, t: vec4<f32>, l: vec4<f32>) -> f32 {
     if (at.z == 0.0) {
         return FAR;
@@ -149,7 +160,8 @@ fn wedge(n: vec4<f32>, at: vec4<f32>, second_reach: f32, p: vec2<f32>, t: vec4<f
     let convex = at.z > 0.0;
     let d0 = line(n.xy, at.w, at.xy, p, t);
     let d1 = line(n.zw, second_reach, at.xy, p, t);
-    if (convex && d0 < 0.0 && d1 < 0.0) {
+    let behind = along(n.xy, at.w, at.xy, p) <= 0.0 && along(n.zw, second_reach, at.xy, p) <= 0.0;
+    if (convex && behind && d0 < 0.0 && d1 < 0.0) {
         let q = p - at.xy;
         return -length(vec2(l.x * q.x + l.z * q.y, l.y * q.x + l.w * q.y));
     }

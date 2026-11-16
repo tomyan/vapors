@@ -170,7 +170,7 @@ pub fn assert_ramp_within_half_a_pixel(
     assert_full_past_half_a_pixel_inside(coverage, mesh, transform, what);
 }
 
-fn pixel_centres() -> impl Iterator<Item = (u32, u32, [f32; 2])> {
+pub fn pixel_centres() -> impl Iterator<Item = (u32, u32, [f32; 2])> {
     (0..SIDE).flat_map(|y| {
         (0..SIDE).map(move |x| {
             let at = |v: u32| f32::from(u16::try_from(v).expect("small")) + 0.5;
@@ -179,14 +179,14 @@ fn pixel_centres() -> impl Iterator<Item = (u32, u32, [f32; 2])> {
     })
 }
 
-fn to_device(m: [f32; 6], q: [f32; 2]) -> [f32; 2] {
+pub fn to_device(m: [f32; 6], q: [f32; 2]) -> [f32; 2] {
     [
         m[0] * q[0] + m[2] * q[1] + m[4],
         m[1] * q[0] + m[3] * q[1] + m[5],
     ]
 }
 
-fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
+pub fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
     mesh.iter().flat_map(|t| {
         (0..3)
             .filter(|&edge| t.on_outline(edge))
@@ -194,7 +194,7 @@ fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]
     })
 }
 
-fn contains([p0, p1, p2]: [[f32; 2]; 3], p: [f32; 2]) -> bool {
+pub fn contains([p0, p1, p2]: [[f32; 2]; 3], p: [f32; 2]) -> bool {
     let side =
         |a: [f32; 2], b: [f32; 2]| (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
     let (s0, s1, s2) = (side(p0, p1), side(p1, p2), side(p2, p0));
