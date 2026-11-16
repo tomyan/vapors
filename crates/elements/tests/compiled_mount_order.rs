@@ -94,6 +94,11 @@ fn tie(red_first: bool) -> (Vec<String>, UpdateCounts) {
     )
 }
 
+// Both tie sheets are compiler-examples', so each key's winners list
+// both and neither is another crate's (`winners_foreign` stays 0): the tie
+// runs through the tested rules. A sheet of another crate is covered at
+// the css level (`cascade_compiled.rs`); an elements-level case waits on a
+// second compiled crate (#445).
 #[test]
 fn a_tie_between_two_components_sheets_goes_to_the_one_mounted_later_in_either_order() {
     // When
