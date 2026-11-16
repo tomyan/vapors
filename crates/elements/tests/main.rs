@@ -24,6 +24,8 @@ mod a11y_mirror_hoisted_scroll;
 mod a11y_mirror_index;
 mod a11y_mirror_index_moves;
 mod a11y_mirror_labelledby;
+mod a11y_mirror_lane_rows;
+mod a11y_mirror_lane_shapes;
 mod a11y_mirror_owner;
 mod a11y_mirror_refused;
 mod a11y_mirror_refused_states;
