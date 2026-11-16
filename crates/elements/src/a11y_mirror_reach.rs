@@ -3,15 +3,11 @@
 //! (whose own ancestors are in), and the nodes referring by id to it or
 //! to an ancestor. An element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
-//! stayed (absolutely positioned); so does a row a lane start moved
-//! that is not a node, as their bounds are from a node above the row,
-//! and so do the hoisted nodes under any such row, whose bounds are from
-//! the viewport. The walk to a row's nearest nodes visits every element
-//! with no record between, hidden subtrees included: its cost follows
-//! what is under a row, not its nodes (4i (2) gives the nodes their
-//! bounds alone). A node named by an id whose element changed, the nodes
-//! focus left and came to, and the hoisted nodes in the frame of a scroll
-//! container scrolled, are read as well.
+//! stayed (absolutely positioned). The rows a lane start moved are
+//! given their bounds apart, and the hoisted nodes under them read again
+//! (`a11y_mirror_started.rs`). A node named by an id whose element
+//! changed, the nodes focus left and came to, and the hoisted nodes in
+//! the frame of a scroll container scrolled, are read as well.
 
 use vapors_dom::NodeId;
 
@@ -23,14 +19,14 @@ use rustc_hash::FxHashSet;
 
 impl Document {
     /// Every node this take reads, each once, the touched first so that
-    /// each comes with its ancestors.
+    /// each comes with its ancestors; and them as a set.
     pub(crate) fn ax_candidates(
         &self,
         touched: &Touched,
         renamed: &[NodeId],
         focus: [Option<NodeId>; 2],
         index: &AxIndex,
-    ) -> Vec<NodeId> {
+    ) -> (Vec<NodeId>, NodeSet) {
         let mut out = Vec::new();
         let mut seen = NodeSet::default();
         let mut add = |node: NodeId| {
@@ -43,7 +39,7 @@ impl Document {
         for &node in &touched.nodes {
             self.ax_reach(node, index, &mut add);
         }
-        for &wrapper in touched.replaced.iter().chain(&touched.started) {
+        for &wrapper in &touched.replaced {
             self.ax_wrapped_nodes(wrapper, &mut add);
         }
         for &node in renamed.iter().chain(&touched.renamed) {
@@ -52,13 +48,10 @@ impl Document {
         for node in self.ax_scrolled_hoisted(&touched.scrolled) {
             add(node);
         }
-        for node in self.ax_hoisted_under(&touched.started) {
-            add(node);
-        }
         for node in focus.into_iter().flatten() {
             add(node);
         }
-        out
+        (out, seen)
     }
 
     /// What a touch of `node` reaches: the node, its ancestors up to one
@@ -103,7 +96,7 @@ impl Document {
     /// carries the box they are placed against, so neither the row nor a
     /// node between reaches them. O(hoisted nodes times their depth), not
     /// the rows' subtrees.
-    fn ax_hoisted_under(&self, rows: &NodeSet) -> Vec<NodeId> {
+    pub(crate) fn ax_hoisted_under(&self, rows: &NodeSet) -> Vec<NodeId> {
         if rows.is_empty() || self.ax.hoisted.is_empty() {
             return Vec::new();
         }
@@ -126,10 +119,8 @@ impl Document {
     }
 
     /// The nearest nodes under `wrapper` when it is not a node itself:
-    /// moved with it, an inserted element or a row a lane start moved,
-    /// with their boxes kept, so no touch names them, and their bounds
-    /// from a node above `wrapper`. A wrapper that is a node moves them
-    /// with its own placement.
+    /// moved with it, with their boxes kept, so no touch names them. A
+    /// wrapper that is a node moves them with its own placement.
     fn ax_wrapped_nodes(&self, wrapper: NodeId, add: &mut impl FnMut(NodeId) -> bool) {
         if self.ax.records.contains_key(&wrapper) || !self.contains(wrapper) {
             return;

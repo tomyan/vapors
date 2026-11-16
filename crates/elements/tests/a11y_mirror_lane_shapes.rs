@@ -40,10 +40,16 @@ fn update_and_take(doc: &Rc<RefCell<Document>>, model: &mut Model) {
     take(doc, model);
 }
 
-/// Takes, applies the take to `model` and holds it against a first take.
+/// Takes, applies the take to `model` and holds it against a first take;
+/// the take names each node once.
 fn take(doc: &Rc<RefCell<Document>>, model: &mut Model) {
     let update = doc.borrow_mut().take_ax_update().expect("updated");
     if let Some(update) = &update {
+        let mut nodes: Vec<NodeId> = update.nodes.iter().map(|node| node.node).collect();
+        let named = nodes.len();
+        nodes.sort_unstable_by_key(|node| node.0);
+        nodes.dedup();
+        assert_eq!(nodes.len(), named, "a node named twice in one take");
         model.apply(update);
     }
     model.assert_mirrors(&doc.borrow());

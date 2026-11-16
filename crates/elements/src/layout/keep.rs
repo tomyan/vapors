@@ -52,6 +52,27 @@ impl KeptBoxes {
     pub(crate) fn slot_of(&self, node: NodeId) -> Option<usize> {
         self.placed.slots.of(super::Key::Element(node))
     }
+
+    /// The elements among the children of the framed lane of the box
+    /// keyed `container`, from the one keyed `first` on, as the boxes
+    /// stand now; `None` when either box or the lane is gone, or the lane no
+    /// longer holds `first`.
+    pub(crate) fn lane_nodes_from(
+        &self,
+        (container, first): (super::Key, super::Key),
+    ) -> Option<Vec<NodeId>> {
+        let slots = &self.placed.slots;
+        let (container, first) = (slots.of(container)?, slots.of(first)?);
+        let children = self.placed.lanes.borrow().children_from(container, first)?;
+        // a text run that is a lane child is its container's text: its
+        // container's nodes did not start elsewhere
+        let keys = children.into_iter().filter_map(|slot| slots.key(slot));
+        let elements = keys.filter_map(|key| match key {
+            super::Key::Element(node) => Some(node),
+            super::Key::Text(..) => None,
+        });
+        Some(elements.collect())
+    }
 }
 
 impl KeptBoxes {
