@@ -73,24 +73,34 @@ the corner wedges) stay one copy: each shader file splits into a
 coverage chunk shared by a 2D and a 3D vertex stage, joined at
 pipeline creation with `concat!(include_str!(..), ..)`.
 
-- **Closed forms.** The fragment already takes the distance's rate
-  across the screen from `dpdx` and `dpdy` of the shape-unit position.
-  Under a projection that position is interpolated perspective-correct
-  and its derivatives are the local Jacobian, so the fragment stage is
-  unchanged. The vertex stage pads the quad by one device pixel per
-  edge (`padding`) from the affine's constant determinant. Under a
-  projection it computes each corner's own Jacobian of screen position
-  against shape units instead. That is analytic from `clip` and the
-  matrix's first two columns. Because a plane maps lines to lines, the
-  padded edge stays at least the smaller of its two corners' margins
-  from the true edge.
+- **The fragment's map: analytic, not derivatives (#422's review).**
+  Under a projection the scene's fragment stages take the map from
+  shape units to device pixels from the analytic screen Jacobian at the
+  fragment's own shape-unit position (`screen_jacobian` in
+  `projective.wgsl`), not from `dpdx` and `dpdy`. A derivative is a
+  difference across a 2x2 quad: it is the Jacobian half a pixel or more
+  from the fragment, an error of first order in the pixel step, and WGSL
+  lets it be fine or coarse at the implementation's choice. Modelled at
+  60 degrees, that is up to 0.030 of coverage at the band's edge with
+  fine derivatives and 0.046 with coarse; at 75 degrees, 0.073 and
+  0.116.
+- **Closed forms.** The vertex stage pads the quad by one device pixel
+  per edge (`padding`) from the affine's constant determinant on the
+  page. Under a projection it computes each corner's own Jacobian of
+  screen position against shape units instead. Because a plane maps
+  lines to lines, the padded edge stays about the smaller of its two
+  corners' margins from the true edge (to first order). D1 shipped
+  taking the distance's rate from `dpdx` and `dpdy`; the analytic map
+  replaces it in a follow-up PR.
 - **Meshes.** The vertex stage moves each outline corner half a device
   pixel out across its lines through that corner's Jacobian, as above.
   The fragment stage replaces the item's constant inverse transpose
-  with the per-fragment Jacobian from `dpdx` and `dpdy` of the local
-  position. A line's device distance is its local distance over the
-  local units per pixel along its normal, which is the closed form's
-  rule.
+  with the analytic Jacobian at the fragment. A line's device distance
+  is its local distance over the local units per pixel along its
+  normal, which is the closed form's rule. That is exact to first order
+  across the half-pixel band; near edge-on the error grows (measured on
+  2026-11-16 at 1.5 units: 0.012 at 60 degrees, 0.050 at 70), which
+  section 2's grazing case is open on.
 - **Corners behind the camera.** A corner with clip w at or below a
   small epsilon gets no padding. The rasteriser clips the triangle, and
   the edges it cut need no ramp.
@@ -200,6 +210,7 @@ what the last one found.
 |---|---|---|---|
 | D1 | Projective closed forms: `closed_forms.wgsl` split into a coverage chunk and 2D and 3D vertex stages; the scene pass's uniforms and layouts in one place (`vapors_renderer::projective`, which `SceneRenderer` builds on); the pipeline built through the counted door (wired into `SceneRenderer::mount` in D3) | the 2D pixel tests unchanged; under an orthographic camera facing the plane at 1 unit per device pixel, the 3D stage matches the 2D route within 1/255 per channel for rects, circles and rounded and elliptical corners; on a plane at 60 degrees under perspective, coverage within bounds measured against a CPU drawing of the analytic shapes (8 x 8 rays a pixel), which shares no code with the GPU stages; the vertex stage's footprint between half and one and a half device pixels outside the shape at 60 to 85 degrees; a quad crossing the near plane draws without NaN | none |
 | D2 | Projective meshes: the same for `meshes.wgsl` | the 2D mesh tests and `gpu_mesh_insides.rs` unchanged; the orthographic test above for the S3b icon set; the 60 degree test against the CPU oracle; the insides rule (every pixel half a device pixel inside covered) under perspective | D1, and the page's `wedge()` fix |
+| D2b | Mesh wedges measured on the device: each stage carries its triangle's corners, normals and reaches onto the device in the vertex stage (projected in the scene, by the affine on the page), and one device-space `wedge` measures every distance exactly; a convex corner's distance behind both edges is the distance to the corner; corners behind the eye carry no wedge, the corners in front carrying their edges' lines. Built on branch `scene/d2b-screen-wedges` (21ba2b93), paused with decals (Tom, 2026-11-16) | every band pixel within the page's 0.01 of 0.5 minus its distance at 60 (front and behind), 70, 75, 80 and 85 degrees (measured 2026-11-16: at most 0.0020 at every pose); box-filtered bounds per pose for sub-pixel foreshortening (measured 0.11 at 60, 0.113 at 70, 0.128 at 75, 0.131 at 80, 0.103 at 85 at 1.5 units); the page's mesh tests and the corner sweep pass with the oracle's acute-tip exclusion removed; a strip from behind the eye ramps by its distance along both sides. Retires D2's RELAXED per-pose distance bounds and its 75 degree ceiling (`gpu_meshes_3d.rs`, `poses`) | D2 |
 | D3 to D6 | Not built. Tom, 2026-11-16: property 9 is judged on the flat scene; S7 and the SceneRenderer decal route are not built; the decal comes as F9. The rows below are kept as the record of the plan; D1 and D2 (and D2b, parked) carry the shared shape code F9 builds on. | | |
 | D3 | `NodeKind::Decal { width, height, shapes }` in `vapors-scene3d`; `SurfaceFrame::shapes`; `SceneRenderer` draws decals after opaque meshes, sorted back to front, `LessEqual` with depth bias, blended | through the Rust API (no `.wisp`): a decal on a cube face, no fighting over the camera range at 60 degrees and at a grazing 85 degrees, where slope-scaled bias is largest, bias values measured at that worst case and cited in the code; a decal partly off its face drawn on the face and past its edge with no fighting at the edge; a decal behind another cube hidden; one draw per run of one kind per decal (counted); an idle frame writes 0 bytes; a shape ref not registered refused naming it | D2 |
 | D4 | Flattening scale per decal (section 6) | a dolly from 1x to 16x re-acquires 4 times (counted); at each step, curve edges within the tolerance of an 8x render; a still camera re-acquires 0 | D3 |
