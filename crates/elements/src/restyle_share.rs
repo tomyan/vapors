@@ -49,7 +49,9 @@ impl Document {
             return Ok((self.compute_own(node, viewport)?, Path::Unkeyed));
         };
         if !self.shareable(key) {
-            return Ok((self.compute_own(node, viewport)?, Path::Unshareable));
+            let style = self.compute_own(node, viewport)?;
+            self.check_winners(node, key, &style);
+            return Ok((style, Path::Unshareable));
         }
         self.shared_style(node, key, viewport)
     }
@@ -71,6 +73,7 @@ impl Document {
             return Ok((style, Path::Shared));
         }
         let style = self.compute_own(node, viewport)?;
+        self.check_winners(node, key, &style);
         let parent = self.parent_style(node);
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.insert(share_key, Rc::clone(&style), parent);
@@ -148,6 +151,14 @@ impl Document {
             })
             .map(|(name, value)| (name.clone(), value.clone()))
             .collect()
+    }
+
+    /// Debug builds: the key's compiled winners against the style the
+    /// cascade computed (`style::winners_oracle`).
+    fn check_winners(&self, node: NodeId, key: &StyleKey, style: &Counted) {
+        if cfg!(debug_assertions) {
+            self.sheets.check_winners(key, &self.describe(node), style);
+        }
     }
 
     /// The oracle: `shared` must equal the style computed for `node`

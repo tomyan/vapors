@@ -5,6 +5,32 @@
 //! CSS value types and no reference depends on the order sheets were
 //! added at run time.
 
+/// Whether a key carries compiled winners: three states, so a key the
+/// compiler could not analyse is not taken for one it never saw.
+#[derive(Clone, Copy, Debug)]
+pub enum Winners {
+    /// A hand-written key (tests, hand-built pages): the runtime
+    /// cascades it in full.
+    Unanalysed,
+    /// A component tag's key: its tag is its props type's `ANCHOR_TAG`,
+    /// which the analysis does not see, so the runtime cascades it in
+    /// full.
+    ComponentTag,
+    /// The compiler's analysis.
+    Compiled(&'static KeyWinners),
+}
+
+impl Winners {
+    /// The compiled winners, if any.
+    #[must_use]
+    pub fn compiled(self) -> Option<&'static KeyWinners> {
+        match self {
+            Self::Compiled(winners) => Some(winners),
+            Self::Unanalysed | Self::ComponentTag => None,
+        }
+    }
+}
+
 /// A key's compiled winners.
 #[derive(Debug)]
 pub struct KeyWinners {
@@ -33,7 +59,9 @@ pub enum SheetRef {
 }
 
 /// A rule: its sheet, as an index into [`KeyWinners::sheets`], and its
-/// place within that sheet.
+/// place within that sheet: its index in the sheet's parsed
+/// `vapors_css::ast::Stylesheet::rules`, which the cascade keeps one for
+/// one and in order (`Cascade::sheet_rule`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RuleRef {
     /// Index into [`KeyWinners::sheets`].
@@ -64,15 +92,19 @@ pub enum PropertyRef {
 /// Where a winning declaration is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeclarationRef {
-    /// In a rule: the declaration's index within it.
+    /// In a rule.
     Rule {
         /// The rule.
         rule: RuleRef,
-        /// The declaration within it.
+        /// The declaration's index in the rule's `declarations`, as
+        /// written: before a shorthand is expanded, so every longhand of
+        /// one shorthand names the same declaration.
         declaration: u32,
     },
-    /// In the key's literal `style`, by index.
+    /// In the key's literal `style`, by its index as written there.
     Inline(u32),
-    /// A presentation attribute's, by index among the key's.
+    /// A presentation attribute's, by its index among the declarations
+    /// the key's presentation attributes make
+    /// (`vapors_css::cascade::declarations_of`).
     Presentation(u32),
 }

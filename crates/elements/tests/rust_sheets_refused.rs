@@ -3,7 +3,7 @@
 //! compiled winners cannot see the sheet. A hand-written key, without
 //! winners, is not analysed.
 
-use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey};
+use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey, Winners};
 use vapors_elements::{Document, ElementError, Viewport};
 use vapors_text::FontSystem;
 
@@ -14,7 +14,7 @@ static WINNERS: KeyWinners = KeyWinners {
     shareable: true,
 };
 
-const fn key(winners: Option<&'static KeyWinners>) -> StyleKey {
+const fn key(winners: Winners) -> StyleKey {
     StyleKey {
         site: "cards/card.wisp:3:1",
         scope: None,
@@ -27,8 +27,8 @@ const fn key(winners: Option<&'static KeyWinners>) -> StyleKey {
     }
 }
 
-static ANALYSED: StyleKey = key(Some(&WINNERS));
-static HAND_WRITTEN: StyleKey = key(None);
+static ANALYSED: StyleKey = key(Winners::Compiled(&WINNERS));
+static HAND_WRITTEN: StyleKey = key(Winners::Unanalysed);
 
 const VIEWPORT: Viewport = Viewport {
     width: 200.0,

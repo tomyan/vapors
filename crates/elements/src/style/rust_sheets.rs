@@ -40,7 +40,7 @@ impl Sheets {
     /// Notes an element made from `key`; the refusal for it when it is
     /// analysed and a sheet was added from Rust.
     pub(crate) fn keyed_refusal(&mut self, key: &'static StyleKey) -> Option<String> {
-        key.winners?;
+        key.winners.compiled()?;
         self.rust.analysed.get_or_insert(key.site);
         let name = self.rust.added.first()?;
         Some(format!(
