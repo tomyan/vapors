@@ -11,7 +11,7 @@ use vapors_shapes::{MeshCorner, MeshTriangle};
 /// Per triangle, at `MeshTriangle`'s own field offsets, for each corner
 /// `k` at locations `4k` to `4k + 3`: its position (two floats), its two
 /// normals (four), its kind (one) and its two reaches (two).
-pub(crate) const TRIANGLE: [wgpu::VertexAttribute; 12] = [
+const TRIANGLE: [wgpu::VertexAttribute; 12] = [
     position(0),
     normals(0),
     kind(0),
@@ -28,7 +28,7 @@ pub(crate) const TRIANGLE: [wgpu::VertexAttribute; 12] = [
 
 /// Per item: the linear part; translation and the inverse of the
 /// determinant; colour.
-pub(crate) const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     12 => Float32x4, 13 => Float32x4, 14 => Float32x4
 ];
 

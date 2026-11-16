@@ -47,19 +47,20 @@ impl ProjectiveMeshes {
         crate::mesh_entries::triangle_bytes(triangles)
     }
 
-    /// Draws `triangles` (`count` of them, bytes of
-    /// [`ProjectiveMeshes::triangle_bytes`]) under the item in `item`, in
-    /// one draw in `pass`, under the camera and the node slot `bound`
+    /// Draws `triangles` (bytes of [`ProjectiveMeshes::triangle_bytes`],
+    /// their count read from the slice's size) under the item in `item`,
+    /// in one draw in `pass`, under the camera and the node slot `bound`
     /// names.
     ///
     /// # Panics
     ///
-    /// If `item` is not one item's bytes.
+    /// If `item` is not one item's bytes, or `triangles` is not whole
+    /// triangles and the padding to 16 bytes an entry has.
     pub fn record(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
         bound: Bound<'_>,
-        (item, triangles, count): (wgpu::BufferSlice<'_>, wgpu::BufferSlice<'_>, u32),
+        (item, triangles): (wgpu::BufferSlice<'_>, wgpu::BufferSlice<'_>),
         work: &WorkCounter,
     ) {
         let one = (crate::mesh_shape::INSTANCE_FLOATS * 4) as u64;
@@ -68,6 +69,7 @@ impl ProjectiveMeshes {
             one,
             "meshes 3d: an item is {one} bytes; pass item_bytes() of one (meshes_3d.rs)"
         );
+        let count = triangle_count(triangles.size());
         pass.set_pipeline(&self.0);
         pass.set_bind_group(0, bound.camera, &[]);
         pass.set_bind_group(1, bound.node, &[bound.offset]);
@@ -75,4 +77,17 @@ impl ProjectiveMeshes {
         pass.set_vertex_buffer(1, item);
         work.draw(pass, 0..3, 0..count);
     }
+}
+
+/// How many triangles `bytes` of an entry hold: whole triangles, then
+/// under 16 bytes of padding (`mesh_entries::mesh_entry_bytes`).
+fn triangle_count(bytes: u64) -> u32 {
+    let one = crate::mesh_entries::TRIANGLE_BYTES;
+    let count = bytes / one;
+    assert!(
+        bytes - count * one < 16,
+        "meshes 3d: {bytes} triangle bytes are not whole {one}-byte triangles and an entry's padding; pass triangle_bytes() (meshes_3d.rs)"
+    );
+    u32::try_from(count)
+        .unwrap_or_else(|_| panic!("meshes 3d: {count} triangles are more than one draw counts"))
 }

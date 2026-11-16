@@ -32,58 +32,88 @@ fn shapes() -> [(&'static str, Option<f32>); 3] {
     ]
 }
 
+/// touche's ten icons, as `gpu_mesh_insides.rs` draws them: S3b's set,
+/// whose arrowheads take the miter limit's branch of the corner move.
+const ICONS: [&str; 10] = [
+    "M1.5 4.5v8h13v-7h-6l-1.5-1.5h-5.5z",
+    "M5 3H3v11h10V3h-2M5.5 2h5v2.5h-5z",
+    "M8 10V2M5 5l3-3 3 3M3 9v5h10V9",
+    "M5 3L2 6l3 3M2 6h7a4 4 0 0 1 0 8H6",
+    "M11 3l3 3-3 3M14 6H7a4 4 0 0 0 0 8h3",
+    "M2 4h12M2 8h12M2 12h12M5 2v4M11 6v4M7 10v4",
+    "M3 10l5-5 5 5",
+    "M2 6v4M5 4v8M8 2v12M11 4v8M14 6v4",
+    "M2 6h3l4-3v10l-4-3H2zM11 6l3 4M14 6l-3 4",
+    "M2 8h11M9 4l4 4-4 4",
+];
+
 #[test]
 fn gpu_a_plane_facing_the_camera_at_one_unit_a_pixel_draws_meshes_as_the_page_does() {
-    let notched = [8.0, 0.0, 0.0, 8.0, 4.25, 2.25];
+    let doubled = [2.0, 0.0, 0.0, 2.0, 0.0, 0.0];
     let turned = [1.6, 1.2, -1.2, 1.6, 14.0, 2.0];
-    for (data, stroke) in shapes() {
-        for transform in [notched, turned] {
-            // Given
-            let drawn = [white(mesh(data, stroke), transform)];
+    let notched = (shapes()[0].0, None, [8.0, 0.0, 0.0, 8.0, 4.25, 2.25]);
+    let icons = ICONS
+        .iter()
+        .flat_map(|data| [(*data, Some(1.5), doubled), (*data, Some(1.5), turned)]);
+    for (data, stroke, transform) in icons.chain([notched]) {
+        // Given
+        let drawn = [white(mesh(data, stroke), transform)];
 
-            // When
-            let scene = mesh_coverage_3d(SIDE, &drawn, (pixel_camera(SIDE), Mat4::IDENTITY));
+        // When
+        let scene = mesh_coverage_3d(SIDE, &drawn, (pixel_camera(SIDE), Mat4::IDENTITY));
 
-            // Then
-            let page = coverage(&drawn);
-            let worst = page
-                .iter()
-                .zip(&scene)
-                .map(|(p, s)| (p - s).abs())
-                .fold(0.0, f32::max);
-            assert!(
-                worst <= 1.0 / 255.0,
-                "{data} under {transform:?}: a pixel differs by {worst}"
-            );
-        }
+        // Then
+        let page = coverage(&drawn);
+        let worst = page
+            .iter()
+            .zip(&scene)
+            .map(|(p, s)| (p - s).abs())
+            .fold(0.0, f32::max);
+        assert!(
+            worst <= 1.0 / 255.0,
+            "{data} under {transform:?}: a pixel differs by {worst}"
+        );
     }
 }
 
-/// How far a band pixel on the turned plane may be from 0.5 minus its
-/// distance to the outline: the fragment's map from the derivatives
-/// across a 2x2 quad is the local Jacobian to second order, and the
-/// worst measured here on 2026-11-16 was 0.029; with the readback's 8
-/// bits, 0.032 (the page's own bound is 0.01).
-const SCENE_DISTANCE: f32 = 0.032;
+/// How far a band pixel on a turned plane may be from 0.5 minus its
+/// distance to the outline. The fragment's Jacobian is analytic, so what
+/// is left is the line distance taken through the Jacobian at the
+/// fragment, exact to first order across the half-pixel band, and the
+/// readback's 8 bits: measured at most 0.0103 at 60 degrees on
+/// 2026-11-16. The page's own bound is 0.01.
+const SCENE_DISTANCE: f32 = 0.015;
 
-/// A 45 degree perspective, square, and a plane 3 units away turned 60
-/// degrees about X, the scene's own matrices.
-fn turned_plane() -> (Mat4, Mat4) {
+/// A plane turned `degrees` about X, `distance` from the eye, seen from
+/// its back when `behind` (turned a further half turn about Y), through
+/// the scene's own 45 degree perspective.
+fn camera(degrees: f32, distance: f32, behind: bool) -> (Mat4, Mat4) {
     let lens = vapors_scene3d::Projection::perspective(45f32.to_radians(), 0.1, 100.0)
         .and_then(|lens| lens.matrix(1.0))
         .expect("a valid lens");
-    let world = Mat4::from_translation(Vec3::new(0.0, 0.0, -3.0))
-        * Mat4::from_rotation_x(60f32.to_radians());
+    let flip = if behind { std::f32::consts::PI } else { 0.0 };
+    let world = Mat4::from_translation(Vec3::new(0.0, 0.0, -distance))
+        * Mat4::from_rotation_x(degrees.to_radians())
+        * Mat4::from_rotation_y(flip);
     (lens, world)
 }
 
+/// The poses the band and insides rules are held at: 60 degrees, and the
+/// same seen from behind (the Jacobian's determinant negative).
+fn poses() -> [(&'static str, (Mat4, Mat4)); 2] {
+    [
+        ("60 degrees", camera(60.0, 3.0, false)),
+        ("60 degrees from behind", camera(60.0, 3.0, true)),
+    ]
+}
+
 /// Shape units to plane units: 1/8 a unit each, centred (about 12.9
-/// device pixels a plane unit there, so a 1.5 stroke is over two device
-/// pixels across and one along the turn).
+/// device pixels a plane unit at 60 degrees and 3 units, so a 1.5 stroke
+/// is over two device pixels across and one along the turn).
 const ON_PLANE: [f32; 6] = [0.125, 0.0, 0.0, 0.125, -1.0, -0.9];
 
 /// `data`'s mesh on the plane, as `ON_PLANE` (scaled up 4 for a fill)
-/// places it: its triangles and where a shape unit lands on the screen.
+/// places it: its triangles and where a shape unit lands on the plane.
 fn on_plane(data: &str, stroke: Option<f32>) -> (Vec<vapors_shapes::MeshTriangle>, [f32; 6]) {
     let scale = if stroke.is_some() { 1.0 } else { 4.0 };
     let plane = [
@@ -97,75 +127,87 @@ fn on_plane(data: &str, stroke: Option<f32>) -> (Vec<vapors_shapes::MeshTriangle
     (mesh(data, stroke), plane)
 }
 
-/// Shape point `q` on the screen under `plane` and the turned camera.
-fn placed(plane: [f32; 6], q: [f32; 2]) -> [f32; 2] {
+/// Shape point `q` on the screen under `plane` and `camera`.
+fn placed(plane: [f32; 6], camera: (Mat4, Mat4), q: [f32; 2]) -> [f32; 2] {
     let on = [
         plane[0] * q[0] + plane[2] * q[1] + plane[4],
         plane[1] * q[0] + plane[3] * q[1] + plane[5],
     ];
-    on_screen(SIDE, turned_plane(), on)
+    on_screen(SIDE, camera, on)
 }
 
 #[test]
-fn gpu_meshes_on_a_plane_at_60_degrees_are_where_a_cpu_drawing_puts_them() {
-    for (data, stroke) in shapes() {
+fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
+    for ((data, stroke), (pose, camera)) in shapes()
+        .into_iter()
+        .flat_map(|s| poses().map(move |p| (s, p)))
+    {
         // Given
         let (triangles, plane) = on_plane(data, stroke);
+        let what = format!("{data} at {pose}");
 
         // When it is drawn, and drawn on the CPU from its own triangles
-        let drawn = mesh_coverage_3d(SIDE, &[white(triangles.clone(), plane)], turned_plane());
-        let oracle = cpu_mesh_coverage(SIDE, &triangles, plane, turned_plane());
+        let drawn = mesh_coverage_3d(SIDE, &[white(triangles.clone(), plane)], camera);
+        let oracle = cpu_mesh_coverage(SIDE, &triangles, plane, camera);
 
         // Then the page's band rule (support/mesh_oracle.rs), its
         // distances and corners taken on the screen as the camera
-        // projects the mesh: every band pixel within SCENE_DISTANCE of
-        // 0.5 minus its distance to the outline, and away from sharp
-        // corners within 0.11 of the CPU drawing
+        // projects the mesh
+        let project = |q| placed(plane, camera, q);
         oracle::assert_band_matches(
             &drawn,
             &triangles,
-            (&|q| placed(plane, q), SCENE_DISTANCE),
+            (&project, SCENE_DISTANCE),
             &oracle,
-            data,
-        );
-        let (area, expected) = (drawn.iter().sum::<f32>(), oracle.iter().sum::<f32>());
-        // measured on 2026-11-16: area within 1.0% (the notched rect,
-        // its sharp corners' ramps)
-        assert!(
-            (area - expected).abs() <= expected * 0.015,
-            "{data}: area {area}, the CPU drawing's {expected}"
+            &what,
         );
     }
 }
 
 #[test]
-fn gpu_meshes_on_a_plane_at_60_degrees_are_full_inside_and_empty_outside() {
-    for (data, stroke) in shapes() {
+fn gpu_meshes_on_turned_planes_are_full_inside_and_empty_outside() {
+    for ((data, stroke), (pose, camera)) in shapes()
+        .into_iter()
+        .flat_map(|s| poses().map(move |p| (s, p)))
+    {
         // Given
         let (triangles, plane) = on_plane(data, stroke);
 
         // When
-        let drawn = mesh_coverage_3d(SIDE, &[white(triangles.clone(), plane)], turned_plane());
+        let drawn = mesh_coverage_3d(SIDE, &[white(triangles.clone(), plane)], camera);
 
         // Then, each corner placed on the screen as the camera projects it
-        assert_ramp_within_half_a_pixel_placed(&drawn, &triangles, &|q| placed(plane, q), data);
+        let project = |q| placed(plane, camera, q);
+        assert_ramp_within_half_a_pixel_placed(
+            &drawn,
+            &triangles,
+            &project,
+            &format!("{data} at {pose}"),
+        );
     }
+}
+
+/// Ground under an eye 1 unit up, from plane y `near` to 50 units ahead.
+fn ground_from(near: f32) -> Vec<f32> {
+    let data = format!("M-50 {near}H50V50H-50Z");
+    let world = Mat4::from_translation(Vec3::new(0.0, -1.0, 0.0))
+        * Mat4::from_rotation_x(-90f32.to_radians());
+    let identity = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    mesh_coverage_3d(
+        SIDE,
+        &[white(mesh(&data, None), identity)],
+        (camera(0.0, 0.0, false).0, world),
+    )
 }
 
 #[test]
 fn gpu_a_mesh_reaching_behind_or_to_the_camera_draws_the_part_in_front() {
-    let world = Mat4::from_translation(Vec3::new(0.0, -1.0, 0.0))
-        * Mat4::from_rotation_x(-90f32.to_radians());
-    for (what, data) in [
-        ("from behind the eye", "M-50 -5H50V50H-50Z"),
-        ("from the eye's own plane", "M-50 0H50V50H-50Z"),
+    for (what, near) in [
+        ("from behind the eye", -5.0),
+        ("from the eye's own plane", 0.0),
     ] {
         // When
-        let drawn = mesh_coverage_3d(
-            SIDE,
-            &[white(mesh(data, None), [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])],
-            (turned_plane().0, world),
-        );
+        let drawn = ground_from(near);
 
         // Then the bottom quarter is ground, the top quarter sky
         let row = |y: u32| &drawn[(y * SIDE) as usize..((y + 1) * SIDE) as usize];

@@ -73,24 +73,34 @@ the corner wedges) stay one copy: each shader file splits into a
 coverage chunk shared by a 2D and a 3D vertex stage, joined at
 pipeline creation with `concat!(include_str!(..), ..)`.
 
-- **Closed forms.** The fragment already takes the distance's rate
-  across the screen from `dpdx` and `dpdy` of the shape-unit position.
-  Under a projection that position is interpolated perspective-correct
-  and its derivatives are the local Jacobian, so the fragment stage is
-  unchanged. The vertex stage pads the quad by one device pixel per
-  edge (`padding`) from the affine's constant determinant. Under a
-  projection it computes each corner's own Jacobian of screen position
-  against shape units instead. That is analytic from `clip` and the
-  matrix's first two columns. Because a plane maps lines to lines, the
-  padded edge stays at least the smaller of its two corners' margins
-  from the true edge.
+- **The fragment's map: analytic, not derivatives (#422's review).**
+  Under a projection the scene's fragment stages take the map from
+  shape units to device pixels from the analytic screen Jacobian at the
+  fragment's own shape-unit position (`screen_jacobian` in
+  `projective.wgsl`), not from `dpdx` and `dpdy`. A derivative is a
+  difference across a 2x2 quad: it is the Jacobian half a pixel or more
+  from the fragment, an error of first order in the pixel step, and WGSL
+  lets it be fine or coarse at the implementation's choice. Modelled at
+  60 degrees, that is up to 0.030 of coverage at the band's edge with
+  fine derivatives and 0.046 with coarse; at 75 degrees, 0.073 and
+  0.116.
+- **Closed forms.** The vertex stage pads the quad by one device pixel
+  per edge (`padding`) from the affine's constant determinant on the
+  page. Under a projection it computes each corner's own Jacobian of
+  screen position against shape units instead. Because a plane maps
+  lines to lines, the padded edge stays about the smaller of its two
+  corners' margins from the true edge (to first order). D1 shipped
+  taking the distance's rate from `dpdx` and `dpdy`; the analytic map
+  replaces it in a follow-up PR.
 - **Meshes.** The vertex stage moves each outline corner half a device
   pixel out across its lines through that corner's Jacobian, as above.
   The fragment stage replaces the item's constant inverse transpose
-  with the per-fragment Jacobian from `dpdx` and `dpdy` of the local
-  position. A line's device distance is its local distance over the
-  local units per pixel along its normal, which is the closed form's
-  rule.
+  with the analytic Jacobian at the fragment. A line's device distance
+  is its local distance over the local units per pixel along its
+  normal, which is the closed form's rule. That is exact to first order
+  across the half-pixel band; near edge-on the error grows (measured on
+  2026-11-16 at 1.5 units: 0.012 at 60 degrees, 0.050 at 70), which
+  section 2's grazing case is open on.
 - **Corners behind the camera.** A corner with clip w at or below a
   small epsilon gets no padding. The rasteriser clips the triangle, and
   the edges it cut need no ramp.

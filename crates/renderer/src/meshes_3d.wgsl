@@ -3,10 +3,13 @@
 // moves each outline corner half a device pixel out through the screen
 // Jacobian at that corner, in place of the page's constant affine. The
 // fragment stage takes the map from shape units to device pixels at each
-// fragment from the derivatives of the shape-unit position, which under
-// a projection are its local inverse: their transpose is the map's
-// inverse transpose, which the wedge distances divide by, as the closed
-// forms take their rate across the screen.
+// fragment from the same analytic Jacobian, at the fragment's own
+// shape-unit position: exact, and the same on every adapter. Derivatives
+// across a 2x2 quad would not do: `dpdx` may be fine or coarse, at the
+// implementation's choice, and either way it is the Jacobian half a pixel
+// or more from the fragment, an error of first order in the pixel step
+// (#422's review: 0.046 of coverage at the band's edge at 60 degrees on
+// a coarse adapter, 0.116 at 75).
 
 @vertex
 fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
@@ -14,7 +17,10 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
     let j = screen_jacobian(item.linear, item.place.xy, at);
     let det = j.x * j.w - j.y * j.z;
     var moved = vec2(0.0);
-    if (abs(det) > 1e-12) {
+    // Edge-on (the columns parallel, as closed_forms_3d.wgsl's padding
+    // takes it, independent of the view box's scale) or behind the eye
+    // (j zero): no move.
+    if (abs(det) > 1e-6 * length(j.xy) * length(j.zw)) {
         moved = local_move(corner_normals(t, corner), corner_kind(t, corner), j, 1.0 / det);
     }
     let local = at + moved;
@@ -24,11 +30,13 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
 
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let across_x = dpdx(in.local);
-    let across_y = dpdy(in.local);
-    let t = vec4(across_x, across_y);
-    let det = across_x.x * across_y.y - across_y.x * across_x.y;
-    let safe = select(1e-20, det, abs(det) > 1e-20);
-    let l = vec4(across_y.y, -across_x.y, -across_y.x, across_x.x) / safe;
-    return covered(in, t, l);
+    let l = screen_jacobian(in.linear, in.shift, in.local);
+    let det = l.x * l.w - l.y * l.z;
+    // A fragment exists only in front of the eye (the rasteriser clips the
+    // rest), so the Jacobian is zero or singular only edge-on, where the
+    // plane is a line on the screen: nothing is drawn there.
+    if (det == 0.0) {
+        return vec4(in.colour.rgb, 0.0);
+    }
+    return covered(in, inverse_transpose(l, 1.0 / det), l);
 }

@@ -1,19 +1,20 @@
-// Mesh items, the part shared by the page's stages (meshes_2d.wgsl)
-// and the scene's (meshes_3d.wgsl): an entry's triangles, one instance each, every corner
-// with its wedge (crates/shapes/src/mesh.rs: the outward unit normals
-// of the two outline edges bounding it, how far each edge runs from it,
-// and whether it is convex (1), reflex (-1) or inside (0)), under an
-// item's affine transform. The vertex shader picks its corner by vertex
-// index and moves an outline corner half a device pixel out across both
-// its lines in device space (the device miter, clamped at SVG's limit
-// of 4). The fragment shader takes coverage as 0.5 plus the least, over
-// the triangle's outline corners, of the corner's wedge distance in
-// device pixels (convex: the nearer of its two lines, or beyond both
-// the device distance to the corner; reflex: the farther line), a line
-// counting only alongside its edge, not past the edge's far end: 0.5
-// on the outline, the ramp half a pixel either side. A line's distance in device pixels is its distance in the
-// mesh's units over the length of the inverse transpose of the
-// transform applied to its normal, the same for the whole item.
+// Mesh items, the part shared by the page's stages (meshes_2d.wgsl) and
+// the scene's (meshes_3d.wgsl): an entry's triangles, one instance each,
+// every corner with its wedge (crates/shapes/src/mesh.rs: the outward
+// unit normals of the two outline edges bounding it, how far each edge
+// runs from it, and whether it is convex (1), reflex (-1) or inside
+// (0)), under a map from the mesh's units to device pixels: the item's
+// affine on the page, a plane's projection in the scene. The vertex
+// stage picks its corner by vertex index and moves an outline corner
+// half a device pixel out across both its lines in device space (the
+// device miter, clamped at SVG's limit of 4). The fragment stage takes
+// coverage as 0.5 plus the least, over the triangle's outline corners,
+// of the corner's wedge distance in device pixels (`wedge`), a line
+// counting only alongside its edge, not past the edge's far end: 0.5 on
+// the outline, the ramp half a pixel either side. A line's distance in
+// device pixels is its distance in the mesh's units over the length of
+// the map's inverse transpose applied to its normal: the same for the
+// whole item on the page, the map at each fragment in the scene.
 
 struct Triangle {
     @location(0) position0: vec2<f32>,
@@ -53,6 +54,9 @@ struct Out {
     @location(8) @interpolate(flat) inverse_transpose: vec4<f32>,
     @location(9) @interpolate(flat) colour: vec4<f32>,
     @location(10) @interpolate(flat) linear: vec4<f32>,
+    // the item's translation (e, f), which the scene's fragment stage
+    // reads to take its Jacobian
+    @location(11) @interpolate(flat) shift: vec2<f32>,
 }
 
 // How far the outline moves out, device pixels: the ramp's outer half.
@@ -112,6 +116,7 @@ fn vertex_out(t: Triangle, item: Item, local: vec2<f32>, position: vec4<f32>, in
     out.inverse_transpose = inverse_transpose;
     out.colour = item.colour;
     out.linear = item.linear;
+    out.shift = item.place.xy;
     return out;
 }
 

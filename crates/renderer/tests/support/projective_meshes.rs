@@ -16,7 +16,7 @@ use crate::scene::{buffer, reds, scene_pixels};
 /// `camera.1` places, seen by `camera.0`, on a `side` square target.
 pub fn mesh_coverage_3d(side: u32, meshes: &[Drawn], camera: (Mat4, Mat4)) -> Vec<f32> {
     let black = Color::from_rgba8(0, 0, 0, 255);
-    let bytes: Vec<(Vec<u8>, Vec<u8>, u32)> = meshes.iter().map(mesh_bytes).collect();
+    let bytes: Vec<(Vec<u8>, Vec<u8>)> = meshes.iter().map(mesh_bytes).collect();
     reds(&scene_pixels(
         side,
         camera,
@@ -24,29 +24,22 @@ pub fn mesh_coverage_3d(side: u32, meshes: &[Drawn], camera: (Mat4, Mat4)) -> Ve
         |gpu, layouts, formats, pass, bound| {
             let pipeline = ProjectiveMeshes::new(&gpu.device, layouts, formats);
             let work = WorkCounter::default();
-            for (item, triangles, count) in &bytes {
+            for (item, triangles) in &bytes {
                 let item = buffer(gpu, wgpu::BufferUsages::VERTEX, item);
                 let triangles = buffer(gpu, wgpu::BufferUsages::VERTEX, triangles);
-                pipeline.record(
-                    pass,
-                    bound,
-                    (item.slice(..), triangles.slice(..), *count),
-                    &work,
-                );
+                pipeline.record(pass, bound, (item.slice(..), triangles.slice(..)), &work);
             }
         },
     ))
 }
 
-fn mesh_bytes((triangles, transform, colour): &Drawn) -> (Vec<u8>, Vec<u8>, u32) {
+fn mesh_bytes((triangles, transform, colour): &Drawn) -> (Vec<u8>, Vec<u8>) {
     let item = MeshShape::new(*transform, *colour)
         .expect("drawable")
         .expect("has area");
-    let count = u32::try_from(triangles.len()).expect("a test mesh");
     (
         ProjectiveMeshes::item_bytes(&item),
         ProjectiveMeshes::triangle_bytes(triangles),
-        count,
     )
 }
 
