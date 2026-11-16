@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_elements::{Cursor, Document, Point};
-use vapors_platform::{Event, Instant, Platform};
+use vapors_platform::{Event, Platform};
 
 use crate::pointer::{Action, action};
 
@@ -107,7 +107,7 @@ impl DocumentInput {
         let route = self.route(document, event)?;
         if route == Route::Host {
             let action = self.action(&document.borrow(), event)?;
-            self.tooltip_event(&document.borrow(), event, action, Instant::now());
+            self.tooltip_event(&document.borrow(), event, action, platform.now());
             return Ok(Given {
                 route,
                 changed: false,
@@ -131,12 +131,13 @@ impl DocumentInput {
         platform: &Platform,
     ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
-        let (flinging, fading) = (self.flinging(), self.touch_thumbs_fading());
+        let now = platform.now();
+        let (flinging, fading) = (self.flinging(), self.touch_thumbs_fading(now));
         if let Some(action) = action {
-            self.act(document, action);
+            self.act(document, action, now);
         }
         if let Event::WindowFocus { focused } = event {
-            self.window_focus(document, *focused);
+            self.window_focus(document, *focused, now);
         }
         let unused_key = key(document, event) == Some(false)
             && !keys::field_paste_key(&document.borrow(), event);
@@ -146,10 +147,10 @@ impl DocumentInput {
             self.held.keys.insert(code.clone(), Route::Both);
         }
         self.paste_if(document, event, platform);
-        self.tooltip_event(&document.borrow(), event, action, Instant::now());
+        self.tooltip_event(&document.borrow(), event, action, now);
         // a fling or a thumb fade the event started needs a frame to move
         // on: a first touch on nothing painted changes nothing else (#413)
-        let started = (!flinging && self.flinging()) || (!fading && self.touch_thumbs_fading());
+        let started = (!flinging && self.flinging()) || (!fading && self.touch_thumbs_fading(now));
         let changed = document.borrow_mut().take_changed() || started;
         let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {

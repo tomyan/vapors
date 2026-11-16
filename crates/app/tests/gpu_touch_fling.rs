@@ -52,14 +52,15 @@ fn frame(app: &mut ElementsApp, gpu: &Gpu, now: Instant) -> Next {
 }
 
 /// The touch and the gestures it completes, delivered as the window
-/// does: the touch first.
+/// does: the touch first, at `ms` after `base` on the platform's clock.
 fn deliver(
     app: &mut ElementsApp,
-    gestures: &mut Gestures,
+    (gestures, base): (&mut Gestures, Instant),
     platform: &Platform,
     touch: (TouchPhase, f32, u64),
 ) {
     let (phase, y, ms) = touch;
+    platform.set_now(base + Duration::from_millis(ms));
     app.event(finger(phase, y), platform);
     for gesture in gestures.touch(0, phase, 50.0, y, Duration::from_millis(ms)) {
         app.event(gesture, platform);
@@ -102,19 +103,20 @@ fn gpu_a_flicked_list_coasts_after_the_finger_lifts_and_then_rests() {
     let mut app = started(&gpu, &doc, base);
     deliver(
         &mut app,
-        &mut gestures,
+        (&mut gestures, base),
         &platform,
         (TouchPhase::Started, 250.0, 0),
     );
     for n in 1..=10_u64 {
         deliver(
             &mut app,
-            &mut gestures,
+            (&mut gestures, base),
             &platform,
             (TouchPhase::Moved, 250.0 - 8.0 * n as f32, 8 * n),
         );
     }
     let dragged = doc.borrow().scroll_offset(list).expect("scrolls")[1];
+    platform.set_now(base + Duration::from_millis(88));
     app.event(finger(TouchPhase::Ended, 170.0), &platform);
     let _ = platform.take_redraw_request();
 

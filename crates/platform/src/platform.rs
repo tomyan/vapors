@@ -35,6 +35,8 @@ pub struct Platform {
     ax_updates: RefCell<Vec<AxUpdate>>,
     /// The links a detached platform was asked to follow (`navigate.rs`).
     pub(crate) followed: RefCell<Vec<crate::navigate::Followed>>,
+    /// The time [`Platform::now`] answers; `None` for the system clock.
+    clock: Cell<Option<crate::Instant>>,
 }
 
 impl Platform {
@@ -58,7 +60,23 @@ impl Platform {
             text_field: RefCell::new(None),
             ax_updates: RefCell::new(Vec::new()),
             followed: RefCell::new(Vec::new()),
+            clock: Cell::new(None),
         }
+    }
+
+    /// The time an event is handled at: the system clock, or what
+    /// [`Platform::set_now`] set. An app stamps input with this rather
+    /// than reading the clock itself, so a test that drives its frames on
+    /// its own clock drives its events on the same one (#440).
+    #[must_use]
+    pub fn now(&self) -> crate::Instant {
+        self.clock.get().unwrap_or_else(crate::Instant::now)
+    }
+
+    /// Sets the time [`Platform::now`] answers from here on: for a test
+    /// that times its frames itself.
+    pub fn set_now(&self, now: crate::Instant) {
+        self.clock.set(Some(now));
     }
 
     /// Ask for a frame: what an app that returns

@@ -32,8 +32,6 @@ pub(crate) struct Rebuilt {
     /// Owners whose box children were edited in place
     /// (`child_edits.rs`), and those whose edits were declined.
     pub(crate) edits: EditCounts,
-    /// The boxes lending the taken caches visited (`Lender::lend_from`).
-    pub(crate) lend_visits: usize,
 }
 
 /// How many elements with recorded edits were edited, how many
@@ -88,7 +86,6 @@ impl Rebuilt {
             reshaped: Vec::new(),
             changed: Vec::new(),
             edits: EditCounts::default(),
-            lend_visits: 0,
         }
     }
 
@@ -109,7 +106,6 @@ impl Rebuilt {
             reshaped,
             changed: Vec::new(),
             edits: EditCounts::default(),
-            lend_visits: 0,
         }
     }
 

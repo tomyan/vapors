@@ -22,8 +22,7 @@ impl Placed {
     }
 
     /// Puts `owner`'s box back with its children edited; the slots of
-    /// the boxes built, the owner's first, and those of the inserted
-    /// children's boxes, the roots of the subtrees built.
+    /// the boxes built, the owner's first.
     ///
     /// # Panics
     /// The owner's box was not taken, or a removed slot or an inserted
@@ -34,7 +33,7 @@ impl Placed {
         source: &Source<'_>,
         (owner, edits): (NodeId, &Edits),
         taken: &mut Taken,
-    ) -> (Vec<usize>, Vec<usize>) {
+    ) -> Vec<usize> {
         let key = Key::Element(owner);
         let slot = self.slot_for(key, taken);
         let mut children = old_children(taken, slot);
@@ -46,14 +45,12 @@ impl Placed {
                 .child_removed(slot, removed, children.get(at).copied());
         }
         let mut put = vec![slot];
-        let mut roots = Vec::new();
         let mut pending = edits.inserted.clone();
         while let Some(child) = next_in_order(source, &mut pending) {
             let at = self.after_previous(source, (child, &children), taken);
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             let after = at.checked_sub(1).map(|before| children[before]);
             children.insert(at, built[0]);
-            roots.push(built[0]);
             self.lanes
                 .borrow_mut()
                 .child_inserted(slot, built[0], after);
@@ -67,7 +64,7 @@ impl Placed {
         own.children = children;
         self.hold(key, slot);
         self.boxes[slot] = own;
-        (put, roots)
+        put
     }
 
     /// The slot `node`'s box holds, or held when another owner rebuilt

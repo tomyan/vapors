@@ -144,10 +144,6 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
-    /// Boxes the narrowed rebuild's lending visited, comparing each
-    /// rebuilt box with the box taken from its slot (`Lender::lend_from`);
-    /// 0 when every box was built.
-    pub boxes_lend_visited: usize,
     /// Scroll containers whose range the placement walk measured from
     /// their content (4g): those laid out or built again; a container
     /// that only scrolled is clamped to the range it kept.
