@@ -2,7 +2,11 @@
 //! `target` names it, and the one judged runs need: `judged`, release
 //! with one codegen unit (the workspace `Cargo.toml` says why). A judged
 //! scaling run built any other way is refused, since its numbers move
-//! with how the compiler split the code.
+//! with how the compiler split the code. The build script fails a
+//! judged build that any override it can see would change: a
+//! `CARGO_PROFILE_JUDGED_*` variable, codegen units in the rustflags, or
+//! a `[profile.judged]` codegen-units in a cargo config on the path or in
+//! cargo's home (`build_judged.rs`).
 
 /// The profile directory this binary was built into (`build.rs`).
 pub const BUILT: &str = env!("VAPORS_PERF_PROFILE_DIR");
@@ -13,7 +17,7 @@ pub const JUDGED: &str = "judged";
 #[must_use]
 pub fn header() -> String {
     if BUILT == JUDGED {
-        format!("{BUILT} (release, codegen-units 1)")
+        format!("{BUILT} (release, codegen-units 1, no override at build)")
     } else {
         format!("{BUILT} (not the judged profile)")
     }

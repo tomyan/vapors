@@ -53,6 +53,9 @@ ensure_worktree() {
   fi
   mkdir -p "$target"
   [ -L "$worktree/target" ] || ln -s "$target" "$worktree/target"
+  # the judge builds the judged profile alone since 2026-11-16; a release
+  # directory left from before only holds disk
+  rm -rf "$target/release"
   git -C "$worktree" checkout -q --detach "$ref"
 }
 

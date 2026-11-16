@@ -16,10 +16,15 @@ use crate::{ci, fail, gate, sccache};
 /// The release build of vapors-perf took 104 s with the cache warm and
 /// 525 s with no cache and an empty target, 4 jobs at load average 33
 /// (2026-11-13); 30 minutes is over three times the cold build. The
-/// judged profile's single codegen unit costs no more: cold, 208 s and
-/// 676 s of CPU against release's 218 s and 721 s; after touching
-/// vapors-scene, 42 to 44 s against 34 to 48 s (2026-11-16, no cache, 4
-/// jobs, load 4 to 16).
+/// judged profile's single codegen unit costs no more (2026-11-16, 4
+/// jobs, each in an empty `CARGO_TARGET_DIR`):
+/// - no cache (`RUSTC_WRAPPER= cargo build --profile judged -p
+///   vapors-perf`, then `--release`), load 7 to 10: judged 208 s and
+///   676 s of CPU, release 218 s and 721 s; after touching vapors-scene,
+///   42 to 44 s against 34 to 48 s at load 7 to 16;
+/// - sccache warm (`RUSTC_WRAPPER=sccache`, as xtask builds, the cache
+///   filled by a first build), load 11 to 19: judged 18.2 s, release
+///   18.7 s.
 const BUILD_DEADLINE: Duration = Duration::from_mins(30);
 
 /// Every change took 71 s together at load average 20 and 380 s at load

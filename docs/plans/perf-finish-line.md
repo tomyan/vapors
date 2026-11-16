@@ -5,7 +5,10 @@ vapors work until every property below holds, measured. The comparative
 benchmark, the website and outside funding applications wait for it.
 
 Each property is measured by `crates/perf` (`vapors-perf`) in a release
-build on the dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
+build, its `--scaling` growth checks in the judged profile (release with
+one codegen unit, since 2026-11-16; the per-row ceilings were set again
+then, `docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"), on the
+dev machine (Intel UHD 630, ANV), 1-minute load under 1.5,
 three runs, medians, and recorded in `docs/perf/`. A property holds when
 the harness shows it, not when the code is believed to do it.
 

@@ -16,24 +16,33 @@ use crate::scaling::PhaseSeries;
 ///
 /// Relaxed from 9500 (2026-11-13): main measured 9538, 9541.5 and 9542
 /// per row, the accessibility mirror's per-row cost since #258 tracks
-/// hoisted nodes; 9600 is that rounded up to the next hundred, ten
-/// times the repeat noise. Layout-lane PR 5 (the accessibility mirror
-/// in flow, `docs/plans/splice-layout.md`) retires it, restoring 9500.
-pub const INSERT_A11Y_PER_ROW: u64 = 9600;
+/// hoisted nodes; 9600 was that rounded up to the next hundred.
+///
+/// Set again for the judged profile (2026-11-16, one codegen unit):
+/// 10,500.2 to 10,539.8 per row over three judged runs at 30c03ed2;
+/// 10,600 is the highest rounded up to the next hundred
+/// (`docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"). Layout-lane
+/// PR 5 (the accessibility mirror in flow, `docs/plans/splice-layout.md`)
+/// retires it, with the lower ceiling measured judged then.
+pub const INSERT_A11Y_PER_ROW: u64 = 10_600;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `FlexInsert`, on the flex-column list,
 /// whose rows are one block holding their text: measured 1829.6 and
 /// 1832.9 per row (insert and remove frames, 2026-11-14, layout-lane PR
-/// 3f-2); 1900 is that rounded up to the next hundred. Layout-lane PR 5
+/// 3f-2); 1900 was that rounded up to the next hundred. Set again for
+/// the judged profile (2026-11-16): 1961.2 to 1965.2 over three judged
+/// runs at 30c03ed2; 2000 is the highest rounded up. Layout-lane PR 5
 /// (the accessibility mirror in flow) retires it.
-pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1900;
+pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 2000;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
 ///
 /// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
-/// 13,443 and 13,446.3 per row. Layout-lane PR 5 retires it, restoring
-/// 13,000.
-pub const RESIZE_A11Y_PER_ROW: u64 = 13_500;
+/// 13,443 and 13,446.3 per row. Set again for the judged profile
+/// (2026-11-16): 15,639.5 to 15,701.8 over three judged runs at
+/// 30c03ed2; 15,800 is the highest rounded up. Layout-lane PR 5 retires
+/// it, with the lower ceiling measured judged then.
+pub const RESIZE_A11Y_PER_ROW: u64 = 15_800;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
 /// every size: the take reads the scrolled container alone, its rows'

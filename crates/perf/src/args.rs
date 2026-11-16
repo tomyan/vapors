@@ -36,7 +36,8 @@ pub struct Options {
     /// Run the Mount workload at one size, in this process, and print its
     /// resident set on one line (`mount_memory`'s child mode).
     pub mount_memory: Option<usize>,
-    /// Run a scene for 60 s of frames, every one judged (`scene_run`):
+    /// Run a scene for 60 s of frames, each held to the frame budget
+    /// (`scene_run`), on the shipped profile:
     /// the racer, or the scene named after the flag; no counts, no other
     /// flag.
     pub scene_run: Option<SceneKind>,

@@ -85,6 +85,24 @@ since_last_pass() {
   git -C "$worktree" log --format='- %h %s' "$since..$2" | head -n 50
 }
 
+# The profile the judge in log $1 was built with, as its header names
+# it (`Profile: judged (release, codegen-units 1); ...`).
+profile_of() {
+  sed -n 's/^Profile: \([^;]*\).*/\1/p' "$1" | head -n 1
+}
+
+# A line saying the build's profile changed since the last run, when it
+# did: a pass or failure then reflects the new baseline as well as the
+# commits (on 2026-11-16 the judge moved to one codegen unit, and the
+# per-row ceilings were set again, docs/perf/a11y-phase-2026-11-12.md).
+baseline_note() {
+  local was
+  was=$(cat "$state/profile" 2>/dev/null || true)
+  if [ -n "$was" ] && [ "$was" != "${profile:-unknown}" ]; then
+    printf 'The judge'"'"'s build profile changed since the last run, from %s to %s: this result reflects the new baseline as well as the commits.\n\n' "$was" "${profile:-unknown}"
+  fi
+}
+
 # Change $1 failed in log $2 at revision $3.
 report_change_failure() {
   local block parts
@@ -93,9 +111,9 @@ report_change_failure() {
 $(tail -n 40 "$2")"
   parts=$(failing_parts <<<"$block")
   file_issue "$change_prefix$1:" "$change_prefix$1: ${parts:-failed, not by growth (see the body)}" \
-    "\`--scaling $1\` failed at $3 ($(date -u +%FT%TZ)).
+    "\`--scaling $1\` failed at $3 ($(date -u +%FT%TZ)), built with the ${profile:-unknown} profile.
 
-$(since_last_pass "$1" "$3")
+$(baseline_note)$(since_last_pass "$1" "$3")
 
 \`\`\`
 $block
@@ -107,7 +125,7 @@ Reproduce: \`cargo build --profile judged -p vapors-perf && target/judged/vapors
 # Change $1 passed at revision $2.
 report_change_pass() {
   echo "$2" >"$state/pass/$1"
-  close_issue "$change_prefix$1:" "\`--scaling $1\` passed at $2 ($(date -u +%FT%TZ)); closing."
+  close_issue "$change_prefix$1:" "$(baseline_note)\`--scaling $1\` passed at $2 ($(date -u +%FT%TZ)), built with the ${profile:-unknown} profile; closing."
 }
 
 # Closes the open change issues of changes the harness no longer lists
@@ -146,7 +164,9 @@ $(cat "$state/UNREPORTED")"
 
 # Every report for log $1 at revision $2, the judge having exited $3.
 report_results() {
-  local change expected failing missing
+  local change expected failing missing profile
+  profile=$(profile_of "$1")
+  profile=${profile:-unknown}
   report_unreported
   expected=$(expected_changes "$1")
   for change in $(changes_that "$1" pass); do report_change_pass "$change" "$2"; done
@@ -163,4 +183,5 @@ report_results() {
     report_retired "$expected" "$2"
     [ "$3" -ne 0 ] || close_issue "$runner_title" "\`cargo xtask scaling\` passed at $2; closing."
   fi
+  echo "$profile" >"$state/profile"
 }
