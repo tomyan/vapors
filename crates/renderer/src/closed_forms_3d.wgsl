@@ -2,13 +2,9 @@
 // closed_forms_shared.wgsl and projective.wgsl; docs/plans/decal.md
 // section 2): the instance's affine transform takes shape units to a
 // node's plane, z = 0, and the node's world matrix and the camera's
-// view-projection take the plane to clip space. The fragment stage is
-// the page's: it reads the distance's rate across the screen from the
-// derivatives of the shape-unit position, which under a projection is
-// interpolated perspective-correct. Taken across a 2x2 quad, those
-// derivatives are the local Jacobian with an error of second order in
-// the quad's size: exact under an affine map, and here within the
-// bounds tests/gpu_closed_forms_3d.rs measured against a CPU drawing.
+// view-projection take the plane to clip space. The fragment stage
+// (`fs_main`, below) is the page's coverage with the map from device
+// pixels to shape units taken from the analytic Jacobian.
 
 // The padding in shape units along x and y that moves each edge of the
 // box MARGIN device pixels out at `local`, as the page's `padding` does
@@ -40,4 +36,24 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     let local = corner + (at * 2.0 - 1.0) * pad;
     let position = to_clip() * vec4(on_plane(instance.linear, instance.shift.xy, local), 0.0, 1.0);
     return vertex_out(instance, local, position);
+}
+
+// The shape units per device pixel, right and down, from the analytic
+// Jacobian at the fragment's own position: exact, and the same on every
+// adapter. Derivatives across a 2x2 quad would not do under a
+// projection: `dpdx` may be fine or coarse, at the implementation's
+// choice, and either way it is the Jacobian half a pixel or more from
+// the fragment, an error of first order in the pixel step (#422's
+// review; modelled at D1's 60 degree pose: 0.027 of coverage at the
+// band's edge with fine derivatives, 0.041 with coarse). A fragment
+// exists only in front of the eye, so the Jacobian is singular only
+// edge-on, where the plane is a line on the screen: nothing is drawn.
+@fragment
+fn fs_main(in: Out) -> @location(0) vec4<f32> {
+    let j = screen_jacobian(in.linear, in.shift, in.local);
+    let det = j.x * j.w - j.y * j.z;
+    if (det == 0.0) {
+        return vec4(in.colour.rgb, 0.0);
+    }
+    return covered(in, vec2(j.w, -j.y) / det, vec2(-j.z, j.x) / det);
 }

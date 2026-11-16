@@ -230,17 +230,9 @@ pub fn cpu_coverage_8x(
     side: u32,
     inside: &dyn Fn([f32; 2]) -> bool,
     affine: [f32; 6],
-    (view_projection, world): (Mat4, Mat4),
+    camera: (Mat4, Mat4),
 ) -> Vec<f32> {
-    let to_plane = (view_projection * world).inverse();
-    let shape_at = |hit: Vec3| inside(unaffine(affine, [hit.x, hit.y]));
-    let sample = |[x, y]: [f32; 2]| {
-        let ndc = [x / to_f32(side) * 2.0 - 1.0, 1.0 - y / to_f32(side) * 2.0];
-        let near = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 0.0));
-        let far = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 1.0));
-        let along = near.z / (near.z - far.z);
-        (0.0..=1.0).contains(&along) && shape_at(near + (far - near) * along)
-    };
+    let sample = |p: [f32; 2]| shape_point(side, affine, camera, p).is_some_and(inside);
     (0..side * side)
         .map(|at| {
             let [left, top] = [to_f32(at % side), to_f32(at / side)];
@@ -251,6 +243,28 @@ pub fn cpu_coverage_8x(
             to_f32(u32::try_from(hits).expect("at most 64")) / 64.0
         })
         .collect()
+}
+
+/// The shape point under device point `p` of a `side` square target:
+/// the ray through it cast onto the node's plane (z = 0 in the node's
+/// space) through the inverse of `camera`, then taken back through the
+/// inverse of `affine`; `None` where the ray meets the plane behind the
+/// eye or past the far plane.
+pub fn shape_point(
+    side: u32,
+    affine: [f32; 6],
+    (view_projection, world): (Mat4, Mat4),
+    [x, y]: [f32; 2],
+) -> Option<[f32; 2]> {
+    let to_plane = (view_projection * world).inverse();
+    let ndc = [x / to_f32(side) * 2.0 - 1.0, 1.0 - y / to_f32(side) * 2.0];
+    let near = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 0.0));
+    let far = to_plane.project_point3(Vec3::new(ndc[0], ndc[1], 1.0));
+    let along = near.z / (near.z - far.z);
+    let hit = near + (far - near) * along;
+    (0.0..=1.0)
+        .contains(&along)
+        .then(|| unaffine(affine, [hit.x, hit.y]))
 }
 
 /// A test-sized count as `f32`: exact below 2^24.
