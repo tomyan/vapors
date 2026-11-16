@@ -6,59 +6,58 @@ nodes, and no frame over 16.7 ms across a 60 s run. Order of work item
 8: the shape table and the one-scene proof, after 3D slice 2's PRs 4,
 4b and 5 (`docs/plans/3d-2.md`).
 
-Read from the code at 7d1fe84. Plan only; nothing here is built. Line
-counts per PR are estimates. Every number is cited or marked "to be
-measured". Sections 1 to 4 follow the recommendation of each open
-decision in section 5; where another option would change a row, the
-decision says which.
+Sections 1 to 6 were read from the code at 7d1fe84 as a plan; section
+0 is updated to main at dcfae109 (2026-11-16). Line counts per PR are
+estimates. Every number is cited or marked "to be measured". Sections 1
+to 4 follow section 5's decisions, which Tom took on 2026-11-12, each
+as recommended; the options are kept there as the record.
 
-## 0. Where things stand
+## 0. Where things stand (2026-11-16, main at dcfae109)
 
-- **Icons** (`docs/icons.md`): `<svg>` with stroked `<path>`s (M L H V A
-  Z, `currentColor`, stroke only) is parsed at run time by
-  `vapors_shapes::IconPath`, stroked on the CPU by zeno into an 8-bit mask
-  per path, cached in the glyph atlas at device size, and drawn as one
-  tinted quad per path (`Item::Icon { icon, rect, colour }`,
-  `crates/scene/src/display.rs:137`; built in
-  `crates/elements/src/svg_paint.rs`). Capped at 256 device px. The
-  compiler does not look at path data; `svg` and `path` are only names
-  in its vocabulary (`crates/compiler/src/template/vocabulary.rs`).
-- **Build-time style analysis** (Analysis PRs 1 and 2a to 2d merged, 2e
-  open as #240): the compiler emits one `static StyleKey` per template
-  element (site, scope, tag, literal classes, `class:` toggles, literal
-  `style`; `crates/compiler/src/codegen/style_key.rs`), and the tree
-  shares one computed style between elements whose share key matches
-  (template key, parent's style, states, toggles, selected attributes;
-  `crates/elements/src/restyle_share.rs:113`). At 3000 rows the first
-  update computes 4 styles plus 2 unkeyed, with 6 live (#240).
-- **The racer** (`crates/racer`): its own `Track` renderer on the HUD's
-  `gpu-surface` (`crates/racer/src/gpu.rs`). The ground is a full-screen
-  triangle whose fragment shader computes road, verge, kerbs, markings,
-  grass stripes, noise, shadows and a vignette per pixel (`track.wgsl`,
-  `ground` and `fs_main`). Scenery and car are one vertex buffer of
-  position, colour and a car flag, with face shading baked into the
-  colours (`gpu/mesh.rs`), drawn in one call. The camera is a tilted
-  orthographic view written by hand in the shader (`vs_solid`: no
-  perspective divide, depth `0.5 - (...)/4000`). Simulation coordinates
-  are X, Y on the ground and Z up. The `brake` value is written into the
-  uniform (`gpu/setup.rs`, `car_values`) but no shader reads it, and the
-  car has no brake-light meshes (`gpu/mesh.rs`, `car`).
-- **3D slice 2** (`docs/plans/3d-2.md`): PRs 1 to 3b merged.
-  `vapors-scene3d` holds `Scene` (generational node ids, `Group`,
-  `Mesh { geometry, colour }`, `Camera`), +Y up, right-handed.
-  `vapors-scene3d-gpu`'s `SceneRenderer` draws every mesh node unlit in
-  one colour (`shader.wgsl`), single-sampled, one draw and one uniform
-  slot per mesh node, the slot written only when its world version
-  changes. PRs 4 (components), 4b (one cascade into the scene) and 5
-  (lifecycle) are not started.
-- **Racer frame cost today** (`docs/perf/baseline-2026-11-10.md`,
-  section "IU3 PR 3c-1, after, full output", 200 frames, UHD 630):
-  racing, CPU frame median 3.20 ms, max 3.59 ms; GPU span median 6.78
-  ms, max 7.90 ms; GPU time median 4.71 ms, max 6.06 ms; 25 draw calls.
-  The span starts before the frame is recorded and ends after the GPU
-  finishes, so it covers CPU recording and GPU work together (same doc,
-  after the "After one submit" table); frame-to-idle (D6) is therefore
-  close to the span, not to CPU plus span.
+- **What property 9 is judged on.** Tom, 2026-11-13
+  (`perf-finish-line.md`, row 9): a minimal test scene (a few 3D
+  objects, an SVG decal on one, HTML on top), not the racer. The racer
+  is a later showcase. `perf-finish-line.md` says its design is kept
+  in `docs/plans/racer-scene.md`, which does not exist: sections 2, 3.2
+  and the R rows of section 4 below are that design until they are
+  moved there.
+- **The test scene** is `crates/one-scene` (One scene M1, #344): three
+  cubes on a ground plane in a `<Scene>` on a `gpu-surface`, a HUD of
+  buttons over it, CSS colouring the meshes (classes, a token switched
+  by the page's time signal, `visibility`), and a group `:hover`
+  through the 3D hit test. Its 60 s judged run is recorded (M3, #352):
+  0 frames over 16.7 ms in six runs. What it lacks for property 9 is
+  the SVG decal; the decal's design is `docs/plans/decal.md`.
+- **3D slice 2** is merged: PRs 4-1 to 4-3 (#250, #251, #252: `<Scene>`,
+  `<Group>`, `<Mesh>`, `<Camera>` in `.wisp`, a signal change writing
+  one uniform), CSS for 3D C1 to C3 (one cascade into the scene:
+  `color` and `visibility` on meshes, #274, #328, #330, #336), PR 5b
+  (#341, geometry held by counted handles), C4a (#356, `pick`: the
+  nearest visible mesh under a surface point), C4b and C4c (#389, #393:
+  a hit on a scene's surface is answered as its mesh's anchor, so
+  `:hover` reaches scene nodes). R1 (#355): a per-vertex shade times
+  the node's CSS colour (D4). `SceneRenderer` draws opaque meshes
+  only, in one pipeline, depth `Less`, no blending, single-sampled, into
+  the surface's texture, which the painter composites (D1 (a)).
+- **The shape chain**, S1 to S4b, is merged: `vapors-shapes` (S1,
+  #278, #287), the classifier, canonical form, mesh format and lyon
+  tessellator (S2, five PRs ending #307), `Item::Shape` and the
+  painter's `ShapeStore` (S3a1, #350), the mesh pipeline (S3a2, #360,
+  #361), the antialiasing measurement (S3b, #369) and meshes by exact
+  corners (S3a3, #371), `fill`, `stroke` and `stroke-width` in the
+  cascade and `<path>` drawn as shapes from a document's run-time shape
+  cache (S4a, #376, #379, #381), and `<rect>`, `<circle>`, rounded and
+  elliptical corners as closed forms (S4b, #386, #387, #391). Not built:
+  S5a and S5b (compile-time tables and the process registry), S6, and
+  S7 and S8, which `decal.md` replaces.
+- **First frame and the 60 s run**: P0 (#265) and F0 (accepted in #364:
+  every pipeline built before frame 0, a judged frame that builds one
+  refused).
+- **Icons** are unchanged: stroked `<path>`s in the icon subset are
+  drawn by zeno into the glyph atlas (`svg_route.rs` says which route
+  an svg takes).
+- **The racer** is unchanged (`crates/racer`, its own `Track`
+  renderer); R2 to R4 and P1 wait for the showcase.
 
 ## 1. The shape table
 
@@ -382,6 +381,10 @@ Racer tests that move to `SceneRenderer` (R3a2): `gpu_track_tests.rs`,
 
 ### 2.3 SVG markings on the craft
 
+(Superseded for the decal's drawing, depth, picking and slices by
+`docs/plans/decal.md`, 2026-11-16; the craft's markings below stay
+the showcase's content.)
+
 A scene component `<Decal transform={..} width={..} height={..}>` takes
 an inline `<svg>` as its child. Its shapes are drawn in the 3D pass, in
 the decal's plane in the parent node's space, with the viewBox mapped
@@ -568,8 +571,8 @@ is checked against what it found.
 | R3a1 | The racer's world in `.wisp`: root group, camera, ground, merged scenery, car group, on a test page beside the racer | The ground and object check on the racer's geometry in both cameras; scene draw calls pinned (about 11, 2.2) | R2, 3D PRs 4 and 5 | S rows |
 | R3a2 | The racer moves to it; `Track` and its files deleted; the tests in 2.2 moved | Every moved test passes; idle frames render nothing; browser scripts pass by hand | R3a1 | S rows |
 | R3b | CSS on the craft: `--craft-body`, the livery enum, brake-light meshes with `class:braking`, `:hover` (2.4) | Pixel tests per rule (the brake lights brighten while braking); each change counted: no geometry, one uniform per changed node | R3a2, 3D PR 4b | S rows |
-| S7 | Shapes in the 3D pass: `SurfaceFrame::shapes`, `SceneRenderer` draws registered entries with a node's world matrix, paint from the anchor's style; depth bias | A decal on a plane rotated 60 degrees under a perspective camera: edge coverage compared with a reference render at 8x; no depth fighting at the racer's widest zoom | S5b, 3D PR 4b | R3a, R3b |
-| S8 | `<Decal>` with an inline `<svg>` in `.wisp` | A decal's paths take class toggles and tokens; a toggle writes one uniform, tessellates nothing | S7 | R3b |
+| S7 | Replaced by `decal.md` slices D1 to D4 (2026-11-16): shapes in the 3D pass on the run-time cache, not waiting for S5b | `decal.md` | | |
+| S8 | Replaced by `decal.md` slice D5 | `decal.md` | | |
 | R4 | The craft's markings (2.3), replacing the stripe cuboids | Pixel test: the roundel follows the car through a turn; a livery change recolours body and markings in one frame | S8, R3b | none |
 | P1 | Acceptance: P0's run on the one-scene racer, three runs, `docs/perf/`; property 9 marked held or not in `perf-finish-line.md` | No frame over 16.7 ms in each of the three runs, or the frames that were, with their phases | R4 | none |
 
