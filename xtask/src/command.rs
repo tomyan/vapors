@@ -47,19 +47,14 @@ fn spawn(step: &Step) -> Result<Child, String> {
     // refused without sccache: one rule, rather than a list of which
     // steps compile that could fall behind. sccache's own step is the
     // exception, since it is the check.
-    if step.program != "sccache" {
-        // the step's own build directory first, so the cap measures
-        // where it builds
-        let own = step
-            .env
-            .iter()
-            .filter(|(name, _)| name == "CARGO_TARGET_DIR");
-        command.envs(own.map(|(name, value)| (name, value)));
-        crate::sccache::apply(&mut command)?;
-    }
+    cache_and_build_dir(&mut command, step)?;
+    let others = step
+        .env
+        .iter()
+        .filter(|(name, _)| name != "CARGO_TARGET_DIR");
     command
         .args(&step.args)
-        .envs(step.env.iter().map(|(name, value)| (name, value)))
+        .envs(others.map(|(name, value)| (name, value)))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -75,6 +70,22 @@ fn spawn(step: &Step) -> Result<Child, String> {
             step.program
         )
     })
+}
+
+/// The cache on `command` (`sccache::apply`), except for sccache's own
+/// step, and the step's own build directory (`target_cap::step_target_dir`)
+/// set on it by `apply`, which measures that same directory.
+fn cache_and_build_dir(command: &mut std::process::Command, step: &Step) -> Result<(), String> {
+    let here = std::env::current_dir().map_err(|e| format!("the current directory: {e}"))?;
+    let step_dir = here.join(step.dir.as_deref().unwrap_or(""));
+    let builds_into = crate::target_cap::step_target_dir(&step.env, &step_dir);
+    if step.program != "sccache" {
+        return crate::sccache::apply(command, builds_into.as_deref());
+    }
+    if let Some(dir) = builds_into {
+        command.env("CARGO_TARGET_DIR", dir);
+    }
+    Ok(())
 }
 
 /// Give `command` the TMPDIR `tmpdir` says.
@@ -158,3 +169,7 @@ fn joined(handle: Option<JoinHandle<String>>) -> String {
 #[path = "command_kill.rs"]
 mod kill;
 pub(crate) use kill::{ask_groups_to_end, kill_group, kill_group_id};
+
+#[cfg(test)]
+#[path = "command_target_tests.rs"]
+mod target_tests;

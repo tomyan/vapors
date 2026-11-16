@@ -20,16 +20,12 @@ pub fn workspace_root(here: &Path) -> Result<PathBuf, String> {
         })
 }
 
-/// The `CARGO_TARGET_DIR` `command` builds with: its own when it sets
-/// one, none when it removes it, else the one xtask inherited.
-pub fn command_target_dir(command: &std::process::Command) -> Option<std::ffi::OsString> {
-    let own = command
-        .get_envs()
-        .find(|(name, _)| *name == "CARGO_TARGET_DIR");
-    match own {
-        Some((_, value)) => value.map(std::ffi::OsStr::to_os_string),
-        None => std::env::var_os("CARGO_TARGET_DIR"),
-    }
+/// The build directory a step names: its own `CARGO_TARGET_DIR`, taken
+/// from `step_dir` (where the step runs) when relative, as cargo takes
+/// it there; `None` when it names none or an empty one.
+pub fn step_target_dir(env: &[(String, String)], step_dir: &Path) -> Option<PathBuf> {
+    let (_, value) = env.iter().rfind(|(name, _)| name == "CARGO_TARGET_DIR")?;
+    (!value.is_empty()).then(|| step_dir.join(value))
 }
 
 /// The directory cargo builds into: `cargo_target_dir` when set (taken

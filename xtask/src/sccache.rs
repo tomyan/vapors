@@ -5,6 +5,7 @@
 //! and its server must answer, or the build is refused naming
 //! `cargo xtask setup`; a build never falls back to compiling uncached.
 
+use std::path::Path;
 use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -46,17 +47,28 @@ pub struct Stats {
 }
 
 /// Sets the cache on `command`: rustc through sccache, and no
-/// incremental compilation, which sccache cannot cache.
+/// incremental compilation, which sccache cannot cache. `builds_into`
+/// is the build directory the command uses, set on it here as
+/// `CARGO_TARGET_DIR` and measured by the cap, so the two are one
+/// value; `None` for the one xtask inherited (its `CARGO_TARGET_DIR`,
+/// else the workspace's `target/`).
 ///
 /// # Errors
 ///
 /// sccache missing, or its server unable to start or answer, or one
 /// running with another local cache size; or the worktree's build
 /// directory over its cap (`target_cap.rs`).
-pub fn apply(command: &mut Command) -> Result<(), String> {
+pub fn apply(command: &mut Command, builds_into: Option<&Path>) -> Result<(), String> {
+    let measured = match builds_into {
+        Some(dir) => {
+            command.env("CARGO_TARGET_DIR", dir);
+            Some(dir.as_os_str().to_owned())
+        }
+        None => std::env::var_os("CARGO_TARGET_DIR"),
+    };
     // the cap first: it needs no server, and an over-full disk can be
     // why one would not start
-    crate::target_cap::check(crate::target_cap::command_target_dir(command).as_deref())?;
+    crate::target_cap::check(measured.as_deref())?;
     ready()?;
     command.envs(ENV);
     Ok(())

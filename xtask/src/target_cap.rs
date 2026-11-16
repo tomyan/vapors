@@ -5,9 +5,15 @@
 //! to see it, and the command that empties it. The limit's source is
 //! CLAUDE.md's Builds section.
 //!
-//! The directory is the `CARGO_TARGET_DIR` the guarded command builds
-//! with: its own when it sets one, else xtask's, else the workspace's
-//! `target/`; the workspace is the nearest directory at or above the
+//! The directory is the `CARGO_TARGET_DIR` the guarded command is given
+//! (`sccache::apply`): a step's own, from its `env` (taken from the
+//! step's directory when relative), else xtask's, else the workspace's
+//! `target/`. RELAXED: what the cap cannot see is a `--target-dir`
+//! argument, or a `CARGO_TARGET_DIR` set or exported inside a step's
+//! script; a step doing either is measured on the directory its
+//! environment names, not the one it builds into. No step does today;
+//! retired by refusing a planned step whose arguments or `run:` text
+//! set either, naming the file and line. The workspace is the nearest directory at or above the
 //! current one holding `.config/factory.toml`, so a run from a
 //! subdirectory is capped too. A `target-dir` in the workspace's
 //! `.cargo/config.toml` is refused, as it is not read here; one in a
@@ -63,7 +69,7 @@ pub fn check(cargo_target_dir: Option<&std::ffi::OsStr>) -> Result<(), String> {
 mod find;
 #[path = "target_cap_measure.rs"]
 mod measure;
-pub use find::{command_target_dir, target_dir, workspace_root};
+pub use find::{step_target_dir, target_dir, workspace_root};
 pub use measure::measure;
 
 /// `[targets] max_gb` as a number of GB; `None` when unset.

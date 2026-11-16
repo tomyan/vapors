@@ -71,7 +71,7 @@ fn run_example(
         "--example"
     };
     let mut command = crate::priority::command("cargo")?;
-    crate::sccache::apply(&mut command)?;
+    crate::sccache::apply(&mut command, None)?;
     command
         .args(["run", "-q", "-p", package, kind, &target.name, "--"])
         .args(example_args)

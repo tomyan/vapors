@@ -5,9 +5,9 @@ use super::*;
 use crate::scratch;
 
 /// A shell step building into its own scratch target, kept with it.
-fn shell(name: &str, script: &str) -> (Step, scratch::Scratch) {
-    let mut step = Step::new(name, "sh", &["-c", script], "a test step");
-    let (target, env) = scratch::target();
+fn shell(test: &str, script: &str) -> (Step, scratch::Scratch) {
+    let mut step = Step::new(test, "sh", &["-c", script], "a test step");
+    let (target, env) = scratch::target(test);
     step.env.push(env);
     (step, target)
 }
@@ -16,7 +16,10 @@ fn shell(name: &str, script: &str) -> (Step, scratch::Scratch) {
 fn a_passing_step_that_leaves_a_file_in_its_tmpdir_fails_the_run_naming_it() {
     // Given: a step that passes but leaks, as a test that forgets its file
     let base = scratch::dir("ci-leak");
-    let (leaking, _target) = shell("leak", r#"touch "$TMPDIR/leaked-by-a-test""#);
+    let (leaking, _target) = shell(
+        "a_passing_step_that_leaves_a_file_in_its_tmpdir_fails_the_run_naming_it",
+        r#"touch "$TMPDIR/leaked-by-a-test""#,
+    );
 
     // When
     let refusal = crate::run_tmp::around("ci", &base, |tmp| {
@@ -43,7 +46,10 @@ fn steps_that_leave_nothing_pass_and_each_had_the_run_directory_as_tmpdir() {
         expected.display()
     );
 
-    let (step, _target) = shell("tmpdir", &script);
+    let (step, _target) = shell(
+        "steps_that_leave_nothing_pass_and_each_had_the_run_directory_as_tmpdir",
+        &script,
+    );
 
     // When
     let code = crate::run_tmp::around("ci", &base, |tmp| {

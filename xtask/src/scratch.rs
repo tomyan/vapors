@@ -70,9 +70,10 @@ pub fn dir(name: &str) -> Scratch {
 /// `CARGO_TARGET_DIR`: every step is capped on the directory it builds
 /// into (`target_cap.rs`), and a test's step, which builds nothing, was
 /// otherwise capped on the worktree's own target and refused whenever
-/// that was near the limit. Keep it alive while the step runs.
-pub fn target() -> (Scratch, (String, String)) {
-    let target = dir("target");
+/// that was near the limit. Named after `test`, as `dir` is. Keep it
+/// alive while the step runs.
+pub fn target(test: &str) -> (Scratch, (String, String)) {
+    let target = dir(&format!("{test}-target"));
     let env = ("CARGO_TARGET_DIR".to_owned(), target.display().to_string());
     (target, env)
 }
