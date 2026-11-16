@@ -101,7 +101,7 @@ $(since_last_pass "$1" "$3")
 $block
 \`\`\`
 
-Reproduce: \`cargo build --release -p vapors-perf && target/release/vapors-perf 60 10 --scaling $1\` in a clean checkout at $3. Log on the dev machine: $2"
+Reproduce: \`cargo build --profile judged -p vapors-perf && target/judged/vapors-perf 60 10 --scaling $1\` in a clean checkout at $3. Log on the dev machine: $2"
 }
 
 # Change $1 passed at revision $2.

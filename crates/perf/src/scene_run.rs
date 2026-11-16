@@ -31,7 +31,11 @@ pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
     let gpu = open();
     let start =
         before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
-    println!("Revision: {REVISION}\nShader cache: {}", cache.describe());
+    println!(
+        "Revision: {REVISION}\nProfile: {}\nShader cache: {}",
+        crate::build_profile::header(),
+        cache.describe()
+    );
     println!(
         "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
     );

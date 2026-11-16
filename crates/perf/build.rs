@@ -6,6 +6,7 @@ use std::process::Command;
 fn main() {
     vapors_compiler::build::compile_dir("ui");
     println!("cargo:rustc-env=VAPORS_PERF_REVISION={}", revision());
+    println!("cargo:rustc-env=VAPORS_PERF_PROFILE_DIR={}", profile_dir());
     // the revision moves with every commit or checkout (HEAD's log), a
     // staged change (the index) and any edit to the tree
     for watched in [
@@ -44,4 +45,17 @@ fn git(args: &[&str]) -> Result<String, String> {
 fn revision() -> String {
     git(&["describe", "--always", "--dirty", "--abbrev=12"])
         .unwrap_or_else(|why| format!("unknown ({why})"))
+}
+
+/// The profile directory cargo builds this into (`release`, `judged`,
+/// `debug`): `OUT_DIR` is `<target>[/<triple>]/<profile>/build/<pkg>/out`.
+/// Cargo gives a build script no other name for a custom profile.
+fn profile_dir() -> String {
+    let out = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
+    std::path::Path::new(&out)
+        .ancestors()
+        .nth(3)
+        .and_then(|dir| dir.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .expect("OUT_DIR is <target>/<profile>/build/<pkg>/out")
 }

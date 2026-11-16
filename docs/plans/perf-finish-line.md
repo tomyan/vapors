@@ -42,9 +42,9 @@ mount, pipeline creation and first uploads.
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
-cargo build --release -p vapors-perf
+cargo build --profile judged -p vapors-perf
 for change in Idle Text FlexText Class HoveredClass; do
-  ./target/release/vapors-perf 60 10 --scaling $change || echo "$change grows"
+  ./target/judged/vapors-perf 60 10 --scaling $change || echo "$change grows"
 done
 ```
 

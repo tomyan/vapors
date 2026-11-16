@@ -15,7 +15,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
                      [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
-                     [--scene-run [racer|one-scene]]";
+                     [--scene-run [racer|one-scene]]; --scaling needs `--profile judged` in place of `--release`";
 
 /// What the command line asks for.
 #[derive(Debug)]
