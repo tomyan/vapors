@@ -2,8 +2,8 @@
 
 A design note for F1 (`flat-scene.md` section 8, the F1 row; the class
 itself is section 4.3), written against main at ff808875. It says what
-the code does today, what F1 adds, and the three questions for the lead
-before building.
+the code does today, what F1 adds, and the three questions the lead
+answered before it was built.
 
 ## Today
 
@@ -84,6 +84,11 @@ before building.
 Estimate: 250 to 300 lines with tests.
 
 ## Questions for the lead
+
+Answered by the lead (2026-11-16): each recommendation below is taken.
+`parts_reclassed` goes on `UpdateCounts` in F4b; W6 is its own pull
+request after F1; paint under `Affine` or `Projective` panics naming
+F4a.
 
 1. **Where `parts_reclassed` goes, and when.** Section 8 puts it on
    `FrameCounts` (`vapors-app`, the painter's GPU work a frame). A
