@@ -48,6 +48,10 @@ pub(crate) struct LaneFrames {
     /// (`Lanes::changes`): the memo holds for that count alone.
     #[cfg(debug_assertions)]
     generation: u64,
+    /// Which setting of the lanes this is: unique across every frames
+    /// value, so a reader can tell that the frames, set again by every
+    /// paint, are the ones it read before (`Painted::frames_epoch`).
+    epoch: u64,
     /// Lane frames worked out by a fold of their lane since the lanes
     /// were set, for the tests that the priming holds (`lane_folds`).
     folds: std::cell::Cell<usize>,
@@ -95,6 +99,7 @@ impl Frames {
             started: started.to_vec(),
             primed: std::cell::OnceCell::new(),
             folds: std::cell::Cell::new(0),
+            epoch: next_epoch(),
         };
         changed
     }
@@ -165,6 +170,12 @@ impl Frames {
         let base = *self.lanes.bases.get(&container)?;
         Some((base, lanes.frame_offset(container, frame)?))
     }
+}
+
+/// A lanes setting no other has had.
+fn next_epoch() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 #[path = "frames_lane_batch.rs"]

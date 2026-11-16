@@ -4,13 +4,14 @@
 //! lane's rows moves each item by its row's offset too
 //! (`painter_rows.rs`).
 
-use vapors_elements::{BatchKey, BatchRows, KeptBatched, Painted};
+use vapors_elements::{BatchKey, KeptBatched, Painted};
 use vapors_renderer::{Shift, Target};
 use vapors_scene::Run;
 
 use super::ScenePainter;
 use super::errors::PaintError;
 use super::kept::Kind as KeptKind;
+use super::places::BatchPlaces;
 use super::region::{clipped, view};
 use super::rows::Moved;
 
@@ -25,49 +26,55 @@ impl ScenePainter {
         drop(batching);
         self.counts.culled = kept.batched.culled;
         assert_parallel(&kept);
-        self.row_tables.begin();
-        let batches = kept
-            .batched
-            .batches
-            .iter()
-            .zip(&kept.frames)
-            .zip(kept.rows.iter());
-        for (at, (((batch, &named), rows), &key)) in batches.zip(&kept.keys).enumerate() {
-            let frame = painted.frame_draw(named);
-            let clip = frame.on_page(batch.clip);
-            match clipped(target, clip).filter(|_| !batch.culled) {
-                Some(clipped) => {
-                    let offsets = painted.row_offsets(named, rows);
-                    let moved = self.moved((key, rows), Shift::whole(frame.shift), &offsets);
-                    self.draw_run(&clipped, painted, (&batch.run, key, at), &moved)?;
-                }
-                None => self
-                    .surfaces
-                    .check_clipped(target.device, painted, &batch.run)?,
-            }
+        self.placed(painted, view(target), &kept);
+        let mut places = std::mem::take(&mut self.places);
+        let drawn = self.draw_batches(target, painted, (&kept, &mut places));
+        self.places = places;
+        drawn
+    }
+
+    /// Draws each of `kept`'s batches at its place in `places`, under its
+    /// scissor; a clipped-out batch's surfaces checked instead.
+    fn draw_batches(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        (kept, places): (&KeptBatched, &mut BatchPlaces),
+    ) -> Result<(), PaintError> {
+        let batches = kept.batched.batches.iter().zip(kept.rows.iter());
+        for (at, ((batch, rows), &key)) in batches.zip(&kept.keys).enumerate() {
+            let frame = places.frame(at, painted, kept);
+            let Some(clipped) =
+                clipped(target, frame.on_page(batch.clip)).filter(|_| !batch.culled)
+            else {
+                self.surfaces
+                    .check_clipped(target.device, painted, &batch.run)?;
+                continue;
+            };
+            let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
+            let shift = Shift::whole(frame.shift);
+            let moved = Moved {
+                shift,
+                table,
+                offsets,
+                rows,
+            };
+            self.draw_run(&clipped, painted, (&batch.run, key, at), &moved)?;
         }
         Ok(())
     }
 
-    /// Where batch `key` with `rows` is drawn: at `shift`, each row at
-    /// its offset in `offsets`, through the batch's kept table.
-    fn moved<'a>(
-        &mut self,
-        (key, rows): (BatchKey, BatchRows<'a>),
-        shift: Shift,
-        offsets: &'a [[f32; 2]],
-    ) -> Moved<'a> {
-        let table = if offsets.is_empty() {
-            vapors_renderer::RowOffsets::NONE
-        } else {
-            self.row_tables.table(key, offsets)
-        };
-        Moved {
-            shift,
-            table,
-            offsets,
-            rows,
+    /// Each batch's place for this frame: kept from the last when the
+    /// paint and view are the same, else worked out again as each batch
+    /// is drawn, each lane batch's table kept by key (`painter_rows.rs`).
+    fn placed(&mut self, painted: &Painted, view: vapors_scene::Rect, kept: &KeptBatched) {
+        if self.places.current(painted, view) {
+            #[cfg(debug_assertions)]
+            self.places.assert_current(painted, kept);
+            return;
         }
+        self.row_tables.begin();
+        self.places.reset((painted, view), kept.frames.len());
     }
 
     /// Draws `run` with the pipeline for its kind under `target`'s

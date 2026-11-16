@@ -124,6 +124,15 @@ impl Painted {
         self.frames.draw(frame)
     }
 
+    /// Which paint's frames these are: another after every paint, the
+    /// same while nothing was painted. While it, the view and the batches
+    /// stay, where each batch is drawn ([`Painted::frame_draw`],
+    /// [`Painted::row_offsets`]) stays too.
+    #[must_use]
+    pub fn frames_epoch(&self) -> u64 {
+        self.frames.epoch()
+    }
+
     /// The offsets of the rows of a batch named `frame` with `rows`, from
     /// where the batch is drawn ([`Painted::frame_draw`]): none for a
     /// batch in one frame.

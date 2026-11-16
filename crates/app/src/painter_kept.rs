@@ -70,7 +70,7 @@ impl ScenePainter {
         let Some(range) = self.kept.range(pipelines, target, (run, rows, key, at)) else {
             return Ok(());
         };
-        let rowed = (moved.shift, &moved.table);
+        let rowed = (moved.shift, moved.table);
         match run {
             Run::Shadows(_) => self.shadows.draw_kept_in_rows(target, range, rowed),
             Run::Quads(_) => self.quads.draw_kept_in_rows(target, range, rowed),
@@ -105,7 +105,7 @@ impl ScenePainter {
         let rowed = (run, moved.rows.items(), key, at);
         let kept = self.kept.text_range(parts, (target, painted), rowed)?;
         if let Some(kept) = kept {
-            let at = (moved.shift, &moved.table);
+            let at = (moved.shift, moved.table);
             self.text
                 .draw_kept_in_rows(target, &mut self.atlas, kept, (blend(run), at));
         }
