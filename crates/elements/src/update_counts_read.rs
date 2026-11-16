@@ -44,6 +44,11 @@ impl UpdateCounts {
         self.splices_declined = usize::from(walks.declined.is_some());
         self.splice_decline = walks.declined;
         (self.paint_relabelled, self.paint_relabel_all) = (walks.relabelled, walks.relabel_all);
+        let kept = painted.kept_batches.borrow();
+        self.batch_steps_sorted_again = usize::from(
+            kept.as_ref()
+                .is_some_and(crate::kept_batches::KeptBatches::unsorted),
+        );
     }
 }
 

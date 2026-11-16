@@ -64,7 +64,7 @@ pub(crate) fn paint_partial(
     if frames_moved_now {
         frames_moved(&mut painted);
     } else if lanes_moved {
-        lane_rows_moved(&mut painted);
+        lane_rows_moved(&mut painted, &changed.freed);
     }
     painted.order = order;
     painted
@@ -81,8 +81,8 @@ fn frames_moved(painted: &mut Painted) {
 /// After only framed lanes' rows moved (started elsewhere): the kept
 /// batches searched again in those lanes, at the view's edges, and the
 /// hover tested again.
-fn lane_rows_moved(painted: &mut Painted) {
-    crate::paint_partial_drawn::batches_lanes_moved(painted);
+fn lane_rows_moved(painted: &mut Painted, freed: &[(usize, crate::layout::Key)]) {
+    crate::paint_partial_drawn::batches_lanes_moved(painted, freed);
     painted.hits_changed = HitsChanged::Unknown;
 }
 

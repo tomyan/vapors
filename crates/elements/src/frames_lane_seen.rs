@@ -10,11 +10,12 @@ use vapors_scene::Rect;
 use super::super::Frames;
 
 /// A framed lane as a search of the view found it: its first and last
-/// rows meeting the view.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// rows meeting the view, if any did, and the rows the view's lines may
+/// cut, ink counted (`Frames::lane_edges`).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct LaneSeen {
-    pub(crate) first: usize,
-    pub(crate) last: usize,
+    pub(crate) ends: Option<(usize, usize)>,
+    pub(crate) edges: Vec<usize>,
 }
 
 impl Frames {
@@ -24,15 +25,37 @@ impl Frames {
     }
 
     /// Framed lane `container` as it meets `view`, device pixels on the
-    /// page; `None` when no row of it meets the view. The walk over the
-    /// rows meeting the view memoises each row's frame (the painter moves
-    /// every one); nothing else is read of a row between the edges.
+    /// page; `None` when it is no framed lane. The walk over the rows
+    /// meeting the view memoises each row's frame (the painter moves every
+    /// one); nothing else is read of a row between the edges.
     pub(crate) fn lane_seen(&self, container: usize, view: Rect) -> Option<LaneSeen> {
         let base = *self.lanes.bases.get(&container)?;
         let in_frame = self.view_in(base.parent, view);
         let rows = self.lane_rows_meeting(container, in_frame);
-        let (&first, &last) = (rows.first()?, rows.last()?);
-        Some(LaneSeen { first, last })
+        let ends = rows
+            .first()
+            .zip(rows.last())
+            .map(|(&first, &last)| (first, last));
+        let edges = self.lane_edges(container, base, in_frame);
+        Some(LaneSeen { ends, edges })
+    }
+
+    /// Whether framed lane `container` holds a row in slot `row`.
+    #[cfg(debug_assertions)]
+    pub(crate) fn lane_holds(&self, container: usize, row: usize) -> bool {
+        let lanes = self.lanes.shared.as_ref().map(|lanes| lanes.borrow());
+        lanes.is_some_and(|lanes| lanes.holds(container, row))
+    }
+
+    /// Whether frame `frame` holds frames of its own: a scroll container
+    /// in it (`Frames::meeting`'s index), or a framed lane whose content
+    /// is in it.
+    pub(crate) fn holds_frames(&self, frame: usize) -> bool {
+        let scrollers = self
+            .index
+            .get(&frame)
+            .is_some_and(|index| !index.is_empty());
+        scrollers || !self.lanes_in(frame).is_empty()
     }
 
     /// The rows of framed lane `container` from the start of row `a` to

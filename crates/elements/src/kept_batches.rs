@@ -104,6 +104,12 @@ impl KeptBatches {
         kept.batches(sources);
     }
 
+    /// Whether the steps are to be sorted again at the next draw
+    /// (`UpdateCounts::batch_steps_sorted_again`).
+    pub(crate) fn unsorted(&self) -> bool {
+        self.unsorted
+    }
+
     /// Notes that the steps must be sorted again before the next draw: a
     /// frame's shift or clip changed, or paint order was walked again.
     pub(crate) fn unsort(&mut self) {

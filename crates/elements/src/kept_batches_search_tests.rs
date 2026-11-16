@@ -68,6 +68,11 @@ fn rows_put_in_and_taken_out_around_the_view_patch_the_steps_found() {
     let first = row(&doc, 0);
     put_row(&mut doc, list, Some(first));
     assert_eq!(drawn(&mut doc), 0, "patched above");
+    assert_eq!(
+        doc.update_counts().batch_steps_sorted_again,
+        0,
+        "counted as patched"
+    );
     // taken out above (rows move up: one enters at the bottom)
     let second = row(&doc, 1);
     doc.remove(second);
@@ -162,9 +167,12 @@ fn the_first_row_in_view_taken_out_sorts_the_steps_again() {
     // longer holds
     let top = doc.children(list)[50];
     doc.remove(top);
+    doc.update(VIEWPORT).expect("updates");
+    let counted = doc.update_counts().batch_steps_sorted_again;
     let builds = drawn(&mut doc);
 
-    // Then: the steps were sorted again (and are a full search's: the
-    // debug check in `KeptBatches::for_view`)
-    assert_eq!(builds, 1);
+    // Then: the update counted the fallback, and the steps were sorted
+    // again (and are a full search's: the debug check in
+    // `KeptBatches::for_view`)
+    assert_eq!((counted, builds), (1, 1));
 }

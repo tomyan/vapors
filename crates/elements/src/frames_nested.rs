@@ -33,6 +33,11 @@ pub(crate) struct NestedIndex {
 }
 
 impl NestedIndex {
+    /// Whether it holds no container.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.entries.is_empty() && self.tall.is_empty()
+    }
+
     /// The index of `nested`, each container with its clip.
     pub(crate) fn of(nested: impl Iterator<Item = (usize, Option<Rect>)>) -> Self {
         let mut index = Self::default();

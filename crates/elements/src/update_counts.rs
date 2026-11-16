@@ -238,6 +238,12 @@ pub struct UpdateCounts {
     /// Times the splice relabelled every label (counted in
     /// `paint_relabelled` too), so a page that hits it shows.
     pub paint_relabel_all: usize,
+    /// 1 when the update left the kept batches' steps to be sorted again
+    /// at the next draw, every frame searched afresh: a frame moved, paint
+    /// order was walked, every label relabelled, or the patch at a lane's
+    /// ends fell back (`KeptBatches::lanes_moved`); else 0. Insert and
+    /// `FlexInsert` take the patch when this stays 0.
+    pub batch_steps_sorted_again: usize,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.

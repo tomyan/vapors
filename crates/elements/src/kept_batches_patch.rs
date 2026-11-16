@@ -48,16 +48,21 @@ impl KeptBatches {
         });
     }
 
-    /// `shown` put among the shown steps by its label, unless a step at
-    /// that label is there already.
+    /// `shown` put among the shown steps by its label.
+    ///
+    /// # Panics
+    ///
+    /// When a step is shown at that label already: two steps at one label
+    /// would leave one undrawn, or one drawn twice.
     pub(super) fn insert_shown(&mut self, shown: Shown) {
         let at = self.shown.partition_point(|kept| kept.label < shown.label);
-        if self
-            .shown
-            .get(at)
-            .is_some_and(|kept| kept.label == shown.label)
-        {
-            return;
+        if let Some(kept) = self.shown.get(at).filter(|kept| kept.label == shown.label) {
+            panic!(
+                "step {:?} is put among the shown steps at label {}, which step {:?} holds: a \
+                 relabel moved a step onto a label not yet given up, or a step was put in twice \
+                 (kept_batches_patch.rs, kept_batches_search.rs); reproduce with `cargo xtask test`",
+                shown.step, shown.label, kept.step
+            );
         }
         self.shown.insert(at, shown);
         self.shown_items += shown.items;
@@ -89,13 +94,20 @@ impl KeptBatches {
         for &(label, _) in &edits.removed {
             _ = self.remove(label);
         }
-        for &(_, old, new) in &edits.relabelled {
-            if let Some(shown) = self.remove(old) {
-                self.insert_shown(Shown {
+        // every old label given up before any new one is taken: a step can
+        // move onto a label another step is moving off
+        let moved: Vec<Shown> = edits
+            .relabelled
+            .iter()
+            .filter_map(|&(_, old, new)| {
+                Some(Shown {
                     label: new,
-                    ..shown
-                });
-            }
+                    ..self.remove(old)?
+                })
+            })
+            .collect();
+        for shown in moved {
+            self.insert_shown(shown);
         }
     }
 

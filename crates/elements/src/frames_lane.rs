@@ -62,10 +62,6 @@ impl PartialEq for LaneFrames {
 }
 
 impl Frames {
-    /// The lane frames from now on: those of the children of the
-    /// containers in `bases`, from `shared`; whether any base changed
-    /// (a container moved along its axis moves every frame it holds,
-    /// with no row placed or started again).
     /// The lane bases `from` was set with, carried into frames made
     /// afresh: `set_lanes` then answers whether the bases changed since
     /// the last update, not since these frames were made with none.
@@ -73,6 +69,10 @@ impl Frames {
         self.lanes.bases.clone_from(&from.lanes.bases);
     }
 
+    /// The lane frames from now on: those of the children of the
+    /// containers in `bases`, from `shared`; whether any base changed
+    /// (a container moved along its axis moves every frame it holds,
+    /// with no row placed or started again).
     pub(crate) fn set_lanes(
         &mut self,
         shared: SharedLanes,

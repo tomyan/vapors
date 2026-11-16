@@ -10,6 +10,7 @@ use vapors_scene::Rect;
 use super::{KeptBatches, Shown, Sources};
 use crate::framed_batches::hidden_in;
 use crate::frames::LaneSeen;
+use crate::layout::Key;
 
 /// The frames whose steps can show in `view`: those whose container's
 /// clip meets it (`frames_nested.rs`), and those holding a step that
@@ -53,19 +54,20 @@ impl KeptBatches {
     }
 
     /// After rows of framed lanes moved (started elsewhere) and no other
-    /// frame did: each lane met again, its rows retested only at its ends,
-    /// those from its old first row's start to its new one's and from its
-    /// old last row's to its new one's, each end row included (a row the
-    /// view cuts is an end row); a row between keeps its shown steps
-    /// unread. O(log rows + rows at the ends) a
-    /// lane, after the walk that gives the painter each row's frame.
-    /// Sorted again at the next draw when a lane left the view or lost an
-    /// end row.
-    pub(crate) fn lanes_moved(&mut self, sources: Sources<'_>) {
+    /// frame did: each lane met again, and its rows retested only at its
+    /// ends: those from its old first row's start to its new one's and
+    /// from its old last row's to its new one's, and those the view's
+    /// lines may cut, ink counted, before and now. A row between keeps its
+    /// shown steps unread. O(log rows + rows at the ends) a lane, after the
+    /// walk that gives the painter each row's frame. Sorted again at the
+    /// next draw when a lane gained or lost all its rows in view, lost an
+    /// end row, or a row retested holds frames of its own (a scroll box,
+    /// a nested lane), whose steps a row's search does not reach.
+    pub(crate) fn lanes_moved(&mut self, sources: Sources<'_>, freed: &[(usize, Key)]) {
         if self.unsorted {
             return;
         }
-        let Some((retest, now)) = self.ends_moved(sources) else {
+        let Some((retest, now)) = self.ends_moved(sources, freed) else {
             self.unsort();
             return;
         };
@@ -79,25 +81,80 @@ impl KeptBatches {
         self.lanes = now;
     }
 
+    /// Panics, naming the row, when a lane's end row at the last search,
+    /// freed by this update, is held by its lane again: its slot was taken
+    /// by an insert, and would read as the same row moved
+    /// (`lane_rows_spanning`), where a freed end row must find no start and
+    /// sort the steps again.
+    #[cfg(debug_assertions)]
+    fn assert_freed_ends_gone(&self, sources: Sources<'_>, freed: &[(usize, Key)]) {
+        for (&container, lane) in &self.lanes {
+            let ends = lane
+                .ends
+                .into_iter()
+                .flat_map(|(first, last)| [first, last]);
+            for end in ends.filter(|&end| freed.iter().any(|&(slot, _)| slot == end)) {
+                assert!(
+                    !sources.frames.lane_holds(container, end),
+                    "row {end}, an end of lane {container} at the last search, was freed by this \
+                     update and its lane holds the slot again: an insert took it \
+                     (kept_batches_search.rs `ends_moved`); reproduce with `cargo xtask test`"
+                );
+            }
+        }
+    }
+
     /// The rows to retest at each lane's ends, and each lane as met now;
-    /// `None` when a lane left the view or an end row is gone.
+    /// `None` when the steps must be sorted again (`lanes_moved`).
     fn ends_moved(
         &self,
         sources: Sources<'_>,
+        freed: &[(usize, Key)],
     ) -> Option<(FxHashSet<usize>, FxHashMap<usize, LaneSeen>)> {
-        let (mut retest, mut now) = (FxHashSet::default(), FxHashMap::default());
-        for (&container, was) in &self.lanes {
-            let seen = sources.frames.lane_seen(container, self.view)?;
-            let spanning = |a, b| sources.frames.lane_rows_spanning(container, (a, b));
-            retest.extend(spanning(was.first, seen.first)?);
-            retest.extend(spanning(was.last, seen.last)?);
-            now.insert(container, seen);
+        #[cfg(debug_assertions)]
+        self.assert_freed_ends_gone(sources, freed);
+        #[cfg(not(debug_assertions))]
+        let _ = freed; // only the debug build's check reads it
+        let now = lanes_seen(&frames_to_search(self.view, sources), self.view, sources);
+        let mut retest = FxHashSet::default();
+        let containers = self
+            .lanes
+            .keys()
+            .chain(now.keys().filter(|c| !self.lanes.contains_key(c)));
+        for container in containers {
+            let (was, seen) = (self.lanes.get(container), now.get(container));
+            retest.extend(lane_ends(*container, (was, seen), sources)?);
         }
-        Some((retest, now))
+        let holding = retest.iter().any(|&row| sources.frames.holds_frames(row));
+        (!holding).then_some((retest, now))
     }
 }
 
-/// Each framed lane in `frames` (those searched) as it meets `view`.
+/// The rows of lane `container` to retest, met as `was` at the last
+/// search and as `seen` now (`None`: not met); `None` when it gained or
+/// lost all its rows in view, or an end row is gone.
+fn lane_ends(
+    container: usize,
+    (was, seen): (Option<&LaneSeen>, Option<&LaneSeen>),
+    sources: Sources<'_>,
+) -> Option<Vec<usize>> {
+    let ends = |lane: Option<&LaneSeen>| lane.and_then(|lane| lane.ends);
+    let (Some(was_ends), Some(seen_ends)) = (ends(was), ends(seen)) else {
+        return (ends(was).is_none() && ends(seen).is_none()).then(Vec::new);
+    };
+    let spanning = |a, b| sources.frames.lane_rows_spanning(container, (a, b));
+    let mut rows = spanning(was_ends.0, seen_ends.0)?;
+    rows.extend(spanning(was_ends.1, seen_ends.1)?);
+    let edges = was
+        .into_iter()
+        .chain(seen)
+        .flat_map(|lane| lane.edges.iter().copied());
+    rows.extend(edges);
+    Some(rows)
+}
+
+/// Each framed lane in `frames` (those searched) as it meets `view`,
+/// those with no row in view too.
 fn lanes_seen(frames: &[usize], view: Rect, sources: Sources<'_>) -> FxHashMap<usize, LaneSeen> {
     let containers = frames
         .iter()
@@ -124,3 +181,7 @@ fn showing(frame: usize, in_frame: Rect, sources: Sources<'_>) -> impl Iterator<
 #[cfg(test)]
 #[path = "kept_batches_search_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "kept_batches_search_cases_tests.rs"]
+mod cases_tests;

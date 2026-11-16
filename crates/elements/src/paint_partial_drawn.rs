@@ -114,11 +114,11 @@ fn batches_spliced(painted: &mut Painted, edits: &crate::kept_order_splice::Spli
 
 /// `painted`'s kept batches, if any, searched again in the framed lanes
 /// whose rows moved, when no other frame did (`KeptBatches::lanes_moved`).
-pub(crate) fn batches_lanes_moved(painted: &mut Painted) {
+pub(crate) fn batches_lanes_moved(painted: &mut Painted, freed: &[(usize, crate::layout::Key)]) {
     let Some(mut kept) = painted.kept_batches.take() else {
         return;
     };
-    kept.lanes_moved(painted.batch_sources());
+    kept.lanes_moved(painted.batch_sources(), freed);
     *painted.kept_batches.get_mut() = Some(kept);
 }
 

@@ -75,6 +75,34 @@ impl Frames {
         (from, to)
     }
 
+    /// The rows of lane `container` that the view's top or bottom line may
+    /// cut once their ink is counted: those meeting a band around each
+    /// line, the lane's ink and a device pixel wide each way. A row that is
+    /// none of these lies wholly inside the view, or wholly outside it,
+    /// ink and all.
+    pub(super) fn lane_edges(
+        &self,
+        container: usize,
+        base: LaneBase,
+        in_frame: Rect,
+    ) -> Vec<usize> {
+        let Some(shared) = &self.lanes.shared else {
+            return Vec::new();
+        };
+        let (scale, origin) = (f64::from(self.scale), f64::from(base.origin));
+        let [above, below] = self.lane_ink.0.get(&container).copied().unwrap_or_default();
+        let (above, below, pixel) = (f64::from(above), f64::from(below), 1.0 / scale);
+        let band = |line: f32| {
+            let line = f64::from(line) / scale - origin;
+            (line - below - pixel, line + above + pixel)
+        };
+        let lanes = shared.borrow();
+        let rows = [band(in_frame.top), band(in_frame.bottom)]
+            .into_iter()
+            .flat_map(|(from, to)| lanes.children_between(container, from, to));
+        rows.map(|(slot, _)| slot).collect()
+    }
+
     /// Panics, naming the frame, when `at`, made from the search's start,
     /// is not the frame a fold of the lane gives: two answers to where a
     /// row is.
