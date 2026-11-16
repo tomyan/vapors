@@ -27,7 +27,7 @@ impl Resolver<'_> {
             return Err(refused);
         }
         let removed = recorded.removed.iter();
-        let removed = removed.map(|removed| self.removed(owner, &kept.children, removed));
+        let removed = removed.map(|removed| self.removed(owner, (slot, &kept.children), removed));
         let removed = removed.collect::<Result<Vec<usize>, _>>()?;
         let inserted = self.inserted(owner, &recorded.inserted)?;
         let new_children = recorded.inserted.clone();
@@ -43,10 +43,11 @@ impl Resolver<'_> {
     fn removed(
         &self,
         owner: NodeId,
-        children: &[usize],
+        (slot, children): (usize, &[usize]),
         removed: &Removed,
     ) -> Result<usize, EditDecline> {
-        if !children.contains(&removed.slot) || !self.gone_from(removed.slot, owner) {
+        if !self.holds_child((slot, children), removed.slot) || !self.gone_from(removed.slot, owner)
+        {
             return Err(EditDecline::Moved);
         }
         let [previous, next] = removed.neighbours;
@@ -56,6 +57,30 @@ impl Resolver<'_> {
             return Err(EditDecline::TextBeside);
         }
         Ok(removed.slot)
+    }
+
+    /// Whether the box at `slot`, whose children are `children`, holds
+    /// the box at `child`: through its lane when the lane holds every
+    /// child (O(log n), `Lanes::index_of`), else by a search. Debug builds
+    /// check the two agree.
+    fn holds_child(&self, (slot, children): (usize, &[usize]), child: usize) -> bool {
+        let laned = self
+            .placed
+            .lanes
+            .borrow()
+            .holds_among(slot, (child, children.len()));
+        let Some(held) = laned else {
+            self.placed.note_scanned(children.len());
+            return children.contains(&child);
+        };
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            held,
+            children.contains(&child),
+            "the lane of slot {slot} and its box's children disagree on whether it holds \
+             slot {child} (layout/child_edits_check.rs); reproduce with `cargo xtask test`"
+        );
+        held
     }
 
     /// The inserted children that make a box.

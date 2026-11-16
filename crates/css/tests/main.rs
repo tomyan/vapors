@@ -4,6 +4,7 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod cascade_compiled;
 mod support;
 #[path = "support/classify.rs"]
 mod support_classify;

@@ -22,9 +22,9 @@ fn a_box_longhand_reaching_an_unclassed_mesh_is_refused_naming_the_rule_and_its_
     // Given: the scene page's two meshes, neither with a class
     let rig = Rig::new();
     rig.signals.shown.set(true);
+    // a compiled sheet (tests/pages): one added from Rust is refused (R1b)
+    crate::add_sheet!(rig.doc, mesh_width::MeshWidth);
     let mut doc = rig.doc.borrow_mut();
-    doc.add_stylesheet("scene.css", "mesh { width: 10px; }")
-        .unwrap();
 
     // When
     let Err(errors) = doc.update(VIEWPORT) else {
@@ -35,7 +35,7 @@ fn a_box_longhand_reaching_an_unclassed_mesh_is_refused_naming_the_rule_and_its_
     let refused: Vec<String> = errors.iter().map(ElementError::to_string).collect();
     let refused = refused.join("\n");
     assert!(
-        refused.contains("scene.css:1:")
+        refused.contains("pages/mesh_width.wisp:2:")
             && refused.contains("`width: 10px`")
             && refused.contains("own_keys.rs")
             && refused.contains("<Mesh geometry>"),

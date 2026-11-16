@@ -45,6 +45,20 @@ pub struct UpdateCounts {
     /// its elements can match reads siblings or descendants, or sits
     /// under `@container`.
     pub styles_unshareable: usize,
+    /// Restyled keyed elements whose style was computed from their
+    /// key's compiled winners (`restyle_compiled`); 0 when the restyle
+    /// failed, as the counts above.
+    pub winners_compiled: usize,
+    /// Restyled elements of a hand-written key (`Winners::Unanalysed`),
+    /// computed by the full cascade: generated code that stops emitting
+    /// winners shows here.
+    pub winners_runtime: usize,
+    /// Restyled elements of a component tag's key
+    /// (`Winners::ComponentTag`), computed by the full cascade.
+    pub winners_component_tag: usize,
+    /// Of `winners_compiled`, those another crate's sheet reaches,
+    /// whose rules were matched on the element as well.
+    pub winners_foreign: usize,
     /// Computed style allocations alive after the update: the share
     /// table's entries and every element styled for itself.
     pub styles_live: usize,
@@ -144,6 +158,14 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// Boxes the narrowed rebuild's lending visited, comparing each
+    /// rebuilt box with the box taken from its slot (`Lender::lend_from`);
+    /// 0 when every box was built.
+    pub boxes_lend_visited: usize,
+    /// Child entries the narrowed rebuild searched or compared one by one:
+    /// where an owner's lane holds every child, its edits are found
+    /// through it in O(log n) and none is counted (4h).
+    pub children_scanned: usize,
     /// Scroll containers whose range the placement walk measured from
     /// their content (4g): those laid out or built again; a container
     /// that only scrolled is clamped to the range it kept.

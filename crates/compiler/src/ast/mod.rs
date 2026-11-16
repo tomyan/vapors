@@ -43,9 +43,15 @@ impl Component {
     /// name [`Component::path`], which an editor can open.
     #[must_use]
     pub fn site_name(&self) -> &str {
-        (self.scope.as_deref())
-            .or(self.global_sheet.as_deref())
-            .unwrap_or(&self.path)
+        (self.scope.as_deref()).unwrap_or_else(|| self.global_sheet_name())
+    }
+
+    /// The name a global sheet is held under after the crate's name:
+    /// [`Component::global_sheet`], or the path as named. One answer for
+    /// the generated `SHEET` and the analysis' `SheetId::Global`.
+    #[must_use]
+    pub fn global_sheet_name(&self) -> &str {
+        self.global_sheet.as_deref().unwrap_or(&self.path)
     }
 }
 

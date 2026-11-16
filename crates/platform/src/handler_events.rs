@@ -63,7 +63,10 @@ impl ApplicationHandler<Message> for Handler {
             // record before they wake. Nothing to do if it ever did.
             Message::GpuStopped => {}
             Message::Wake => self.platform.request_redraw(),
-            Message::Input(event) => self.app.event(event, &self.platform),
+            Message::Input(event) => {
+                self.platform.stamp(crate::Instant::now());
+                self.app.event(event, &self.platform);
+            }
         }
         self.redraw_if_asked();
     }
@@ -101,7 +104,11 @@ impl ApplicationHandler<Message> for Handler {
         if let Some(window) = &self.window {
             self.input.set_scale(window.scale_factor());
         }
-        for app_event in self.input.translate(&event) {
+        // one read of the clock for the event: its gestures, its click
+        // count and the app's handling all take this time (#440)
+        let now = crate::Instant::now();
+        self.platform.stamp(now);
+        for app_event in self.input.translate(&event, now) {
             self.app.event(app_event, &self.platform);
         }
         self.redraw_if_asked();

@@ -22,7 +22,10 @@ pub(crate) fn viewport() -> Viewport {
 /// `listened`, mounted by one update.
 pub(crate) fn mounted(listened: bool) -> (Document, Vec<NodeId>) {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style("rows", ".on { color: rgb(1 2 3); }");
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "rows",
+        ".on { color: rgb(1 2 3); }",
+    ));
     let body = doc.body();
     let rows = (0..ROWS).map(|_| row(&mut doc, body, listened)).collect();
     doc.update(viewport()).expect("mounts");

@@ -1,0 +1,243 @@
+settled after 70 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:22 claude
+16.3       00:00 gh
+ 2.1  4-15:36:26 tailscaled
+ 1.3 12-11:43:28 kcompactd0
+ 1.2  8-00:48:18 sccache
+release-1000-1-cold start 22:36:58 load 1.43 5.59 10.31
+release-1000-1-cold end 22:36:58 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:23 claude
+ 2.1  4-15:36:27 tailscaled
+ 1.3 12-11:43:28 kcompactd0
+ 1.2  8-00:48:18 sccache
+ 0.8 12-11:43:28 kswapd0
+release-1000-1-warm start 22:36:58 load 1.43 5.59 10.31
+release-1000-1-warm end 22:36:59 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:23 claude
+ 2.1  4-15:36:27 tailscaled
+ 1.3 12-11:43:29 kcompactd0
+ 1.2  8-00:48:18 sccache
+ 0.8 12-11:43:28 kswapd0
+release-1000-2-cold start 22:36:59 load 1.43 5.59 10.31
+release-1000-2-cold end 22:36:59 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:23 claude
+ 2.1  4-15:36:27 tailscaled
+ 1.3 12-11:43:29 kcompactd0
+ 1.2  8-00:48:19 sccache
+ 0.8 12-11:43:29 kswapd0
+release-1000-2-warm start 22:36:59 load 1.43 5.59 10.31
+release-1000-2-warm end 22:36:59 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:23 claude
+ 2.1  4-15:36:27 tailscaled
+ 1.3 12-11:43:29 kcompactd0
+ 1.2  8-00:48:19 sccache
+ 0.8 12-11:43:29 kswapd0
+release-1000-3-cold start 22:36:59 load 1.43 5.59 10.31
+release-1000-3-cold end 22:36:59 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:24 claude
+ 2.1  4-15:36:28 tailscaled
+ 1.3 12-11:43:29 kcompactd0
+ 1.2  8-00:48:19 sccache
+ 0.8 12-11:43:29 kswapd0
+release-1000-3-warm start 22:36:59 load 1.43 5.59 10.31
+release-1000-3-warm end 22:37:00 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:24 claude
+ 2.1  4-15:36:28 tailscaled
+ 1.3 12-11:43:30 kcompactd0
+ 1.2  8-00:48:20 sccache
+ 0.8 12-11:43:29 kswapd0
+release-3000-1-cold start 22:37:00 load 1.43 5.59 10.31
+release-3000-1-cold end 22:37:00 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:25 claude
+ 2.1  4-15:36:29 tailscaled
+ 1.3 12-11:43:30 kcompactd0
+ 1.2  8-00:48:20 sccache
+ 0.8 12-11:43:30 kswapd0
+release-3000-1-warm start 22:37:00 load 1.43 5.59 10.31
+release-3000-1-warm end 22:37:01 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:25 claude
+ 2.1  4-15:36:29 tailscaled
+ 1.3 12-11:43:31 kcompactd0
+ 1.2  8-00:48:20 sccache
+ 0.8 12-11:43:30 kswapd0
+release-3000-2-cold start 22:37:01 load 1.43 5.59 10.31
+release-3000-2-cold end 22:37:01 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:25 claude
+ 2.1  4-15:36:29 tailscaled
+ 1.3 12-11:43:31 kcompactd0
+ 1.2  8-00:48:21 sccache
+ 0.8 12-11:43:31 kswapd0
+release-3000-2-warm start 22:37:01 load 1.43 5.59 10.31
+release-3000-2-warm end 22:37:02 exit 0 load 1.43 5.59 10.31
+settled after 0 s, load 1.43 5.59 10.31; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:26 claude
+ 2.1  4-15:36:30 tailscaled
+ 1.3 12-11:43:31 kcompactd0
+ 1.2  8-00:48:21 sccache
+ 0.8 12-11:43:31 kswapd0
+release-3000-3-cold start 22:37:02 load 1.43 5.59 10.31
+release-3000-3-cold end 22:37:02 exit 0 load 1.39 5.52 10.26
+settled after 0 s, load 1.39 5.52 10.26; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:26 claude
+ 2.1  4-15:36:30 tailscaled
+ 1.3 12-11:43:32 kcompactd0
+ 1.2  8-00:48:22 sccache
+ 0.8 12-11:43:32 kswapd0
+release-3000-3-warm start 22:37:02 load 1.39 5.52 10.26
+release-3000-3-warm end 22:37:03 exit 0 load 1.39 5.52 10.26
+settled after 0 s, load 1.39 5.52 10.26; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:27 claude
+ 2.1  4-15:36:31 tailscaled
+ 1.3 12-11:43:32 kcompactd0
+ 1.2  8-00:48:22 sccache
+ 0.8 12-11:43:32 kswapd0
+release-10000-1-cold start 22:37:03 load 1.39 5.52 10.26
+release-10000-1-cold end 22:37:04 exit 0 load 1.39 5.52 10.26
+settled after 0 s, load 1.39 5.52 10.26; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:28 claude
+ 2.1  4-15:36:32 tailscaled
+ 1.3 12-11:43:34 kcompactd0
+ 1.2  8-00:48:24 sccache
+ 0.8 12-11:43:34 kswapd0
+release-10000-1-warm start 22:37:04 load 1.39 5.52 10.26
+release-10000-1-warm end 22:37:05 exit 0 load 1.39 5.52 10.26
+settled after 0 s, load 1.39 5.52 10.26; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:29 claude
+ 2.1  4-15:36:33 tailscaled
+ 1.3 12-11:43:35 kcompactd0
+ 1.2  8-00:48:25 sccache
+ 0.8 12-11:43:35 kswapd0
+release-10000-2-cold start 22:37:05 load 1.39 5.52 10.26
+release-10000-2-cold end 22:37:06 exit 0 load 1.39 5.52 10.26
+settled after 0 s, load 1.39 5.52 10.26; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:31 claude
+ 2.1  4-15:36:35 tailscaled
+ 1.3 12-11:43:36 kcompactd0
+ 1.2  8-00:48:26 sccache
+ 0.8 12-11:43:36 kswapd0
+release-10000-2-warm start 22:37:06 load 1.39 5.52 10.26
+release-10000-2-warm end 22:37:08 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:32 claude
+ 2.1  4-15:36:36 tailscaled
+ 1.3 12-11:43:37 kcompactd0
+ 1.2  8-00:48:27 sccache
+ 0.8 12-11:43:37 kswapd0
+release-10000-3-cold start 22:37:08 load 1.36 5.44 10.21
+release-10000-3-cold end 22:37:09 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:33 claude
+ 2.1  4-15:36:37 tailscaled
+ 1.3 12-11:43:39 kcompactd0
+ 1.2  8-00:48:29 sccache
+ 0.8 12-11:43:39 kswapd0
+release-10000-3-warm start 22:37:09 load 1.36 5.44 10.21
+release-10000-3-warm end 22:37:10 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:35 claude
+ 2.1  4-15:36:39 tailscaled
+ 1.3 12-11:43:40 kcompactd0
+ 1.2  8-00:48:30 sccache
+ 0.8 12-11:43:40 kswapd0
+judged-1000-1 start 22:37:10 load 1.36 5.44 10.21
+judged-1000-1 end 22:37:11 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:35 claude
+ 2.1  4-15:36:39 tailscaled
+ 1.3 12-11:43:41 kcompactd0
+ 1.2  8-00:48:30 sccache
+ 0.8 12-11:43:40 kswapd0
+judged-1000-2 start 22:37:11 load 1.36 5.44 10.21
+judged-1000-2 end 22:37:11 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:35 claude
+ 2.1  4-15:36:39 tailscaled
+ 1.3 12-11:43:41 kcompactd0
+ 1.2  8-00:48:31 sccache
+ 0.8 12-11:43:41 kswapd0
+judged-1000-3 start 22:37:11 load 1.36 5.44 10.21
+judged-1000-3 end 22:37:11 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:35 claude
+ 2.1  4-15:36:39 tailscaled
+ 1.3 12-11:43:41 kcompactd0
+ 1.2  8-00:48:31 sccache
+ 0.8 12-11:43:41 kswapd0
+judged-3000-1 start 22:37:11 load 1.36 5.44 10.21
+judged-3000-1 end 22:37:11 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:36 claude
+ 2.1  4-15:36:40 tailscaled
+ 1.3 12-11:43:41 kcompactd0
+ 1.2  8-00:48:31 sccache
+ 0.8 12-11:43:41 kswapd0
+judged-3000-2 start 22:37:11 load 1.36 5.44 10.21
+judged-3000-2 end 22:37:12 exit 0 load 1.36 5.44 10.21
+settled after 0 s, load 1.36 5.44 10.21; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:36 claude
+ 2.1  4-15:36:40 tailscaled
+ 1.3 12-11:43:42 kcompactd0
+ 1.2  8-00:48:32 sccache
+ 0.8 12-11:43:41 kswapd0
+judged-3000-3 start 22:37:12 load 1.36 5.44 10.21
+judged-3000-3 end 22:37:12 exit 0 load 1.49 5.40 10.17
+settled after 0 s, load 1.49 5.40 10.17; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:36 claude
+ 2.1  4-15:36:40 tailscaled
+ 1.3 12-11:43:42 kcompactd0
+ 1.2  8-00:48:32 sccache
+ 0.8 12-11:43:42 kswapd0
+judged-10000-1 start 22:37:12 load 1.49 5.40 10.17
+judged-10000-1 end 22:37:13 exit 0 load 1.49 5.40 10.17
+settled after 0 s, load 1.49 5.40 10.17; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:38 claude
+ 2.1  4-15:36:42 tailscaled
+ 1.3 12-11:43:43 kcompactd0
+ 1.2  8-00:48:33 sccache
+ 0.8 12-11:43:43 kswapd0
+judged-10000-2 start 22:37:13 load 1.49 5.40 10.17
+judged-10000-2 end 22:37:14 exit 0 load 1.49 5.40 10.17
+settled after 0 s, load 1.49 5.40 10.17; busiest:
+%CPU     ELAPSED COMMAND
+26.5 12-11:43:39 claude
+ 2.1  4-15:36:43 tailscaled
+ 1.3 12-11:43:44 kcompactd0
+ 1.2  8-00:48:34 sccache
+ 0.8 12-11:43:44 kswapd0
+judged-10000-3 start 22:37:14 load 1.49 5.40 10.17
+judged-10000-3 end 22:37:16 exit 0 load 1.49 5.40 10.17

@@ -33,6 +33,7 @@ impl KeptBoxes {
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> (Placed, Rebuilt) {
         self.mark_text_marks(source.text_marks.as_ref());
+        self.placed.scanned.set(0);
         let marks = std::mem::take(&mut self.marks);
         let every =
             marks.all || self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits();
@@ -95,15 +96,16 @@ fn rebuild_owners(
         .map(|owner| slot_of(placed, owner.node))
         .collect();
     let mut taken = take_owners(placed, owners, &slots);
-    let put = owners
-        .iter()
-        .flat_map(|owner| put_owner(placed, source, owner, &mut taken))
-        .collect();
+    let (put, roots) = put_owners(placed, source, owners, &mut taken);
     placed.free_taken(&taken);
-    let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
+    let derived = std::mem::take(&mut taken.reshaped);
+    let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, (&taken, derived));
     rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
-    let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
+    let (changed, visits) = lend_owners(placed, (&nodes, &slots, &roots), &taken, may_keep);
+    rebuilt.to_chain = to_chain(placed, source, (owners, &slots, &roots));
+    rebuilt.lend_visits = visits;
+    rebuilt.children_scanned += placed.scanned.get();
     placed.drop_lanes();
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
     rebuilt
@@ -113,16 +115,92 @@ fn rebuild_owners(
 /// its slot; the owners whose subtree changed, with their slots. Every
 /// owner is lent before any is settled: an owner can sit in a shallow
 /// owner's kept child.
+///
+/// An owner whose children were edited in place, inserting or removing
+/// a box, has another children list than its box before (asserted in
+/// debug builds), so it is changed: only the subtrees of the children it
+/// inserted (`roots`) are lent, O(edits), not its kept children, which
+/// keep their own caches (4h).
 fn lend_owners(
     placed: &mut Placed,
-    (owners, slots): (&[NodeId], &[usize]),
+    (owners, slots, roots): (&[NodeId], &[usize], &[InsertedRoots]),
     taken: &Taken,
     may_keep: &dyn Fn(NodeId) -> bool,
-) -> Vec<(NodeId, usize)> {
-    (owners.iter().zip(slots))
-        .filter(|&(_, &slot)| !lend_subtree(placed, slot, taken, may_keep))
-        .map(|(&owner, &slot)| (owner, slot))
-        .collect()
+) -> (Vec<(NodeId, usize)>, usize) {
+    let mut visits = 0;
+    let mut changed = Vec::new();
+    for ((&owner, &slot), roots) in owners.iter().zip(slots).zip(roots) {
+        let (unchanged, visited) = lend_owner(placed, (slot, roots.as_deref()), taken, may_keep);
+        visits += visited;
+        if !unchanged {
+            changed.push((owner, slot));
+        }
+    }
+    (changed, visits)
+}
+
+/// The slots of the children an owner edited in place inserted; `None`
+/// for an owner built otherwise.
+type InsertedRoots = Option<Vec<usize>>;
+
+/// Lends to the owner at `slot`: to its inserted children's subtrees
+/// alone when it was edited in place (`roots`), else to its subtree;
+/// whether it was unchanged, and the boxes visited.
+fn lend_owner(
+    placed: &mut Placed,
+    (slot, roots): (usize, Option<&[usize]>),
+    taken: &Taken,
+    may_keep: &dyn Fn(NodeId) -> bool,
+) -> (bool, usize) {
+    let Some(roots) = roots else {
+        return lend_subtree(placed, slot, taken, may_keep);
+    };
+    #[cfg(debug_assertions)]
+    assert_children_differ(placed, slot, taken);
+    let visits = roots
+        .iter()
+        .map(|&root| lend_subtree(placed, root, taken, may_keep).1)
+        .sum();
+    (false, visits)
+}
+
+/// Panics, naming the slot, when the owner at `slot`, edited in place
+/// and so reported changed without its children compared, has the same
+/// children as the box taken from its slot: its edits inserted and
+/// removed no box, and the owner should have been lent as before.
+#[cfg(debug_assertions)]
+fn assert_children_differ(placed: &Placed, slot: usize, taken: &Taken) {
+    let before = taken
+        .old_children
+        .get(&slot)
+        .or_else(|| taken.boxes.get(&slot).map(|(_, old)| &old.children));
+    assert!(
+        before != Some(&placed.boxes[slot].children),
+        "the owner in slot {slot}, edited in place, has the children its box had: it is \
+         reported changed for edits that inserted and removed no box (layout/rebuild.rs \
+         `put_owner`); reproduce with `cargo xtask test`"
+    );
+}
+
+/// Builds each owner's boxes into `placed`: the slots the built boxes
+/// took, and for each owner whose children were edited in place the
+/// slots of the children it inserted (`None` for any other owner).
+fn put_owners(
+    placed: &mut Placed,
+    source: &Source<'_>,
+    owners: &[Owner],
+    taken: &mut Taken,
+) -> (Vec<usize>, Vec<InsertedRoots>) {
+    let mut put = Vec::new();
+    let roots = owners
+        .iter()
+        .map(|owner| {
+            let (built, roots) = put_owner(placed, source, owner, taken);
+            put.extend(built);
+            roots
+        })
+        .collect();
+    (put, roots)
 }
 
 /// Takes each owner's boxes, at `slots`, out of `placed`: a shallow
@@ -139,20 +217,30 @@ fn take_owners(placed: &mut Placed, owners: &[Owner], slots: &[usize]) -> Taken 
     taken
 }
 
-/// Builds `owner`'s boxes into `placed`; the slots the built boxes took.
+/// Builds `owner`'s boxes into `placed`; the slots the built boxes took,
+/// and, for an owner edited in place, its inserted children's.
 fn put_owner(
     placed: &mut Placed,
     source: &Source<'_>,
     owner: &Owner,
     taken: &mut Taken,
-) -> Vec<usize> {
+) -> (Vec<usize>, InsertedRoots) {
     match &owner.build {
         Build::Shallow(kept, _) => {
             let (built, placeholders) = build_shallow(source, owner.node, kept);
-            placed.put_subtree(built, &placeholders, taken)
+            (placed.put_subtree(built, &placeholders, taken), None)
         }
-        Build::Edited(edits) => placed.put_edited(source, (owner.node, edits), taken),
-        Build::Full => placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken),
+        Build::Edited(edits) => {
+            let (built, roots) = placed.put_edited(source, (owner.node, edits), taken);
+            // edits that insert and remove no box (a `display: none` child,
+            // empty text) leave the children as they were: lent as before
+            let boxed = !edits.inserted.is_empty() || !edits.removed.is_empty();
+            (built, boxed.then_some(roots))
+        }
+        Build::Full => {
+            let built = placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken);
+            (built, None)
+        }
     }
 }
 
@@ -164,13 +252,13 @@ fn slot_of(placed: &Placed, owner: NodeId) -> usize {
 }
 
 /// Lends the taken boxes' caches to the rebuilt subtree at `slot`;
-/// whether the whole subtree was unchanged.
+/// whether the whole subtree was unchanged, and the boxes visited.
 fn lend_subtree(
     placed: &mut Placed,
     slot: usize,
     taken: &Taken,
     may_keep: &dyn Fn(NodeId) -> bool,
-) -> bool {
+) -> (bool, usize) {
     let before = |at: usize| taken.boxes.get(&at).map(|(key, old)| (*key, old));
     // the lanes are still there: those of the containers built again
     // are dropped after lending (`Placed::drop_lanes`)
@@ -181,12 +269,18 @@ fn lend_subtree(
         may_keep,
         located: &located,
         lent: 0,
+        visited: 0,
     };
-    lender.lend_from(&mut placed.boxes, slot)
+    let unchanged = lender.lend_from(&mut placed.boxes, slot);
+    (unchanged, lender.visited)
 }
 
 #[path = "rebuild_changed.rs"]
 mod changed;
+
+#[path = "rebuild_chain.rs"]
+mod chain;
+use chain::to_chain;
 
 #[cfg(test)]
 #[path = "rebuild_tests.rs"]

@@ -144,10 +144,17 @@ impl Dom for RecordingDom {
         self.calls.push(Call::HitsMoved { node: anchor });
     }
 
-    fn add_style(&mut self, scope: &str, css: &str) {
+    fn add_style(&mut self, sheet: crate::CompiledSheet<'_>) {
         self.calls.push(Call::AddStyle {
-            scope: scope.into(),
-            css: css.into(),
+            scope: sheet.name().into(),
+            css: sheet.text().into(),
+        });
+    }
+
+    fn add_global_style(&mut self, sheet: crate::CompiledSheet<'_>) {
+        self.calls.push(Call::AddGlobalStyle {
+            sheet: sheet.name().into(),
+            css: sheet.text().into(),
         });
     }
 

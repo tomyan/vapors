@@ -1,9 +1,11 @@
 //! What a take reads (R6): every node a touch reaches, each once. A
 //! touch reaches the node, its ancestors up to one reached already
 //! (whose own ancestors are in), and the nodes referring by id to it or
-//! to an ancestor; an element inserted that is not a node reaches the
+//! to an ancestor. An element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
-//! stayed (absolutely positioned); a node named by an id whose element
+//! stayed (absolutely positioned). The rows a lane start moved are
+//! given their bounds apart, and the hoisted nodes under them read again
+//! (`a11y_mirror_started.rs`). A node named by an id whose element
 //! changed, the nodes focus left and came to, and the hoisted nodes in
 //! the frame of a scroll container scrolled, are read as well.
 
@@ -17,14 +19,14 @@ use rustc_hash::FxHashSet;
 
 impl Document {
     /// Every node this take reads, each once, the touched first so that
-    /// each comes with its ancestors.
+    /// each comes with its ancestors; and them as a set.
     pub(crate) fn ax_candidates(
         &self,
         touched: &Touched,
         renamed: &[NodeId],
         focus: [Option<NodeId>; 2],
         index: &AxIndex,
-    ) -> Vec<NodeId> {
+    ) -> (Vec<NodeId>, NodeSet) {
         let mut out = Vec::new();
         let mut seen = NodeSet::default();
         let mut add = |node: NodeId| {
@@ -49,7 +51,7 @@ impl Document {
         for node in focus.into_iter().flatten() {
             add(node);
         }
-        out
+        (out, seen)
     }
 
     /// What a touch of `node` reaches: the node, its ancestors up to one
@@ -87,6 +89,33 @@ impl Document {
             .collect();
         let in_frame = |&node: &NodeId| self.ax_placed_under(node, &|slot| frames.contains(&slot));
         self.ax.hoisted.iter().copied().filter(in_frame).collect()
+    }
+
+    /// The hoisted nodes under any of `rows`, rows a lane start moved:
+    /// their bounds are from the viewport, and the row moved on the page
+    /// carries the box they are placed against, so neither the row nor a
+    /// node between reaches them. O(hoisted nodes times their depth), not
+    /// the rows' subtrees.
+    pub(crate) fn ax_hoisted_under(&self, rows: &NodeSet) -> Vec<NodeId> {
+        if rows.is_empty() || self.ax.hoisted.is_empty() {
+            return Vec::new();
+        }
+        let under_a_row = |&node: &NodeId| {
+            let mut cursor = self.parent(node);
+            while let Some(above) = cursor {
+                if rows.contains(&above) {
+                    return true;
+                }
+                cursor = self.parent(above);
+            }
+            false
+        };
+        self.ax
+            .hoisted
+            .iter()
+            .copied()
+            .filter(under_a_row)
+            .collect()
     }
 
     /// The nearest nodes under `wrapper` when it is not a node itself:

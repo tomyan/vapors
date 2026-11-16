@@ -48,6 +48,7 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
         boxes: build(source, root).into(),
         slots: Slots::default(),
         lanes: super::lane_set::SharedLanes::default(),
+        scanned: std::cell::Cell::default(),
     };
     let viewport = layout.viewport;
     let texts = (layout.fonts, &mut TextCache::default());

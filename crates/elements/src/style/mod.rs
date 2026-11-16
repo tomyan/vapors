@@ -12,12 +12,14 @@ mod grid_gate;
 mod grid_style;
 
 pub(crate) use grid_gate::is_container;
+mod globals;
 mod honoured;
 mod inline;
 pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
+mod rust_sheets;
 mod scene_appearance;
 mod scene_used;
 mod scrollbar;
@@ -27,6 +29,8 @@ pub use sheet_hashes::SheetHash;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
+mod compiled_rules;
+mod compiled_shareable;
 mod sizes;
 mod styles;
 mod surface;
@@ -35,7 +39,6 @@ mod text_style;
 mod used;
 mod used_share;
 mod values;
-mod winners_oracle;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
@@ -75,9 +78,13 @@ pub(crate) struct Sheets {
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
     scopes: std::collections::HashMap<String, String>,
-    /// Each component sheet in the cascade, by name, with its text's
-    /// hash (`sheet_hashes`).
-    hashes: std::collections::HashMap<String, u64>,
+    /// Each global component sheet added, by name, with its text.
+    globals: std::collections::HashMap<String, String>,
+    /// Rust-added sheets against analysed elements (`rust_sheets`).
+    rust: rust_sheets::RustSheets,
+    /// Each component sheet in the cascade, by kind and name: its place
+    /// and its text's hash (`sheet_hashes`).
+    components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
     refused: Vec<ElementError>,
 }
 
@@ -90,7 +97,9 @@ impl Sheets {
             cascade: Cascade::new().user_agent(ua),
             names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
-            hashes: std::collections::HashMap::new(),
+            globals: std::collections::HashMap::new(),
+            rust: rust_sheets::RustSheets::default(),
+            components: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
@@ -146,7 +155,7 @@ impl Sheets {
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());
-        self.note_hash(scope, text);
+        self.note_sheet(sheet_hashes::SheetKind::Scope, scope, text);
     }
 
     /// Which elements a flip of `flag` restyles, as the sheets use it.

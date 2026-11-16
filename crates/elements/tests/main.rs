@@ -4,6 +4,10 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod compiled_mount_order;
+mod compiled_sharing;
+mod compiled_winners;
+mod rust_sheets_refused;
 mod support;
 
 mod a11y_act;
@@ -21,6 +25,8 @@ mod a11y_mirror_hoisted_scroll;
 mod a11y_mirror_index;
 mod a11y_mirror_index_moves;
 mod a11y_mirror_labelledby;
+mod a11y_mirror_lane_rows;
+mod a11y_mirror_lane_shapes;
 mod a11y_mirror_owner;
 mod a11y_mirror_refused;
 mod a11y_mirror_refused_states;
@@ -65,6 +71,7 @@ mod focus_review;
 mod focus_style;
 mod focus_window;
 mod focus_window_held;
+mod global_sheets;
 mod grid_off;
 mod html_none;
 mod html_none_focus;
@@ -111,6 +118,8 @@ mod keys;
 mod lane_batches;
 mod lane_block;
 mod lane_block_stale;
+mod lane_chain;
+mod lane_children;
 mod lane_drift;
 mod lane_flex;
 mod lane_flex_heights;
@@ -118,6 +127,7 @@ mod lane_frame_declines;
 mod lane_frames;
 mod lane_frames_moved;
 mod lane_ink_spliced;
+mod lane_lend;
 mod lane_scrollers;
 mod lane_shapes;
 mod lane_starts;
@@ -229,7 +239,6 @@ mod typing_after_hide;
 mod ua_focus;
 mod update_counts;
 mod used_sharing;
-mod winners_oracle;
 
 /// Every `.rs` file directly under tests/ is a module above, so none is
 /// silently left out of the binary.

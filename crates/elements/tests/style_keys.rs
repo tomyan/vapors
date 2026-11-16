@@ -25,10 +25,10 @@ static ROW: StyleKey = StyleKey {
 /// under the body.
 fn row_page() -> (Document, NodeId) {
     let mut doc = document();
-    doc.add_style(
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
         SCOPE,
         ".row { color: rgb(1 2 3); } .row.marked { color: rgb(4 5 6); }",
-    );
+    ));
     let row = doc.create_keyed_element(&ROW);
     let body = doc.body();
     doc.append(body, row);

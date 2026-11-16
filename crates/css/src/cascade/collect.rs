@@ -89,6 +89,47 @@ pub(crate) fn winners<'a, E: Element>(
     winners
 }
 
+/// [`winners`] from a key's compiled rules (`compiled.rs`): each `base`
+/// declaration of `rules` entered without running the matcher, at its
+/// rule's standing; the `tested` rules and the candidates of sheets the
+/// key does not reference matched on `element`, as in [`winners`].
+pub(crate) fn winners_compiled<'a, E: Element>(
+    rules: &'a [CascadeRule],
+    compiled: &super::CompiledRules,
+    foreign: impl Iterator<Item = &'a CascadeRule>,
+    (element, env): (&E, &Environment),
+    attached: Attached<'a>,
+) -> Winners<'a> {
+    let mut winners = Winners {
+        longhands: vec![None; PROPERTIES.len()],
+        custom: BTreeMap::new(),
+    };
+    winners.consider_attached(attached.presentation, PRESENTATION);
+    for &(rule, declaration) in &compiled.base {
+        let rule = &rules[rule];
+        let decl = &rule.rule.declarations[declaration];
+        winners.consider(decl, standing(rule, decl));
+    }
+    for &rule in &compiled.tested {
+        winners.consider_rule(&rules[rule], element, env);
+    }
+    for rule in foreign {
+        winners.consider_rule(rule, element, env);
+    }
+    winners.consider_attached(attached.inline, INLINE);
+    winners
+}
+
+/// Where `decl` of `rule` stands.
+fn standing(rule: &CascadeRule, decl: &Declaration) -> Standing {
+    Standing {
+        rank: rank(rule.origin, decl.important),
+        specificity: rule.rule.selector.specificity(),
+        order: rule.order,
+        sheet: rule.sheet,
+    }
+}
+
 /// Where the presentation attributes stand: author normal,
 /// specificity 0, first, so an author rule of equal standing beats
 /// them by coming later.
@@ -122,15 +163,8 @@ impl<'a> Winners<'a> {
         if !rule.conditions.hold(element, env) || !matches(&rule.rule.selector, element) {
             return;
         }
-        let specificity = rule.rule.selector.specificity();
         for decl in &rule.rule.declarations {
-            let standing = Standing {
-                rank: rank(rule.origin, decl.important),
-                specificity,
-                order: rule.order,
-                sheet: rule.sheet,
-            };
-            self.consider(decl, standing);
+            self.consider(decl, standing(rule, decl));
         }
     }
 

@@ -20,7 +20,7 @@ use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_owner::Owner;
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
-use crate::layout::{Key, Lanes, Slots};
+use crate::layout::{Key, Slots};
 use crate::node_map::{NodeMap, NodeSet};
 
 /// What a take collects before it reads anything.
@@ -45,6 +45,10 @@ pub(crate) struct Touched {
     /// (`a11y_mirror_index::INDEXED`): with the inserted and freed ones,
     /// the only elements whose index entries can differ.
     pub(crate) indexed: NodeSet,
+    /// Each framed lane whose children from one on started elsewhere,
+    /// as the keys of its container's box and of that child's: kept as
+    /// a range, expanded once by the take (4i (2), with 4f-3).
+    pub(crate) started: Vec<(Key, Key)>,
 }
 
 pub(crate) struct AxMirror {
@@ -82,7 +86,7 @@ impl Default for AxMirror {
 
 impl AxMirror {
     /// Notes the boxes an update built, moved or freed, by their nodes.
-    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, (slots, lanes): (&Slots, &Lanes)) {
+    pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, slots: &Slots) {
         // a box made or unmade a containing block, or a positioned box
         // freed, can change which parent node a node's box is placed in
         // (hoisted or not) without moving it, so nothing touches it:
@@ -95,19 +99,19 @@ impl AxMirror {
             return;
         }
         // a framed lane child that started elsewhere has not moved in
-        // its frame, but its record's bounds are from its parent node
-        // (`docs/plans/splice-layout.md`, 5.3; until PR 5's mirror in flow)
+        // its frame, but its record's bounds, or its nearest nodes', are
+        // from a node above it (`docs/plans/splice-layout.md`, 5.3):
+        // each lane's range is kept, and the take expands it once
+        // (`a11y_mirror_started.rs`). A lane dropped later in the layout:
+        // placement places its rows again (`started_unframed`), and a row
+        // whose rect changed is in `moved` below
         let started = changed
             .started
             .iter()
-            // a lane dropped later in the layout: placement places its rows
-            // again (`started_unframed`), and a row whose rect changed is in
-            // `moved` above; one placed where it was keeps its record
-            .flat_map(|&(container, first)| {
-                lanes.children_from(container, first).unwrap_or_default()
-            });
+            .map(|&(container, first)| (key_of(slots, container), key_of(slots, first)));
+        self.touched.started.extend(started);
         let built = changed.rebuilt.iter().chain(&changed.moved).copied();
-        for key in built.chain(started).filter_map(|slot| slots.key(slot)) {
+        for key in built.filter_map(|slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
         }
         for (_, key) in &changed.freed {
@@ -161,6 +165,7 @@ impl AxMirror {
             && touched.scrolled.is_empty()
             && touched.freed.is_empty()
             && touched.indexed.is_empty()
+            && touched.started.is_empty()
     }
 
     /// What was touched since the last take; cleared.
@@ -183,6 +188,7 @@ impl AxMirror {
         touched.scrolled.extend(self.touched.scrolled.drain());
         touched.freed.extend(self.touched.freed.drain());
         touched.indexed.extend(self.touched.indexed.drain());
+        touched.started.append(&mut self.touched.started);
         self.touched = touched;
         self.index = Some(index);
     }
@@ -239,6 +245,22 @@ impl AxMirror {
 }
 
 /// The element a box's key names, or the text's element for a text run.
+/// The key of the box in `slot`, a lane child that started elsewhere or
+/// its container, this update.
+///
+/// # Panics
+/// When the slot holds no box: the lane names a slot the slots freed.
+fn key_of(slots: &Slots, slot: usize) -> Key {
+    slots.key(slot).unwrap_or_else(|| {
+        panic!(
+            "slot {slot}, a lane container or a child that started elsewhere this update, \
+             holds no box: the lane names a slot the slots freed (layout/lane_write.rs \
+             `write_laid`, a11y_mirror_state.rs `touch_slots`); reproduce with \
+             `cargo xtask test`"
+        )
+    })
+}
+
 fn node_of(key: Key) -> NodeId {
     match key {
         Key::Element(node) | Key::Text(node, _) => node,

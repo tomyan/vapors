@@ -151,7 +151,10 @@ fn relative_name(path: &Path, root: &Path) -> Result<String, CompileError> {
 /// # Errors
 /// As [`compile_file`].
 pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
-    generate(&parse_file_global(path)?)
+    // its sheet named by its file under its own directory, the same on
+    // every machine, as `compile_dir_global` names it under the root
+    let root = path.parent().unwrap_or_else(|| Path::new(""));
+    generate(&parse_file_global_under(path, root)?)
 }
 
 /// [`parse_file`] for a component whose `<style>` is a global sheet,

@@ -17,34 +17,60 @@ pub enum SheetHash {
     Registered(u64),
     /// None: its component has not mounted, or its sheet was refused.
     Absent,
-    /// The cascade cannot tell, for the reason given.
-    Unresolvable(&'static str),
 }
 
-/// Why a global sheet cannot be told apart: until R1a, a
-/// `Styles::Global` component's sheet is added by name with
-/// `add_stylesheet`, not under its file.
-const GLOBAL_UNTIL_R1A: &str = "a global component's sheet is added from Rust under a name, not \
-     under its file, until the compiler registers global sheets itself (build-time-styles.md, R1a)";
+/// Which kind of component sheet a name is held under: a scope and a
+/// global sheet may share a name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum SheetKind {
+    Scope,
+    Global,
+}
+
+/// A component sheet in the cascade: where it sits and its text's hash.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Held {
+    /// Its index in the cascade (the order sheets were added).
+    pub(crate) index: usize,
+    hash: u64,
+}
 
 impl Sheets {
-    /// Notes `text`, now in the cascade as `name`.
-    pub(crate) fn note_hash(&mut self, name: &str, text: &str) {
-        self.hashes.insert(name.to_owned(), sheet_hash(text));
+    /// Notes `text`, just added to the cascade as the `kind` sheet
+    /// `name`: the last sheet added.
+    pub(crate) fn note_sheet(&mut self, kind: SheetKind, name: &str, text: &str) {
+        let held = Held {
+            index: self.names.len() - 1,
+            hash: sheet_hash(text),
+        };
+        self.components.insert((kind, name.to_owned()), held);
+    }
+
+    /// The component sheet `sheet` names, if it is in the cascade: one
+    /// table, by kind and name, for its hash (check 1) and its place
+    /// (the winners oracle, the compiled rules).
+    pub(crate) fn held(&self, sheet: SheetRef) -> Option<Held> {
+        let (kind, name) = match sheet {
+            SheetRef::UserAgent => {
+                return Some(Held {
+                    index: super::USER_AGENT_SHEET,
+                    hash: user_agent_hash(),
+                });
+            }
+            SheetRef::Scope(name) => (SheetKind::Scope, name),
+            SheetRef::Global(name) => (SheetKind::Global, name),
+        };
+        self.components.get(&(kind, name.to_owned())).copied()
     }
 
     /// The hash of the sheet in the cascade as `sheet`.
     pub(crate) fn hash_of(&self, sheet: SheetRef) -> SheetHash {
-        static USER_AGENT: OnceLock<u64> = OnceLock::new();
-        match sheet {
-            SheetRef::UserAgent => SheetHash::Registered(
-                *USER_AGENT.get_or_init(|| sheet_hash(vapors_css::user_agent::TEXT)),
-            ),
-            SheetRef::Scope(scope) => self
-                .hashes
-                .get(scope)
-                .map_or(SheetHash::Absent, |&hash| SheetHash::Registered(hash)),
-            SheetRef::Global(_) => SheetHash::Unresolvable(GLOBAL_UNTIL_R1A),
-        }
+        self.held(sheet)
+            .map_or(SheetHash::Absent, |held| SheetHash::Registered(held.hash))
     }
+}
+
+fn user_agent_hash() -> u64 {
+    static USER_AGENT: OnceLock<u64> = OnceLock::new();
+    *USER_AGENT.get_or_init(|| sheet_hash(vapors_css::user_agent::TEXT))
 }

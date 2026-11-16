@@ -156,10 +156,10 @@ pub fn change(
             let mut d = doc.borrow_mut();
             d.add_stylesheet(&format!("more{step}.css"), ".row { padding-left: 1px; }")
                 .expect("parses");
-            d.add_style(
+            d.add_style(vapors_dom::CompiledSheet::for_tests(
                 &format!("scope{step}"),
                 ":global(.box) { margin-left: 1px; }",
-            );
+            ));
             "add a sheet and a scoped style".to_owned()
         }
     }

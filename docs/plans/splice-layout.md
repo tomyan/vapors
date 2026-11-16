@@ -1173,14 +1173,18 @@ slice below measures its cause again before its code.
 
 | Term | Per row | Where | Removed by |
 |---|---|---|---|
-| The a11y touch of started rows | about 100 | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set | 4f-3 |
+| The a11y touch of started rows | about 100; removed by 4i (2) (Insert update 132 to 49 a row) | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set; now each lane's range is kept and the take expands it once | 4f-3, folded into 4i (2) |
 | Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
 | Draw over the merge base, after 4f-2e | Idle +2.6%, Insert +4.8%, FlexInsert +7.5% (flat across sizes) | `draw`: the batches phase (the sort, making the batches, the keys) and the painter's per-batch work, per row in view, not per row in the list | later optimisation |
 | Lane batches cut at rows that paint shapes (fold option (b)) | unmeasured (no perf scenario holds shapes): a batch or more a row in view, as each such row's steps split the lane's run; a row with a background, an svg icon and text draws about four batches | `framed_batches.rs` `resolved`: a step that paints a shape is batched in its row's own frame, as the shape and mesh pipelines take no table of row offsets, and batches keep paint order | F2 (the flat scene's transform table, `docs/plans/flat-scene.md`) |
 | Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
 | Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
-| Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
-| Insert accessibility | about 4720 (FlexInsert about 1800) | `accessibility`: the take reads every started row again, as a record's bounds are from its parent node (section 5.3), and makes the take's index afresh (`AxIndex::of`) | 4i |
+| Insert box build | about 37; after 4h (A) (#439) Insert layout is 17.2 / 18.7 a row (judged, 1k to 3k / 3k to 10k), from 50.9 / 53.4; after 4h (#443, #444) it is -0.2 a row from 1000 to 3000 and 1.4 from 3000 to 10000 (judged), the step three rows below | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h; what is left is the three rows below |
+| A second insert in one owner in one update | an O(n) search for each insert after the first, up to its place (`lane_children.rs` pins 96 and 396 entries for an insert near the end of 100 and 400 rows) | `layout`, the box rebuild (`Placed::child_position`): the owner's lane takes a row put in only at its next layout, so after the first insert the owner has more children than its lane, and later places are searched for, counted in `UpdateCounts::children_scanned`. The perf scenarios insert one row an update | a known term for updates that insert more than once; not planned |
+| The box's children vector | at most about 0.1: remove frames, which move the same tail, measure 0.1 a row from 10000 to 40000 rows (judged). The 0.25 first recorded was an estimate (8 bytes a row) | `layout`, `put_edited`: an insert or removal in an owner edited in place moves the tail of its box's children vector (`Vec::insert` and `remove`) | 4l |
+| Insert-frame layout, a step at some sizes | 1.4 from 3000 to 10000 rows, which the flat rule would fail if `layout` were judged for Insert (1000 to 10000: +9.3 k, +6.6%); not a slope: -0.3 from 10000 to 20000 and 0.5 from 20000 to 40000. Per frame: 140.9 k, 140.4 k, 141.7 k, 143.9 k, 150.2 k, 147.1 k and 157.1 k at 1000, 3000, 5000, 7000, 10000, 20000 and 40000 rows, within 300 between four runs. Remove frames: 0.2, then 0.1 | `layout`, in `laid_out`, split by temporary spans: from 3000 to 10000 rows the box rebuild adds 3.9 k and the lay out 5.4 k; the lay out is 75.1 k, 70.1 k and 72.4 k at 10000, 20000 and 40000. Not the lane tree's depth, which is 3 at 1000 rows, 4 from 3000 to 7000 and 5 from 10000 to 40000. Not located further; work that depends on the slot numbers (hash probes) would vary like this, unverified. Reproduce: `cargo build --profile judged -p vapors-perf && target/judged/vapors-perf 60 10 --scaling Insert`, other sizes by editing `SIZES` in `crates/perf/src/scaling.rs` | not located; not planned |
+| Resize, after the lane work (2026-11-16) | accessibility 2461, layout 14, update 16 (judged, 1k to 10k, at #434's head); a layout figure of about 33k a row from an earlier count is stale | accessibility: one bounds write per moved row (4i's options); layout and update small | recorded, not a target this iteration |
+| Insert accessibility | about 4720 (FlexInsert about 1800); after 4i about 1230 (FlexInsert about 230), judged | `accessibility`: the take made its index afresh on every insert and remove (`AxIndex::of`, 71% of Insert's take; now patched, 4i (1), #432), and read every started row again in full (now each row's bounds alone, 4i (2)). What is left is one bounds write a moved row: the a11y tree carries every node's bounds, each from its parent node | 4i; the rest deferred by Tom (2026-11-16) to a later accessibility iteration, with the two options under 4i and no slices planned |
 | Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
 | Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
 
@@ -1197,21 +1201,51 @@ The slices:
   `--scaling Scroll`'s and `Insert`'s `layout` hold no per-row term from
   placement, and the placement check (`placement_check.rs`) and the
   scroll tests are unchanged.
-- **4h. An owner's children edited, not walked.** An insert or removal
-  under an owner rebuilds the owner's box with its children list made
-  again from every child; the child edits (`child_edits.rs`) already
-  name the one inserted or removed, so the list is edited at that
-  place and the other children's slots are not looked up. Accepted
-  when `Insert`'s and `FlexInsert`'s box build holds no per-row term.
-- **4i. A lane row's a11y record bounded in its lane frame.** A started
-  row has not moved in its frame; its record's bounds are taken from
-  its frame (resolved as `Frames::at` does) rather than from its parent
-  node, so the take reads the rows the update changed, not every
-  started row, and the take's index is patched, not made afresh.
-  Accepted when `accessibility` for `Insert` and `FlexInsert` holds no
-  per-row term from started rows, the mirror model checks
-  (`a11y_mirror` tests) are unchanged, and the platform a11y bounds
-  equal a full take's.
+- **4h. An owner's children edited, not walked.** Measured first (10k
+  rows, a cycles profile of `Document::update`): lending from the edited
+  owner, the order splice's copy, and the a11y row touch. (A), #439: an
+  owner edited in place lends only to its inserted children, O(edits);
+  Insert layout 50.9 to 17.2 a row, FlexInsert 50.5 to 17.0. (B), the
+  order splice made in place, was measured and dropped: the copy is a
+  vectorised memcpy, cheap in instructions (judged layout unchanged,
+  50.6 against 50.9) and in layout's median time (about 371 µs either
+  way); its weight in the cycles profile was allocation and page faults.
+  It is not an instruction term. The a11y row touch was outside the
+  layout span (4f-3, removed by 4i (2)). About 17 a row remains in
+  Insert's layout, not yet placed.
+- **4i. The a11y take after an insert.** Measured first: 71% of
+  Insert's take was the index made afresh on every insert and remove,
+  26% every started row's record read again in full. (1), #432: the
+  index is patched from the elements whose entries can change (an
+  indexed attribute written, a subtree inserted, moved or removed),
+  checked against a scan in debug builds. (2), with 4f-3: the update
+  keeps each lane's started range; the take expands it once and gives
+  each row nothing else touched its bounds alone (its record's, or its
+  nearest nodes' when it is not a node; before #436 a started row with
+  no role left its nodes' bounds stale, and #436 read them in full).
+  Judged ceilings
+  tightened to Insert 1250, FlexInsert 240, Resize 2480.
+
+  Still per row: each moved row's bounds are rewritten, as the mirror
+  carries every node's bounds from its parent node, about 1240 a row.
+  Deferred by Tom (2026-11-16) to a later, dedicated accessibility
+  iteration; no slices are planned for it now. The two ways recorded to
+  make it independent of the list's length:
+  - **Bounds relative to a node per lane.** The platform would compose
+    each row's place from a lane node and the row's offset in it, so an
+    insert writes the lane node and the new row. There is no AccessKit
+    here: the platform mirror is the web page's DOM
+    (`crates/platform/src/a11y_mirror_*.rs`), each record an element
+    placed `position: absolute` from its parent's. The in-flow mirror
+    (PR 5 in the comments: rows as static elements of their heights in
+    a lane element, which the browser places) is that option there; a
+    native platform would need per-node transforms, to be checked in its
+    toolkit when one is added.
+  - **Fresh bounds only for rows in or near the view.** Rows far
+    offscreen would keep stale offsets until they come near the view.
+    It needs a check that platforms tolerate it, against the a11y
+    oracle (`ax_oracle --check`) and a screen reader's virtual cursor,
+    which reads offscreen rows.
 - **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
   is kept in blocks, as the extents index's entries are (`blocks.rs`),
   so a removal or insert moves one block. Accepted when `paint` is
@@ -1229,6 +1263,10 @@ The slices:
   nightly scaling run reports a fractional-row page. Accepted when the
   comparisons show no new difference, and `--scaling` on a 19.2 px row
   page meets the exit checks the whole-row pages meet.
+- **4l. The box's children in blocks.** The box's children vector
+  kept in blocks, as 4j keeps the drawn steps, so an insert or removal
+  in an owner edited in place moves one block, not the tail. Measured
+  at most about 0.1 a row (the table), so recorded, not built.
 
 Order and fold (the lead, on #402; changed 2026-11-16 after Tom's "fine to have optimisations for later"):
 - **4f-2, with 4f-2b to 4f-2e**, first: batching across lane frames (#407), one search a lane and batches made with less work (#414), the patch at a lane's ends (#415), places kept between frames (#418), and one table per lane part with stable row slots (#423).
@@ -1245,4 +1283,5 @@ Order and fold (the lead, on #402; changed 2026-11-16 after Tom's "fine to have 
   - **4h**;
   - **4j**, the smallest;
   - **4k**, which starts with the Chromium evidence and may end with the decline kept and its cost recorded;
+  - **4l**, recorded, not planned;
   - the draw terms, as a later optimisation.

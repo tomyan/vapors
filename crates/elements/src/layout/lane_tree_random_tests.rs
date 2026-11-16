@@ -26,6 +26,24 @@ fn check<S: Summary>(
         let expected = starts(&plain);
         check_starts(&tree, &children, &expected, (seed, step));
         check_between(&tree, &children, &expected, (seed, step));
+        check_sizes(&tree, (seed, step));
+    }
+}
+
+/// Every node's stored size is the one its children give, new nodes
+/// from a split or a new root included.
+fn check_sizes<S: Summary>(tree: &LaneTree<S>, (seed, step): (u64, usize)) {
+    assert_eq!(
+        tree.sizes.len(),
+        tree.nodes.len(),
+        "seed {seed}, step {step}"
+    );
+    for node in 0..tree.nodes.len() {
+        assert_eq!(
+            tree.size(node),
+            tree.size_of(node),
+            "seed {seed}, step {step}, size of node {node}"
+        );
     }
 }
 
@@ -44,6 +62,13 @@ fn check_starts<S: Summary>(
     }
     let order: Vec<Handle> = children.iter().map(|&(h, _)| h).collect();
     assert_eq!(tree.handles(), order, "seed {seed}, step {step}");
+    for (index, &handle) in order.iter().enumerate() {
+        assert_eq!(
+            tree.rank(handle),
+            index,
+            "seed {seed}, step {step}, rank of child {index}"
+        );
+    }
 }
 
 /// One edit: an insert at `at` (half the time), a remove, or a resize.

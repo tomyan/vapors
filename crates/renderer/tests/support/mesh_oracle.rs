@@ -14,9 +14,11 @@
 
 use vapors_shapes::MeshTriangle;
 
-use crate::support::{
-    SIDE, contains, inside_by, outside_by, pixel_centres, segment_distance, to_device,
-};
+#[path = "mesh_corners.rs"]
+mod corners;
+use corners::{Corners, holds_the_corner};
+
+use crate::support::{Place, SIDE, contains, inside_by, outside_by, pixel_centres, to_device};
 
 /// Each pixel's coverage of `mesh` under `transform`, drawn on the CPU.
 pub fn cpu_coverage(mesh: &[MeshTriangle], transform: [f32; 6]) -> Vec<f32> {
@@ -35,6 +37,9 @@ pub fn cpu_coverage(mesh: &[MeshTriangle], transform: [f32; 6]) -> Vec<f32> {
         })
         .collect()
 }
+
+/// How to run the tests that use this oracle.
+const REPRODUCE: &str = "reproduce: cargo nextest run -p vapors-renderer -E 'binary(gpu_mesh_insides) | binary(gpu_mesh_corner_sweep) | binary(gpu_meshes_3d)'";
 
 /// The most a band pixel may differ from the CPU drawing: a ramp of
 /// 1/2 - d differs from a box filter by up to 0.043 on a straight edge
@@ -57,6 +62,12 @@ pub const SHARP_TURN: f32 = 0.28;
 /// #420's fix: at most 0.0033.
 pub const DISTANCE_TOLERANCE: f32 = 0.01;
 
+/// How far under 0.5 minus its distance an inside pixel may read where a
+/// triangle without the near sharp corner can cover it (#421): measured
+/// at most 0.0124 under, on Redo at 1.55 (pixel (22, 15)), on 2026-11-16;
+/// that and one more 8-bit step's margin, 0.02.
+pub const UNDER_TOLERANCE: f32 = 0.02;
+
 /// Asserts every pixel whose centre lies within half a device pixel of
 /// `mesh`'s outline under `transform` is within [`DISTANCE_TOLERANCE`]
 /// of 0.5 minus its CPU distance to the outline, which is what the
@@ -70,32 +81,65 @@ pub fn assert_band_matches_cpu(
     transform: [f32; 6],
     what: &str,
 ) {
+    let drawing = cpu_coverage(mesh, transform);
+    assert_band_matches(
+        coverage,
+        mesh,
+        (
+            &|q| to_device(transform, q),
+            DISTANCE_TOLERANCE,
+            BAND_TOLERANCE,
+        ),
+        &drawing,
+        what,
+    );
+}
+
+/// [`assert_band_matches_cpu`] with the corners placed by `place` (a map
+/// that keeps lines straight), a pixel's distance judged within
+/// `tolerance` and its box-filtered value within `box_tolerance`, and
+/// `drawing` the CPU drawing under `place`.
+pub fn assert_band_matches(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    (place, tolerance, box_tolerance): (Place<'_>, f32, f32),
+    drawing: &[f32],
+    what: &str,
+) {
     let band = Band {
         mesh,
-        transform,
-        corners: Corners::of(mesh, transform),
-        drawing: cpu_coverage(mesh, transform),
+        place,
+        tolerance,
+        box_tolerance,
+        corners: Corners::of(mesh, place),
+        drawing,
     };
     let mut judged = 0;
     for (x, y, centre) in pixel_centres() {
         let drawn = coverage[(y * SIDE + x) as usize];
         if let Some(failure) = band.judge(centre, drawn, (y * SIDE + x) as usize) {
-            panic!("{what}: pixel ({x}, {y}) covered {drawn}; {failure}");
+            panic!(
+                "{what}: pixel ({x}, {y}) covered {drawn}; {failure}; fix: the mesh shader's \
+                 wedge distances (meshes_shared.wgsl, `wedge`) or the bound's source; {REPRODUCE}"
+            );
         }
         judged += usize::from(band.judged(centre));
     }
     assert!(
         judged > 0,
-        "{what}: the band check judged no pixel: is the transform the one drawn?"
+        "{what}: the band check judged no pixel; fix: pass the placement the mesh was drawn \
+         under; {REPRODUCE}"
     );
 }
 
 /// What the band check reads for one mesh.
 struct Band<'a> {
     mesh: &'a [MeshTriangle],
-    transform: [f32; 6],
+    place: Place<'a>,
+    tolerance: f32,
+    box_tolerance: f32,
     corners: Corners,
-    drawing: Vec<f32>,
+    drawing: &'a [f32],
 }
 
 impl Band<'_> {
@@ -115,137 +159,31 @@ impl Band<'_> {
         let (outside, inside) = self.distances(centre);
         let by_distance = (0.5 - outside + inside).clamp(0.0, 1.0);
         let own_edges =
-            inside == 0.0 || holds_the_corner(self.mesh, self.transform, &self.corners, centre);
-        if own_edges && (drawn - by_distance).abs() > DISTANCE_TOLERANCE {
+            inside == 0.0 || holds_the_corner(self.mesh, self.place, &self.corners, centre);
+        if own_edges && (drawn - by_distance).abs() > self.tolerance {
             return Some(format!(
                 "0.5 minus its distance to the outline is {by_distance}"
             ));
         }
+        // A triangle without the near corner over-covers by up to the
+        // corner's distance (it reads a farther edge of its own; #421), so
+        // an inside pixel it may cover is held from below only, within
+        // UNDER_TOLERANCE, or the caller's bound where that is wider
+        if !own_edges && drawn < by_distance - UNDER_TOLERANCE.max(self.tolerance) {
+            return Some(format!(
+                "under 0.5 minus its distance to the outline, {by_distance}"
+            ));
+        }
         let boxed = self.drawing[at];
         let near_sharp = self.corners.near_sharp(centre);
-        (!near_sharp && (drawn - boxed).abs() > BAND_TOLERANCE)
+        (!near_sharp && (drawn - boxed).abs() > self.box_tolerance)
             .then(|| format!("the CPU drawing has {boxed}"))
     }
 
     fn distances(&self, centre: [f32; 2]) -> (f32, f32) {
         (
-            outside_by(self.mesh, self.transform, centre),
-            inside_by(self.mesh, self.transform, centre),
+            outside_by(self.mesh, self.place, centre),
+            inside_by(self.mesh, self.place, centre),
         )
     }
-}
-
-/// An outline corner on the device: its position, its two edges' far
-/// ends, the angle between its normals, and whether it is convex.
-type Corner = ([f32; 2], [[f32; 2]; 2], f32, bool);
-
-/// A mesh's outline corners on the device.
-struct Corners {
-    all: Vec<Corner>,
-}
-
-impl Corners {
-    /// Each outline corner on the device, its angles taken there: under
-    /// a non-uniform scale or a skew, a corner's turn on the device is
-    /// not its turn in mesh units, and the shader's is the device's.
-    fn of(mesh: &[MeshTriangle], transform: [f32; 6]) -> Self {
-        let all = mesh
-            .iter()
-            .flat_map(|t| t.corners)
-            .filter(|c| c.kind != 0.0)
-            .map(|c| {
-                let end = |k: usize| {
-                    let (n, reach) = (c.normals[k], c.reaches[k]);
-                    to_device(
-                        transform,
-                        [c.position[0] - n[1] * reach, c.position[1] + n[0] * reach],
-                    )
-                };
-                let (at, ends) = (to_device(transform, c.position), [end(0), end(1)]);
-                (at, ends, between_normals(at, ends), c.kind > 0.0)
-            })
-            .collect();
-        Self { all }
-    }
-
-    fn near_sharp(&self, p: [f32; 2]) -> bool {
-        self.all
-            .iter()
-            .any(|(c, _, between, _)| *between > SHARP_TURN && within_a_pixel(*c, p))
-    }
-
-    /// RELAXED (#419): beside a corner whose normals are more than 151
-    /// degrees apart, the vertex stage's move is capped at the miter
-    /// limit, its edges sit under half a pixel out, and the outer ramp
-    /// is cut along them: pixels within a pixel of the corner or of
-    /// either of its edges, until #419 is fixed. And by design (meshes.wgsl,
-    /// `wedge`): past an acute convex tip, behind both its edges, the
-    /// shader keeps a line's distance, the tip mitred, not the distance
-    /// to the tip a CPU distance gives.
-    fn left_to_the_half_pixel_rule(&self, p: [f32; 2]) -> bool {
-        self.all.iter().any(|(c, ends, between, convex)| {
-            let beside =
-                within_a_pixel(*c, p) || ends.iter().any(|e| segment_distance(p, *c, *e) <= 1.0);
-            let clamped = (between / 2.0).cos() < 0.25 && beside;
-            let past_a_tip =
-                *convex && *between > std::f32::consts::FRAC_PI_2 && behind_both(*c, *ends, p);
-            clamped || past_a_tip
-        })
-    }
-}
-
-fn within_a_pixel(c: [f32; 2], p: [f32; 2]) -> bool {
-    (c[0] - p[0]).hypot(c[1] - p[1]) < 1.0
-}
-
-fn behind_both(c: [f32; 2], ends: [[f32; 2]; 2], p: [f32; 2]) -> bool {
-    let q = [p[0] - c[0], p[1] - c[1]];
-    ends.iter()
-        .all(|e| q[0] * (e[0] - c[0]) + q[1] * (e[1] - c[1]) <= 0.0)
-}
-
-/// The angle between a corner's outward normals on the device: pi less
-/// the angle between its two edges, which run from `at` to `ends`.
-fn between_normals(at: [f32; 2], ends: [[f32; 2]; 2]) -> f32 {
-    let [a, b] = ends.map(|e| [e[0] - at[0], e[1] - at[1]]);
-    let cosine = (a[0] * b[0] + a[1] * b[1]) / (a[0].hypot(a[1]) * b[0].hypot(b[1]));
-    std::f32::consts::PI - cosine.clamp(-1.0, 1.0).acos()
-}
-
-/// Whether every triangle that can cover `centre` has, among its own
-/// corners, each sharp corner within a device pixel of it. A triangle's
-/// coverage comes from its own corners' edges only (`MeshCorner`), and
-/// the vertex stage's move drags its inner edges by up to half a pixel,
-/// so a triangle within a pixel of the centre can cover it; one without
-/// the corner reads the nearer of its own edges there and can over-cover
-/// by up to the corner's distance. An inside pixel where that can happen
-/// is left to the half-pixel rule, which judges those deeper than half
-/// a pixel (the review's fan in `gpu_mesh_insides.rs`: pixel (20, 10),
-/// 0.35 px inside the notch's corner, reads 1).
-fn holds_the_corner(
-    mesh: &[MeshTriangle],
-    transform: [f32; 6],
-    corners: &Corners,
-    centre: [f32; 2],
-) -> bool {
-    let near: Vec<[f32; 2]> = corners
-        .all
-        .iter()
-        .filter(|(c, _, between, _)| *between > SHARP_TURN && within_a_pixel(*c, centre))
-        .map(|(c, ..)| *c)
-        .collect();
-    mesh.iter()
-        .map(|t| t.corners.map(|c| to_device(transform, c.position)))
-        .filter(|t| {
-            contains(*t, centre)
-                || t.iter()
-                    .zip(t.iter().cycle().skip(1))
-                    .any(|(a, b)| segment_distance(centre, *a, *b) <= 1.0)
-        })
-        .all(|t| {
-            near.iter().all(|c| {
-                t.iter()
-                    .any(|v| (v[0] - c[0]).abs() < 1e-4 && (v[1] - c[1]).abs() < 1e-4)
-            })
-        })
 }

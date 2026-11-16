@@ -43,8 +43,20 @@ pub struct KeyWinners {
     /// crate's sheets that can reach it: tested at run time on the real
     /// element.
     pub conditional: &'static [RuleRef],
-    /// No candidate rule blocks sharing.
-    pub shareable: bool,
+    /// The sheets, as indices into [`KeyWinners::sheets`], holding a
+    /// candidate rule that blocks sharing (it reads siblings or
+    /// descendants, or sits under `@container`): the key's elements
+    /// share while none of these is in the cascade and no rule of a
+    /// sheet the winners do not reference blocks it. Per sheet, as a
+    /// sheet of the crate may not be in the cascade (its component has
+    /// not mounted).
+    pub blocked_by: &'static [u8],
+    /// The index in [`KeyWinners::sheets`] of the key's own component
+    /// sheet, scoped or global; `None` when its component has no
+    /// `<style>` or its winners reference none of it. That sheet is in
+    /// the cascade before the key's elements exist, so its absence means
+    /// the compiler and the runtime name it differently.
+    pub own: Option<u8>,
 }
 
 /// A sheet by identity, as the runtime registers it.

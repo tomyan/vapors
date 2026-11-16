@@ -3,7 +3,7 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use vapors_dom::{Dom, Handler, NodeId, PropertyValue, StyleKey};
+use vapors_dom::{CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
@@ -15,8 +15,13 @@ impl Dom for Document {
     }
 
     fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
-        self.arena
-            .insert(Node::new(Kind::Element(Element::keyed(key))))
+        let node = self
+            .arena
+            .insert(Node::new(Kind::Element(Element::keyed(key))));
+        if let Some(refusal) = self.sheets.keyed_refusal(key) {
+            self.refuse(node, format!("create_keyed_element: {refusal}"));
+        }
+        node
     }
 
     fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
@@ -44,9 +49,24 @@ impl Dom for Document {
 
     /// Every mount calls it; a sheet already added changes nothing. A
     /// new one restyles every element: which elements its rules reach
-    /// is not worked out.
-    fn add_style(&mut self, scope: &str, css: &str) {
-        if self.sheets.add_scoped(scope, css) {
+    /// is not worked out. One whose text does not hash as the compiler
+    /// said is refused (`Sheets::compiled_text`).
+    fn add_style(&mut self, sheet: CompiledSheet<'_>) {
+        if !self.sheets.compiled_text(sheet) {
+            return;
+        }
+        if self.sheets.add_scoped(sheet.name(), sheet.text()) {
+            self.note_change();
+            self.dirty.everything();
+        }
+    }
+
+    /// As [`Dom::add_style`], unscoped.
+    fn add_global_style(&mut self, sheet: CompiledSheet<'_>) {
+        if !self.sheets.compiled_text(sheet) {
+            return;
+        }
+        if self.sheets.add_global(sheet.name(), sheet.text()) {
             self.note_change();
             self.dirty.everything();
         }

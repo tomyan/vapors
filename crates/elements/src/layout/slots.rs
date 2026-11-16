@@ -18,6 +18,15 @@ pub(crate) enum Key {
     Text(NodeId, usize),
 }
 
+impl Key {
+    /// The node whose box this is: the element, or the text's node.
+    pub(crate) fn node(self) -> NodeId {
+        match self {
+            Key::Element(node) | Key::Text(node, _) => node,
+        }
+    }
+}
+
 /// The slot each key holds, each slot's key, and the vacant slots.
 #[derive(Default)]
 pub(crate) struct Slots {
@@ -34,9 +43,17 @@ pub(crate) struct Placed {
     pub(crate) boxes: crate::slot_list::SlotList<LayoutBox>,
     pub(crate) slots: Slots,
     pub(crate) lanes: super::lane_set::SharedLanes,
+    /// The child entries this rebuild searched or compared one by one
+    /// (`Placed::searched`), for `UpdateCounts::children_scanned`.
+    pub(crate) scanned: std::cell::Cell<usize>,
 }
 
 impl Placed {
+    /// Notes `entries` child entries searched or compared one by one.
+    pub(crate) fn note_scanned(&self, entries: usize) {
+        self.scanned.set(self.scanned.get() + entries);
+    }
+
     /// Each per-slot list's name, length and capacity (the growth
     /// tests read these alone).
     #[cfg(test)]
@@ -90,6 +107,7 @@ impl Slots {
             boxes: boxes.into(),
             slots,
             lanes: super::lane_set::SharedLanes::default(),
+            scanned: std::cell::Cell::default(),
         }
     }
 
