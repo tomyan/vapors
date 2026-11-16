@@ -44,6 +44,9 @@ impl TouchScroll {
             if self.fling.is_some() {
                 self.booster.observe(Observed::FlingCancel, now);
             }
+            if !self.touching {
+                self.fades.touch_after_mouse(now);
+            }
             *self = Self {
                 down: Some(at),
                 touching: true,
@@ -118,10 +121,10 @@ impl TouchScroll {
     }
 
     /// Every container's thumbs drawn as they are at `now`: fully while
-    /// the mouse is in use, else each at its own touch fade.
+    /// the mouse is in use, else each at its own touch fade over the
+    /// floor's (`ThumbFades::touch_after_mouse`).
     pub(crate) fn draw_thumbs(&mut self, document: &mut Document, now: Instant) {
         if self.touching {
-            document.set_thumb_opacity(0.0);
             self.fades.apply(document, now);
         } else {
             document.set_thumb_opacity(1.0);
@@ -139,7 +142,9 @@ impl TouchScroll {
     #[cfg(test)]
     pub(crate) fn thumb_opacity(&self, container: NodeId, now: Instant) -> f32 {
         if self.touching {
-            self.fades.opacity(container, now)
+            self.fades
+                .opacity(container, now)
+                .max(self.fades.floor_opacity(now))
         } else {
             1.0
         }

@@ -79,6 +79,13 @@ impl Document {
         self.thumb_alpha = alpha;
     }
 
+    /// The opacity every container's thumbs are drawn at least at (as
+    /// [`Document::set_thumb_opacity`] last set it, quantised).
+    #[must_use]
+    pub fn thumb_opacity(&self) -> f32 {
+        f32::from(self.thumb_alpha) / 255.0
+    }
+
     /// Draws `container`'s own thumbs at `opacity` (as
     /// [`Document::set_thumb_opacity`]) from the next update, where that
     /// is above every container's: a touch app shows a container's
