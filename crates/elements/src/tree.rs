@@ -78,6 +78,12 @@ impl Arena {
         self.free(node);
     }
 
+    /// The children of `node`, in order, without collecting them.
+    pub(crate) fn each_child(&self, node: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+        let first = self.get(node, "each_child").first_child;
+        std::iter::successors(first, |&child| self.get(child, "each_child").next)
+    }
+
     /// The children of `node`, in order.
     pub(crate) fn children(&self, node: NodeId) -> Vec<NodeId> {
         let mut out = Vec::new();

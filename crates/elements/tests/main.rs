@@ -122,6 +122,7 @@ mod lane_frame_declines;
 mod lane_frames;
 mod lane_frames_moved;
 mod lane_ink_spliced;
+mod lane_lend;
 mod lane_scrollers;
 mod lane_shapes;
 mod lane_starts;

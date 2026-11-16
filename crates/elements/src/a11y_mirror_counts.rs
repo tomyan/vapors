@@ -13,7 +13,9 @@ use crate::document::Document;
 #[non_exhaustive]
 pub struct AxTakeCounts {
     /// Nodes read again and compared with their record: every node a
-    /// touch reached, each once; every node for a take of all.
+    /// touch reached, each once, and the nodes under rows a lane start
+    /// moved that could not be given their bounds alone (hoisted, or no
+    /// longer drawn); every node for a take of all.
     pub nodes_read: usize,
     /// Index entries read: the touched nodes when the index was
     /// patched, every element when it was scanned.
@@ -22,6 +24,9 @@ pub struct AxTakeCounts {
     /// first take; an element inserted or removed; an id carried by
     /// more than one element), else 0.
     pub index_scans: usize,
+    /// Nodes given new bounds alone: the rows a lane start moved that
+    /// the take did not read, or their nearest nodes, each once (4i (2)).
+    pub bounds_only: usize,
     /// Steps the placement ordering took: each placement sorted into
     /// ready or waiting, released by the one it waited on, and placed;
     /// at most three times the placements.
