@@ -156,7 +156,7 @@ fn gpu_the_outer_ramp_beside_a_near_straight_corner_is_not_cut() {
     // Given touche's Redo icon at 1.55: its top edge runs straight into
     // the arc at (9.05, 5.25), a corner turning 8 degrees, and from x =
     // 8.5 to there the pixels just outside the edge read 0 where the CPU
-    // drawing gives a third (found by decal D2's 8x comparison)
+    // drawing gives 0.375 (found by decal D2's 8x comparison)
     let redo = "M5 3L2 6l3 3M2 6h7a4 4 0 0 1 0 8H6";
 
     // When, Then

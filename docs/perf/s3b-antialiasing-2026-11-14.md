@@ -1,5 +1,11 @@
 # S3b: antialiasing per shape kind against Chromium (2026-11-14)
 
+(2026-11-16: the exact-corner numbers below were measured before #420
+changed the mesh shader's corner regions: a corner's distance only behind
+it along both edges, decided on the device, and the reflex corner's
+mirrored. Re-measuring them needs Chromium; until then they describe the
+shader as it was at 2026-11-14.)
+
 One-scene row S3b (`docs/plans/one-scene.md`). Measured with
 `cargo run -p vapors-elements-corpus --example aa_methods` (add
 `-- --out <dir>` for the images) at this report's commit, on the browser and

@@ -145,14 +145,38 @@ fn line(m: vec2<f32>, reach: f32, corner: vec2<f32>, p: vec2<f32>, t: vec4<f32>)
     return -dot(m, p - corner) / max(length(device_normal(m, t)), 1e-20);
 }
 
+// `v`, a vector in the mesh's units, on the device under `l`, the map
+// [[a, c], [b, d]] from mesh units to device pixels.
+fn on_device_vector(v: vec2<f32>, l: vec4<f32>) -> vec2<f32> {
+    return vec2(l.x * v.x + l.z * v.y, l.y * v.x + l.w * v.y);
+}
+
+// Whether p lies behind `corner` along the edge with outward unit normal
+// m running `reach` along (-m.y, m.x), measured on the device: under a
+// non-uniform scale or a skew, the line through the corner perpendicular
+// to the edge in mesh units is not perpendicular on the device, and the
+// corner's region is the device's (#420's review, L1).
+fn behind_on_device(m: vec2<f32>, reach: f32, q: vec2<f32>, l: vec4<f32>) -> bool {
+    let along = on_device_vector(vec2(-m.y, m.x) * sign(reach), l);
+    return dot(on_device_vector(q, l), along) <= 0.0;
+}
+
 // A corner's wedge distance at p in device pixels, inside positive. A
-// convex corner's is the nearer of its two lines, except behind the
-// corner along both its edges, where the outline's nearest point is the
-// corner itself: there it is the device distance to the corner, as the
-// closed forms take it. Outside both lines alone is not enough: beside a
-// corner that turns little, a point just outside one edge is outside the
-// other line too, extended back past the corner, and its nearest point
-// is on the edge (the Redo icon's arc join, D2's review).
+// convex corner's is the nearer of its two lines, except outside both
+// lines and behind the corner along both its edges, where it is the
+// device distance to the corner, as the closed forms take it; a reflex
+// corner's, mirrored, is the farther of its lines, except inside both
+// and behind the corner along both edges, where it is the distance to
+// the corner (inside the notched rect's notch corner, #420's review
+// round: the lines alone gave 0.25 px where the corner is 0.35 away). Outside
+// both lines alone is not enough: beside a corner that turns little, a
+// point just outside one edge is outside the other line too, extended
+// back past the corner, and its nearest point is on the edge (the Redo
+// icon's arc join). Past an acute tip, a point behind both edges but
+// inside one line keeps the other line's distance, not the tip's: the
+// tip stays mitred, as the outline is, rather than rounded. With the
+// test on the device, each distance is the device distance under any
+// affine map, a non-uniform scale or a skew included.
 fn wedge(n: vec4<f32>, at: vec4<f32>, second_reach: f32, p: vec2<f32>, t: vec4<f32>, l: vec4<f32>) -> f32 {
     if (at.z == 0.0) {
         return FAR;
@@ -160,10 +184,13 @@ fn wedge(n: vec4<f32>, at: vec4<f32>, second_reach: f32, p: vec2<f32>, t: vec4<f
     let convex = at.z > 0.0;
     let d0 = line(n.xy, at.w, at.xy, p, t);
     let d1 = line(n.zw, second_reach, at.xy, p, t);
-    let behind = along(n.xy, at.w, at.xy, p) <= 0.0 && along(n.zw, second_reach, at.xy, p) <= 0.0;
+    let q = p - at.xy;
+    let behind = behind_on_device(n.xy, at.w, q, l) && behind_on_device(n.zw, second_reach, q, l);
     if (convex && behind && d0 < 0.0 && d1 < 0.0) {
-        let q = p - at.xy;
-        return -length(vec2(l.x * q.x + l.z * q.y, l.y * q.x + l.w * q.y));
+        return -length(on_device_vector(q, l));
+    }
+    if (!convex && behind && d0 > 0.0 && d1 > 0.0) {
+        return length(on_device_vector(q, l));
     }
     return select(max(d0, d1), min(d0, d1), convex);
 }

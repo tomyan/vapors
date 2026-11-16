@@ -201,7 +201,7 @@ pub fn contains([p0, p1, p2]: [[f32; 2]; 3], p: [f32; 2]) -> bool {
     (s0 >= 0.0 && s1 >= 0.0 && s2 >= 0.0) || (s0 <= 0.0 && s1 <= 0.0 && s2 <= 0.0)
 }
 
-fn segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+pub fn segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     let t = (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
     let (qx, qy) = (a[0] + t * dx - p[0], a[1] + t * dy - p[1]);
