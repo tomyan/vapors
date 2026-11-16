@@ -73,7 +73,8 @@ fn assert_drawn_afresh(list: &List, case: &str) {
     let view = vapors_scene::Rect::new(0.0, 0.0, 400.0, 300.0);
     let kept = painted.kept_batches(view).clone();
     let fresh = painted.scene().framed_batches(view);
-    assert_eq!((kept.batched, kept.frames), fresh, "{case}");
+    let kept = (kept.batched, kept.frames, kept.rows);
+    assert_eq!(kept, (fresh.batched, fresh.frames, fresh.rows), "{case}");
 }
 
 #[test]

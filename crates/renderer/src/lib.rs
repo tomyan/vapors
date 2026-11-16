@@ -52,6 +52,7 @@ pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
 pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
+pub use instanced::assert_rows;
 pub use kept_bind_group::KeptBindGroup;
 pub use kept_range::KeptRange;
 pub use mips::{upload_rgba8_mipmapped, upload_rgba8_mipmapped_counted};

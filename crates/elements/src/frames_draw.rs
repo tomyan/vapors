@@ -6,12 +6,35 @@
 
 use vapors_scene::Rect;
 
+use crate::framed_batches::BatchRows;
 use crate::frames::Frames;
 use crate::painted::Painted;
 
-/// Names the scroll frame a batch's items are in.
+/// Names where a batch's items are: one frame, or the rows of a framed
+/// lane, each item in its own row's frame (`framed_batches.rs`, 4f).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct BatchFrame(pub(crate) usize);
+pub struct BatchFrame(pub(crate) Framing);
+
+/// What a [`BatchFrame`] names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Framing {
+    /// A scroll frame, a lane frame alone, or the page's.
+    Frame(usize),
+    /// The rows of the framed lane of this container.
+    Lane(usize),
+}
+
+impl BatchFrame {
+    /// Frame `frame`.
+    pub(crate) fn frame(frame: usize) -> Self {
+        Self(Framing::Frame(frame))
+    }
+
+    /// The rows of the framed lane of `container`.
+    pub(crate) fn lane(container: usize) -> Self {
+        Self(Framing::Lane(container))
+    }
+}
 
 /// Where a frame's batches are drawn on the target.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -33,13 +56,29 @@ impl Frames {
         view.offset(at.shift.map(|v| -v))
     }
 
-    /// Where frame `frame`'s batches are drawn.
-    pub(crate) fn draw(&self, frame: usize) -> FrameDraw {
-        let at = self.at(frame);
+    /// Where a batch named `frame` is drawn: its frame's shift and clip,
+    /// or a lane's (`Frames::lane_template_of`), each row then moved by
+    /// its offset (`row_offsets`).
+    pub(crate) fn draw(&self, frame: BatchFrame) -> FrameDraw {
+        let at = match frame.0 {
+            Framing::Frame(frame) => self.at(frame),
+            Framing::Lane(container) => self.lane_template_of(container),
+        };
         FrameDraw {
             shift: at.shift,
             clip: at.device_clip,
         }
+    }
+
+    /// Each of `rows`' frames' offset from lane `container`'s template,
+    /// device pixels, whole: what the shader adds to the batch's shift.
+    pub(crate) fn row_offsets(&self, container: usize, rows: &[usize]) -> Vec<[f32; 2]> {
+        let base = self.lane_template_of(container).shift;
+        let offset = |&row: &usize| {
+            let shift = self.at(row).shift;
+            [shift[0] - base[0], shift[1] - base[1]]
+        };
+        rows.iter().map(offset).collect()
     }
 }
 
@@ -52,6 +91,21 @@ impl Painted {
     /// kept from another paint.
     #[must_use]
     pub fn frame_draw(&self, frame: BatchFrame) -> FrameDraw {
-        self.frames.draw(frame.0)
+        self.frames.draw(frame)
+    }
+
+    /// The offsets of the rows of a batch named `frame` with `rows`, from
+    /// where the batch is drawn ([`Painted::frame_draw`]): none for a
+    /// batch in one frame.
+    ///
+    /// # Panics
+    ///
+    /// As [`Painted::frame_draw`].
+    #[must_use]
+    pub fn row_offsets(&self, frame: BatchFrame, rows: &BatchRows) -> Vec<[f32; 2]> {
+        match frame.0 {
+            Framing::Frame(_) => Vec::new(),
+            Framing::Lane(container) => self.frames.row_offsets(container, &rows.frames),
+        }
     }
 }

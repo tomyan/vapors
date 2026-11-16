@@ -29,6 +29,15 @@ pub(crate) fn quads(
     texts: &[TextDraw<'_>],
     pins: Option<&mut AtlasPins>,
 ) -> Result<Vec<f32>, AtlasError> {
+    Ok(quads_counted(atlas, texts, pins)?.0)
+}
+
+/// As [`quads`], and each text's vertices among the floats.
+pub(crate) fn quads_counted(
+    atlas: &mut GlyphAtlas,
+    texts: &[TextDraw<'_>],
+    pins: Option<&mut AtlasPins>,
+) -> Result<(Vec<f32>, Vec<usize>), AtlasError> {
     let glyphs = || texts.iter().flat_map(|text| glyphs_of(*text));
     let fetch = |(_, request): &(GlyphAt, GlyphRequest<'_>), pins: Option<&mut AtlasPins>| {
         atlas.get_pinned(request, pins)
@@ -36,7 +45,25 @@ pub(crate) fn quads(
     let placed = placed_all(glyphs, pins, fetch)?;
     // read after placing: placing may grow the page
     let page = atlas.coverage_page().size();
-    Ok(glyph_floats(glyphs().map(|(at, _)| at).zip(&placed), page))
+    let floats = glyph_floats(glyphs().map(|(at, _)| at).zip(&placed), page);
+    let entries = texts.iter().map(|text| glyphs_of(*text).count());
+    Ok((floats, vertices_per_draw(&placed, entries)))
+}
+
+/// Each draw's vertices among the floats of `placed`: six for each of
+/// its inked entries (glyphs or icon strokes), the draws holding
+/// `entries` entries each, in order.
+pub(crate) fn vertices_per_draw(
+    placed: &[AtlasGlyph],
+    entries: impl Iterator<Item = usize>,
+) -> Vec<usize> {
+    let mut at = 0;
+    let inked = |count: usize| {
+        let mine = &placed[at..at + count];
+        at += count;
+        6 * mine.iter().filter(|placed| !placed.is_empty()).count()
+    };
+    entries.map(inked).collect()
 }
 
 /// Vertex floats for each inked glyph of `placed`, on a page of `page`

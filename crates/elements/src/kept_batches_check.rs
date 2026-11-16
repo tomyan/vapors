@@ -8,20 +8,30 @@
 
 use vapors_scene::{Batched, Item, Run};
 
-use crate::framed_batches::hidden_items;
+use crate::framed_batches::{BatchRows, FramedBatched, hidden_items};
 use crate::frames::Frames;
-use crate::frames_draw::BatchFrame;
+use crate::frames_draw::{BatchFrame, Framing};
 use crate::kept_batches::{Shown, Sources};
 use crate::kept_batches_keys::KeptBatched;
 
 /// Panics, naming the first differing batch, frame or the culled
 /// counts, when `kept` is not `fresh`.
-pub(crate) fn assert_same(kept: &KeptBatched, fresh: &(Batched, Vec<BatchFrame>)) {
-    let difference = first_difference(&kept.batched, &fresh.0).or_else(|| {
-        let at = (0..kept.frames.len().max(fresh.1.len()))
-            .find(|&at| kept.frames.get(at) != fresh.1.get(at))?;
-        let (kept, fresh) = (kept.frames.get(at), fresh.1.get(at));
-        Some(format!("batch {at} is in frame {kept:?}, afresh {fresh:?}"))
+pub(crate) fn assert_same(kept: &KeptBatched, fresh: &FramedBatched) {
+    let difference = first_difference(&kept.batched, &fresh.batched).or_else(|| {
+        let longest = kept.frames.len().max(fresh.frames.len());
+        let differs = |at: &usize| {
+            kept.frames.get(*at) != fresh.frames.get(*at)
+                || kept.rows.get(*at) != fresh.rows.get(*at)
+        };
+        let at = (0..longest).find(differs)?;
+        let (frame, rows) = (
+            (kept.frames.get(at), fresh.frames.get(at)),
+            (kept.rows.get(at), fresh.rows.get(at)),
+        );
+        Some(format!(
+            "batch {at} is in {:?} with rows {:?}, afresh {:?} with {:?}",
+            frame.0, rows.0, frame.1, rows.1
+        ))
     });
     if let Some(difference) = difference {
         panic!(
@@ -54,12 +64,30 @@ type Placed = ((Item, Option<vapors_scene::Rect>), bool);
 
 /// `kept`'s items put on the page by their frames in `frames`.
 fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
-    let batches = kept.batched.batches.iter().zip(&kept.frames);
-    let on_page = batches.flat_map(|(batch, frame)| {
-        let put = move |item| (frames.item(frame.0, &item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(put)
+    let batches = kept
+        .batched
+        .batches
+        .iter()
+        .zip(&kept.frames)
+        .zip(&kept.rows);
+    let on_page = batches.flat_map(|((batch, &frame), rows)| {
+        let items = run_items(&batch.run).into_iter().enumerate();
+        let put = move |(at, item)| {
+            let in_frame = item_frame(frame, rows, at);
+            (frames.item(in_frame, &item, batch.clip), batch.culled)
+        };
+        items.map(put)
     });
     on_page.collect()
+}
+
+/// The frame of the `at`th item of a batch at `frame` with `rows`: the
+/// batch's frame, or the item's row's.
+fn item_frame(frame: BatchFrame, rows: &BatchRows, at: usize) -> usize {
+    match frame.0 {
+        Framing::Frame(frame) => frame,
+        Framing::Lane(_) => rows.frames[rows.items[at] as usize],
+    }
 }
 
 /// `page`'s items, each with its batch's clip.

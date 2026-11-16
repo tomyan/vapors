@@ -16,12 +16,13 @@
 //! and compares them with the bytes kept (`painter_kept_check.rs`).
 
 use vapors_elements::{BatchKey, Painted};
-use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Shift, Target};
+use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Target};
 use vapors_scene::{Item, Rect, Run};
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
 use super::errors::PaintError;
+use super::rows::Moved;
 
 #[path = "painter_kept_gpu.rs"]
 mod gpu;
@@ -56,7 +57,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: Shift,
+        moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
@@ -65,21 +66,23 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(range) = self.kept.range(pipelines, target, (run, key, at)) else {
+        let rows = moved.rows.items();
+        let Some(range) = self.kept.range(pipelines, target, (run, rows, key, at)) else {
             return Ok(());
         };
+        let rowed = (moved.shift, &moved.table);
         match run {
-            Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
-            Run::Quads(_) => self.quads.draw_kept(target, range, shift),
+            Run::Shadows(_) => self.shadows.draw_kept_in_rows(target, range, rowed),
+            Run::Quads(_) => self.quads.draw_kept_in_rows(target, range, rowed),
             Run::Images(items) => {
                 let images = &mut self.images;
                 self.textures
-                    .draw_kept(images, target, painted, (items, range, shift));
+                    .draw_kept(images, target, painted, (items, range, moved));
             }
             Run::Surfaces(items) => {
                 let images = &mut self.images;
                 self.surfaces
-                    .draw_kept(images, target, painted, (items, range, shift))?;
+                    .draw_kept(images, target, painted, (items, range, moved))?;
             }
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
@@ -96,15 +99,15 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: Shift,
+        moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let parts = (&mut self.text, &mut self.atlas);
-        let kept = self
-            .kept
-            .text_range(parts, (target, painted), (run, key, at))?;
+        let rowed = (run, moved.rows.items(), key, at);
+        let kept = self.kept.text_range(parts, (target, painted), rowed)?;
         if let Some(kept) = kept {
+            let at = (moved.shift, &moved.table);
             self.text
-                .draw_kept(target, &mut self.atlas, kept, blend(run), shift);
+                .draw_kept_in_rows(target, &mut self.atlas, kept, (blend(run), at));
         }
         Ok(())
     }
@@ -124,6 +127,7 @@ impl ScenePainter {
             atlas: &mut self.atlas,
         };
         self.kept.release_undrawn(&mut pipelines);
+        self.row_tables.release_undrawn();
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
             held, retained,
@@ -183,11 +187,13 @@ impl Kind {
     }
 }
 
-/// `run`'s instance or vertex bytes, as its pipeline draws them.
-pub(super) fn run_bytes(run: &Run) -> Vec<u8> {
+/// `run`'s instance or vertex bytes, each item in its row of `rows`
+/// (none for a batch in one frame), as its pipeline draws them; images
+/// and surfaces, drawn an item at a time, carry their row in the shift.
+pub(super) fn run_bytes(run: &Run, rows: &[u32]) -> Vec<u8> {
     match run {
-        Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
-        Run::Quads(quads) => QuadPipeline::bytes(quads),
+        Run::Shadows(shadows) => ShadowPipeline::bytes_in_rows(shadows, rows),
+        Run::Quads(quads) => QuadPipeline::bytes_in_rows(quads, rows),
         Run::Images(items) | Run::Surfaces(items) => {
             ImagePipeline::rect_bytes(items.iter().map(item_rect))
         }

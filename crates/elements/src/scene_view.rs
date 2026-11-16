@@ -8,8 +8,8 @@
 use vapors_scene::{Batched, Item, Rect, Scene};
 
 use crate::drawn_steps::DrawnSteps;
+use crate::framed_batches::FramedBatched;
 use crate::frames::Frames;
-use crate::frames_draw::BatchFrame;
 use crate::kept_box::KeptBox;
 use crate::kept_hits::FramedHit;
 use crate::paint_labels::Label;
@@ -64,7 +64,7 @@ impl<'a> SceneView<'a> {
     /// pixels) in their scroll frames, with each one's frame, made
     /// afresh as the kept batches are (`framed_batches.rs`).
     #[must_use]
-    pub fn framed_batches(&self, view: Rect) -> (Batched, Vec<BatchFrame>) {
+    pub fn framed_batches(&self, view: Rect) -> FramedBatched {
         let steps: Vec<Step> = self.drawn.steps().collect();
         crate::framed_batches::framed_batches(&steps, |&step| step, (self.boxes, self.frames), view)
     }

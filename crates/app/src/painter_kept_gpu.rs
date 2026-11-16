@@ -58,14 +58,14 @@ impl KeptGpu {
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
-        (run, key, at): (&Run, BatchKey, usize),
+        (run, rows, key, at): (&Run, &[u32], BatchKey, usize),
     ) -> Option<&KeptRange> {
         match self.entries.get(&key) {
             Some(gpu) => {
-                gpu.check(run, at);
+                gpu.check((run, rows), at);
                 self.kept += 1;
             }
-            _ => self.write(&mut pipelines, target, (run, key))?,
+            _ => self.write(&mut pipelines, target, (run, rows, key))?,
         }
         let gpu = self.entries.get_mut(&key).expect("kept or written above");
         gpu.drawn = self.frame;
@@ -77,9 +77,9 @@ impl KeptGpu {
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
-        (run, key): (&Run, BatchKey),
+        (run, rows, key): (&Run, &[u32], BatchKey),
     ) -> Option<()> {
-        let (kind, bytes) = (Kind::of(run), run_bytes(run));
+        let (kind, bytes) = (Kind::of(run), run_bytes(run, rows));
         let range = pipelines.keep(kind, target, &bytes)?;
         self.written += 1;
         let gpu = Gpu {
@@ -122,10 +122,10 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, run: &Run, at: usize) {
+    fn check(&self, (run, rows): (&Run, &[u32]), at: usize) {
         #[cfg(debug_assertions)]
-        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run), (run, at));
+        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run, rows), (run, at));
         #[cfg(not(debug_assertions))]
-        let _ = (run, at); // only the debug build's compare uses them
+        let _ = (run, rows, at); // only the debug build's compare uses them
     }
 }

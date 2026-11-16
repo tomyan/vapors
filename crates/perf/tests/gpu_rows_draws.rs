@@ -30,14 +30,11 @@ fn gpu_the_rows_pages_idle_frame_draws_the_rows_in_view_only() {
     // Then
     let frame = samples.counts.frame;
     let in_view = rows_in_view();
-    // Relaxed until 4f: each row is a lane frame of its own
-    // (`docs/plans/splice-layout.md`, section 11), and items in
-    // different frames are drawn apart, so a row's label and button
-    // text are two runs instead of the button's text joining the next
-    // row's label. 4f batches across lane frames (the lane shift as
-    // per-instance data), which puts this back to 1 + (in view - 1) + 1
-    // unclipped runs.
-    let unclipped_runs = 2 * in_view;
+    // Unclipped runs: the first label, each button's text with the next
+    // row's label (in view - 1), the last button's text in view. Each row
+    // is a lane frame of its own; a batch spans them, each item at its
+    // row's offset (4f).
+    let unclipped_runs = 1 + (in_view - 1) + 1;
     // One run per value in view.
     let texts = unclipped_runs + in_view;
     assert_eq!(frame.texts.draw_calls, texts as u64, "{frame:?}");

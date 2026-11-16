@@ -22,6 +22,8 @@ pub struct ScenePainter {
     textures: Textures,
     surfaces: Surfaces,
     kept: KeptGpu,
+    /// Each lane batch's table of row offsets (`painter_rows.rs`).
+    row_tables: RowTables,
     counts: FrameCounts,
 }
 
@@ -73,6 +75,7 @@ impl ScenePainter {
             textures: Textures::default(),
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
+            row_tables: RowTables::default(),
             counts: FrameCounts::default(),
         })
     }
@@ -139,9 +142,12 @@ mod counts;
 mod kept;
 #[path = "painter_region.rs"]
 mod region;
+#[path = "painter_rows.rs"]
+mod rows;
 #[path = "painter_runs.rs"]
 mod runs;
 use kept::KeptGpu;
+use rows::RowTables;
 #[cfg(debug_assertions)]
 #[path = "painter_kept_check.rs"]
 mod kept_check;

@@ -261,9 +261,14 @@ pub(crate) fn rowed_instances<T>(
     bytes
 }
 
-/// Panics, naming `label`, unless `rows` is empty or holds one index for
+/// Refuses, naming `label`, rows that are not empty or one index for
 /// each of `items` items, every one inside the [`RowOffsets`] table.
-pub(crate) fn assert_rows(label: &str, items: usize, rows: &[u32]) {
+///
+/// # Panics
+///
+/// As said: an index past the table would be read clamped, silently, and
+/// a short `rows` would put the rest in row 0.
+pub fn assert_rows(label: &str, items: usize, rows: &[u32]) {
     assert!(
         rows.is_empty() || rows.len() == items,
         "{label}: {} row indexes for {items} items; give one an item, or none for a batch in one \

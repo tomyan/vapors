@@ -20,9 +20,10 @@ pub struct RowOffsets {
 }
 
 impl RowOffsets {
-    /// The rows one batch's table holds: two to each `vec4<f32>` of the
+    /// The rows one batch's table holds (`vapors_scene::ROWS_PER_BATCH`,
+    /// which batching splits runs by): two to each `vec4<f32>` of the
     /// uniform, 1 KiB.
-    pub const CAPACITY: usize = 128;
+    pub const CAPACITY: usize = vapors_scene::ROWS_PER_BATCH;
 
     /// Every row at no offset: items in one frame.
     pub const NONE: Self = Self {

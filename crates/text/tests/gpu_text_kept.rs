@@ -158,3 +158,38 @@ fn gpu_kept_text_drawn_in_a_row_matches_the_text_drawn_at_the_rows_offset() {
     painter.atlas.unpin(pins);
     painter.pipeline.release(range);
 }
+
+#[test]
+fn gpu_texts_built_in_two_rows_draw_each_at_its_rows_offset() {
+    // Given: "Hi" drawn at 2, 4 and "Yo" at 2, 34
+    let mut immediate = Painter::new(PAGE);
+    let (hi, yo) = (immediate.layout("Hi"), immediate.layout("Yo"));
+    let apart = immediate.frame(|pipeline, atlas, target| {
+        pipeline.draw(target, atlas, &hi, [2.0, 4.0], BlendParams::default())?;
+        pipeline.draw(target, atlas, &yo, [2.0, 34.0], BlendParams::default())
+    });
+
+    // When: both built at 2, 4, "Yo" in row 1, thirty pixels down
+    let mut painter = Painter::new(PAGE);
+    let (hi, yo) = (painter.layout("Hi"), painter.layout("Yo"));
+    let kept = RefCell::new(None);
+    let rowed = painter.frame(|pipeline, atlas, target| {
+        let at = |layout| TextDraw {
+            layout,
+            origin: [2.0, 4.0],
+        };
+        let (bytes, pins) = TextPipeline::text_bytes_in_rows(atlas, &[at(&hi), at(&yo)], &[0, 1])?;
+        let range = pipeline.keep(target, &bytes).expect("kept");
+        let rows = RowOffsets::whole(&[[0.0, 0.0], [0.0, 30.0]]);
+        let moved = (BlendParams::default(), (NONE, &rows));
+        pipeline.draw_kept_in_rows(target, atlas, (&range, &pins), moved);
+        *kept.borrow_mut() = Some((range, pins));
+        Ok(())
+    });
+
+    // Then
+    assert!(rowed.pixels == apart.pixels, "texts in two rows differ");
+    let (range, pins) = kept.into_inner().expect("kept in the frame");
+    painter.atlas.unpin(pins);
+    painter.pipeline.release(range);
+}

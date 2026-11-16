@@ -196,6 +196,34 @@ impl Frames {
         self.lane_child_at(self.lane_template(base, outer), base, offset)
     }
 
+    /// The framed lane container whose child frame `frame` is, if it is
+    /// one: what batches over a lane's rows are grouped by (4f).
+    pub(crate) fn lane_container_of(&self, frame: usize) -> Option<usize> {
+        let container = self.lanes.shared.as_ref()?.borrow().container_of(frame)?;
+        self.lanes
+            .bases
+            .contains_key(&container)
+            .then_some(container)
+    }
+
+    /// Where the batches over framed lane `container`'s rows are drawn:
+    /// the frame its content is in, cut to the clip it gives its content
+    /// (`lane_template`). A row's offset from it is its frame's shift
+    /// less this one's, an exact integer (`lane_child_at`).
+    ///
+    /// # Panics
+    ///
+    /// When `container` is no framed lane container.
+    pub(crate) fn lane_template_of(&self, container: usize) -> FrameAt {
+        let base = *self.lanes.bases.get(&container).unwrap_or_else(|| {
+            panic!(
+                "a batch names lane {container}, which these frames hold no base for: a batch \
+                 kept from another paint (frames_lane.rs); reproduce with `cargo xtask test`"
+            )
+        });
+        self.lane_template(base, self.at(base.parent))
+    }
+
     /// The base of the framed lane `frame` is a child of and the
     /// child's offset in it, CSS pixels.
     fn lane_place(&self, frame: usize) -> Option<(LaneBase, f64)> {

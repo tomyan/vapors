@@ -161,12 +161,11 @@ impl KeptBatches {
     pub(crate) fn batches(&mut self, sources: Sources<'_>) -> &KeptBatched {
         if self.current().is_none() {
             let (shown, boxes) = (&self.shown, (sources.boxes, sources.frames));
-            let (mut batched, frames) =
-                framed_batches(shown, |&(_, step, _)| step, boxes, self.view);
-            self.shown_culled = batched.culled;
-            batched.culled = self.culled(sources.extents);
+            let mut framed = framed_batches(shown, |&(_, step, _)| step, boxes, self.view);
+            self.shown_culled = framed.batched.culled;
+            framed.batched.culled = self.culled(sources.extents);
             let was = self.batched.as_ref();
-            self.batched = Some(KeptBatched::keyed((batched, frames), was));
+            self.batched = Some(KeptBatched::keyed(framed, was));
             self.stale = false;
         }
         self.batched.as_ref().expect("made above")
