@@ -4,6 +4,8 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod compiled_mount_order;
+mod compiled_winners;
 mod rust_sheets_refused;
 mod support;
 
@@ -231,7 +233,6 @@ mod typing_after_hide;
 mod ua_focus;
 mod update_counts;
 mod used_sharing;
-mod winners_oracle;
 
 /// Every `.rs` file directly under tests/ is a module above, so none is
 /// silently left out of the binary.
