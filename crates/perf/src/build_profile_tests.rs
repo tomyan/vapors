@@ -98,3 +98,43 @@ fn the_configs_read_are_each_directory_up_and_cargos_home() {
         );
     }
 }
+
+#[test]
+fn the_profile_is_named_from_out_dir_and_an_unknown_layout_is_refused() {
+    let named = |out: &str| build_judged::profile_of(std::path::Path::new(out));
+    assert_eq!(
+        named("/t/judged/build/vapors-perf-1a/out").as_deref(),
+        Ok("judged")
+    );
+    assert_eq!(
+        named("/t/x86_64-unknown-linux-gnu/release/build/p-1/out").as_deref(),
+        Ok("release")
+    );
+    let refused = named("/t/judged/build/vapors-perf/1a/out").expect_err("build-dir layout");
+    assert!(refused.contains("cannot be named"), "{refused}");
+}
+
+#[test]
+fn only_a_judged_build_is_refused_for_an_override() {
+    // Given an override in the environment
+    let env = vec![(
+        "CARGO_PROFILE_JUDGED_CODEGEN_UNITS".to_owned(),
+        "16".to_owned(),
+    )];
+
+    // Then a release build goes on, and a judged one is refused naming it
+    assert_eq!(build_judged::refusal("release", &env, &[]), Ok(()));
+    let refused = build_judged::refusal("judged", &env, &[]).expect_err("overridden");
+    assert!(
+        refused.contains("CARGO_PROFILE_JUDGED_CODEGEN_UNITS=16"),
+        "{refused}"
+    );
+    assert_eq!(build_judged::refusal("judged", &[], &[]), Ok(()));
+}
+
+#[test]
+fn a_scene_run_names_the_profile_built_and_whether_it_is_the_shipped_one() {
+    assert!(super::scene_header("release").starts_with("release (the shipped profile"));
+    let other = super::scene_header("judged");
+    assert!(other.starts_with("judged (not release"), "{other}");
+}

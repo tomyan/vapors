@@ -38,8 +38,8 @@ pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
     let start =
         before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
     println!(
-        "Revision: {REVISION}\nProfile: {} (scene runs are judged against release, the shipped profile)\nShader cache: {}",
-        crate::build_profile::BUILT,
+        "Revision: {REVISION}\nProfile: {}\nShader cache: {}",
+        crate::build_profile::scene_header(crate::build_profile::BUILT),
         cache.describe()
     );
     println!(

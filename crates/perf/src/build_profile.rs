@@ -6,7 +6,8 @@
 //! judged build that any override it can see would change: a
 //! `CARGO_PROFILE_JUDGED_*` variable, codegen units in the rustflags, or
 //! a `[profile.judged]` codegen-units in a cargo config on the path or in
-//! cargo's home (`build_judged.rs`).
+//! cargo's home (`build_judged.rs`). It cannot see `cargo --config`
+//! overrides or a config's inline tables; `build_judged.rs` names both.
 
 /// The profile directory this binary was built into (`build.rs`).
 pub const BUILT: &str = env!("VAPORS_PERF_PROFILE_DIR");
@@ -17,9 +18,21 @@ pub const JUDGED: &str = "judged";
 #[must_use]
 pub fn header() -> String {
     if BUILT == JUDGED {
-        format!("{BUILT} (release, codegen-units 1, no override at build)")
+        format!("{BUILT} (release, codegen-units 1, no override the build could see)")
     } else {
         format!("{BUILT} (not the judged profile)")
+    }
+}
+
+/// The profile a scene run states: scene runs are held to release, the
+/// shipped profile (`scene_run.rs`), so `built` is named with whether it
+/// is that one.
+#[must_use]
+pub fn scene_header(built: &str) -> String {
+    if built == "release" {
+        "release (the shipped profile, which scene runs are judged against)".to_owned()
+    } else {
+        format!("{built} (not release, the shipped profile scene runs are judged against)")
     }
 }
 

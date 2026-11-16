@@ -19,8 +19,9 @@ use crate::scaling::PhaseSeries;
 /// hoisted nodes; 9600 was that rounded up to the next hundred.
 ///
 /// Set again for the judged profile (2026-11-16, one codegen unit):
-/// 10,500.2 to 10,539.8 per row over three judged runs at 30c03ed2;
-/// 10,600 is the highest rounded up to the next hundred
+/// 10,500.2 to 10,550.3 per row over four judged runs (three at
+/// 30c03ed2, one at #411's head); 10,600 is the first hundred at least
+/// 0.4% over the highest, 0.47% of headroom
 /// (`docs/perf/a11y-phase-2026-11-12.md`, "Judged profile"). Layout-lane
 /// PR 5 (the accessibility mirror in flow, `docs/plans/splice-layout.md`)
 /// retires it, with the lower ceiling measured judged then.
@@ -30,17 +31,19 @@ pub const INSERT_A11Y_PER_ROW: u64 = 10_600;
 /// whose rows are one block holding their text: measured 1829.6 and
 /// 1832.9 per row (insert and remove frames, 2026-11-14, layout-lane PR
 /// 3f-2); 1900 was that rounded up to the next hundred. Set again for
-/// the judged profile (2026-11-16): 1961.2 to 1965.2 over three judged
-/// runs at 30c03ed2; 2000 is the highest rounded up. Layout-lane PR 5
-/// (the accessibility mirror in flow) retires it.
-pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 2000;
+/// the judged profile (2026-11-16): 1961.2 to 1968.1 over the same four
+/// judged runs; 1980 is the first ten at least 0.4% over the highest,
+/// 0.60% of headroom. Layout-lane PR 5 (the accessibility mirror in
+/// flow) retires it.
+pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1980;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
 ///
 /// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
 /// 13,443 and 13,446.3 per row. Set again for the judged profile
-/// (2026-11-16): 15,639.5 to 15,701.8 over three judged runs at
-/// 30c03ed2; 15,800 is the highest rounded up. Layout-lane PR 5 retires
+/// (2026-11-16): 15,639.5 to 15,721.2 over the same four judged runs;
+/// 15,800 is the first hundred at least 0.4% over the highest, 0.50% of
+/// headroom. Layout-lane PR 5 retires
 /// it, with the lower ceiling measured judged then.
 pub const RESIZE_A11Y_PER_ROW: u64 = 15_800;
 

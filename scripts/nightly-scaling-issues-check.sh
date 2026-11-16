@@ -82,11 +82,11 @@ check "a failed run with every change passing names that" "$(calls 'every change
 reset; printf '15\tNightly scaling: Idle: x\n' >"$FAKE_OPEN"; echo "release (not the judged profile)" >"$state/profile"
 report_results "$work/pass.log" abc 0
 check "a pass after the profile changed says the baseline moved" \
-  "$(calls 'changed since the last run, from release (not the judged profile) to judged (release, codegen-units 1, no override at build)')" 1
-check "and the profile is kept for the next run" "$(cat "$state/profile")" "judged (release, codegen-units 1, no override at build)"
-reset; echo "judged (release, codegen-units 1, no override at build)" >"$state/profile"; report_results "$fixture" abc 1
+  "$(calls 'changed since the last run, from release (not the judged profile) to judged (release, codegen-units 1, no override the build could see)')" 1
+check "and the profile is kept for the next run" "$(cat "$state/profile")" "judged (release, codegen-units 1, no override the build could see)"
+reset; echo "judged (release, codegen-units 1, no override the build could see)" >"$state/profile"; report_results "$fixture" abc 1
 check "a failure under the same profile names it and no change" \
-  "$(calls 'built with the judged (release, codegen-units 1, no override at build) profile')$(calls 'changed since the last run')" "30"
+  "$(calls 'built with the judged (release, codegen-units 1, no override the build could see) profile')$(calls 'changed since the last run')" "30"
 
 # The marker functions, from the runner.
 source <(sed -n '/^record_stale_marker() {/,/^}/p; /^unit_failed() {/,/^}/p' "$here/nightly-scaling.sh") ||

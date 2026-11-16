@@ -86,7 +86,7 @@ since_last_pass() {
 }
 
 # The profile the judge in log $1 was built with, as its header names
-# it (`Profile: judged (release, codegen-units 1); ...`).
+# it (`Profile: judged (release, codegen-units 1, ...); ...`).
 profile_of() {
   sed -n 's/^Profile: \([^;]*\).*/\1/p' "$1" | head -n 1
 }

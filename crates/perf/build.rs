@@ -9,9 +9,12 @@ mod build_judged;
 fn main() {
     vapors_compiler::build::compile_dir("ui");
     println!("cargo:rustc-env=VAPORS_PERF_REVISION={}", revision());
-    let profile = profile_dir();
-    if profile == "judged" {
-        refuse_overrides();
+    let out = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
+    let profile =
+        build_judged::profile_of(std::path::Path::new(&out)).unwrap_or_else(|why| panic!("{why}"));
+    let (env, configs) = what_overrides_read();
+    if let Err(why) = build_judged::refusal(&profile, &env, &configs) {
+        panic!("{why}");
     }
     println!("cargo:rustc-env=VAPORS_PERF_PROFILE_DIR={profile}");
     // the revision moves with every commit or checkout (HEAD's log), a
@@ -54,45 +57,30 @@ fn revision() -> String {
         .unwrap_or_else(|why| format!("unknown ({why})"))
 }
 
-/// The profile directory cargo builds this into (`release`, `judged`,
-/// `debug`): `OUT_DIR` is `<target>[/<triple>]/<profile>/build/<pkg>/out`.
-/// Cargo gives a build script no other name for a custom profile. A
-/// layout without `build` two levels up (cargo's unstable build-dir has
-/// `<profile>/build/<pkg>/<hash>/out`) fails the build naming that.
-fn profile_dir() -> String {
-    let out = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
-    let out = std::path::Path::new(&out);
-    let name = |n: usize| {
-        out.ancestors()
-            .nth(n)
-            .and_then(|dir| dir.file_name())
-            .map(|name| name.to_string_lossy().into_owned())
-    };
-    assert!(
-        name(2).as_deref() == Some("build"),
-        "OUT_DIR {} is not <target>/<profile>/build/<pkg>/out, so the profile cannot be named; \
-         fix: teach crates/perf/build.rs this layout",
-        out.display()
-    );
-    name(3).expect("a profile directory above build/")
-}
+/// A cargo config file's path and text.
+type Config = (std::path::PathBuf, String);
 
-/// Fails the build when anything it can see overrides the judged
-/// profile's one codegen unit (`build_judged.rs`).
-fn refuse_overrides() {
+/// The environment and the cargo config files that exist, which the
+/// judged profile's overrides are read from (`build_judged.rs`), each
+/// watched so a change reruns this script. A config file that does not
+/// exist is not watched: cargo reruns a build script on every build while
+/// a watched path is missing. Creating one is seen at the next run of
+/// this script.
+fn what_overrides_read() -> (Vec<(String, String)>, Vec<Config>) {
     let env: Vec<(String, String)> = std::env::vars().collect();
-    for (name, _) in env
+    let profile_vars = env
         .iter()
-        .filter(|(name, _)| name.starts_with("CARGO_PROFILE_JUDGED_"))
-    {
-        println!("cargo:rerun-if-env-changed={name}");
-    }
+        .map(|(name, _)| name.as_str())
+        .filter(|name| name.starts_with("CARGO_PROFILE_JUDGED_"));
     for name in [
         "CARGO_ENCODED_RUSTFLAGS",
         "RUSTFLAGS",
         "CARGO_BUILD_RUSTFLAGS",
         "CARGO_PROFILE_JUDGED_CODEGEN_UNITS",
-    ] {
+    ]
+    .into_iter()
+    .chain(profile_vars)
+    {
         println!("cargo:rerun-if-env-changed={name}");
     }
     let manifest =
@@ -101,18 +89,25 @@ fn refuse_overrides() {
         .map(std::path::PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| std::path::Path::new(&home).join(".cargo")))
         .expect("CARGO_HOME or HOME");
-    let configs: Vec<(std::path::PathBuf, String)> = build_judged::config_paths(&manifest, &home)
+    let configs = build_judged::config_paths(&manifest, &home)
         .into_iter()
-        .filter_map(|path| {
-            println!("cargo:rerun-if-changed={}", path.display());
-            std::fs::read_to_string(&path).ok().map(|text| (path, text))
-        })
+        .filter_map(read_config)
         .collect();
-    let found = build_judged::overrides(&env, &configs);
-    assert!(
-        found.is_empty(),
-        "the judged profile is release with one codegen unit, and these override it: {}; \
-         fix: remove them for a judged build, or build --release for an unjudged one",
-        found.join("; ")
-    );
+    (env, configs)
+}
+
+/// The config file at `path` and its text, watched; `None` when it does
+/// not exist; a file that exists but cannot be read fails the build.
+fn read_config(path: std::path::PathBuf) -> Option<Config> {
+    match std::fs::read_to_string(&path) {
+        Ok(text) => {
+            println!("cargo:rerun-if-changed={}", path.display());
+            Some((path, text))
+        }
+        Err(why) if why.kind() == std::io::ErrorKind::NotFound => None,
+        Err(why) => panic!(
+            "cannot read cargo config {}: {why}; fix: make it readable",
+            path.display()
+        ),
+    }
 }

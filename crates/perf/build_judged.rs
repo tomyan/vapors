@@ -1,11 +1,64 @@
-//! The overrides the build script refuses for the judged profile: any
+//! The build script's decisions, kept here so the crate's tests
+//! (`build_profile_tests.rs`) run them: the profile a build is for, named
+//! from `OUT_DIR`, and for the judged profile the overrides refused, any
 //! that could change its one codegen unit. Read from what a build script
 //! can see: cargo's environment (`CARGO_PROFILE_JUDGED_*`, the encoded
 //! and plain rustflags) and the cargo config files on the path from the
-//! package up and in cargo's home. Shared with the crate's tests
-//! (`build_profile_tests.rs`).
+//! package up and in cargo's home.
+//!
+//! Not seen, so not refused: `cargo --config profile.judged.codegen-units=16`
+//! (cargo gives a build script no trace of it), and a config that sets
+//! the value in an inline table (`profile = { judged = { codegen-units =
+//! 16 } }` or `judged = { codegen-units = 16 }` under `[profile]`), which
+//! this line reader does not parse. Reading the config with a TOML parser
+//! would retire the second; the first needs cargo to expose the profile.
 
 use std::path::{Path, PathBuf};
+
+/// The profile directory cargo builds into (`release`, `judged`, `debug`),
+/// from `out_dir`, which is `<target>[/<triple>]/<profile>/build/<pkg>/out`.
+/// Cargo gives a build script no other name for a custom profile.
+///
+/// # Errors
+/// A layout without `build` two levels up (cargo's unstable build-dir has
+/// `<profile>/build/<pkg>/<hash>/out`), naming it.
+pub fn profile_of(out_dir: &Path) -> Result<String, String> {
+    let name = |n: usize| out_dir.ancestors().nth(n).and_then(Path::file_name);
+    match (name(2), name(3)) {
+        (Some(build), Some(profile)) if build == "build" => {
+            Ok(profile.to_string_lossy().into_owned())
+        }
+        _ => Err(format!(
+            "OUT_DIR {} is not <target>/<profile>/build/<pkg>/out, so the profile cannot be named; \
+             fix: teach crates/perf/build_judged.rs this layout",
+            out_dir.display()
+        )),
+    }
+}
+
+/// Whether a build for `profile` may go on: any profile but `judged`
+/// always, and `judged` with no override.
+///
+/// # Errors
+/// The judged profile overridden, naming each override and the fix.
+pub fn refusal(
+    profile: &str,
+    env: &[(String, String)],
+    configs: &[(PathBuf, String)],
+) -> Result<(), String> {
+    if profile != "judged" {
+        return Ok(());
+    }
+    let found = overrides(env, configs);
+    if found.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "the judged profile is release with one codegen unit, and these override it: {}; \
+         fix: remove them for a judged build, or build --release for an unjudged one",
+        found.join("; ")
+    ))
+}
 
 /// Each override of the judged profile found, as a line naming where.
 pub fn overrides(env: &[(String, String)], configs: &[(PathBuf, String)]) -> Vec<String> {
