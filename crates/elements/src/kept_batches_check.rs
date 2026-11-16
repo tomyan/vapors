@@ -10,7 +10,8 @@ use vapors_scene::{Batched, Item, Run};
 
 use crate::framed_batches::{BatchRows, FramedBatched, hidden_items};
 use crate::frames::Frames;
-use crate::frames_draw::{BatchFrame, Framing};
+use crate::frames::shifted;
+use crate::frames_draw::{BatchFrame, FrameDraw, Framing};
 use crate::kept_batches::{Shown, Sources};
 use crate::kept_batches_keys::KeptBatched;
 
@@ -62,7 +63,10 @@ pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched
 /// An item, its clip and whether its batch is culled.
 type Placed = ((Item, Option<vapors_scene::Rect>), bool);
 
-/// `kept`'s items put on the page by their frames in `frames`.
+/// `kept`'s items put on the page as the painter draws them: each
+/// batch's clip moved by its frame's (or lane template's) shift and cut
+/// to its clip, the scissor; each item moved by that shift and its row's
+/// offset, what the shader adds (`vapors-app`'s `painter_runs.rs`).
 fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
     let batches = kept
         .batched
@@ -71,23 +75,74 @@ fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
         .zip(&kept.frames)
         .zip(&kept.rows);
     let on_page = batches.flat_map(|((batch, &frame), rows)| {
+        let (draw, offsets) = (frames.draw(frame), row_offsets(frames, frame, rows));
         let items = run_items(&batch.run).into_iter().enumerate();
-        let put = move |(at, item)| {
-            let in_frame = item_frame(frame, rows, at);
-            (frames.item(in_frame, &item, batch.clip), batch.culled)
+        let put = move |(at, item): (usize, Item)| {
+            let offset = item_offset(&offsets, rows, at);
+            (as_painted(&item, batch.clip, (draw, offset)), batch.culled)
         };
-        items.map(put)
+        items.map(put).collect::<Vec<_>>()
     });
     on_page.collect()
 }
 
-/// The frame of the `at`th item of a batch at `frame` with `rows`: the
-/// batch's frame, or the item's row's.
-fn item_frame(frame: BatchFrame, rows: &BatchRows, at: usize) -> usize {
+/// The offsets of a batch's rows, as the painter reads them; none for a
+/// batch in one frame.
+fn row_offsets(frames: &Frames, frame: BatchFrame, rows: &BatchRows) -> Vec<[f32; 2]> {
     match frame.0 {
-        Framing::Frame(frame) => frame,
-        Framing::Lane(_) => rows.frames[rows.items[at] as usize],
+        Framing::Frame(_) => Vec::new(),
+        Framing::Lane(container) => frames.row_offsets(container, &rows.frames),
     }
+}
+
+/// The `at`th item's row's offset: none for a batch in one frame.
+fn item_offset(offsets: &[[f32; 2]], rows: &BatchRows, at: usize) -> [f32; 2] {
+    if rows.items.is_empty() {
+        return [0.0, 0.0];
+    }
+    let row = rows
+        .items
+        .get(at)
+        .and_then(|&row| offsets.get(row as usize));
+    *row.unwrap_or_else(|| {
+        panic!(
+            "item {at} of a lane batch has no row with an offset ({} items' rows, {} offsets): \
+             each batched item names its row (framed_batches_rows.rs); reproduce with `cargo \
+             xtask test`",
+            rows.items.len(),
+            offsets.len()
+        )
+    })
+}
+
+/// `item` under `clip` as drawn at `draw` with its row's `offset`: the
+/// item moved by both, the clip by the shift and cut to the frame's clip.
+/// Unmoved, to the bit, by a zero shift (a key tells -0.0 from 0.0).
+// Exact: a zero shift is exactly zero.
+#[allow(clippy::float_cmp)]
+fn as_painted(
+    item: &Item,
+    clip: Option<vapors_scene::Rect>,
+    (draw, offset): (FrameDraw, [f32; 2]),
+) -> (Item, Option<vapors_scene::Rect>) {
+    let shift = [draw.shift[0] + offset[0], draw.shift[1] + offset[1]];
+    let item = if shift == [0.0, 0.0] {
+        *item
+    } else {
+        shifted(*item, shift)
+    };
+    let clip = clip.map(|clip| {
+        if draw.shift == [0.0, 0.0] {
+            clip
+        } else {
+            clip.offset(draw.shift)
+        }
+    });
+    let clip = match (clip, draw.clip) {
+        (Some(clip), Some(frame)) => Some(clip.intersection(frame)),
+        (clip, frame) => clip.or(frame),
+    };
+    (item, clip)
 }
 
 /// `page`'s items, each with its batch's clip.

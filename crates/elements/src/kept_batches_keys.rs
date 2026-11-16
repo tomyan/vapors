@@ -81,7 +81,9 @@ impl KeptBatched {
     }
 
     /// Whether `self`'s batch at `was` draws the bytes `framed`'s at `now`
-    /// does: the same run to the bit and each item in the same row.
+    /// does: the same run to the bit and each item at the same row index.
+    /// The rows' frames are not in the bytes: the painter reads their
+    /// offsets each draw, so a batch whose rows moved keeps its bytes.
     fn same(&self, was: usize, (framed, now): (&FramedBatched, usize)) -> bool {
         let (Some(old), Some(new)) = (
             self.batched.batches.get(was),
@@ -89,7 +91,9 @@ impl KeptBatched {
         ) else {
             return false;
         };
-        same_bits(&old.run, &new.run) && self.rows.get(was) == framed.rows.get(now)
+        let (old_rows, new_rows) = (self.rows.get(was), framed.rows.get(now));
+        same_bits(&old.run, &new.run)
+            && old_rows.map(BatchRows::items) == new_rows.map(BatchRows::items)
     }
 
     /// A key for each of `batched`'s batches: `self`'s at the same place

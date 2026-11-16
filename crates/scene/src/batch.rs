@@ -93,14 +93,29 @@ impl Batched {
     /// each culled in a view of its own (the rows of a lane, each in its
     /// own frame's coordinates).
     pub fn add(&mut self, item: &Item, clip: Option<Rect>, view: Rect) -> bool {
-        if !culled(item, clip, view) {
-            self.push(item, clip, false);
+        self.add_clipped(item, (clip, clip), view)
+    }
+
+    /// As [`Batched::add`], culled under `culled_by` but batched under
+    /// `batched_under`: for an item whose clip is in its row's
+    /// coordinates (culling, in the row's view) and is drawn in the
+    /// lane's (the batch's clip, moved by the row's offset), so items of
+    /// different rows under equal clips in their rows are not batched
+    /// under one scissor.
+    pub fn add_clipped(
+        &mut self,
+        item: &Item,
+        (culled_by, batched_under): (Option<Rect>, Option<Rect>),
+        view: Rect,
+    ) -> bool {
+        if !culled(item, culled_by, view) {
+            self.push(item, batched_under, false);
             return true;
         }
         self.culled += 1;
         let surface = matches!(item, Item::Surface { .. });
         if surface {
-            self.push(item, clip, true);
+            self.push(item, batched_under, true);
         }
         surface
     }

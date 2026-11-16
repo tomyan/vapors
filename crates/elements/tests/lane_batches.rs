@@ -13,6 +13,7 @@ use std::rc::Rc;
 
 use support::lane_page::assert_drawn_afresh;
 use support::{document, element, viewport};
+use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 
 /// A list of `count` rows under body, each `height` CSS px with a
@@ -107,4 +108,38 @@ fn rows_fractional_in_device_pixels_at_scale_2_75_are_declined_and_drawn_in_plac
     // Then: declined, so no batch is over rows, and drawn as the page has it
     assert!(rows.is_empty(), "{rows:?}");
     assert_drawn_afresh(&doc, pixel_view(), "fractional rows at 2.75");
+}
+
+/// The keys of the batches drawn at `view`.
+fn batch_keys(doc: &Rc<RefCell<Document>>, view: Viewport) -> Vec<vapors_elements::BatchKey> {
+    let mut doc = doc.borrow_mut();
+    let painted = doc.update(view).expect("updates");
+    let rect = vapors_scene::Rect::new(0.0, 0.0, view.width * view.scale, view.height * view.scale);
+    painted.kept_batches(rect).keys.clone()
+}
+
+#[test]
+fn a_row_put_in_above_moves_rows_across_the_split_and_the_batches_keep_their_keys() {
+    // Given: 1 px rows, split at 128 rows, drawn
+    let view = viewport(400.0, 300.0);
+    let doc = coloured_rows(400, "1px", view);
+    let keys = batch_keys(&doc, view);
+
+    // When: a row put in at the top: the 128th row moves into the second
+    // batch, the 256th into the third
+    {
+        let mut doc = doc.borrow_mut();
+        let list = doc.children(doc.body())[0];
+        let row = doc.create_element("div");
+        doc.set_attribute(row, "class", "row");
+        let first = doc.children(list)[0];
+        doc.insert_before(list, row, Some(first));
+    }
+
+    // Then: split as before; each batch draws the same bytes, its items
+    // at the same row indexes, so it keeps its key; and the batches are
+    // those of batching afresh, drawn where the page has each item
+    assert_eq!(batch_rows(&doc, view), [128, 128, 45]);
+    assert_eq!(batch_keys(&doc, view), keys);
+    assert_drawn_afresh(&doc, view, "rows moved across the split");
 }

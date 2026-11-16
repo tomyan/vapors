@@ -179,6 +179,8 @@ mod lane;
 mod read;
 pub(crate) use lane::LaneBase;
 use lane::{LaneFrames, LaneInk};
+#[cfg(debug_assertions)]
+pub(crate) use read::shifted;
 pub(crate) use update::FrameInputs;
 
 #[cfg(test)]

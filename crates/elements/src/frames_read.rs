@@ -108,7 +108,7 @@ impl Frames {
 }
 
 /// `item` moved by `delta`, device pixels.
-fn shifted(item: Item, delta: [f32; 2]) -> Item {
+pub(crate) fn shifted(item: Item, delta: [f32; 2]) -> Item {
     match item {
         Item::Text { text, origin, ink } => Item::Text {
             text,

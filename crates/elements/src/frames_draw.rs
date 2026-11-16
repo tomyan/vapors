@@ -51,9 +51,7 @@ impl Frames {
     /// `view`, device pixels on the page, in frame `frame`'s coordinates
     /// and cut to its clip: where the frame's items can show.
     pub(crate) fn view_in(&self, frame: usize, view: Rect) -> Rect {
-        let at = self.at(frame);
-        let view = at.device_clip.map_or(view, |clip| clip.intersection(view));
-        view.offset(at.shift.map(|v| -v))
+        view_at(self.at(frame), view)
     }
 
     /// Where a batch named `frame` is drawn: its frame's shift and clip,
@@ -80,6 +78,13 @@ impl Frames {
         };
         rows.iter().map(offset).collect()
     }
+}
+
+/// `view`, device pixels on the page, in the coordinates of the frame
+/// at `at` and cut to its clip.
+pub(crate) fn view_at(at: crate::frames::FrameAt, view: Rect) -> Rect {
+    let view = at.device_clip.map_or(view, |clip| clip.intersection(view));
+    view.offset(at.shift.map(|v| -v))
 }
 
 impl Painted {

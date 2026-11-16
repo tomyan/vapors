@@ -1,8 +1,10 @@
 //! Batches over the rows of a lane (`docs/plans/splice-layout.md`
 //! section 11.2, 4f): each item drawn at its batch's shift and its row's
 //! offset. A batch's table of row offsets ([`RowOffsets`]) is kept with
-//! its key and made again only when its rows' offsets change (an insert
-//! above them), so a draw neither builds nor hashes one otherwise.
+//! its key and made again only when its rows' offsets change (a row
+//! above them grown or put in): each draw still reads the rows' offsets
+//! and compares them with the kept ones, but builds no table and hashes
+//! none for the uniform slots.
 
 use std::collections::HashMap;
 
@@ -64,13 +66,32 @@ pub(super) struct Moved<'a> {
 
 impl Moved<'_> {
     /// Where the `at`th item is drawn, for the pipelines that draw an
-    /// item at a time (images and surfaces): the shift and its row's
-    /// offset.
+    /// item at a time (images and surfaces): the shift for a batch in one
+    /// frame (no rows); else the shift and its row's offset.
+    ///
+    /// # Panics
+    ///
+    /// When the batch has rows and the item has none, or its row no
+    /// offset: drawn at the shift alone, it would land in the lane's
+    /// first row.
     pub(super) fn item_shift(&self, at: usize) -> Shift {
-        let Some(&row) = self.rows.items().get(at) else {
+        let items = self.rows.items();
+        if items.is_empty() {
             return self.shift;
-        };
-        let [dx, dy] = self.offsets[row as usize];
+        }
+        let offset = items
+            .get(at)
+            .and_then(|&row| self.offsets.get(row as usize));
+        let [dx, dy] = *offset.unwrap_or_else(|| {
+            panic!(
+                "item {at} of a lane batch has no row with an offset ({} items' rows, {} \
+                 offsets): each item of a batch over a lane's rows names its row, culled \
+                 surfaces included (vapors-elements framed_batches_rows.rs); reproduce with \
+                 `cargo xtask test`",
+                items.len(),
+                self.offsets.len()
+            )
+        });
         let [x, y] = self.shift.pixels();
         Shift::whole([x + dx, y + dy])
     }

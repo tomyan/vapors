@@ -53,13 +53,25 @@ pub(crate) fn quads_counted(
 /// Each draw's vertices among the floats of `placed`: six for each of
 /// its inked entries (glyphs or icon strokes), the draws holding
 /// `entries` entries each, in order.
+///
+/// # Panics
+///
+/// When the draws hold more entries than were placed.
 pub(crate) fn vertices_per_draw(
     placed: &[AtlasGlyph],
     entries: impl Iterator<Item = usize>,
 ) -> Vec<usize> {
     let mut at = 0;
     let inked = |count: usize| {
-        let mine = &placed[at..at + count];
+        let mine = placed.get(at..at + count).unwrap_or_else(|| {
+            panic!(
+                "a draw's entries {at}..{} run past the {} placed: each draw's entries are \
+                 those placed for it, in order (quads.rs, draw_icon.rs); reproduce with `cargo \
+                 xtask test`",
+                at + count,
+                placed.len()
+            )
+        });
         at += count;
         6 * mine.iter().filter(|placed| !placed.is_empty()).count()
     };
