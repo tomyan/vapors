@@ -101,7 +101,7 @@ fn rebuild_owners(
     rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let (changed, visits) = lend_owners(placed, (&nodes, &slots, &roots), &taken, may_keep);
-    rebuilt.inserted = to_chain(placed, source, (owners, &slots, &roots));
+    rebuilt.to_chain = to_chain(placed, source, (owners, &slots, &roots));
     rebuilt.lend_visits = visits;
     placed.drop_lanes();
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));

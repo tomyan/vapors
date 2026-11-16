@@ -33,9 +33,9 @@ fn an_insert_chains_the_same_children_on_a_list_four_times_the_size() {
     };
     let (a, b) = (insert(&small), insert(&large));
 
-    // Then: the inserted row's children, not every row
-    assert_eq!(a.slots_chained, b.slots_chained);
-    assert!(a.slots_chained > 0, "the inserted row is chained");
+    // Then: the inserted row's children and those of the containers laid
+    // out above it, 6 on either list, not every row
+    assert_eq!((a.slots_chained, b.slots_chained), (6, 6));
 }
 
 #[test]
@@ -45,12 +45,16 @@ fn a_row_moved_under_another_row_with_an_insert_matches_a_full_update() {
 
     // When: a row put in before row 5, and row 30 moved into row 40, in
     // one update
-    page.edited(VIEW(), |page| {
+    let counts = page.edited(VIEW(), |page| {
         page.insert_at(5);
         page.doc
             .borrow_mut()
             .insert_before(page.rows[40], page.rows[30], None);
     });
+    // both the list and row 40 are edited in place, so each chains only
+    // what the rebuild lists for it: the moved row, as row 40's insert
+    let edited = (counts.children_edited, counts.children_edits_declined);
+    assert_eq!(edited, (2, 0), "{counts:?}");
 
     // Then: matched against a full update inside `edited`
 }

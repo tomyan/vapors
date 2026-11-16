@@ -33,16 +33,21 @@ pub(super) fn to_chain(
     chain
 }
 
-/// The slot of the box `node`'s box is a child of: its nearest ancestor
-/// element's that holds a box (an ancestor with `display: contents` or
-/// none holds none).
+/// The slot of the box `node`'s box is a child of: its parent element's.
+/// `None` for the root.
+///
+/// # Panics
+/// When the parent holds no box: every element with a box has a parent
+/// element with one (`display: contents` is refused, and nothing under
+/// `display: none` makes a box), so slots and boxes disagree.
 fn box_parent(placed: &Placed, source: &Source<'_>, node: NodeId) -> Option<usize> {
-    let mut at = source.arena.get(node, "box_parent").parent;
-    while let Some(ancestor) = at {
-        if let Some(slot) = placed.slots.of(Key::Element(ancestor)) {
-            return Some(slot);
-        }
-        at = source.arena.get(ancestor, "box_parent").parent;
-    }
-    None
+    let parent = source.arena.get(node, "box_parent").parent?;
+    let slot = placed.slots.of(Key::Element(parent));
+    Some(slot.unwrap_or_else(|| {
+        panic!(
+            "owner {node:?}, rebuilt with a box, has parent {parent:?}, which holds no box: \
+             slots and boxes disagree (layout/rebuild_chain.rs `box_parent`); reproduce with \
+             `cargo xtask test`"
+        )
+    }))
 }
