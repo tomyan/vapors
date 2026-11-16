@@ -114,6 +114,18 @@ pub struct UpdateCounts {
     /// The condition that declined the first of those, when
     /// `lanes_declined` is above 0, else `None`.
     pub lane_decline: Option<LaneDecline>,
+    /// Lane containers whose children are frames of their own after this
+    /// update (`docs/plans/splice-layout.md`, section 11): those placed
+    /// framed and those kept framed.
+    pub lanes_framed: usize,
+    /// Lane containers placed this update whose children could not be
+    /// frames of their own (`LaneFramePixel`, `LaneFrameScrollingChild`): their
+    /// children keep the placement from before lane frames
+    /// (`docs/plans/splice-layout.md`, section 11).
+    pub lanes_unframed: usize,
+    /// The reason for the first of those, when `lanes_unframed` is above
+    /// 0, else `None`.
+    pub lane_unframed: Option<LaneDecline>,
     /// Rebuilt boxes whose subtree changed and that layout laid out in
     /// isolation (`layout/isolated.rs`): asked what their parent asked
     /// the box they replaced, they answered the same, so their
@@ -146,6 +158,10 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// Scroll containers whose range the placement walk measured from
+    /// their content (4g): those laid out or built again; a container
+    /// that only scrolled is clamped to the range it kept.
+    pub scroll_ranges_measured: usize,
     /// In-flow children chained to the slot they are placed in before
     /// the placement walk (M10b, `placement.rs`): those of each slot
     /// built again or laid out, each such slot once. 0 when nothing is
@@ -171,6 +187,11 @@ pub struct UpdateCounts {
     /// whole device pixels before and after, its edges snapping as
     /// they did, moved.
     pub boxes_shifted: usize,
+    /// Scroll frames this update worked out (`paint_frames.rs`): every
+    /// one when they were made afresh, else those whose container
+    /// scrolled or whose clips were redone and the frames nested in them,
+    /// stopping at a frame kept by its own part (`frames_relative.rs`).
+    pub scroll_frames_worked: usize,
     /// Boxes whose kept paint paint read and kept rather than drew:
     /// those moved or whose clip was worked out again, but whose paint
     /// was made from the same rect, clip and padding (IU3 3c-3d2). The
@@ -216,6 +237,10 @@ pub struct UpdateCounts {
     /// spliced for inserted and removed in-flow boxes in place of being
     /// walked (`order_splice.rs`, `docs/plans/splice.md` (c)): 1 or 0.
     pub order_splices: usize,
+    /// Of those, the splices whose drawing steps, extents index and hits
+    /// were patched by the splice's edits, not made afresh
+    /// (`paint_partial_drawn.rs` `many`): 1 or 0.
+    pub order_splices_patched: usize,
     /// Times a shape change could not be spliced and the whole tree was
     /// walked instead: a changed slot's children reordered, a box with
     /// a stacking other than the default inserted or removed, or a
@@ -224,6 +249,19 @@ pub struct UpdateCounts {
     /// The condition that declined the splice when `splices_declined`
     /// is 1, else `None`.
     pub splice_decline: Option<SpliceDecline>,
+    /// Paint-order labels the splice relabelled to make room for the
+    /// steps it put in (`paint_labels.rs`), every label when it found no
+    /// range with room: each relabelled step's entries are patched.
+    pub paint_relabelled: usize,
+    /// Times the splice relabelled every label (counted in
+    /// `paint_relabelled` too), so a page that hits it shows.
+    pub paint_relabel_all: usize,
+    /// 1 when the update left the kept batches' steps to be sorted again
+    /// at the next draw, every frame searched afresh: a frame moved, paint
+    /// order was walked, every label relabelled, or the patch at a lane's
+    /// ends fell back (`KeptBatches::lanes_moved`); else 0. Insert and
+    /// `FlexInsert` take the patch when this stays 0.
+    pub batch_steps_sorted_again: usize,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.

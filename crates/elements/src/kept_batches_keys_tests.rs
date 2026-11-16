@@ -23,8 +23,15 @@ pub(super) fn batches(items: &[(Item, Option<Rect>)]) -> Batched {
 
 /// `batched` on the page, keyed against `was`.
 pub(super) fn keyed(batched: Batched, was: Option<&KeptBatched>) -> KeptBatched {
-    let frames = vec![BatchFrame(PAGE); batched.batches.len()];
-    KeptBatched::keyed((batched, frames), was)
+    let count = batched.batches.len();
+    let mut rows = crate::framed_batches::RowsOfBatches::default();
+    rows.add_unrowed(count);
+    let framed = crate::framed_batches::FramedBatched {
+        frames: vec![BatchFrame::frame(PAGE); count],
+        rows,
+        batched,
+    };
+    KeptBatched::keyed(framed, was)
 }
 
 /// Three batches: a quad unclipped, one clipped, one unclipped again.
@@ -150,4 +157,52 @@ fn a_batch_whose_edge_went_from_minus_zero_to_zero_gets_a_new_key() {
     // Then
     assert_eq!((again.keys[0], again.keys[2]), (was.keys[0], was.keys[2]));
     assert_ne!(again.keys[1], was.keys[1]);
+}
+
+/// One batch of two quads, each in the row `items` names, in rows 7
+/// and 8, keyed against `was`.
+fn in_rows(items: [u32; 2], was: Option<&KeptBatched>) -> KeptBatched {
+    in_row_frames(items, [7, 8], was)
+}
+
+/// As [`in_rows`], the rows' frames `row_frames`.
+fn in_row_frames(
+    items: [u32; 2],
+    row_frames: [usize; 2],
+    was: Option<&KeptBatched>,
+) -> KeptBatched {
+    let batched = batches(&[(quad(0.0, 1), None), (quad(20.0, 1), None)]);
+    let rows = crate::framed_batches::RowsOfBatches::one(&row_frames, &items);
+    let framed = crate::framed_batches::FramedBatched {
+        frames: vec![BatchFrame::lane(3)],
+        rows,
+        batched,
+    };
+    KeptBatched::keyed(framed, was)
+}
+
+#[test]
+fn a_batch_whose_items_moved_to_other_rows_gets_a_new_key() {
+    // Given: the quads in rows 0 and 1
+    let was = in_rows([0, 1], None);
+
+    // When: both in row 0, the same run to the bit
+    let again = in_rows([0, 0], Some(&was));
+
+    // Then: its bytes, holding each item's row, are others
+    assert_ne!(again.keys, was.keys);
+    assert_eq!(in_rows([0, 1], Some(&was)).keys, was.keys);
+}
+
+#[test]
+fn a_batch_whose_items_are_in_other_rows_frames_at_the_same_indexes_keeps_its_key() {
+    // Given: the quads in rows 0 and 1, frames 7 and 8
+    let was = in_rows([0, 1], None);
+
+    // When: a scroll by two rows puts the same items in frames 9 and 10
+    let again = in_row_frames([0, 1], [9, 10], Some(&was));
+
+    // Then: its bytes, holding the indexes, are the same; the painter
+    // reads the new frames' offsets
+    assert_eq!(again.keys, was.keys);
 }

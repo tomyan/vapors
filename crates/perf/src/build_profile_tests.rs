@@ -138,3 +138,13 @@ fn a_scene_run_names_the_profile_built_and_whether_it_is_the_shipped_one() {
     let other = super::scene_header("judged");
     assert!(other.starts_with("judged (not release"), "{other}");
 }
+
+#[test]
+fn a_mount_run_names_the_profile_built_and_whether_it_is_the_shipped_one() {
+    assert_eq!(
+        super::shipped_header("release"),
+        "release (the shipped profile)"
+    );
+    let other = super::shipped_header("judged");
+    assert!(other.starts_with("judged (not release"), "{other}");
+}

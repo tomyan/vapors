@@ -1,6 +1,8 @@
 //! Drawing the scene's kept batches (`painter.rs`): each batch in
 //! painting order, moved by its scroll frame's shift, under its clip
-//! moved the same way and cut to the frame's clip.
+//! moved the same way and cut to the frame's clip; a batch over a
+//! lane's rows moves each item by its row's offset too
+//! (`painter_rows.rs`).
 
 use vapors_elements::{BatchKey, KeptBatched, Painted};
 use vapors_renderer::{Shift, Target};
@@ -9,7 +11,9 @@ use vapors_scene::Run;
 use super::ScenePainter;
 use super::errors::PaintError;
 use super::kept::Kind as KeptKind;
-use super::region::{clipped, on_page, view};
+use super::places::BatchPlaces;
+use super::region::{clipped, view};
+use super::rows::Moved;
 
 impl ScenePainter {
     pub(super) fn paint_runs(
@@ -22,40 +26,80 @@ impl ScenePainter {
         drop(batching);
         self.counts.culled = kept.batched.culled;
         assert_parallel(&kept);
-        let batches = kept.batched.batches.iter().zip(&kept.frames);
-        for (at, ((batch, &frame), &key)) in batches.zip(&kept.keys).enumerate() {
-            let frame = painted.frame_draw(frame);
-            let clip = on_page(batch.clip, frame);
-            match clipped(target, clip).filter(|_| !batch.culled) {
-                Some(clipped) => {
-                    self.draw_run(
-                        &clipped,
-                        painted,
-                        (&batch.run, key, at),
-                        Shift::whole(frame.shift),
-                    )?;
-                }
-                None => self
-                    .surfaces
-                    .check_clipped(target.device, painted, &batch.run)?,
-            }
+        self.placed(painted, view(target), &kept);
+        let mut places = std::mem::take(&mut self.places);
+        let drawn = self.draw_batches(target, painted, (&kept, &mut places));
+        self.places = places;
+        drawn
+    }
+
+    /// Draws each of `kept`'s batches at its place in `places`, under its
+    /// scissor; a clipped-out batch's surfaces checked instead.
+    fn draw_batches(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        (kept, places): (&KeptBatched, &mut BatchPlaces),
+    ) -> Result<(), PaintError> {
+        for (at, batch) in kept.batched.batches.iter().enumerate() {
+            let frame = places.frame(at, painted, kept);
+            let Some(clipped) =
+                clipped(target, frame.on_page(batch.clip)).filter(|_| !batch.culled)
+            else {
+                self.surfaces
+                    .check_clipped(target.device, painted, &batch.run)?;
+                continue;
+            };
+            self.draw_placed(&clipped, (painted, kept), (places, at, frame))?;
         }
         Ok(())
     }
 
+    /// Draws `kept`'s batch `at` under `target` at `frame`, each row at
+    /// its offset in `places`.
+    fn draw_placed(
+        &mut self,
+        target: &Target<'_>,
+        (painted, kept): (&Painted, &KeptBatched),
+        (places, at, frame): (&mut BatchPlaces, usize, vapors_elements::FrameDraw),
+    ) -> Result<(), PaintError> {
+        let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
+        let moved = Moved {
+            shift: Shift::whole(frame.shift),
+            table,
+            offsets,
+            rows: kept.rows.get(at).unwrap_or_default(),
+        };
+        let run = &kept.batched.batches[at].run;
+        self.draw_run(target, painted, (run, kept.keys[at], at), &moved)
+    }
+
+    /// Each batch's place for this frame: kept from the last when the
+    /// paint and view are the same, else worked out again as each batch
+    /// is drawn, each lane batch's table kept by key (`painter_rows.rs`).
+    fn placed(&mut self, painted: &Painted, view: vapors_scene::Rect, kept: &KeptBatched) {
+        if self.places.current(painted, view, kept) {
+            #[cfg(debug_assertions)]
+            self.places.assert_current(painted, kept);
+            return;
+        }
+        self.row_tables.begin();
+        self.places.reset((painted, view), kept);
+    }
+
     /// Draws `run` with the pipeline for its kind under `target`'s
-    /// scissor, moved by its frame's `shift`, and counts the work it
-    /// issued. A draw the pipeline's buffers refused ends the frame here.
+    /// scissor, moved as `moved` says, and counts the work it issued. A
+    /// draw the pipeline's buffers refused ends the frame here.
     fn draw_run(
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: Shift,
+        moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let result = match KeptKind::of_run(run) {
-            Some(_) => self.draw_retained(target, painted, (run, key, at), shift),
-            None => self.draw_kept_text(target, painted, (run, key, at), shift),
+            Some(_) => self.draw_retained(target, painted, (run, key, at), moved),
+            None => self.draw_kept_text(target, painted, (run, key, at), moved),
         };
         self.count_run(run);
         result?;

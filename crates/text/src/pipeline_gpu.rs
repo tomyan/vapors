@@ -82,8 +82,8 @@ pub(crate) fn render_pipeline(
     )
 }
 
-const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
-    wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
+const ATTRIBUTES: [wgpu::VertexAttribute; 4] =
+    wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4, 3 => Uint32];
 const BUFFERS: [Option<wgpu::VertexBufferLayout<'static>>; 1] = [Some(wgpu::VertexBufferLayout {
     array_stride: VERTEX_SIZE,
     step_mode: wgpu::VertexStepMode::Vertex,

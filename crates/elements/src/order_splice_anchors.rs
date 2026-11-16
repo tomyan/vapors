@@ -25,17 +25,19 @@ impl Children<'_> {
         place: Place<'_>,
     ) -> Result<(usize, usize), Declined> {
         let in_flow = |slot: &usize| !stackings.get(*slot).positioned;
-        let mut after = self.new[run.end..].iter().filter(|slot| self.kept(**slot));
+        let mut after = (run.end..self.new.len())
+            .filter(|&at| self.kept_at(at))
+            .map(|at| &self.new[at]);
         if let Some(&next) = after.find(|slot| in_flow(slot)) {
             return Ok((
                 placed(place, Step::Box(next)),
                 placed(place, Step::Outline(next)),
             ));
         }
-        let mut before = self.new[..run.start]
-            .iter()
+        let mut before = (0..run.start)
             .rev()
-            .filter(|slot| self.kept(**slot));
+            .filter(|&at| self.kept_at(at))
+            .map(|at| &self.new[at]);
         if let Some(&prev) = before.find(|slot| in_flow(slot)) {
             let last = last_in_flow(boxes, stackings, prev)?;
             return Ok((
@@ -43,7 +45,7 @@ impl Children<'_> {
                 placed(place, Step::Outline(last)) + 1,
             ));
         }
-        if self.new.iter().any(|slot| self.kept(*slot)) {
+        if self.keeps_any() {
             return Err(Declined::OnlyOutOfFlowKept);
         }
         let own = self.owner;

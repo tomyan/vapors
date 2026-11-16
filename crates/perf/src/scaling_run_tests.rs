@@ -105,7 +105,7 @@ fn a_first_frame_phase_is_known_to_the_mount_list_and_not_to_the_steady_table() 
 
     // When
     let steady = at_size(1000, &samples, &PHASES);
-    let first = at_size(1000, &samples, &crate::mount_report::MOUNT_PHASES);
+    let first = at_size(1000, &samples, &crate::report::EVERY_PHASE);
 
     // Then
     assert!(steady.expect_err("steady").contains("accessibility"));

@@ -6,7 +6,10 @@
 //! kept frames with frames made afresh after every update.
 
 use crate::changed_slots::ChangedSlots;
-use crate::frames::{FrameInputs, Frames};
+use rustc_hash::FxHashMap;
+
+use crate::frames::{FrameInputs, Frames, LaneBase};
+use crate::kept_clips::Clips;
 use crate::kept_order::KeptOrder;
 use crate::layout::LayoutBox;
 use crate::paint::PaintInput;
@@ -22,7 +25,10 @@ pub(crate) fn updated(
     (boxes, input): (&[LayoutBox], &PaintInput<'_>),
     (changed, kept): (&ChangedSlots, bool),
 ) -> bool {
-    let reshaped = !kept || order.walks.reshaped();
+    // a lane that started or stopped framing moved the scroll containers
+    // in its rows to other frames, which a kept update cannot follow
+    let reshaped = !kept || order.walks.reshaped() || changed.reframed;
+    let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
     // Relaxed in a release build: the scan runs only when the frames are
     // made afresh. The scroll containers change only when paint order is
     // walked or spliced (a box that starts or stops scrolling is
@@ -30,7 +36,11 @@ pub(crate) fn updated(
     // refuses a container the frames were not made for in its place.
     if reshaped || cfg!(debug_assertions) {
         let scrolls = |slot| input.stackings.scrolls(slot);
-        crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
+        let named = (
+            &scrolls as &dyn Fn(usize) -> bool,
+            &lane_frame as &dyn Fn(usize) -> bool,
+        );
+        crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, named);
     }
     let depth = |slot| order.tree.depth(slot);
     let shift =
@@ -39,11 +49,55 @@ pub(crate) fn updated(
         clips: &order.clips,
         depth: &depth,
         shift: &shift,
+        lane_frame: &lane_frame,
     };
-    if reshaped {
-        return made_afresh(painted, &order.thumbs, &inputs, input.scale);
+    let moved = if reshaped {
+        let spliced = kept && order.walks.order == 0;
+        made_afresh(painted, &order.thumbs, &inputs, (input.scale, spliced))
+    } else {
+        kept_updated(painted, (order, changed), &inputs, input)
+    };
+    let bases = lane_bases(input, &order.clips);
+    let lanes = (bases, &changed.started[..]);
+    let rebased = painted
+        .frames
+        .set_lanes(std::rc::Rc::clone(input.lanes), lanes);
+    moved || rebased
+}
+
+/// Each framed lane's base (`frames_lane.rs`): the frame its
+/// container's content is in, the container's top there and the clip it
+/// gives its content, from the placement and clips painted from.
+/// O(framed lanes): a framed lane is one of many children
+/// (`placement_frames.rs`).
+fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBase> {
+    let framed = input
+        .placement
+        .framing
+        .iter()
+        .filter(|(_, framing)| framing.is_ok());
+    framed
+        .map(|(&container, _)| (container, lane_base(input, clips, container)))
+        .collect()
+}
+
+/// The base of the framed lane container `container`: its content is
+/// in its own scroll frame when it scrolls, clipped there already; else
+/// in the frame its box is in, under the clip it gives its content.
+fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBase {
+    let origin = input.placement.rects[container].y;
+    if input.stackings.scrolls(container) {
+        return LaneBase {
+            parent: container,
+            origin,
+            inner: None,
+        };
     }
-    kept_updated(painted, (order, changed), &inputs, input)
+    LaneBase {
+        parent: clips.frame(container),
+        origin,
+        inner: clips.inner(container),
+    }
 }
 
 /// `painted`'s frames made afresh for the scroll containers `thumbs`;
@@ -52,10 +106,16 @@ fn made_afresh(
     painted: &mut Painted,
     thumbs: &[usize],
     inputs: &FrameInputs<'_>,
-    scale: f32,
+    (scale, spliced): (f32, bool),
 ) -> bool {
     painted.frames_worked = thumbs.len();
-    let made = Frames::of(thumbs, inputs, scale);
+    let mut made = Frames::of(thumbs, inputs, scale);
+    // a splice notes ink only for the lane frames it painted
+    // (`paint_lane_ink.rs`); the kept rows' ink is carried
+    if spliced {
+        made.take_lane_ink(&mut painted.frames);
+    }
+    made.keep_lane_bases(&painted.frames);
     !std::mem::replace(&mut painted.frames, made).same_frames(&painted.frames)
 }
 

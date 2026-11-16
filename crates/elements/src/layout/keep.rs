@@ -14,7 +14,7 @@
 //! handles point into. An absolute or fixed box is never lent: its
 //! containing block lies outside its subtree.
 
-use taffy::Position;
+use taffy::{Layout, Point, Position};
 use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
@@ -108,10 +108,15 @@ impl KeptBoxes {
         }
         let (old, old_boxes) = (&self.placed.slots, &self.placed.boxes);
         let before = |at: usize| Some((old.key(at)?, old_boxes.get(at)?));
+        // the boxes lent to are placed with no lane yet, so each layout
+        // lent is where Taffy put it, its lane's start added back
+        let lanes = self.placed.lanes.borrow();
+        let located = |at: usize, layout: &Layout| lanes.taffy_location(at, layout);
         let mut lender = Lender {
             before: &before,
             new: &placed.slots,
             may_keep,
+            located: &located,
             lent: 0,
         };
         lender.lend_from(&mut placed.boxes, 0);
@@ -125,6 +130,8 @@ pub(super) struct Lender<'a> {
     pub(super) before: &'a dyn Fn(usize) -> Option<(Key, &'a LayoutBox)>,
     pub(super) new: &'a Slots,
     pub(super) may_keep: &'a dyn Fn(NodeId) -> bool,
+    /// Where a lent layout in a slot puts its box.
+    pub(super) located: &'a dyn Fn(usize, &Layout) -> Point<f32>,
     pub(super) lent: usize,
 }
 
@@ -176,6 +183,7 @@ impl Lender<'_> {
         }
         boxes[at].cache = before.cache.clone();
         boxes[at].layout = before.layout;
+        boxes[at].layout.location = (self.located)(at, &before.layout);
         boxes[at].asked.clone_from(&before.asked);
         boxes[at].asked_overflowed = before.asked_overflowed;
         self.lent += 1;

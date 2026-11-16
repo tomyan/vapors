@@ -43,7 +43,7 @@ pub(crate) fn resize_with<T>(list: &mut Vec<T>, len: usize, make: impl FnMut() -
 }
 
 /// A kept list of one entry per slot: a `Vec` read as a slice, grown
-/// only by a quarter (`resize`, `resize_with`, `splice`).
+/// only by a quarter (`resize`, `resize_with`, `push`).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SlotList<T>(Vec<T>);
 
@@ -95,19 +95,6 @@ impl<T> SlotList<T> {
     /// `len` entries, the new ones made by `make`, grown by a quarter.
     pub(crate) fn resize_with(&mut self, len: usize, make: impl FnMut() -> T) {
         resize_with(&mut self.0, len, make);
-    }
-
-    /// The entries in `range` replaced by `items`, grown by a quarter;
-    /// the entries taken out.
-    pub(crate) fn splice(
-        &mut self,
-        range: std::ops::Range<usize>,
-        items: impl IntoIterator<Item = T>,
-    ) -> Vec<T> {
-        let items: Vec<T> = items.into_iter().collect();
-        let wanted = self.0.len() - range.len() + items.len();
-        reserve(&mut self.0, wanted);
-        self.0.splice(range, items).collect()
     }
 
     /// `item` added at the end, grown by a quarter.

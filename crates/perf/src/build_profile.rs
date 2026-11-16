@@ -17,10 +17,16 @@ pub const JUDGED: &str = "judged";
 /// The profile, as each report's header states it.
 #[must_use]
 pub fn header() -> String {
-    if BUILT == JUDGED {
-        format!("{BUILT} (release, codegen-units 1, no override the build could see)")
+    header_for(BUILT)
+}
+
+/// The header for a build with the profile `built`.
+#[must_use]
+pub fn header_for(built: &str) -> String {
+    if built == JUDGED {
+        format!("{built} (release, codegen-units 1, no override the build could see)")
     } else {
-        format!("{BUILT} (not the judged profile)")
+        format!("{built} (not the judged profile)")
     }
 }
 
@@ -33,6 +39,19 @@ pub fn scene_header(built: &str) -> String {
         "release (the shipped profile, which scene runs are judged against)".to_owned()
     } else {
         format!("{built} (not release, the shipped profile scene runs are judged against)")
+    }
+}
+
+/// The profile a Mount run states. Its times are property 7's, the first
+/// frame a user waits for, so they are taken on release, the shipped
+/// profile, as scene runs are; `scripts/first-frame-table.sh` refuses a
+/// run whose header says otherwise.
+#[must_use]
+pub fn shipped_header(built: &str) -> String {
+    if built == "release" {
+        "release (the shipped profile)".to_owned()
+    } else {
+        format!("{built} (not release, the shipped profile)")
     }
 }
 

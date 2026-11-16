@@ -27,26 +27,50 @@ pub(crate) enum SheetKind {
     Global,
 }
 
+/// A component sheet in the cascade: where it sits and its text's hash.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Held {
+    /// Its index in the cascade (the order sheets were added).
+    pub(crate) index: usize,
+    hash: u64,
+}
+
 impl Sheets {
-    /// Notes `text`, now in the cascade as the `kind` sheet `name`.
-    pub(crate) fn note_hash(&mut self, kind: SheetKind, name: &str, text: &str) {
-        self.hashes
-            .insert((kind, name.to_owned()), sheet_hash(text));
+    /// Notes `text`, just added to the cascade as the `kind` sheet
+    /// `name`: the last sheet added.
+    pub(crate) fn note_sheet(&mut self, kind: SheetKind, name: &str, text: &str) {
+        let held = Held {
+            index: self.names.len() - 1,
+            hash: sheet_hash(text),
+        };
+        self.components.insert((kind, name.to_owned()), held);
+    }
+
+    /// The component sheet `sheet` names, if it is in the cascade: one
+    /// table, by kind and name, for its hash (check 1) and its place
+    /// (the winners oracle, the compiled rules).
+    pub(crate) fn held(&self, sheet: SheetRef) -> Option<Held> {
+        let (kind, name) = match sheet {
+            SheetRef::UserAgent => {
+                return Some(Held {
+                    index: super::USER_AGENT_SHEET,
+                    hash: user_agent_hash(),
+                });
+            }
+            SheetRef::Scope(name) => (SheetKind::Scope, name),
+            SheetRef::Global(name) => (SheetKind::Global, name),
+        };
+        self.components.get(&(kind, name.to_owned())).copied()
     }
 
     /// The hash of the sheet in the cascade as `sheet`.
     pub(crate) fn hash_of(&self, sheet: SheetRef) -> SheetHash {
-        static USER_AGENT: OnceLock<u64> = OnceLock::new();
-        let held = |kind, name: &str| {
-            let hash = self.hashes.get(&(kind, name.to_owned()));
-            hash.map_or(SheetHash::Absent, |&hash| SheetHash::Registered(hash))
-        };
-        match sheet {
-            SheetRef::UserAgent => SheetHash::Registered(
-                *USER_AGENT.get_or_init(|| sheet_hash(vapors_css::user_agent::TEXT)),
-            ),
-            SheetRef::Scope(scope) => held(SheetKind::Scope, scope),
-            SheetRef::Global(sheet) => held(SheetKind::Global, sheet),
-        }
+        self.held(sheet)
+            .map_or(SheetHash::Absent, |held| SheetHash::Registered(held.hash))
     }
+}
+
+fn user_agent_hash() -> u64 {
+    static USER_AGENT: OnceLock<u64> = OnceLock::new();
+    *USER_AGENT.get_or_init(|| sheet_hash(vapors_css::user_agent::TEXT))
 }

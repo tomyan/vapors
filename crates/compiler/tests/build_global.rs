@@ -141,3 +141,33 @@ fn only_the_layout_corpus_builds_its_components_with_global_styles() {
         "compile_dir_global is for the layout corpus only, whose CSS must mean what Chromium reads; an app uses compile_dir"
     );
 }
+
+#[test]
+fn a_global_file_compiled_alone_names_its_sheet_by_its_file_not_its_path() {
+    // Given: an absolute path
+    let (src, _) = dirs("global_file");
+    write(&src, "card.wisp", STYLED);
+    let path = src.join("card.wisp");
+
+    // When
+    let code = vapors_compiler::compile_file_global(&path).unwrap_or_else(|err| panic!("{err}"));
+
+    // Then
+    let named = squashed(&code);
+    assert!(
+        named.contains(&squashed(&format!(
+            "SHEET: &str = {}",
+            in_crate("card.wisp")
+        ))),
+        "{code}"
+    );
+    assert!(
+        !named.contains(&squashed(&in_crate(&path.display().to_string()))),
+        "{code}"
+    );
+}
+
+/// `name` after the crate's name, as the generated code writes it.
+fn in_crate(name: &str) -> String {
+    format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {name:?})")
+}

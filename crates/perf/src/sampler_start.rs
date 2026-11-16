@@ -1,6 +1,7 @@
 //! The one place a run starts its app, and the one check that no frame
 //! builds a pipeline (one-scene F0: `App::start` builds every one
-//! before frame 0), shared by the sampled, judged and idle runs.
+//! before frame 0), shared by the sampled, judged, idle and first-frame
+//! runs.
 
 use std::time::{Duration, Instant};
 
@@ -11,25 +12,9 @@ use super::{FRAME_DEADLINE, Sampler};
 use crate::gpu_time::wait;
 use crate::run::Workload;
 
-/// Whether a run's app is started before frame 0.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Apps {
-    /// Started, and no frame may build a pipeline: every run's but
-    /// Mount's.
-    Started,
-    /// A new app every frame, never started (`Sampler::sample_mounts`,
-    /// which only the Mount workload reaches): it times a page's first
-    /// update in its first frame, which `App::start` would take out of
-    /// the frame, so its frames build the pipelines and are not checked,
-    /// and no frame reads a GPU time back. Retired when Mount times
-    /// `App::start` with the mount.
-    NewEachFrame,
-}
-
 impl Sampler<'_> {
     /// `workload`'s app started on this GPU for textures of `format`,
-    /// timed to the GPU's idle after it; nothing for a new app each
-    /// frame.
+    /// timed to the GPU's idle after it.
     ///
     /// # Errors
     /// `App::start` refusing, or the GPU wait after it failing.
@@ -37,11 +22,7 @@ impl Sampler<'_> {
         &self,
         workload: &mut dyn Workload,
         format: wgpu::TextureFormat,
-        apps: Apps,
     ) -> Result<Duration, String> {
-        if apps == Apps::NewEachFrame {
-            return Ok(Duration::ZERO);
-        }
         let start = self.start_for(workload.size(), format);
         let started = Instant::now();
         workload
@@ -75,11 +56,10 @@ impl BuiltSince {
         Self(built())
     }
 
-    /// Refuses frame `index` when it built a pipeline or shader module,
-    /// unless `apps` is a new app each frame (see [`Apps::NewEachFrame`]).
-    pub(super) fn refuse_any(self, index: usize, apps: Apps) -> Result<(), String> {
+    /// Refuses frame `index` when it built a pipeline or shader module.
+    pub(super) fn refuse_any(self, index: usize) -> Result<(), String> {
         let since = built().since(self.0);
-        if apps == Apps::NewEachFrame || since.is_none() {
+        if since.is_none() {
             return Ok(());
         }
         Err(format!(
