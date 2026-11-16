@@ -8,7 +8,7 @@
 //! before the take; lanes inside rows of a lane; and a node hoisted out
 //! of a node under a moved row.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -5,7 +5,7 @@
 //! The mirror kept by takes holds what a first take would
 //! (`Model::assert_mirrors`), on the shapes of vapors-perf's rows pages.
 
-mod support;
+use crate::support;
 
 use support::flex_list::{ROW_MARGIN, flex_list, list_viewport};
 use support::mirror_model::Model;
