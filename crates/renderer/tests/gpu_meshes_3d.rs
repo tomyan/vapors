@@ -70,8 +70,10 @@ fn gpu_a_plane_facing_the_camera_at_one_unit_a_pixel_draws_meshes_as_the_page_do
             .zip(&scene)
             .map(|(p, s)| (p - s).abs())
             .fold(0.0, f32::max);
+        // in whole 8-bit steps, so the step's own float form (1/255 read
+        // back as 0.0039216) is not a hair over it
         assert!(
-            worst <= 1.0 / 255.0,
+            (worst * 255.0).round() <= 1.0,
             "{data} under {transform:?}: a pixel differs by {worst}"
         );
     }
@@ -261,7 +263,7 @@ fn gpu_a_plane_seen_edge_on_draws_nothing() {
     // Then: at most a sliver's coverage, under one 8-bit step
     let most = drawn.iter().fold(0.0, |most: f32, c| most.max(*c));
     assert!(
-        most <= 1.0 / 255.0,
+        (most * 255.0).round() <= 1.0,
         "an edge-on plane drew a pixel at {most}"
     );
 }
