@@ -47,7 +47,7 @@ impl MeshShape {
         }))
     }
 
-    /// The three four-float attributes `meshes.wgsl` reads per
+    /// The three four-float attributes `meshes_shared.wgsl` declares per
     /// instance: the transform's linear part; its translation and the
     /// inverse of its determinant; the colour.
     pub(crate) fn instance(&self) -> [f32; INSTANCE_FLOATS] {

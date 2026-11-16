@@ -1,18 +1,20 @@
-// Mesh items: an entry's triangles, one instance each, every corner
-// with its wedge (crates/shapes/src/mesh.rs: the outward unit normals
-// of the two outline edges bounding it, how far each edge runs from it,
-// and whether it is convex (1), reflex (-1) or inside (0)), under an
-// item's affine transform. The vertex shader picks its corner by vertex
-// index and moves an outline corner half a device pixel out across both
-// its lines in device space (the device miter, clamped at SVG's limit
-// of 4). The fragment shader takes coverage as 0.5 plus the least, over
-// the triangle's outline corners, of the corner's wedge distance in
-// device pixels (convex: the nearer of its two lines, or beyond both
-// the device distance to the corner; reflex: the farther line), a line
-// counting only alongside its edge, not past the edge's far end: 0.5
-// on the outline, the ramp half a pixel either side. A line's distance in device pixels is its distance in the
-// mesh's units over the length of the inverse transpose of the
-// transform applied to its normal, the same for the whole item.
+// Mesh items, the part shared by the page's stages (meshes_2d.wgsl) and
+// the scene's (meshes_3d.wgsl): an entry's triangles, one instance each,
+// every corner with its wedge (crates/shapes/src/mesh.rs: the outward
+// unit normals of the two outline edges bounding it, how far each edge
+// runs from it, and whether it is convex (1), reflex (-1) or inside
+// (0)), under a map from the mesh's units to device pixels: the item's
+// affine on the page, a plane's projection in the scene. The vertex
+// stage picks its corner by vertex index and moves an outline corner
+// half a device pixel out across both its lines in device space (the
+// device miter, clamped at SVG's limit of 4). The fragment stage takes
+// coverage as 0.5 plus the least, over the triangle's outline corners,
+// of the corner's wedge distance in device pixels (`wedge`), a line
+// counting only alongside its edge, not past the edge's far end: 0.5 on
+// the outline, the ramp half a pixel either side. A line's distance in
+// device pixels is its distance in the mesh's units over the length of
+// the map's inverse transpose applied to its normal: the same for the
+// whole item on the page, the map at each fragment in the scene.
 
 struct Triangle {
     @location(0) position0: vec2<f32>,
@@ -52,14 +54,10 @@ struct Out {
     @location(8) @interpolate(flat) inverse_transpose: vec4<f32>,
     @location(9) @interpolate(flat) colour: vec4<f32>,
     @location(10) @interpolate(flat) linear: vec4<f32>,
+    // the item's translation (e, f), which the scene's fragment stage
+    // reads to take its Jacobian
+    @location(11) @interpolate(flat) shift: vec2<f32>,
 }
-
-struct View {
-    size: vec2<f32>,
-    shift: vec2<f32>,
-}
-
-@group(0) @binding(0) var<uniform> view: View;
 
 // How far the outline moves out, device pixels: the ramp's outer half.
 const HALF: f32 = 0.5;
@@ -101,17 +99,12 @@ fn local_move(n: vec4<f32>, kind: f32, l: vec4<f32>, inverse: f32) -> vec2<f32> 
     return vec2(l.w * miter.x - l.z * miter.y, -l.y * miter.x + l.x * miter.y) * inverse;
 }
 
-@vertex
-fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
-    let positions = array(t.position0, t.position1, t.position2);
-    let normals = array(t.normals0, t.normals1, t.normals2);
-    let kinds = array(t.kind0, t.kind1, t.kind2);
-    let l = item.linear;
-    let local = positions[corner] + local_move(normals[corner], kinds[corner], l, item.place.z);
-    let pixel = vec2(l.x * local.x + l.z * local.y, l.y * local.x + l.w * local.y) + item.place.xy;
-    let on_target = pixel + view.shift;
+// What the fragment stage reads of corner `corner` of triangle `t`, at
+// `local` (shape units) placed at `position`; `inverse_transpose` and
+// `linear` are the item's, which the page's fragment stage reads.
+fn vertex_out(t: Triangle, item: Item, local: vec2<f32>, position: vec4<f32>, inverse_transpose: vec4<f32>) -> Out {
     var out: Out;
-    out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
+    out.position = position;
     out.local = local;
     out.normals0 = t.normals0;
     out.at0 = vec4(t.position0, t.kind0, t.reaches0.x);
@@ -120,10 +113,27 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
     out.normals2 = t.normals2;
     out.at2 = vec4(t.position2, t.kind2, t.reaches2.x);
     out.second_reaches = vec4(t.reaches0.y, t.reaches1.y, t.reaches2.y, 0.0);
-    out.inverse_transpose = inverse_transpose(l, item.place.z);
+    out.inverse_transpose = inverse_transpose;
     out.colour = item.colour;
-    out.linear = l;
+    out.linear = item.linear;
+    out.shift = item.place.xy;
     return out;
+}
+
+// Corner `corner` of triangle `t`: its position and its move's inputs.
+fn corner_of(t: Triangle, corner: u32) -> vec2<f32> {
+    let positions = array(t.position0, t.position1, t.position2);
+    return positions[corner];
+}
+
+fn corner_normals(t: Triangle, corner: u32) -> vec4<f32> {
+    let normals = array(t.normals0, t.normals1, t.normals2);
+    return normals[corner];
+}
+
+fn corner_kind(t: Triangle, corner: u32) -> f32 {
+    let kinds = array(t.kind0, t.kind1, t.kind2);
+    return kinds[corner];
 }
 
 // How far p lies along the edge from `corner` with outward unit normal
@@ -195,12 +205,12 @@ fn wedge(n: vec4<f32>, at: vec4<f32>, second_reach: f32, p: vec2<f32>, t: vec4<f
     return select(max(d0, d1), min(d0, d1), convex);
 }
 
-@fragment
-fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let t = in.inverse_transpose;
-    let w0 = wedge(in.normals0, in.at0, in.second_reaches.x, in.local, t, in.linear);
-    let w1 = wedge(in.normals1, in.at1, in.second_reaches.y, in.local, t, in.linear);
-    let w2 = wedge(in.normals2, in.at2, in.second_reaches.z, in.local, t, in.linear);
+// The colour of `in` with its coverage at its position, `t` the inverse
+// transpose of the shape-to-device linear map there and `l` the map.
+fn covered(in: Out, t: vec4<f32>, l: vec4<f32>) -> vec4<f32> {
+    let w0 = wedge(in.normals0, in.at0, in.second_reaches.x, in.local, t, l);
+    let w1 = wedge(in.normals1, in.at1, in.second_reaches.y, in.local, t, l);
+    let w2 = wedge(in.normals2, in.at2, in.second_reaches.z, in.local, t, l);
     let coverage = clamp(0.5 + min(w0, min(w1, w2)), 0.0, 1.0);
     return vec4(in.colour.rgb, in.colour.a * coverage);
 }
