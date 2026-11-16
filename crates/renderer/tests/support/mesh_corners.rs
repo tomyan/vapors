@@ -49,30 +49,18 @@ impl Corners {
     /// degrees apart, the vertex stage's move is capped at the miter
     /// limit, its edges sit under half a pixel out, and the outer ramp
     /// is cut along them: pixels within a pixel of the corner or of
-    /// either of its edges, until #419 is fixed. And by design (meshes.wgsl,
-    /// `wedge`): past an acute convex tip, behind both its edges, the
-    /// shader keeps a line's distance, the tip mitred, not the distance
-    /// to the tip a CPU distance gives.
+    /// either of its edges, until #419 is fixed.
     pub(super) fn left_to_the_half_pixel_rule(&self, p: [f32; 2]) -> bool {
-        self.all.iter().any(|(c, ends, between, convex)| {
+        self.all.iter().any(|(c, ends, between, _)| {
             let beside =
                 within_a_pixel(*c, p) || ends.iter().any(|e| segment_distance(p, *c, *e) <= 1.0);
-            let clamped = (between / 2.0).cos() < 0.25 && beside;
-            let past_a_tip =
-                *convex && *between > std::f32::consts::FRAC_PI_2 && behind_both(*c, *ends, p);
-            clamped || past_a_tip
+            (between / 2.0).cos() < 0.25 && beside
         })
     }
 }
 
 fn within_a_pixel(c: [f32; 2], p: [f32; 2]) -> bool {
     (c[0] - p[0]).hypot(c[1] - p[1]) < 1.0
-}
-
-fn behind_both(c: [f32; 2], ends: [[f32; 2]; 2], p: [f32; 2]) -> bool {
-    let q = [p[0] - c[0], p[1] - c[1]];
-    ends.iter()
-        .all(|e| q[0] * (e[0] - c[0]) + q[1] * (e[1] - c[1]) <= 0.0)
 }
 
 /// The angle between a corner's outward normals on the device: pi less

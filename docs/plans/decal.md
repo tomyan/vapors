@@ -92,18 +92,22 @@ pipeline creation with `concat!(include_str!(..), ..)`.
   corners' margins from the true edge (to first order). D1 shipped
   taking the distance's rate from `dpdx` and `dpdy`; the analytic map
   replaces it in a follow-up PR.
-- **Meshes.** The vertex stage moves each outline corner half a device
-  pixel out across its lines through that corner's Jacobian, as above.
-  The fragment stage replaces the item's constant inverse transpose
-  with the analytic Jacobian at the fragment. A line's device distance
-  is its local distance over the local units per pixel along its
-  normal, which is the closed form's rule. That is exact to first order
-  across the half-pixel band; near edge-on the error grows (measured on
-  2026-11-16 at 1.5 units: 0.012 at 60 degrees, 0.050 at 70), which
-  section 2's grazing case is open on.
+- **Meshes (D2b).** The vertex stage moves each outline corner half a
+  device pixel out across its lines through that corner's Jacobian, as
+  above, and carries the triangle's wedges onto the screen: each corner
+  and its edges' far ends projected, the outward normals taken there.
+  A plane's projection keeps lines straight, so the fragment stage
+  measures every distance on the screen, exactly, at any angle; the
+  page does the same through its affine, so one device-space `wedge`
+  serves both. A convex corner's distance behind both its edges is the
+  distance to the corner (exact; a mitred line distance there
+  over-covered foreshortened corners). D2 shipped the analytic Jacobian
+  at the fragment, first order across the band (0.012 at 60 degrees,
+  0.050 at 70); D2b retires it.
 - **Corners behind the camera.** A corner with clip w at or below a
-  small epsilon gets no padding. The rasteriser clips the triangle, and
-  the edges it cut need no ramp.
+  small epsilon gets no padding and no wedge on the screen: the corners
+  in front carry its edges' lines, each stretched past any fragment
+  where its far end is behind the eye. The rasteriser clips the rest.
 
 Curves in mesh entries are flattened at a scale, and a camera changes
 the scale (section 6).

@@ -20,7 +20,7 @@ use scene_meshes::{cpu_mesh_coverage, mesh_coverage_3d};
 
 #[path = "support/mesh_oracle.rs"]
 mod oracle;
-use oracle::BAND_TOLERANCE;
+use oracle::{BAND_TOLERANCE, DISTANCE_TOLERANCE};
 
 /// The notched rect of `gpu_mesh_insides.rs`, whose corner lines reach
 /// past their edges' ends into the fill, and two of touche's strokes, one
@@ -63,7 +63,9 @@ fn gpu_a_plane_facing_the_camera_at_one_unit_a_pixel_draws_meshes_as_the_page_do
         // When
         let scene = mesh_coverage_3d(SIDE, &drawn, (pixel_camera(SIDE), Mat4::IDENTITY));
 
-        // Then
+        // Then within one 8-bit step (and float slack): the scene carries
+        // each wedge onto the screen through the camera's matrices, the
+        // page through its affine, in f32 either way
         let page = coverage(&drawn);
         let worst = page
             .iter()
@@ -71,19 +73,11 @@ fn gpu_a_plane_facing_the_camera_at_one_unit_a_pixel_draws_meshes_as_the_page_do
             .map(|(p, s)| (p - s).abs())
             .fold(0.0, f32::max);
         assert!(
-            worst <= 1.0 / 255.0,
+            worst <= 1.5 / 255.0,
             "{data} under {transform:?}: a pixel differs by {worst}"
         );
     }
 }
-
-/// How far a band pixel on a turned plane may be from 0.5 minus its
-/// distance to the outline. The fragment's Jacobian is analytic, so what
-/// is left is the line distance taken through the Jacobian at the
-/// fragment, exact to first order across the half-pixel band, and the
-/// readback's 8 bits: measured at most 0.0103 at 60 degrees on
-/// 2026-11-16. The page's own bound is 0.01.
-const SCENE_DISTANCE: f32 = 0.015;
 
 /// A plane turned `degrees` about X, `distance` from the eye, seen from
 /// its back when `behind` (turned a further half turn about Y), through
@@ -99,33 +93,61 @@ fn camera(degrees: f32, distance: f32, behind: bool) -> (Mat4, Mat4) {
     (lens, world)
 }
 
-/// The poses the band and insides rules are held at, each with its band
-/// bounds (distance, box-filtered): 60 degrees, the same seen from behind
-/// (the Jacobian's determinant positive there, negative from the front),
-/// 70 and 75.
+/// A shape's path data and stroke width, if stroked.
+type Shape = (&'static str, Option<f32>);
+
+/// A pose: its name, its camera, its box-filtered bound, its shapes.
+type Pose = (&'static str, (Mat4, Mat4), f32, &'static [Shape]);
+
+/// The poses the band and insides rules are held at, each with the
+/// shapes it holds them to and its box-filtered bound. Every pose's
+/// distances are held to the page's own bound (`DISTANCE_TOLERANCE`, 0.01):
+/// the wedges are measured on the screen, exact at any angle (measured
+/// on 2026-11-16: at most 0.0020 at every pose, the readback's 8 bits).
 ///
-/// RELAXED (decal D2b): the distances are taken through the Jacobian at
-/// the fragment, and near edge-on the scale changes across the band, so
-/// the bounds grow with the angle (measured on 2026-11-16 at 3 units,
-/// distance: 0.0103 at 60 degrees, 0.0141 at 70, 0.0305 at 75; box:
-/// within 0.11 to 70, 0.136 at 75; each bound that and the readback's 8
-/// bits, rounded up), and past 75 degrees the ramp is not judged at all
-/// (at 85 the notched rect leaves a pixel 0.61 px outside at 0.29). D2b
-/// takes each wedge's distances on the screen, exact at any angle, and
-/// retires this: one bound for every pose, and poses to 85 degrees.
-fn poses() -> [(&'static str, (Mat4, Mat4), f32, f32); 4] {
-    let (scene, boxed) = (SCENE_DISTANCE, BAND_TOLERANCE);
+/// The box bound grows with the angle, from foreshortening, not from the
+/// distances: a feature a few pixels wide across the plane is a fraction
+/// of one along the turn, and a ramp and a box filter part where a shape
+/// is under a pixel wide (S3b's known sub-pixel limit). Measured: within
+/// 0.11 at 60 degrees, 0.113 at 70, 0.128 at 75, 0.131 at 80, 0.103 at 85
+/// (the plane nearer, 1.5 units); each bound that and 8 bits, rounded up.
+/// At 80 and 85 the chevron's tips are clamped corners (#419) wherever it
+/// lies, so those poses hold the notched rect and Redo's arc; at 85 and 3
+/// units the arc's stroke is 0.2 px across the turn, all of it sub-pixel.
+fn poses() -> [Pose; 6] {
+    const ALL: &[Shape] = &[
+        ("M0 0H1V1H2V0H3V3H2.1H0Z", None),
+        ("M2 6h7a4 4 0 0 1 0 8H6", Some(1.5)),
+        ("M3 10l5-5 5 5", Some(1.5)),
+    ];
+    const BROAD: &[Shape] = &[
+        ("M0 0H1V1H2V0H3V3H2.1H0Z", None),
+        ("M2 6h7a4 4 0 0 1 0 8H6", Some(1.5)),
+    ];
     [
-        ("60 degrees", camera(60.0, 3.0, false), scene, boxed),
+        ("60 degrees", camera(60.0, 3.0, false), BAND_TOLERANCE, ALL),
         (
             "60 degrees from behind",
             camera(60.0, 3.0, true),
-            scene,
-            boxed,
+            BAND_TOLERANCE,
+            ALL,
         ),
-        ("70 degrees", camera(70.0, 3.0, false), 0.018, boxed),
-        ("75 degrees", camera(75.0, 3.0, false), 0.033, 0.14),
+        ("70 degrees", camera(70.0, 3.0, false), 0.115, ALL),
+        ("75 degrees", camera(75.0, 3.0, false), 0.13, ALL),
+        ("80 degrees", camera(80.0, 3.0, false), 0.135, BROAD),
+        ("85 degrees", camera(85.0, 1.5, false), 0.11, BROAD),
     ]
+}
+
+/// Each pose with each shape it holds.
+fn posed() -> impl Iterator<Item = (Shape, (&'static str, (Mat4, Mat4), f32))> {
+    poses()
+        .into_iter()
+        .flat_map(|(pose, camera, boxed, shapes)| {
+            shapes
+                .iter()
+                .map(move |shape| (*shape, (pose, camera, boxed)))
+        })
 }
 
 /// Shape units to plane units: 1/8 a unit each, centred (about 12.9
@@ -159,10 +181,7 @@ fn placed(plane: [f32; 6], camera: (Mat4, Mat4), q: [f32; 2]) -> [f32; 2] {
 
 #[test]
 fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
-    for ((data, stroke), (pose, camera, bound, box_bound)) in shapes()
-        .into_iter()
-        .flat_map(|s| poses().map(move |p| (s, p)))
-    {
+    for ((data, stroke), (pose, camera, box_bound)) in posed() {
         // Given
         let (triangles, plane) = on_plane(data, stroke);
         let what = format!("{data} at {pose}");
@@ -178,7 +197,7 @@ fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
         oracle::assert_band_matches(
             &drawn,
             &triangles,
-            (&project, bound, box_bound),
+            (&project, DISTANCE_TOLERANCE, box_bound),
             &oracle,
             &what,
         );
@@ -187,10 +206,7 @@ fn gpu_meshes_on_turned_planes_are_where_a_cpu_drawing_puts_them() {
 
 #[test]
 fn gpu_meshes_on_turned_planes_are_full_inside_and_empty_outside() {
-    for ((data, stroke), (pose, camera, _, _)) in shapes()
-        .into_iter()
-        .flat_map(|s| poses().map(move |p| (s, p)))
-    {
+    for ((data, stroke), (pose, camera, _)) in posed() {
         // Given
         let (triangles, plane) = on_plane(data, stroke);
 

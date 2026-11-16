@@ -1,15 +1,63 @@
 // The scene's stages for mesh items (the rest is meshes_shared.wgsl and
-// projective.wgsl; docs/plans/decal.md section 2). The vertex stage
-// moves each outline corner half a device pixel out through the screen
-// Jacobian at that corner, in place of the page's constant affine. The
-// fragment stage takes the map from shape units to device pixels at each
-// fragment from the same analytic Jacobian, at the fragment's own
-// shape-unit position: exact, and the same on every adapter. Derivatives
-// across a 2x2 quad would not do: `dpdx` may be fine or coarse, at the
-// implementation's choice, and either way it is the Jacobian half a pixel
-// or more from the fragment, an error of first order in the pixel step
-// (#422's review: 0.046 of coverage at the band's edge at 60 degrees on
-// a coarse adapter, 0.116 at 75).
+// projective.wgsl; docs/plans/decal.md section 2). A plane's projection
+// keeps lines straight, so the vertex stage carries each corner's wedge
+// onto the screen by projecting the corner and its edges' far ends, and
+// the fragment stage measures every distance on the screen, exactly, at
+// any angle. The vertex stage also moves each outline corner half a
+// device pixel out through the screen Jacobian at that corner.
+
+// Mesh point `q` (shape units) in clip space under the item and node.
+fn clip_of(item: Item, q: vec2<f32>) -> vec4<f32> {
+    return to_clip() * vec4(on_plane(item.linear, item.place.xy, q), 0.0, 1.0);
+}
+
+// Clip point `c` on the screen, framebuffer pixels, +Y down.
+fn on_screen(c: vec4<f32>) -> vec2<f32> {
+    return (c.xy / c.w * vec2(0.5, -0.5) + 0.5) * camera.size;
+}
+
+// The edge from `at` along local `edge` on the screen, from the corner's
+// own screen point `start`: its screen vector, or, when its far end is at
+// or behind the eye, the corner's Jacobian applied to it stretched past
+// any fragment (FAR), so its line's direction holds and no far end cuts
+// it short on the screen.
+fn screen_edge(item: Item, at: vec2<f32>, edge: vec2<f32>, start: vec2<f32>, j: vec4<f32>) -> vec2<f32> {
+    let end = clip_of(item, at + edge);
+    if (end.w <= NEAR_W) {
+        let along = vec2(j.x * edge.x + j.z * edge.y, j.y * edge.x + j.w * edge.y);
+        return normalize(along) * FAR;
+    }
+    return on_screen(end) - start;
+}
+
+// The outward unit normal on the screen of an edge running `edge` (screen
+// pixels), on the side the local normal `n` maps to under `j`.
+fn screen_normal(edge: vec2<f32>, n: vec2<f32>, j: vec4<f32>) -> vec2<f32> {
+    let across = normalize(vec2(edge.y, -edge.x));
+    let outward = vec2(j.x * n.x + j.z * n.y, j.y * n.x + j.w * n.y);
+    return select(-across, across, dot(across, outward) >= 0.0);
+}
+
+// Corner `corner` of `t` on the screen. A corner at or behind the eye
+// has no wedge here: its edges' lines are carried by the corners at
+// their other ends that are in front, and the rasteriser clips the rest.
+fn scene_corner(t: Triangle, item: Item, corner: u32) -> DeviceCorner {
+    let kind = corner_kind(t, corner);
+    let n = corner_normals(t, corner);
+    let at = corner_of(t, corner);
+    let c = clip_of(item, at);
+    if (kind == 0.0 || c.w <= NEAR_W) {
+        return NO_WEDGE;
+    }
+    let start = on_screen(c);
+    let j = screen_jacobian(item.linear, item.place.xy, at);
+    let reaches = corner_reaches(t, corner);
+    let edge0 = screen_edge(item, at, vec2(-n.y, n.x) * reaches.x, start, j);
+    let edge1 = screen_edge(item, at, vec2(-n.w, n.z) * reaches.y, start, j);
+    let n0 = screen_normal(edge0, n.xy, j);
+    let n1 = screen_normal(edge1, n.zw, j);
+    return DeviceCorner(vec4(start, kind, device_reach(edge0, n0)), vec4(n0, n1), device_reach(edge1, n1));
+}
 
 @vertex
 fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
@@ -23,25 +71,12 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
     if (abs(det) > 1e-6 * length(j.xy) * length(j.zw)) {
         moved = local_move(corner_normals(t, corner), corner_kind(t, corner), j, 1.0 / det);
     }
-    let local = at + moved;
-    let position = to_clip() * vec4(on_plane(item.linear, item.place.xy, local), 0.0, 1.0);
-    return vertex_out(t, item, local, position, vec4(0.0));
+    let position = clip_of(item, at + moved);
+    let corners = array(scene_corner(t, item, 0u), scene_corner(t, item, 1u), scene_corner(t, item, 2u));
+    return vertex_out(corners, item.colour, position);
 }
 
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let l = screen_jacobian(in.linear, in.shift, in.local);
-    let det = l.x * l.w - l.y * l.z;
-    // A fragment exists only in front of the eye (the rasteriser clips the
-    // rest), so the Jacobian is zero or singular only edge-on, where the
-    // plane is a line on the screen: coverage 0, which is what an edge-on
-    // plane shows, not an approximation. It keeps 1 / det finite; a
-    // fragment needs area on the screen, which an edge-on plane has none
-    // of, so no test reaches it (`gpu_a_plane_seen_edge_on_draws_nothing`
-    // passes with it removed, the vertex stage's guard being the one that
-    // case needs).
-    if (det == 0.0) {
-        return vec4(in.colour.rgb, 0.0);
-    }
-    return covered(in, inverse_transpose(l, 1.0 / det), l);
+    return covered(in);
 }
