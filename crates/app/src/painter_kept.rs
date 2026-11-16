@@ -18,13 +18,14 @@
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{
     ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
-    Shift, Target,
+    Target,
 };
 use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
 use super::errors::PaintError;
+use super::rows::Moved;
 use crate::shape_store::ShapeStore;
 
 #[path = "painter_kept_gpu.rs"]
@@ -60,7 +61,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: Shift,
+        moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
@@ -72,15 +73,19 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(kept) = self.kept.range(pipelines, target, (run, key, at))? else {
+        let rows = moved.rows.items();
+        let Some(kept) = self.kept.range(pipelines, target, (run, rows, key, at))? else {
             return Ok(());
         };
-        let range = kept.range;
+        let (range, shift, rowed) = (kept.range, moved.shift, (moved.shift, moved.table));
         match run {
-            Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
-            Run::Quads(_) => self.quads.draw_kept(target, range, shift),
-            Run::Shapes(_) => self.closed_forms.draw_kept(target, range, shift),
+            Run::Shadows(_) => self.shadows.draw_kept_in_rows(target, range, rowed),
+            Run::Quads(_) => self.quads.draw_kept_in_rows(target, range, rowed),
+            Run::Shapes(_) => self
+                .closed_forms
+                .draw_kept(target, range, unrowed(shift, rows)),
             Run::Meshes(_) => {
+                let shift = unrowed(shift, rows);
                 let drawn = self
                     .shapes
                     .uploaded(kept.meshes)
@@ -91,12 +96,12 @@ impl ScenePainter {
             Run::Images(items) => {
                 let images = &mut self.images;
                 self.textures
-                    .draw_kept(images, target, painted, (items, range, shift));
+                    .draw_kept(images, target, painted, (items, range, moved));
             }
             Run::Surfaces(items) => {
                 let images = &mut self.images;
                 self.surfaces
-                    .draw_kept(images, target, painted, (items, range, shift))?;
+                    .draw_kept(images, target, painted, (items, range, moved))?;
             }
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
@@ -113,15 +118,15 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: Shift,
+        moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let parts = (&mut self.text, &mut self.atlas);
-        let kept = self
-            .kept
-            .text_range(parts, (target, painted), (run, key, at))?;
+        let rowed = (run, moved.rows.items(), key, at);
+        let kept = self.kept.text_range(parts, (target, painted), rowed)?;
         if let Some(kept) = kept {
+            let at = (moved.shift, moved.table);
             self.text
-                .draw_kept(target, &mut self.atlas, kept, blend(run), shift);
+                .draw_kept_in_rows(target, &mut self.atlas, kept, (blend(run), at));
         }
         Ok(())
     }
@@ -144,6 +149,7 @@ impl ScenePainter {
             atlas: &mut self.atlas,
         };
         self.kept.release_undrawn(&mut pipelines);
+        self.row_tables.release_undrawn();
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
             held, retained,
@@ -190,6 +196,25 @@ impl Pipelines<'_> {
             Kind::Images => self.images.release(range),
         }
     }
+}
+
+/// `shift`, for a shape or mesh batch, which is batched in one frame
+/// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
+/// frame's shift, with no rows.
+///
+/// # Panics
+///
+/// When the batch has rows: its pipeline has no table of row offsets, so
+/// every row would draw at the first's place.
+fn unrowed(shift: vapors_renderer::Shift, rows: &[u32]) -> vapors_renderer::Shift {
+    assert!(
+        rows.is_empty(),
+        "a shape or mesh batch spans {} items' rows, and its pipeline takes no table of row \
+         offsets: shapes and meshes in a lane row are batched in the row's frame \
+         (vapors-elements framed_batches.rs `resolved`); reproduce with `cargo xtask test`",
+        rows.len()
+    );
+    shift
 }
 
 /// The blend a text or icon run draws with.

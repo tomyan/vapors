@@ -24,6 +24,14 @@ impl Frames {
             let (kept, fresh) = (self.by_frame.get(&slot), other.by_frame.get(&slot));
             return Some(format!("frame {slot}: kept {kept:?}, fresh {fresh:?}"));
         }
+        let parts = sorted(self.relative.keys().chain(other.relative.keys()));
+        let differs = |&slot: &usize| self.relative.get(&slot) != other.relative.get(&slot);
+        if let Some(slot) = parts.into_iter().find(differs) {
+            let (kept, fresh) = (self.relative.get(&slot), other.relative.get(&slot));
+            return Some(format!(
+                "frame {slot}'s own part: kept {kept:?}, fresh {fresh:?}"
+            ));
+        }
         self.first_differing_index(other)
     }
 
@@ -54,7 +62,9 @@ impl Frames {
     /// Whether every frame's shift and clip, and the scale, are
     /// `other`'s: whether a change moved anything on the page.
     pub(crate) fn same_frames(&self, other: &Self) -> bool {
-        self.scale.to_bits() == other.scale.to_bits() && self.by_frame == other.by_frame
+        self.scale.to_bits() == other.scale.to_bits()
+            && self.by_frame == other.by_frame
+            && self.relative == other.relative
     }
 }
 

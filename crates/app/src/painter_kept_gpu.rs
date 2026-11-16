@@ -74,15 +74,18 @@ impl KeptGpu {
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
-        (run, key, at): (&Run, BatchKey, usize),
+        (run, rows, key, at): (&Run, &[u32], BatchKey, usize),
     ) -> Result<Option<Kept<'_>>, PaintError> {
         match self.entries.get(&key) {
             Some(gpu) => {
-                gpu.check(run, at, pipelines.shapes);
+                gpu.check((run, rows), at, pipelines.shapes);
                 self.kept += 1;
             }
             _ => {
-                if self.write(&mut pipelines, target, (run, key))?.is_none() {
+                if self
+                    .write(&mut pipelines, target, (run, rows, key))?
+                    .is_none()
+                {
                     return Ok(None);
                 }
             }
@@ -101,9 +104,9 @@ impl KeptGpu {
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
-        (run, key): (&Run, BatchKey),
+        (run, rows, key): (&Run, &[u32], BatchKey),
     ) -> Result<Option<()>, PaintError> {
-        let (kind, built) = (Kind::of(run), run_bytes(run, pipelines.shapes)?);
+        let (kind, built) = (Kind::of(run), run_bytes((run, rows), pipelines.shapes)?);
         let RunBytes { bytes, meshes } = built;
         let Some(range) = pipelines.keep(kind, target, &bytes) else {
             return Ok(None);
@@ -150,14 +153,14 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, run: &Run, at: usize, shapes: &ShapeStore) {
+    fn check(&self, (run, rows): (&Run, &[u32]), at: usize, shapes: &ShapeStore) {
         #[cfg(debug_assertions)]
         {
-            let fresh = run_bytes(run, shapes)
+            let fresh = run_bytes((run, rows), shapes)
                 .expect("built when these bytes were kept; the store only grows");
             super::super::kept_check::assert_kept(&self.bytes, &fresh.bytes, (run, at));
         }
         #[cfg(not(debug_assertions))]
-        let _ = (run, at, shapes); // only the debug build's compare uses them
+        let _ = (run, rows, at, shapes); // only the debug build's compare uses them
     }
 }

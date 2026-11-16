@@ -11,6 +11,7 @@ mod inline;
 mod isolated;
 mod keep;
 mod lane;
+mod lane_aside;
 mod lane_block;
 mod lane_block_answer;
 mod lane_block_child;
@@ -35,12 +36,19 @@ mod lane_flex_place;
 mod lane_flex_share;
 mod lane_flex_sizes;
 mod lane_flex_summary;
+mod lane_frame;
 mod lane_kind;
 mod lane_layout;
+mod lane_location;
 #[cfg(test)]
 mod lane_page;
+mod lane_set;
 mod lane_share;
 mod lane_tree;
+mod lane_view;
+mod lane_write;
+#[cfg(debug_assertions)]
+mod lane_written_check;
 mod layout_box;
 #[cfg(debug_assertions)]
 pub(crate) mod layout_check;
@@ -52,6 +60,7 @@ mod rebuild;
 mod rebuild_check;
 mod rebuilt;
 mod replaced;
+mod reshaped;
 mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
@@ -68,8 +77,11 @@ pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
+pub(crate) use lane_block_answer::narrow;
 pub(crate) use lane_layout::LaneCounts;
+pub(crate) use lane_set::{Lanes, SharedLanes};
 pub(crate) use rebuilt::Rebuilt;
+pub(crate) use reshaped::{Reshaped, Shared};
 pub(crate) use slots::{Key, Placed, Slots};
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
@@ -106,7 +118,7 @@ pub struct BoxRect {
 /// A `calc()` that did not resolve (see `Calcs`), with what Taffy did
 /// (boxed: the pair is wider than clippy's `Err` limit).
 pub(crate) fn lay_out(
-    mut placed: Placed,
+    placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
     scale: f32,
     size: (f32, f32),
@@ -114,6 +126,8 @@ pub(crate) fn lay_out(
     settling: Settling,
 ) -> Result<(Placed, LayoutWork), Box<(String, LayoutWork)>> {
     let (fonts, cache) = texts;
+    let shared = std::rc::Rc::clone(&placed.lanes);
+    let mut lanes = shared.borrow_mut();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts,
@@ -123,7 +137,7 @@ pub(crate) fn lay_out(
         written: Written::default(),
         calls: 0,
         disowned: 0,
-        lanes: &mut placed.lanes,
+        lanes: &mut lanes,
         lanes_enabled: settling.lanes,
         stale: settling.built.into_iter().collect(),
         lane_counts: LaneCounts::default(),
@@ -147,6 +161,7 @@ pub(crate) fn lay_out(
         written: std::mem::take(&mut tree.written),
     };
     let boxes = tree.boxes;
+    drop(lanes);
     match calcs.failure() {
         Some(failure) => Err(Box::new((failure, work))),
         None => Ok((
@@ -174,13 +189,14 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
 /// Each box's border box in document coordinates: its place in its
 /// containing block's content, whose origin is that box's corner less
 /// its scroll offset (`offsets`, by box index, in CSS pixels); and each
-/// box's padding, read in the same pass.
+/// box's padding, read in the same pass. A lane child is where Taffy
+/// puts it, its start from `lanes` added back.
 pub(crate) fn placed(
-    boxes: &[LayoutBox],
+    (boxes, lanes): (&[LayoutBox], &Lanes),
     offsets: &[[f32; 2]],
 ) -> (Vec<BoxRect>, Vec<taffy::Rect<f32>>) {
     let corner = |index: usize, origin: (f32, f32)| {
-        let location = boxes[index].layout.location;
+        let location = lanes.taffy_location(index, &boxes[index].layout);
         (origin.0 + location.x, origin.1 + location.y)
     };
     let origins = crate::chain::by_containing_block(boxes, (0.0, 0.0), &|index, origin| {

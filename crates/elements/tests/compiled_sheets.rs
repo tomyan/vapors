@@ -164,3 +164,19 @@ fn a_global_key_passes_when_another_components_global_sheet_is_absent() {
     // Then
     assert_eq!(doc.check_compiled_sheets(key), Ok(()));
 }
+
+#[test]
+fn a_scope_and_a_global_sheet_of_one_name_are_held_apart() {
+    // Given: one name, two kinds, two texts
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_style(OWN, CARD);
+    doc.add_global_style(OWN, ".card { color: blue; }");
+
+    // Then
+    let registered = |text| SheetHash::Registered(sheet_hash(text));
+    assert_eq!(doc.sheet_hash(SheetRef::Scope(OWN)), registered(CARD));
+    assert_eq!(
+        doc.sheet_hash(SheetRef::Global(OWN)),
+        registered(".card { color: blue; }")
+    );
+}

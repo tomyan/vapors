@@ -24,6 +24,11 @@ const VIEWPORT: Viewport = Viewport {
 /// won by declaration 0 of rule `rule` of CARD, hashed `hash`, every
 /// user-agent rule left to run time so the test names no other winner.
 fn key(rule: u32, hash: u64) -> &'static StyleKey {
+    key_in(SheetRef::Scope(OWN), rule, hash)
+}
+
+/// [`key`] of a component whose sheet is `own`, scoped or global.
+fn key_in(own: SheetRef, rule: u32, hash: u64) -> &'static StyleKey {
     let color = PropertyId::from_name("color").expect("a longhand").index();
     let base = vec![BaseWinner {
         property: PropertyRef::Longhand(u16::try_from(color).expect("fits")),
@@ -37,7 +42,7 @@ fn key(rule: u32, hash: u64) -> &'static StyleKey {
             SheetRef::UserAgent,
             sheet_hash(vapors_css::user_agent::TEXT),
         ),
-        (SheetRef::Scope(OWN), hash),
+        (own, hash),
     ];
     let winners = Box::leak(Box::new(KeyWinners {
         sheets: sheets.leak(),
@@ -48,7 +53,7 @@ fn key(rule: u32, hash: u64) -> &'static StyleKey {
     }));
     Box::leak(Box::new(StyleKey {
         site: "cards/card.wisp:3:1",
-        scope: Some(OWN),
+        scope: matches!(own, SheetRef::Scope(_)).then_some(OWN),
         tag: "span",
         classes: &["card"],
         toggles: &["x"],
@@ -71,7 +76,11 @@ fn user_agent_rules() -> Vec<RuleRef> {
 /// (toggled on or off), updated: the colours, or the refusal.
 fn colours(key: &'static StyleKey, x: &[bool]) -> Result<Vec<String>, String> {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style(OWN, CARD);
+    if key.scope.is_some() {
+        doc.add_style(OWN, CARD);
+    } else {
+        doc.add_global_style(OWN, CARD);
+    }
     let body = doc.body();
     let nodes: Vec<_> = x
         .iter()
@@ -204,4 +213,14 @@ fn a_key_shares_while_the_sheet_its_winners_name_as_blocking_is_not_in_the_casca
     // Then: (shared, unshareable)
     assert_eq!(shared(false), (1, 0));
     assert_eq!(shared(true), (0, 2));
+}
+
+#[test]
+fn a_global_keys_winners_that_disagree_with_the_cascade_refuse_its_first_element() {
+    // Given: a global component's key, its sheet registered by name
+    let found = colours(key_in(SheetRef::Global(OWN), 1, sheet_hash(CARD)), &[false]);
+
+    // Then
+    let refused = found.expect_err("refused");
+    assert!(refused.contains("differs from the cascade's"), "{refused}");
 }

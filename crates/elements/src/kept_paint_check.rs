@@ -80,12 +80,15 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
 
 /// "hits" when `kept`'s hits are not `fresh`'s, in painting order; the
 /// first kept hit for hit testing that differs from a fresh gather of
-/// `kept`'s scene. The kept hits are gathered when none are, so every
-/// later update patches them and is compared.
+/// `kept`'s scene, or, when every hit is the same in order, the first
+/// label held under another frame or none (a relabel keeps the order,
+/// so only the labels show it). The kept hits are gathered when none
+/// are, so every later update patches them and is compared.
 fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = String> {
     let hits = !kept.scene().hits().eq(fresh.scene().hits());
     let gathered = crate::kept_hits::KeptHits::of(&kept.scene());
-    let first = first_differing_hit(kept.kept_hits(), &gathered);
+    let first = first_differing_hit(kept.kept_hits(), &gathered)
+        .or_else(|| kept.kept_hits().first_label_differing(&gathered));
     hits.then(|| "hits".to_owned()).into_iter().chain(first)
 }
 
@@ -95,7 +98,7 @@ fn first_differing_hit(
     kept: &crate::kept_hits::KeptHits,
     gathered: &crate::kept_hits::KeptHits,
 ) -> Option<String> {
-    let (mut kept, mut gathered) = (kept.hits(), gathered.hits());
+    let (mut kept, mut gathered) = (kept.hits().into_iter(), gathered.hits().into_iter());
     (0..).find_map(|at| match (kept.next(), gathered.next()) {
         (None, None) => Some(None),
         (k, g) if k != g => Some(Some(format!(
@@ -112,15 +115,16 @@ fn differing_extents(kept: &Painted) -> Option<&'static str> {
     if let Some(total) = kept.extents.total_differing() {
         return Some(total);
     }
-    let places = kept.order.steps.len();
-    let afresh = crate::frame_extents::Extents::of(&kept.drawn, places, &kept.kept_boxes);
+    let slots = kept.kept_boxes.len();
+    let afresh = crate::frame_extents::Extents::of(&kept.drawn, slots, &kept.kept_boxes);
     (kept.extents != afresh).then_some("extents index")
 }
 
 /// "drawn steps" when the steps `kept` lists as drawing are not those
 /// found afresh from its paint order and kept boxes.
 fn differing_drawn(kept: &Painted) -> Option<&'static str> {
-    let drawn = crate::drawn_steps::DrawnSteps::of(&kept.order.steps, &kept.kept_boxes);
+    let order = (&kept.order.steps[..], &kept.order.labels[..]);
+    let drawn = crate::drawn_steps::DrawnSteps::of(order, &kept.kept_boxes);
     (kept.drawn != drawn).then_some("drawn steps")
 }
 

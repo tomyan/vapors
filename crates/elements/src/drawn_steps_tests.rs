@@ -54,7 +54,10 @@ fn only_the_steps_whose_part_holds_items_are_listed_in_paint_order() {
     ];
 
     // When
-    let drawn = DrawnSteps::of(&steps(), &boxes);
+    let drawn = DrawnSteps::of(
+        (&steps(), &crate::paint_labels::afresh(steps().len())),
+        &boxes,
+    );
 
     // Then
     let listed: Vec<Step> = drawn.steps().collect();
@@ -68,21 +71,33 @@ fn a_step_that_now_draws_is_put_in_at_its_place() {
         Some(kept(true, false, false)),
         Some(kept(false, false, false)),
     ];
-    let mut drawn = DrawnSteps::of(&steps(), &boxes);
+    let mut drawn = DrawnSteps::of(
+        (&steps(), &crate::paint_labels::afresh(steps().len())),
+        &boxes,
+    );
     boxes[1] = Some(kept(true, true, false));
 
     // When
     drawn.patch([1].into_iter(), &boxes);
 
     // Then
-    assert_eq!(drawn, DrawnSteps::of(&steps(), &boxes));
+    assert_eq!(
+        drawn,
+        DrawnSteps::of(
+            (&steps(), &crate::paint_labels::afresh(steps().len())),
+            &boxes
+        )
+    );
 }
 
 #[test]
 fn a_step_that_no_longer_draws_and_a_freed_slots_steps_are_taken_out() {
     // Given
     let mut boxes = [Some(kept(true, true, true)), Some(kept(true, true, false))];
-    let mut drawn = DrawnSteps::of(&steps(), &boxes);
+    let mut drawn = DrawnSteps::of(
+        (&steps(), &crate::paint_labels::afresh(steps().len())),
+        &boxes,
+    );
     (boxes[0], boxes[1]) = (Some(kept(true, false, true)), None);
 
     // When
@@ -103,7 +118,7 @@ fn a_step_put_in_among_many_moves_at_most_a_block_of_entries() {
         (0..count).map(|_| Some(kept(true, false, false))).collect();
     boxes[middle] = Some(kept(false, false, false));
     let steps: Vec<Step> = (0..count).map(Step::Box).collect();
-    let mut drawn = DrawnSteps::of(&steps, &boxes);
+    let mut drawn = DrawnSteps::of((&steps, &crate::paint_labels::afresh(steps.len())), &boxes);
 
     // When
     boxes[middle] = Some(kept(true, false, false));

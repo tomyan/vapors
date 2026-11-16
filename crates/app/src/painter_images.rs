@@ -8,10 +8,12 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_renderer::{
-    GpuWork, ImagePipeline, KeptRange, Sampling, Shift, Target, TextureBinding, WorkCounter,
+    GpuWork, ImagePipeline, KeptRange, Sampling, Target, TextureBinding, WorkCounter,
     upload_rgba8_mipmapped_counted,
 };
 use vapors_scene::{Item, RgbaImage};
+
+use super::rows::Moved;
 
 /// The images uploaded so far, by the image they hold (compared by
 /// identity: one registration is one upload).
@@ -53,11 +55,12 @@ impl Textures {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, shift): (&[Item], &KeptRange, Shift),
+        (items, kept, moved): (&[Item], &KeptRange, &Moved<'_>),
     ) {
         for (place, item) in (0..).zip(items) {
             if let Item::Image { image, .. } = item {
                 let bound = self.bound(pipeline, target, painted.image(*image));
+                let shift = moved.item_shift(place as usize);
                 pipeline.draw_kept(target, bound, (kept, place), shift);
             }
         }

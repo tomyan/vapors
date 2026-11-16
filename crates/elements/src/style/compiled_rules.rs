@@ -6,7 +6,7 @@
 use vapors_css::cascade::{CompiledRules, ComputedStyle, Environment, unshareable};
 use vapors_dom::{DeclarationRef, KeyWinners, RuleRef, SheetRef, StyleKey};
 
-use super::{Sheets, USER_AGENT_SHEET};
+use super::Sheets;
 use crate::arena::Arena;
 use crate::css_element::ElementRef;
 use crate::error::ElementError;
@@ -67,14 +67,10 @@ impl Sheets {
         Ok(entries)
     }
 
-    /// `sheet`'s place in the cascade, `None` when absent.
+    /// `sheet`'s place in the cascade, `None` when absent: from the one
+    /// table, by kind and name, that check 1 reads too (`Sheets::held`).
     pub(crate) fn index_of(&self, sheet: SheetRef) -> Option<usize> {
-        match sheet {
-            SheetRef::UserAgent => Some(USER_AGENT_SHEET),
-            SheetRef::Scope(name) | SheetRef::Global(name) => {
-                self.names.iter().position(|held| held == name)
-            }
-        }
+        self.held(sheet).map(|held| held.index)
     }
 
     fn rule_of(

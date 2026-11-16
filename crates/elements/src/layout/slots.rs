@@ -33,7 +33,7 @@ pub(crate) struct Slots {
 pub(crate) struct Placed {
     pub(crate) boxes: crate::slot_list::SlotList<LayoutBox>,
     pub(crate) slots: Slots,
-    pub(crate) lanes: super::lane::Lanes,
+    pub(crate) lanes: super::lane_set::SharedLanes,
 }
 
 impl Placed {
@@ -89,7 +89,7 @@ impl Slots {
         Placed {
             boxes: boxes.into(),
             slots,
-            lanes: super::lane::Lanes::default(),
+            lanes: super::lane_set::SharedLanes::default(),
         }
     }
 

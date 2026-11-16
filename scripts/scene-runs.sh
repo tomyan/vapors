@@ -14,10 +14,8 @@
 # (each run refuses a 1-minute load of 1.5 or more): run it under
 # `cargo xtask quiet <minutes> -- scripts/scene-runs.sh <dir> <scene>`,
 # which holds xtask's ci, test and gate runs. Before the first run it
-# waits for the 1-minute load to fall under 1.5, at most 15 min (the
-# wait measured 400 s and 521 s after gates, 2026-11-14), logging the wait, the
-# three load averages and the busiest processes. A run exits 1 when a
-# frame is over budget; that is recorded, not a failure of the script.
+# waits for the 1-minute load to fall under 1.5 (scripts/settle.sh).
+# A run exits 1 when a frame is over budget; that is recorded, not a failure of the script.
 # A run that never reached its first frame (a refusal: the load, the
 # adapter, the shader cache) fails the script, naming its output.
 set -eu
@@ -35,20 +33,7 @@ mkdir -p "$out"
 cargo build --release -p vapors-perf
 cp target/release/vapors-perf "$out/vapors-perf"
 (cd "$out" && sha256sum vapors-perf > sha256.txt)
-load() { cut -d' ' -f1-3 /proc/loadavg; }
-# settle: waits for a 1-minute load under 1.5, at most 900 s, and logs
-# the wait, the load and the five busiest processes.
-settle() {
-  started=$(date +%s)
-  until awk "BEGIN { exit !($(cut -d' ' -f1 /proc/loadavg) < 1.5) }"; do
-    if [ $(( $(date +%s) - started )) -ge 900 ]; then
-      echo "the 1-minute load is still $(load) after 900 s; nothing was run" | tee -a "$out/log.txt" >&2; exit 1
-    fi
-    sleep 10
-  done
-  echo "settled after $(( $(date +%s) - started )) s, load $(load); busiest:" >> "$out/log.txt"
-  ps -eo pcpu,etime,comm --sort=-pcpu | head -6 >> "$out/log.txt"
-}
+. "$(dirname "$0")/settle.sh"
 run() { # run <name> <cache dir>
   echo "$1 start $(date +%T) load $(load)" >> "$out/log.txt"
   code=0

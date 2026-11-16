@@ -10,10 +10,14 @@ use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline, Shift};
 use super::frame::{pixel, quad, square, target};
 
 pub const SIDE: u32 = 4;
-/// A quad's instance bytes.
-pub const QUAD_BYTES: u64 = 128;
-/// A kept buffer's first size (`FIRST_SIZE` in `retained.rs`): 512 quads.
+/// A quad's instance bytes: eight `vec4`s and the row index padded to
+/// sixteen bytes (`instanced.rs`).
+pub const QUAD_BYTES: u64 = 144;
+/// A kept buffer's first size (`FIRST_SIZE` in `retained.rs`).
 pub const FIRST_SIZE: u64 = 64 * 1024;
+/// The quads a kept buffer's first size holds: 455.
+#[allow(clippy::cast_possible_truncation)] // 455
+pub const BUFFER_QUADS: usize = (FIRST_SIZE / QUAD_BYTES) as usize;
 pub const RED: [u8; 4] = [255, 0, 0, 255];
 pub const GREEN: [u8; 4] = [0, 255, 0, 255];
 pub const BLUE: [u8; 4] = [0, 0, 255, 255];
