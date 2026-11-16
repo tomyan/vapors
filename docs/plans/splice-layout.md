@@ -983,11 +983,16 @@ Lane frames are lighter than scroll frames:
     (their positions are in the row's frame, which an insert does not
     move); an insert above changes only the tables of the batches
     drawn, O(rows shown), never a retained instance.
-  - Items still batch only under one clip (a row's own clip inside its
-    frame breaks the batch, as a clip change does today), and each is
-    culled in its own row's view, as now.
-  - Every pipeline with positions takes the index: quads, shadows,
-    texts, images and icons. Surfaces keep one frame a batch.
+  - Items still batch only under one clip, and each is culled in its
+    own row's view, as now. A clip inside a row is batched moved into
+    the lane template's coordinates (by the row's offset), so the
+    painter's scissor, the template's shift plus the batch's clip, is
+    the row's clip, and equal clips in different rows are different
+    batches (#407's review, H1).
+  - Every pipeline with positions takes the index: quads, shadows and
+    texts. Images and surfaces, drawn an item at a time, are batched
+    across rows too, each drawn at the batch's shift plus its row's
+    offset; a culled surface keeps its place and its row.
   - **Index stability.** A batch's indexes are given when the batch is
     made, in the order its rows first appear, and a kept batch keeps
     them: its table's values change with its rows' offsets, its
