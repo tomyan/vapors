@@ -5,7 +5,7 @@
 //! when it is shown; given a role, it takes them. Proven by the model
 //! mirror held against the document after every take.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

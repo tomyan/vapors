@@ -5,7 +5,7 @@
 //! (`kept_order_check.rs`); the small cases also match a full update
 //! through the oracle. The declined cases: `order_splice_declined.rs`.
 
-mod support;
+use crate::support;
 
 use support::splice_page::{
     ROW_X, SPLICED, inserted, many_rows, matches_full, order, page, updated,

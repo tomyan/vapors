@@ -2,7 +2,7 @@
 //! anything outside the subset, before layout, naming the element, the
 //! attribute and the fix.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{SVG, assert_accepted, assert_refused, icon, with_attributes};
 use support::{document, element, text};

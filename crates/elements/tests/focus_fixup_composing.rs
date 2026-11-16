@@ -5,7 +5,7 @@
 //! text is already in the value, so `change` carries it, and the
 //! composition ends with no event: vapors fires no composition events.
 
-mod support;
+use crate::support;
 
 use support::fixup::{hide_field, typed_in, update_and_settle};
 use support::text_page::{Page, value};

@@ -2,7 +2,7 @@
 //! whether an element is inline still refuse: what the author wrote is
 //! unsupported whether or not it is shown.
 
-mod support;
+use crate::support;
 
 use support::element;
 use support::hidden_page::{assert_refused, page, row, row_in};

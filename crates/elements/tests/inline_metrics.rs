@@ -4,7 +4,7 @@
 //! refused, naming it; one that differs only in weight or face is laid
 //! out.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, text, viewport};
 

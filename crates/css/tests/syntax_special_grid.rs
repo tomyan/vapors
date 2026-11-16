@@ -1,6 +1,6 @@
 //! Grid track lists (`src/syntax/special_grid.rs`).
 
-mod support;
+use crate::support;
 
 use support::property_values::accepts;
 use support::refusal;

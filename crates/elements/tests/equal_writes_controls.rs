@@ -4,7 +4,7 @@
 //! control, and a value equal to what the control shows leaves its
 //! focus, caret, selection and undo alone.
 
-mod support;
+use crate::support;
 
 use support::{checkbox_page, number_page, text_page};
 use vapors_dom::{Dom, PropertyValue};

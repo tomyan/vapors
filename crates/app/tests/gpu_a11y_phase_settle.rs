@@ -6,8 +6,7 @@
 //! focused button, removing the element under the pointer, or
 //! scrolling under a resting pointer.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

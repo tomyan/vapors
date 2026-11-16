@@ -1,6 +1,6 @@
 //! Animation sampling (`src/animation/sampler.rs`).
 
-mod support;
+use crate::support;
 
 use support::animation_sample::{pulse_animation, px};
 use vapors_css::property::PropertyId;

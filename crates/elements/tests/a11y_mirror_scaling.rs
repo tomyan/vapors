@@ -7,7 +7,7 @@
 //! rows' bounds being from it, and scans nothing; a role removed over K children orders
 //! its K placements in steps that grow with K, not K squared.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

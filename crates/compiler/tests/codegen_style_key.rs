@@ -4,8 +4,7 @@
 //! emitted for them, and a `class:` directive toggles through
 //! `toggle_classes`.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, at, generated, generated_with};
 

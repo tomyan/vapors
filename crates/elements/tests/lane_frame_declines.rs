@@ -5,7 +5,7 @@
 //! a row no longer declines (`lane_scrollers.rs`). Each case matches a
 //! full update.
 
-mod support;
+use crate::support;
 
 use support::lane_page::header_list;
 use support::narrow_list::ROWS;

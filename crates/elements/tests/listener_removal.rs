@@ -5,7 +5,7 @@
 //! the document can observe). Each case panicked at `arena.rs` before
 //! (review-fable-input H1).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;

@@ -3,7 +3,7 @@
 //! button, a number field's commit on blur, and a range, scrub or
 //! text drag's next move.
 
-mod support;
+use crate::support;
 
 use support::sweep_page::{Page, Removed, page, remove_on, the_viewport};
 use vapors_dom::{Dom, Event};

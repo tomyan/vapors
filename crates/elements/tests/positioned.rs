@@ -1,7 +1,7 @@
 //! Positioned elements (F2c S8) beyond what the layout corpus compares
 //! with Chromium: what is refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, text};
 

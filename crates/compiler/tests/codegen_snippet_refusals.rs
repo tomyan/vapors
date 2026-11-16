@@ -5,8 +5,7 @@
 //! the wrong number of arguments; two snippets of one name in a list;
 //! and recursion.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{generated, refusal};
 

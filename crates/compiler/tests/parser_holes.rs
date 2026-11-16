@@ -2,7 +2,7 @@
 //! do not end the hole, and the refusal of a Rust if-expression, which
 //! `{if` would otherwise read as a template block.
 
-mod common;
+use crate::common;
 
 use common::{element, expr, parse_err, parse_ok, text_parts};
 

@@ -1,6 +1,6 @@
 //! Box shorthands (`src/property/shorthand.rs`).
 
-mod support;
+use crate::support;
 
 use support::property_shorthand::longhands;
 use support::{refusal, sheet};

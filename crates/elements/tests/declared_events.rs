@@ -2,7 +2,7 @@
 //! event not declared before: every component mount calls it, and a
 //! repeat changes no element's refusal.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::Dom;

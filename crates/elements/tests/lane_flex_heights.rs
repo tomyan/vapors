@@ -2,7 +2,7 @@
 //! items' heights depend on how it is asked (`layout/lane_flex*.rs`;
 //! the review of #343). Each page also matches a full update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

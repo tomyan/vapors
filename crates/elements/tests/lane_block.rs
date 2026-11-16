@@ -6,7 +6,7 @@
 //! (`vapors_elements::LaneDecline`). Each case also matches a full
 //! update.
 
-mod support;
+use crate::support;
 
 use support::narrow_list::{List, ROWS, VIEW, list};
 use support::oracle::assert_matches_full;

@@ -5,7 +5,7 @@
 //! is `None`), so two rows in containers of different sizes cannot be
 //! built; the count of unshareable rows pins the guard until they can.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, StyleKey};

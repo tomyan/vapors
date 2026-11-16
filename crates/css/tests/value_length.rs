@@ -1,6 +1,6 @@
 //! Lengths (`src/value/length.rs`). vapors-specific; sumi had only the cell.
 
-mod support;
+use crate::support;
 
 use support::value_length::context;
 use vapors_css::value::{Length, LengthUnit, parse_length_text};

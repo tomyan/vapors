@@ -2,7 +2,7 @@
 //! registration; and, on any img, src or not, what vapors does not lay
 //! out or draw yet.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals};
 use vapors_dom::Dom;

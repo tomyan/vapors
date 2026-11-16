@@ -4,8 +4,7 @@
 //! by a later frame. Without them its GPU time is `Unsupported`, never
 //! an estimate; not asked, it is `NotRequested` and nothing is timed.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

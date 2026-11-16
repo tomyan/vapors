@@ -5,7 +5,7 @@
 //! click or by property. The order against Chromium is pinned by the
 //! corpus's `checkbox.events`.
 
-mod support;
+use crate::support;
 
 use support::checkbox_page::{checked, click, key, page};
 use vapors_dom::{Dom, Event, PropertyValue};

@@ -3,8 +3,7 @@
 //! entry's vertices uploaded once, counted as `shape_bytes_uploaded`, so
 //! an unchanged frame uploads and writes nothing.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_app::shape_item;

@@ -3,7 +3,7 @@
 //! subset accepts that attribute and no other `data-*`, and a scoped
 //! rule reaches the icon.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_accepted, assert_refused, icon};
 use support::viewport;

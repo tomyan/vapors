@@ -3,7 +3,7 @@
 //! press focuses the nearest focusable element; `:focus` and
 //! `:focus-within` follow focus; a positive tabindex is refused.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

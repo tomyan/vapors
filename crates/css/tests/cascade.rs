@@ -1,6 +1,6 @@
 //! The cascade entry points (`src/cascade/mod.rs`).
 
-mod support;
+use crate::support;
 
 use support::sheet;
 use vapors_css::cascade::Cascade;

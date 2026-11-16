@@ -2,7 +2,7 @@
 //! compiled handler, whose signal's effect sets the text node, while
 //! dispatch holds no borrow of the document.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

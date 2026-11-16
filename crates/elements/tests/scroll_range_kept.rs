@@ -5,7 +5,7 @@
 //! marks it so; the placement check, which settles every container
 //! afresh on each debug update, guards the kept range.
 
-mod support;
+use crate::support;
 
 use support::{document, element};
 use vapors_dom::{Dom, NodeId};

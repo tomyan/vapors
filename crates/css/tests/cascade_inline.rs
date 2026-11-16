@@ -2,7 +2,7 @@
 //! are author declarations that beat any selector's, below an
 //! `!important` sheet declaration unless they are important themselves.
 
-mod support;
+use crate::support;
 
 use support::cascade::{BLUE, RED};
 use support::{chain, computed, css, env, sheet};

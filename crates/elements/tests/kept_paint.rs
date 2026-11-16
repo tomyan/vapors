@@ -3,7 +3,7 @@
 //! scale are those the kept paint shows. Each of those, changed alone,
 //! paints again: the boxes built, and the thumbs; the moved are shifted.
 
-mod support;
+use crate::support;
 
 use support::scroll_list::{at, list, scroll};
 use support::{document, element, text, viewport};

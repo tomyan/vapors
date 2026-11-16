@@ -1,7 +1,7 @@
 //! `img` in the scene (F2c S10): its image over its content box, after
 //! its background and border, and nothing for an img without one.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, NodeId};

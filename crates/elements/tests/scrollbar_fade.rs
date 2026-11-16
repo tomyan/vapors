@@ -1,7 +1,7 @@
 //! Each scroll container's own thumb opacity (a touch app's fade): a
 //! container's thumbs drawn at its own alpha, others' left as they are.
 
-mod support;
+use crate::support;
 
 use support::basics::{document, element};
 use support::scroll_list::at;

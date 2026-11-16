@@ -4,8 +4,7 @@
 //! after a row is put in at the top every row's pixels are where the
 //! insert puts it in device pixels (scale 2).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_dom::Dom;

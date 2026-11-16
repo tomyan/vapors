@@ -32,3 +32,8 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     let position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
     return vertex_out(instance, local, position);
 }
+
+@fragment
+fn fs_main(in: Out) -> @location(0) vec4<f32> {
+    return covered(in, dpdx(in.local), dpdy(in.local));
+}

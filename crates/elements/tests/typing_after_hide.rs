@@ -5,7 +5,7 @@
 //! no field. An agent's edits arrive between frames, so the next frame
 //! is too late.
 
-mod support;
+use crate::support;
 
 use support::fixup::{hide_field, typed_in};
 use support::text_page::{Page, key, value};

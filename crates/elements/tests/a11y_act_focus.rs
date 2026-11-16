@@ -2,7 +2,7 @@
 //! that moves focus mid-way stops them, and the refusal names the node
 //! that took focus and how many keys went before.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};

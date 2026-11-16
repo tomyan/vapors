@@ -2,8 +2,7 @@
 //! `children` snippet, built against `dyn Dom`, and `{render name()}`
 //! builds a snippet in place.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated_with};
 

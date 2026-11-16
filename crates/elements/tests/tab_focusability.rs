@@ -4,7 +4,7 @@
 //! element hidden since the last update is skipped, one shown since is
 //! visited, and neither leaves focus stuck.
 
-mod support;
+use crate::support;
 
 use support::focus_page::{page, tab};
 use vapors_dom::Dom;

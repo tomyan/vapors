@@ -1,6 +1,6 @@
 //! `flex` and grid line shorthands (`src/property/shorthand_layout.rs`).
 
-mod support;
+use crate::support;
 
 use support::property_shorthand::longhands;
 

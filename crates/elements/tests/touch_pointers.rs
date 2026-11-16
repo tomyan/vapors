@@ -5,7 +5,7 @@
 //! `set_pointer_capture` owns the touch, which the app reads before
 //! letting a pan scroll.
 
-mod support;
+use crate::support;
 
 use support::pointer::{Log, SHEET, record, setup};
 use vapors_dom::{Dom, Event};

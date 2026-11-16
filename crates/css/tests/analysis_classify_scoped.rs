@@ -1,8 +1,7 @@
 //! `analysis::classify` over rules in the form `scope::scoped` gives
 //! them, the state pseudo-class names `Depends` prints, and its text.
 
-#[path = "support/classify.rs"]
-mod support;
+use crate::support_classify as support;
 
 use support::{CARD, classified, classified_scoped, depends};
 use vapors_css::analysis::{KeyFacts, Match};

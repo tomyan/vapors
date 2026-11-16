@@ -31,7 +31,7 @@ impl SceneHits {
     /// The source of watched scene `scene`, which `surfaces` named.
     pub(crate) fn source(&self, scene: NodeId) -> &HitSource {
         let (_, source) = self.sources.get(&scene).expect(
-            "`surfaces` named a scene `sources` does not hold: the two are inserted and removed together in scene_hits.rs, so this is a defect there; reproduce with `cargo test -p vapors-elements --test scene_hits`",
+            "`surfaces` named a scene `sources` does not hold: the two are inserted and removed together in scene_hits.rs, so this is a defect there; reproduce with `cargo test -p vapors-elements --test tests scene_hits::`",
         );
         source
     }

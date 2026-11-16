@@ -1,7 +1,7 @@
 //! A hidden labelling element's text changing renames the element it
 //! labels (the #432 review's L4).
 
-mod support;
+use crate::support;
 
 use support::mirror::{labels, node_of, step, taken_model};
 use support::{element, text};

@@ -6,7 +6,7 @@
 //! debug build holds the labels increasing along paint order after every
 //! update (`kept_order_check.rs`), and each case matches a full update.
 
-mod support;
+use crate::support;
 
 use support::narrow_list::{List, VIEW, list, row};
 use support::oracle::assert_matches_full;

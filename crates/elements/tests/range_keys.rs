@@ -2,7 +2,7 @@
 //! one step and Shift by ten, Page, Home and End as Chromium, each
 //! firing `input` and `change`; a `value` property sets it silently.
 
-mod support;
+use crate::support;
 
 use support::range_page::{key, page, page_with, shift_key, value};
 use vapors_dom::{Dom, Event, PropertyValue};

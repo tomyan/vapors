@@ -3,8 +3,7 @@
 //! the section offsets, signals without a type (a struct field needs
 //! one), and the deferred features.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::refusal;
 

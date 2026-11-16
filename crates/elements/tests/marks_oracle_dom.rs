@@ -2,7 +2,7 @@
 //! the viewport makes marks the boxes it changes, so the update after
 //! it matches a full update. Each case fails without its mark.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

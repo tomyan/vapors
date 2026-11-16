@@ -4,7 +4,7 @@
 //! bound (`layout/layout_check.rs`, `tolerance`). Each page is checked
 //! by the update itself.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 

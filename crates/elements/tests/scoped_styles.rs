@@ -3,7 +3,7 @@
 //! every compound of a selector in scope, and gains one attribute's
 //! specificity (Svelte's rule).
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE};

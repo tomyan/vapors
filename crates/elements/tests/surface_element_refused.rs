@@ -2,7 +2,7 @@
 //! empty one; padding, a border-radius and `display: inline`, each
 //! naming the declaration's sheet and line.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::Dom;

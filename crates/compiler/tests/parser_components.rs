@@ -7,7 +7,7 @@
 //! (`ClassifyTag`, `TagRegistryKey`, `TagComponentFile`) has no
 //! counterpart and is not translated.
 
-mod common;
+use crate::common;
 
 use common::{component, element, parse_ok, text};
 

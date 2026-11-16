@@ -5,8 +5,7 @@
 //! a renderer's GPU validation error; what a refused frame releases; and
 //! `draw_over` refusing as `draw` does.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, Misfit, RED, Rig, Solid, bare_document, document, update};
 use vapors_app::{DrawOverError, PaintError};

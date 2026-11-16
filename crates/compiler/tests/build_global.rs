@@ -3,8 +3,7 @@
 //! Nothing is scoped: no `SCOPE`, no `add_style`, no tag; each mount
 //! registers the sheet itself under `SHEET`, its crate and file.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use build::{dirs, read, write};
 use vapors_compiler::build::{Styles, compile_dir_into_styled};

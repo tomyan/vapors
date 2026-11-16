@@ -571,8 +571,8 @@ is checked against what it found.
 | R3a1 | The racer's world in `.wisp`: root group, camera, ground, merged scenery, car group, on a test page beside the racer | The ground and object check on the racer's geometry in both cameras; scene draw calls pinned (about 11, 2.2) | R2, 3D PRs 4 and 5 | S rows |
 | R3a2 | The racer moves to it; `Track` and its files deleted; the tests in 2.2 moved | Every moved test passes; idle frames render nothing; browser scripts pass by hand | R3a1 | S rows |
 | R3b | CSS on the craft: `--craft-body`, the livery enum, brake-light meshes with `class:braking`, `:hover` (2.4) | Pixel tests per rule (the brake lights brighten while braking); each change counted: no geometry, one uniform per changed node | R3a2, 3D PR 4b | S rows |
-| S7 | Replaced by `decal.md` slices D1 to D4 (2026-11-16): shapes in the 3D pass on the run-time cache, not waiting for S5b | `decal.md` | | |
-| S8 | Replaced by `decal.md` slice D5 | `decal.md` | | |
+| S7 | Not built. Tom, 2026-11-16: property 9 is judged on the flat scene; S7 and the SceneRenderer decal route are not built; the decal comes as F9. | | | |
+| S8 | Not built: as S7 | | | |
 | R4 | The craft's markings (2.3), replacing the stripe cuboids | Pixel test: the roundel follows the car through a turn; a livery change recolours body and markings in one frame | S8, R3b | none |
 | P1 | Acceptance: P0's run on the one-scene racer, three runs, `docs/perf/`; property 9 marked held or not in `perf-finish-line.md` | No frame over 16.7 ms in each of the three runs, or the frames that were, with their phases | R4 | none |
 
