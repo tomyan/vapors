@@ -70,16 +70,20 @@ impl Document {
     /// so they are placed here whatever else touched the row. Each node
     /// once, none the take read; and the hoisted nodes under the rows,
     /// whose bounds are from the viewport, read in full. The nodes given
-    /// bounds alone, and those read in full.
+    /// bounds alone, and those read in full. `ranges`: how many lane
+    /// ranges the rows are from; a node is found under two rows only
+    /// when ranges of two lanes overlap (a lane inside a row of another),
+    /// or by the hoisted pass, so the nodes done are noted only then.
     ///
     /// # Errors
     /// As [`Document::take_ax_update`], from a node read again in full.
     pub(crate) fn ax_rebound_rows(
         &self,
-        rows: &[NodeId],
+        (rows, ranges): (&[NodeId], usize),
         read: &NodeSet,
         (rebounding, diff): (&mut Rebounding<'_>, &mut Diff),
     ) -> Result<(usize, usize), AxError> {
+        let dedupe = ranges > 1 || !self.ax.hoisted.is_empty();
         let mut done = NodeSet::default();
         let mut counts = (0, 0);
         for &row in rows {
@@ -89,7 +93,7 @@ impl Document {
             let mut found = std::mem::take(&mut rebounding.found);
             self.ax_nearest_records(row, (&mut rebounding.below, &mut found));
             for &node in &found {
-                if !read.contains(&node) && done.insert(node) {
+                if !read.contains(&node) && (!dedupe || done.insert(node)) {
                     let full = self.ax_rebound(node, rebounding, diff)?;
                     *if full { &mut counts.1 } else { &mut counts.0 } += 1;
                 }

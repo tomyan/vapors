@@ -117,8 +117,11 @@ impl Document {
         }
         let rows = self.ax_started_rows(&touched.started);
         let mut rebounding = Rebounding::new(index, &touched.replaced);
-        let (bounds_only, full) =
-            self.ax_rebound_rows(&rows, &read, (&mut rebounding, &mut diff))?;
+        let (bounds_only, full) = self.ax_rebound_rows(
+            (&rows, touched.started.len()),
+            &read,
+            (&mut rebounding, &mut diff),
+        )?;
         self.ax.counts.bounds_only = bounds_only;
         self.ax.counts.nodes_read += full;
         if let Some(node) = focus.filter(|&node| diff.after(node, &self.ax.records) == After::Gone)

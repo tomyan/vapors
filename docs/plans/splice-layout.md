@@ -1214,7 +1214,7 @@ The slices:
   nearest nodes' when it is not a node; before #436 a started row with
   no role left its nodes' bounds stale, and #436 read them in full).
   Judged ceilings
-  tightened to Insert 1300, FlexInsert 240, Resize 2500.
+  tightened to Insert 1250, FlexInsert 240, Resize 2480.
 
   Still per row: each moved row's bounds are rewritten, as the mirror
   carries every node's bounds from its parent node. Ways to make it
