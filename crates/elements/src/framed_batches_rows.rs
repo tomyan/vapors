@@ -7,7 +7,7 @@
 
 use vapors_scene::{Batched, Item, ROWS_PER_BATCH, Rect};
 
-use super::{Resolved, RowsOfBatches, Sources};
+use super::{LastSeen, Resolved, RowsOfBatches, Sources};
 use crate::frames_draw::view_at;
 use crate::scene_view::frame_items;
 
@@ -19,22 +19,17 @@ pub(super) fn rows_batched(
     view: Rect,
 ) -> Vec<(Batched, RowsOfBatches)> {
     let template = frames.lane_template_of(container).shift;
-    let mut last: Option<(usize, Row)> = None;
+    let mut last = LastSeen::default();
     let mut parts = Parts::default();
     for at in run {
-        let row = match last {
-            Some((frame, row)) if frame == at.frame => row,
-            _ => {
-                let frame = frames.at(at.frame);
-                let offset = [frame.shift[0] - template[0], frame.shift[1] - template[1]];
-                let row = Row {
-                    view: view_at(frame, view),
-                    offset,
-                };
-                last = Some((at.frame, row));
-                row
+        let row = last.get(at.frame, || {
+            let frame = frames.at(at.frame);
+            let offset = [frame.shift[0] - template[0], frame.shift[1] - template[1]];
+            Row {
+                view: view_at(frame, view),
+                offset,
             }
-        };
+        });
         for (item, clip) in frame_items(boxes, at.step).1 {
             parts.add((at.frame, row), &item, clip);
         }
@@ -96,9 +91,30 @@ impl Parts {
 
     /// The part being filled closed, and a new one started.
     fn close(&mut self) {
+        #[cfg(debug_assertions)]
+        self.assert_rows_held();
         let part = std::mem::take(&mut self.part);
         self.done.push((part, std::mem::take(&mut self.part_rows)));
         (self.last_row, self.rows) = (None, 0);
+    }
+
+    /// Panics, naming the batch, when a batch's item rows are not one an
+    /// item of its run: `note_row` noted an item in another batch than the
+    /// one `Batched` put it in.
+    #[cfg(debug_assertions)]
+    fn assert_rows_held(&self) {
+        let rows = self.part_rows.iter();
+        for (at, (batch, rows)) in self.part.batches.iter().zip(rows).enumerate() {
+            assert_eq!(
+                rows.items.len(),
+                batch.run.len(),
+                "batch {at} of a lane part holds {} item rows for {} items: an item was noted in \
+                 another batch than it was batched in (framed_batches_rows.rs `note_row`); \
+                 reproduce with `cargo xtask test`",
+                rows.items.len(),
+                batch.run.len()
+            );
+        }
     }
 
     /// Every part, each batch with its rows.

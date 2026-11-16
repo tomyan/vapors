@@ -29,9 +29,20 @@ pub(crate) struct Lanes {
     /// Containers built again since lending, whose lanes are dropped
     /// once their boxes are lent (`Placed::drop_lanes`).
     pub(super) rebuilt: Vec<usize>,
+    /// How many times a lane was put back after layout, dropped, or told
+    /// of a child put in or taken out: a frames' memo filled at one count
+    /// is stale at another (`Frames::lane_at` asserts it in a debug
+    /// build).
+    pub(super) changes: u64,
 }
 
 impl Lanes {
+    /// How many times the lanes changed (`changes`).
+    #[cfg(debug_assertions)]
+    pub(crate) fn changes(&self) -> u64 {
+        self.changes
+    }
+
     /// The lane of the container in `container`, of either kind.
     pub(super) fn lane(&self, container: usize) -> Option<&dyn LaneView> {
         if let Some(lane) = self.block.get(&container) {
@@ -55,6 +66,7 @@ impl Lanes {
     /// add them: a container built again and lent its cache is not laid
     /// out again (section 11.2).
     pub(crate) fn remove(&mut self, slot: usize, boxes: &mut [LayoutBox]) {
+        self.changes += 1;
         if let Some(lane) = self.block.remove(&slot) {
             lane.restore_starts(slot, boxes);
         }
@@ -67,6 +79,7 @@ impl Lanes {
     /// nothing: its children are freed or built again elsewhere, and
     /// their slots may hold other boxes now.
     pub(crate) fn forget(&mut self, slot: usize) {
+        self.changes += 1;
         self.block.remove(&slot);
         self.flex.remove(&slot);
     }
@@ -168,6 +181,7 @@ impl Lanes {
     /// Tells the lane of the container in `owner`, if it has one, of
     /// the child put in at `slot` after `after` (`Lane::child_inserted`).
     pub(crate) fn child_inserted(&mut self, owner: usize, slot: usize, after: Option<usize>) {
+        self.changes += 1;
         if let Some(lane) = self.lane_mut(owner) {
             lane.child_inserted(slot, after);
         }
@@ -176,6 +190,7 @@ impl Lanes {
     /// Tells the lane of the container in `owner`, if it has one, of
     /// the child taken out of `slot` (`Lane::child_removed`).
     pub(crate) fn child_removed(&mut self, owner: usize, slot: usize, next: Option<usize>) {
+        self.changes += 1;
         if let Some(lane) = self.lane_mut(owner) {
             lane.child_removed(slot, next);
         }

@@ -66,26 +66,47 @@ pub(crate) struct Resolved {
     pub(crate) group: BatchFrame,
 }
 
-/// Each of `steps` resolved, a frame's group looked up once a run of
-/// steps in it (a row's steps are consecutive).
+/// Each of `steps` resolved, a frame's group looked up again only when
+/// the frame changes from the step before. A row's steps mostly run
+/// together; a positioned descendant's paint later, and the lookup is
+/// then made again.
 fn resolved(steps: impl Iterator<Item = Step>, (boxes, frames): Sources<'_>) -> Vec<Resolved> {
-    let mut last: Option<(usize, BatchFrame)> = None;
-    let mut group_of = |frame: usize| match last {
-        Some((was, group)) if was == frame => group,
-        _ => {
-            let group = frames
-                .lane_container_of(frame)
-                .map_or_else(|| BatchFrame::frame(frame), BatchFrame::lane);
-            last = Some((frame, group));
-            group
-        }
-    };
+    let mut last = LastSeen::default();
     let resolve = |step| {
         let frame = frame_items(boxes, step).0;
-        let group = group_of(frame);
+        let group = last.get(frame, || {
+            frames
+                .lane_container_of(frame)
+                .map_or_else(|| BatchFrame::frame(frame), BatchFrame::lane)
+        });
         Resolved { step, frame, group }
     };
     steps.map(resolve).collect()
+}
+
+/// The value made for the last key asked for: made again when the key
+/// changes. For keys that mostly repeat (a row's frame, step after step).
+pub(crate) struct LastSeen<K, V>(Option<(K, V)>);
+
+impl<K, V> Default for LastSeen<K, V> {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl<K: PartialEq + Copy, V: Copy> LastSeen<K, V> {
+    /// The value for `key`: the last one when `key` was the last asked
+    /// for, else `make()`'s.
+    pub(crate) fn get(&mut self, key: K, make: impl FnOnce() -> V) -> V {
+        match self.0 {
+            Some((last, value)) if last == key => value,
+            _ => {
+                let value = make();
+                self.0 = Some((key, value));
+                value
+            }
+        }
+    }
 }
 
 impl FramedBatched {

@@ -14,6 +14,7 @@ impl BoxTree<'_> {
     /// `slot`, noting its children put since.
     pub(super) fn lane_kept<K: LaneKind>(&mut self, slot: usize, mut lane: Lane<K>) {
         let born = std::mem::take(&mut lane.born);
+        self.lanes.changes += 1;
         K::lanes(self.lanes).insert(slot, lane);
         self.lanes
             .parents

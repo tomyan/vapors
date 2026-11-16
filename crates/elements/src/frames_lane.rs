@@ -44,6 +44,10 @@ pub(crate) struct LaneFrames {
     /// borrow (section 11.2, 4d); the table, sized to the largest primed
     /// slot in an update that started rows, is 16 bytes a slot.
     primed: std::cell::OnceCell<Primed>,
+    /// How many times the lanes had changed when they were set
+    /// (`Lanes::changes`): the memo holds for that count alone.
+    #[cfg(debug_assertions)]
+    generation: u64,
     /// Lane frames worked out by a fold of their lane since the lanes
     /// were set, for the tests that the priming holds (`lane_folds`).
     folds: std::cell::Cell<usize>,
@@ -72,7 +76,11 @@ impl Frames {
         for (&container, base) in &bases {
             by_parent.entry(base.parent).or_default().push(container);
         }
+        #[cfg(debug_assertions)]
+        let generation = shared.borrow().changes();
         self.lanes = LaneFrames {
+            #[cfg(debug_assertions)]
+            generation,
             shared: Some(shared),
             bases,
             by_parent,
@@ -94,7 +102,10 @@ impl Frames {
     /// Lane frame `frame`, when `frame` is a framed lane child,
     /// memoised.
     pub(super) fn lane_at(&self, frame: usize) -> Option<FrameAt> {
-        if let Some(&at) = self.lanes.memo.borrow().get(&frame) {
+        let memoised = self.lanes.memo.borrow().get(&frame).copied();
+        if let Some(at) = memoised {
+            #[cfg(debug_assertions)]
+            self.assert_memo_holds(frame, at);
             return Some(at);
         }
         let at = self.lane_resolved(frame, &|outer| self.at(outer))?;

@@ -143,3 +143,36 @@ fn a_row_put_in_above_moves_rows_across_the_split_and_the_batches_keep_their_key
     assert_eq!(batch_keys(&doc, view), keys);
     assert_drawn_afresh(&doc, view, "rows moved across the split");
 }
+
+#[test]
+fn rows_whose_items_return_later_in_a_run_split_within_the_table_and_draw_afresh() {
+    // Given: 200 rows of 1 px, 300 in view, each with a `position:
+    // relative` child that paints after the lane's rows, so each row's
+    // items return in a later part of the run
+    let view = viewport(400.0, 300.0);
+    let css = "body { margin: 0; } .row { height: 1px; background-color: #c33; } \
+        .lift { position: relative; width: 4px; height: 1px; background-color: #33c; }";
+    let mut doc = document();
+    let body = doc.body();
+    let list = element(&mut doc, body, "div", "list");
+    for _ in 0..200 {
+        let row = element(&mut doc, list, "div", "row");
+        element(&mut doc, row, "div", "lift");
+    }
+    doc.add_stylesheet("page.css", css).expect("parses");
+    doc.update(view).expect("updates");
+    let doc = Rc::new(RefCell::new(doc));
+
+    // When
+    let rows = batch_rows(&doc, view);
+
+    // Then: no batch numbers more rows than a table holds, and the
+    // batches are those of batching afresh, drawn where the page has them
+    assert!(
+        rows.iter()
+            .all(|&count| count <= vapors_scene::ROWS_PER_BATCH),
+        "{rows:?}"
+    );
+    assert!(rows.len() > 1, "the case is not reached: {rows:?}");
+    assert_drawn_afresh(&doc, view, "rows returning within a run");
+}

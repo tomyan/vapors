@@ -73,6 +73,25 @@ impl Frames {
     /// Panics, naming the frame, when `at`, made from the search's start,
     /// is not the frame a fold of the lane gives: two answers to where a
     /// row is.
+    /// Panics, naming the frame, when `at`, read from the memo, is not
+    /// the frame the lanes give now: the lanes changed after the memo was
+    /// filled, with no `set_lanes` to empty it.
+    #[cfg(debug_assertions)]
+    pub(super) fn assert_memo_holds(&self, frame: usize, at: super::super::FrameAt) {
+        let now = self
+            .lanes
+            .shared
+            .as_ref()
+            .map(|lanes| lanes.borrow().changes());
+        assert!(
+            now.is_none_or(|now| now == self.lanes.generation),
+            "lane frame {frame} read from the memo ({at:?}) was filled when the lanes had \
+             changed {} times, and they have changed {now:?} times now: the lanes changed after the memo was filled and no \
+             `set_lanes` emptied it (frames_lane.rs); reproduce with `cargo xtask test`",
+            self.lanes.generation
+        );
+    }
+
     #[cfg(debug_assertions)]
     fn assert_memoised_folds(&self, slot: usize, at: super::super::FrameAt) {
         let folded = self.resolved_afresh(slot);
