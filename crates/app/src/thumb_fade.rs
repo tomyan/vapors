@@ -73,13 +73,36 @@ impl ThumbFade {
     }
 }
 
-/// Each scroll container's fade, by container.
+/// Each scroll container's fade, by container, and the fade of the floor
+/// every container's thumbs share after the mouse.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ThumbFades {
     by_container: HashMap<NodeId, ThumbFade>,
+    floor: Option<ThumbFade>,
 }
 
 impl ThumbFades {
+    /// A finger touched at `now`, the mouse in use until then: the thumbs
+    /// the mouse showed fade from now on the scroll timing, rather than
+    /// vanishing in one frame (#405), and each container's own fade goes
+    /// on untouched. A touch start reaches no scrollbar controller in cc:
+    /// the controller's inputs are scrolls, the mouse and `DidRequestShow`
+    /// (`scrollbar_animation_controller.cc:190-301`), called from
+    /// `LayerTreeHostImpl::WillScrollContent`, `DidScrollContent` and the
+    /// mouse handlers (`cc/trees/layer_tree_host_impl.cc:4754-4796`,
+    /// `:4970-5006`), so in Chrome a finger landing changes no thumb.
+    pub(crate) fn touch_after_mouse(&mut self, now: Instant) {
+        let mut floor = ThumbFade::default();
+        floor.scrolled(now);
+        self.floor = Some(floor);
+    }
+
+    /// The floor's opacity at `now`: what every container's thumbs are
+    /// drawn at least at.
+    pub(crate) fn floor_opacity(&self, now: Instant) -> f32 {
+        self.floor.map_or(0.0, |floor| floor.opacity(now))
+    }
+
     /// `container` scrolled at `now`.
     pub(crate) fn scrolled(&mut self, container: NodeId, now: Instant) {
         self.by_container
@@ -99,6 +122,7 @@ impl ThumbFades {
     /// Each container's thumbs drawn at their opacity at `now`; those
     /// faded out are drawn hidden once and forgotten.
     pub(crate) fn apply(&mut self, document: &mut Document, now: Instant) {
+        document.set_thumb_opacity(self.floor_opacity(now));
         for (container, fade) in &self.by_container {
             document.set_thumb_opacity_of(*container, fade.opacity(now));
         }
@@ -113,6 +137,7 @@ impl ThumbFades {
             document.set_thumb_opacity_of(*container, 0.0);
         }
         self.by_container.clear();
+        self.floor = None;
     }
 
     /// How many containers are fading or shown.
@@ -124,7 +149,12 @@ impl ThumbFades {
     /// Where the fades are at `now`: fading if any is, else shown until
     /// the earliest fade start, else hidden.
     pub(crate) fn phase(&self, now: Instant) -> Phase {
-        let phases = self.by_container.values().map(|fade| fade.phase(now));
+        let floor = self.floor.iter().map(|floor| floor.phase(now));
+        let phases = self
+            .by_container
+            .values()
+            .map(|fade| fade.phase(now))
+            .chain(floor);
         let mut earliest = None;
         for phase in phases {
             match phase {

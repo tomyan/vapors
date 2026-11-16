@@ -107,3 +107,25 @@ fn hiding_every_fade_draws_each_hidden_and_forgets_them() {
     assert_eq!(fades.len(), 0);
     assert_eq!(fades.phase(at), Phase::Hidden);
 }
+
+#[test]
+fn a_touch_after_the_mouse_draws_the_shared_thumbs_fading_from_full() {
+    // Given the mouse's thumbs, drawn fully
+    let (doc, _, _) = crate::scroll_fixture::nested();
+    let (mut fades, at) = (super::ThumbFades::default(), Instant::now());
+    doc.borrow_mut().take_changed();
+
+    // When a finger touches, and frames draw the thumbs
+    fades.touch_after_mouse(at);
+    let mut changed_at = |when| {
+        fades.apply(&mut doc.borrow_mut(), when);
+        doc.borrow_mut().take_changed()
+    };
+
+    // Then they stay full through the delay, fade, and end hidden
+    assert!(!changed_at(at), "not hidden at the touch");
+    assert!(!changed_at(at + 299 * MS));
+    assert!(changed_at(at + 450 * MS));
+    assert!(changed_at(at + FADE_DELAY + FADE_DURATION));
+    assert_eq!(fades.phase(at + FADE_DELAY + FADE_DURATION), Phase::Hidden);
+}
