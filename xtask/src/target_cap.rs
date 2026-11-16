@@ -9,11 +9,12 @@
 //! `target/<profile>/deps` and `target/<triple>/<profile>/deps`, one
 //! directory listing each with no walk below, summed as allocated
 //! blocks (as `du` counts). Measured 2026-11-16 on six of the dev box's
-//! targets, `deps` held 89% to 96% of what `du -sb` counted (98.3 of
-//! 111.0 GB, 84.3 of 90.0, 47.1 of 50.8, 31.5 of 32.7, 1.3 of 1.4,
-//! 0.7 of 0.9), read in 2 to 34 ms where `du` took 9 to 400 ms warm and
+//! targets, `deps` held 82% to 96% of what `du -sb` counted, 89% and
+//! up on those over a gigabyte (98.3 of 111.0 GB, 84.3 of 90.0, 47.1 of
+//! 50.8, 31.5 of 32.7, 1.3 of 1.4, 0.7 of 0.9), read in 2 to 34 ms where `du` took 9 to 400 ms warm and
 //! more cold. So the cap fires at `max_gb` of build products, with the
-//! whole directory then at most about an eighth larger.
+//! whole directory then, at sizes near the cap, at most about an eighth
+//! larger.
 
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
