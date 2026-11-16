@@ -31,8 +31,18 @@ pub(crate) struct Keyed<'e> {
     /// Whether the key carries the literal attributes (an element's;
     /// a component tag's are props).
     pub(super) carries_attributes: bool,
+    /// An element, which the styles analysis sees, or a component tag,
+    /// whose key's tag its props type decides.
+    pub(super) kind: KeyedKind,
     pub(super) attributes: &'e Attributes,
     pub(super) offset: usize,
+}
+
+/// What a key is made from, for its winners.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyedKind {
+    Element,
+    ComponentTag,
 }
 
 impl<'e> Keyed<'e> {
@@ -43,6 +53,7 @@ impl<'e> Keyed<'e> {
             elsewhere: "a child element".to_owned(),
             reads_uses: false,
             carries_attributes: true,
+            kind: KeyedKind::Element,
             attributes: &element.attributes,
             offset: element.offset,
         }
@@ -55,6 +66,7 @@ impl<'e> Keyed<'e> {
             elsewhere: format!("an element inside <{}>", tag.name),
             reads_uses: true,
             carries_attributes: false,
+            kind: KeyedKind::ComponentTag,
             attributes: &tag.attributes,
             offset: tag.offset,
         }
@@ -101,13 +113,19 @@ impl Emitter<'_> {
         })
     }
 
-    /// `Some(&WINNERS_{VAR})` for an element, after adding that static;
-    /// `None` for a component tag, whose key's tag its props type
-    /// decides, so the analysis does not see it, and when the emitter
-    /// has no analysis (`generate` without styles).
+    /// `Winners::Compiled(&WINNERS_{VAR})` for an element, after adding
+    /// that static; `Winners::ComponentTag` for a component tag, whose
+    /// key's tag its props type decides, which the analysis does not
+    /// see. Every generation analyses (`generate` with the crate's
+    /// other sheets or none, whose rules the runtime then adds as
+    /// foreign); only the emission that looks for codegen's own refusal
+    /// after the analysis refused has none, and its output is dropped.
     fn winners_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
-        let Some(winners) = self.winners.filter(|_| keyed.carries_attributes) else {
-            return Ok("None".to_owned());
+        if keyed.kind == KeyedKind::ComponentTag {
+            return Ok("vapors_dom::Winners::ComponentTag".to_owned());
+        }
+        let Some(winners) = self.winners else {
+            return Ok("vapors_dom::Winners::Unanalysed".to_owned());
         };
         let (line, column) = self.source.position(keyed.offset);
         let literal = winners.literal(line, column).ok_or_else(|| {
@@ -123,7 +141,7 @@ impl Emitter<'_> {
         self.keys.push(format!(
             "static {name}: vapors_dom::KeyWinners = {literal};"
         ));
-        Ok(format!("Some(&{name})"))
+        Ok(format!("vapors_dom::Winners::Compiled(&{name})"))
     }
 
     fn style_key(&self, keyed: &Keyed, winners: &str) -> Result<String, CompileError> {

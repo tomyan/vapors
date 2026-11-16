@@ -34,7 +34,9 @@ pub use class_names::class_names;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
 pub use event_pointer::{Capture, Pointer};
-pub use key_winners::{BaseWinner, DeclarationRef, KeyWinners, PropertyRef, RuleRef, SheetRef};
+pub use key_winners::{
+    BaseWinner, DeclarationRef, KeyWinners, PropertyRef, RuleRef, SheetRef, Winners,
+};
 pub use listener::{Handler, Listener};
 pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
 pub use modifiers::Modifiers;

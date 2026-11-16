@@ -159,7 +159,8 @@ fn generated(
             .map_or_else(|own| own, |_| vec![refusal])
     })?;
     let hashes = others.hashes_for(component);
-    let winners = key_winners::Winners::new(&analysis, &hashes);
+    let own = component.style.as_ref().and(component.scope.as_deref());
+    let winners = key_winners::Winners::new(&analysis, &hashes, own);
     let mut emitter = emit_template(component, &source, &info, (1, index), Some(&winners))?;
     let width = digits(emitter.names_made().saturating_sub(1));
     if width > 1 {

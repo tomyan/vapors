@@ -226,7 +226,7 @@ pub use painted::Painted;
 pub use scene_view::SceneView;
 pub use shortcuts::ShortcutModifier;
 pub use splice_decline::SpliceDecline;
-pub use style::{ALL_CURSORS, Cursor, SceneUsed};
+pub use style::{ALL_CURSORS, Cursor, SceneUsed, SheetHash};
 pub use tags::FIRED as FIRED_EVENTS;
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;

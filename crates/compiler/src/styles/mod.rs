@@ -129,7 +129,9 @@ pub(super) fn own_sheet(
             (SheetId::Scope(scope.clone()), scoped)
         }
         None => (
-            SheetId::Global(component.path.clone()),
+            SheetId::Global(
+                (component.global_sheet.clone()).unwrap_or_else(|| component.path.clone()),
+            ),
             crate::style_check::checked(source, section, Styles::Global)?,
         ),
     })

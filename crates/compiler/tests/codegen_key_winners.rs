@@ -35,17 +35,20 @@ fn longhand(name: &str) -> usize {
 }
 
 #[test]
-fn an_elements_winners_list_the_user_agent_sheet_and_its_own_hashed_as_the_runtime_registers_them()
-{
+fn an_elements_winners_list_the_user_agent_sheet_and_its_own_by_scope_hashed_as_the_runtime_registers_them()
+ {
     // When
     let code = styled("<div class=\"card\"></div>");
 
     // Then
-    assert_has(&code, "winners: Some(&WINNERS_DIV0)");
+    assert_has(
+        &code,
+        "winners: vapors_dom::Winners::Compiled(&WINNERS_DIV0)",
+    );
     assert_has(
         &code,
         &format!(
-            "sheets: &[(vapors_dom::SheetRef::UserAgent, {}), (vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp\")), {})]",
+            "sheets: &[(vapors_dom::SheetRef::UserAgent, {}), (vapors_dom::SheetRef::Scope(SCOPE), {})]",
             hash(vapors_css::user_agent::TEXT),
             hash(STYLE)
         ),
@@ -92,16 +95,18 @@ fn a_component_tags_key_has_no_winners_as_its_props_type_decides_its_tag() {
     );
 
     // Then
-    assert_has(&code, "attributes: &[], winners: None }");
+    assert_has(
+        &code,
+        "attributes: &[], winners: vapors_dom::Winners::ComponentTag }",
+    );
 }
 
 #[test]
 fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() {
     // Given a crate of two components, the other one styling `div`
-    let dir = std::env::temp_dir().join(format!("key-winners-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("a temp dir");
-    let card = dir.join("card.wisp");
-    let other = dir.join("other.wisp");
+    let dir = TempDir::new("key-winners");
+    let card = dir.0.join("card.wisp");
+    let other = dir.0.join("other.wisp");
     std::fs::write(
         &card,
         format!("<style>{STYLE}</style>\n<div class=\"card\"></div>"),
@@ -113,7 +118,7 @@ fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() 
         format!("<style>{other_style}</style>\n<span></span>"),
     )
     .expect("written");
-    let parse = |path: &std::path::Path| parse_file_under(path, &dir).expect("parses");
+    let parse = |path: &std::path::Path| parse_file_under(path, &dir.0).expect("parses");
     let (card, other) = (parse(&card), parse(&other));
     let sheets = CrateSheets::of([&card, &other]);
 
@@ -121,7 +126,6 @@ fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() 
     let code = generate_checked(&card, &PropsIndex::default(), &sheets.others_for(&card))
         .expect("generates")
         .code;
-    std::fs::remove_dir_all(&dir).expect("removed");
 
     // Then: listed third, its rule conditional, since its order against
     // the card's own rules is decided when the sheets are added
@@ -133,4 +137,22 @@ fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() 
         ),
     );
     assert_has(&code, "vapors_dom::RuleRef { sheet: 2, rule: 0 }]");
+}
+
+/// A directory removed when dropped, so a failed test leaves nothing in
+/// the system's temporary directory.
+struct TempDir(std::path::PathBuf);
+
+impl TempDir {
+    fn new(name: &str) -> Self {
+        let dir = std::env::temp_dir().join(format!("{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a temp dir");
+        Self(dir)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }

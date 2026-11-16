@@ -47,7 +47,7 @@ fn rows_compute_one_style_and_one_used_style_per_share_key_at_any_count() {
 }
 
 #[test]
-fn every_compiled_row_element_has_winners_whose_sheets_hash_as_registered() {
+fn every_compiled_row_element_has_winners_whose_sheets_are_registered_and_hash_alike() {
     // Given
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
     let body = doc.borrow().body();
@@ -70,11 +70,16 @@ fn every_compiled_row_element_has_winners_whose_sheets_hash_as_registered() {
         };
 
         // Then
-        assert!(
-            key.winners.is_some(),
-            "{} has no compiled winners",
-            key.site
-        );
+        let winners = key.winners.compiled();
+        let winners = winners.unwrap_or_else(|| panic!("{} has no compiled winners", key.site));
+        for &(sheet, _) in winners.sheets {
+            let held = doc.sheet_hash(sheet);
+            assert!(
+                matches!(held, vapors_elements::SheetHash::Registered(_)),
+                "{}: {sheet:?} is {held:?}, not in the cascade",
+                key.site
+            );
+        }
         doc.check_compiled_sheets(key)
             .unwrap_or_else(|refusal| panic!("{refusal}"));
         checked += 1;

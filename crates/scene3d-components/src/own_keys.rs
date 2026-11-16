@@ -22,7 +22,7 @@ const fn own(tag: &'static str) -> StyleKey {
         toggles: &[],
         attributes: &[],
         style: None,
-        winners: None,
+        winners: vapors_dom::Winners::Unanalysed,
     }
 }
 

@@ -11,24 +11,35 @@ use std::fmt::Write;
 use vapors_css::analysis::{KeyWinners, Match, Place, SheetId, Winner};
 use vapors_css::cascade::{INLINE_SHEET, PRESENTATION_SHEET};
 
+use super::shell::in_crate;
 use crate::styles::{Analysis, ElementStyles};
 
 /// A component's analysis, with each of its sheets' hash, by element
 /// position.
 pub(crate) struct Winners<'a> {
     analysis: &'a Analysis,
+    /// The component's own scope, which the generated `SCOPE` names.
+    own: Option<&'a str>,
     /// `vapors_css::sheet_hash` of each of `analysis.sheets`' text.
     hashes: &'a [u64],
     at: HashMap<(usize, usize), usize>,
 }
 
 impl<'a> Winners<'a> {
-    pub(crate) fn new(analysis: &'a Analysis, hashes: &'a [u64]) -> Self {
+    /// # Panics
+    /// `hashes` not one a sheet of `analysis`: a defect in the caller.
+    pub(crate) fn new(analysis: &'a Analysis, hashes: &'a [u64], own: Option<&'a str>) -> Self {
+        assert_eq!(
+            hashes.len(),
+            analysis.sheets.len(),
+            "one hash a sheet of the analysis (styles::OtherSheets::hashes_for)"
+        );
         let at = (analysis.elements.iter().enumerate())
             .map(|(index, element)| ((element.line, element.col), index))
             .collect();
         Self {
             analysis,
+            own,
             hashes,
             at,
         }
@@ -49,7 +60,7 @@ impl<'a> Winners<'a> {
         let sheets = Sheets::referenced(winners)?;
         let mut out = String::from("vapors_dom::KeyWinners { sheets: &[");
         for &index in &sheets.order {
-            let id = sheet_ref(&self.analysis.sheets[index].0);
+            let id = sheet_ref(&self.analysis.sheets[index].0, self.own);
             let _ = write!(out, "({id}, {}), ", hash_literal(self.hashes[index]));
         }
         out.push_str("], base: &[");
@@ -156,15 +167,17 @@ fn conditional(
     (winners.rules.iter()).filter(|rule| matches!(rule.verdict, Match::Conditional(_)))
 }
 
-/// `id` as the runtime names it: a scope under the crate's name, as the
-/// generated `SCOPE` constant is.
-fn sheet_ref(id: &SheetId) -> String {
+/// `id` as the runtime names it: the component's own scope as its
+/// `SCOPE` constant, any other sheet by `shell::in_crate`, which makes
+/// `SCOPE` too.
+fn sheet_ref(id: &SheetId, own: Option<&str>) -> String {
     match id {
         SheetId::UserAgent => "vapors_dom::SheetRef::UserAgent".to_owned(),
-        SheetId::Scope(scope) => format!(
-            "vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?}))"
-        ),
-        SheetId::Global(file) => format!("vapors_dom::SheetRef::Global({file:?})"),
+        SheetId::Scope(scope) if Some(scope.as_str()) == own => {
+            "vapors_dom::SheetRef::Scope(SCOPE)".to_owned()
+        }
+        SheetId::Scope(scope) => format!("vapors_dom::SheetRef::Scope({})", in_crate(scope)),
+        SheetId::Global(file) => format!("vapors_dom::SheetRef::Global({})", in_crate(file)),
     }
 }
 
