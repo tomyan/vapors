@@ -110,7 +110,15 @@ impl AxMirror {
             .flat_map(|&(container, first)| {
                 lanes.children_from(container, first).unwrap_or_default()
             });
-        for key in started.filter_map(|slot| slots.key(slot)) {
+        for slot in started {
+            let key = slots.key(slot).unwrap_or_else(|| {
+                panic!(
+                    "the lane child in slot {slot}, which started elsewhere this update, holds no \
+                     box: the lane names a slot the slots freed (layout/lane_write.rs \
+                     `write_laid`, a11y_mirror_state.rs `touch_slots`); reproduce with \
+                     `cargo xtask test`"
+                )
+            });
             self.touched.nodes.insert(node_of(key));
             self.touched.started.insert(node_of(key));
         }

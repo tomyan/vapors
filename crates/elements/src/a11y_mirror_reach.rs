@@ -4,7 +4,9 @@
 //! to an ancestor; an element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
 //! stayed (absolutely positioned), and so does a row a lane start moved
-//! that is not a node, as their bounds are from a node above the row;
+//! that is not a node, as their bounds are from a node above the row,
+//! and the hoisted nodes under such a row, whose bounds are from the
+//! viewport;
 //! a node named by an id whose element
 //! changed, the nodes focus left and came to, and the hoisted nodes in
 //! the frame of a scroll container scrolled, are read as well.
@@ -48,6 +50,9 @@ impl Document {
         for node in self.ax_scrolled_hoisted(&touched.scrolled) {
             add(node);
         }
+        for node in self.ax_hoisted_under(&touched.started) {
+            add(node);
+        }
         for node in focus.into_iter().flatten() {
             add(node);
         }
@@ -89,6 +94,33 @@ impl Document {
             .collect();
         let in_frame = |&node: &NodeId| self.ax_placed_under(node, &|slot| frames.contains(&slot));
         self.ax.hoisted.iter().copied().filter(in_frame).collect()
+    }
+
+    /// The hoisted nodes under any of `rows`, rows a lane start moved:
+    /// their bounds are from the viewport, and the row moved on the page
+    /// carries the box they are placed against, so neither the row nor a
+    /// node between reaches them. O(hoisted nodes times their depth), not
+    /// the rows' subtrees.
+    fn ax_hoisted_under(&self, rows: &NodeSet) -> Vec<NodeId> {
+        if rows.is_empty() || self.ax.hoisted.is_empty() {
+            return Vec::new();
+        }
+        let under_a_row = |&node: &NodeId| {
+            let mut cursor = self.parent(node);
+            while let Some(above) = cursor {
+                if rows.contains(&above) {
+                    return true;
+                }
+                cursor = self.parent(above);
+            }
+            false
+        };
+        self.ax
+            .hoisted
+            .iter()
+            .copied()
+            .filter(under_a_row)
+            .collect()
     }
 
     /// The nearest nodes under `wrapper` when it is not a node itself:
