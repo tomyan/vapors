@@ -74,7 +74,7 @@ pub(crate) fn paint(
     match (&layout_box.icon, &layout_box.svg_shapes) {
         (Some(icon), _) if used.visible => {
             input.shapes.borrow_mut().release(node);
-            push_icon(icon, content, used.text.color, input.scale, out);
+            push_icon(icon, content, used.text.color, input, out);
         }
         (_, Some(shapes)) if used.visible => {
             crate::svg_shapes_paint::paint((node, shapes), content, input, out);
@@ -85,9 +85,15 @@ pub(crate) fn paint(
 }
 
 /// One `Item::Icon` of `icon` over `content` snapped to device pixels.
-fn push_icon(icon: &Rc<Icon>, content: BoxRect, colour: Color, scale: f32, out: &mut Painting) {
+fn push_icon(
+    icon: &Rc<Icon>,
+    content: BoxRect,
+    colour: Color,
+    input: &PaintInput<'_>,
+    out: &mut Painting,
+) {
     let id = IconId(out.slabs.icons.insert(Rc::clone(icon)));
-    let rect = crate::paint::snapped(content, scale);
+    let rect = input.snapped(content);
     out.scene.push(Item::Icon {
         icon: id,
         rect,

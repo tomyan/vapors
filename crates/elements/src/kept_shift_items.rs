@@ -9,11 +9,32 @@ use crate::slab::Slabs;
 
 /// Whether every coordinate of `item` is a whole number.
 pub(crate) fn whole_item(item: &Item) -> bool {
+    edges_all(item, is_whole)
+}
+
+/// Whether every finite coordinate paint snaps in `item` is a whole
+/// number, for the debug check after a repaint (`repaint.rs`, which says
+/// why it skips the rest). A shadow's caster alone: its blurred rect is
+/// the caster moved by the offset and grown by the spread, each times
+/// the scale and unsnapped (`paint_own.rs` `shadow_item`), as the
+/// corpus's Chromium comparisons pass it.
+#[cfg(debug_assertions)]
+pub(crate) fn whole_where_finite(item: &Item) -> bool {
+    let edge = |v: f32| !v.is_finite() || is_whole(v);
     match *item {
-        Item::Shadow(shadow) => whole_rect(shadow.rect) && whole_rect(shadow.caster),
-        Item::Quad(quad) => whole_rect(quad.rect),
+        Item::Shadow(shadow) => rect_all(shadow.caster, edge),
+        _ => edges_all(item, edge),
+    }
+}
+
+/// Whether `edge` holds of every coordinate of `item`'s rects; false
+/// for text and shapes.
+fn edges_all(item: &Item, edge: impl Fn(f32) -> bool + Copy) -> bool {
+    match *item {
+        Item::Shadow(shadow) => rect_all(shadow.rect, edge) && rect_all(shadow.caster, edge),
+        Item::Quad(quad) => rect_all(quad.rect, edge),
         Item::Image { rect, .. } | Item::Icon { rect, .. } | Item::Surface { rect, .. } => {
-            whole_rect(rect)
+            rect_all(rect, edge)
         }
         // Painted again rather than shifted in place: a shape's transform
         // and bounds are not checked whole (no element paints one before
@@ -22,12 +43,25 @@ pub(crate) fn whole_item(item: &Item) -> bool {
     }
 }
 
+/// Whether `edge` holds of each of `rect`'s edges.
+fn rect_all(rect: Rect, edge: impl Fn(f32) -> bool) -> bool {
+    [rect.left, rect.top, rect.right, rect.bottom]
+        .into_iter()
+        .all(edge)
+}
+
+/// Whether `item` is of a kind paint snaps to the device pixel grid
+/// under a whole translation: every kind `whole_item` tests but text
+/// and shapes. For the debug check after a repaint (`repaint.rs`).
+#[cfg(debug_assertions)]
+pub(crate) fn snapped_kind(item: &Item) -> bool {
+    !matches!(item, Item::Text { .. } | Item::Shape(_))
+}
+
 // Exact: a whole number has no fraction.
 #[allow(clippy::float_cmp)]
-fn whole_rect(rect: Rect) -> bool {
-    [rect.left, rect.top, rect.right, rect.bottom]
-        .iter()
-        .all(|v| v.fract() == 0.0)
+fn is_whole(v: f32) -> bool {
+    v.fract() == 0.0
 }
 
 /// `item` moved by `delta`.

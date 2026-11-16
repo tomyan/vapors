@@ -116,3 +116,9 @@ whose drawn rect is not whole. If it does, the case is reported with
 its fixture before F1 goes further: it is either a pixel difference
 from Chromium or a gap in the assertion's kinds, and the lead decides
 which.
+
+It fired once, on `a11y_tree::a_node_whose_bounds_are_not_finite_is_refused_by_name_not_written_null`:
+a quad with a right edge of `inf` (`width: 1e39px`). The lead chose to
+have the check skip non-finite edges, declared at the check as a relaxed
+guard, and to file issue #449 (paint should refuse a non-finite rect,
+naming the box). That issue's fix retires the relaxation.

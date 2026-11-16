@@ -7,7 +7,7 @@
 //! the scene's items, the hits, the border boxes and origins.
 
 use rustc_hash::FxHashMap;
-use vapors_scene::Rect;
+use vapors_scene::{Rect, TransformClass};
 
 use crate::layout::BoxRect;
 
@@ -24,6 +24,11 @@ pub(crate) struct FrameAt {
     pub(crate) clip: Option<BoxRect>,
     /// `clip` in device pixels, as items are cut.
     pub(crate) device_clip: Option<Rect>,
+    /// Its composed transform to the target, which decides whether its
+    /// items are snapped (`docs/plans/flat-scene.md` section 4.3): each
+    /// frame takes the class of the frame it is in, and the page's is a
+    /// whole translation, so every frame's is until transforms (F4a).
+    pub(crate) class: TransformClass,
 }
 
 /// Each frame of a paint, by its scroll container's slot; the scroll
@@ -68,6 +73,7 @@ impl Frames {
             shift: [0.0; 2],
             clip: None,
             device_clip: None,
+            class: TransformClass::WholeTranslate,
         };
         Self {
             scale,
@@ -115,13 +121,22 @@ impl Frames {
         frames.map(|(&frame, &at)| (frame, at)).chain(relative)
     }
 
-    /// A frame at `shift` under the page clip `clip`, its device clip
-    /// snapped from it.
-    fn frame_at(&self, shift: [f32; 2], clip: Option<BoxRect>) -> FrameAt {
+    /// Frame `frame` at `shift` under the page clip `clip`, its device
+    /// clip snapped from it, in a frame of class `class`.
+    fn frame_at(
+        &self,
+        (frame, class): (usize, TransformClass),
+        shift: [f32; 2],
+        clip: Option<BoxRect>,
+    ) -> FrameAt {
+        #[cfg(debug_assertions)]
+        assert_whole_shift(frame, class, shift);
+        let _ = frame;
         FrameAt {
             shift,
             clip,
             device_clip: clip.map(|clip| crate::paint::snapped(clip, self.scale)),
+            class,
         }
     }
 
@@ -136,6 +151,20 @@ impl Frames {
             }
         }
     }
+}
+
+/// Panics, naming frame `frame`, when it is of a class that snaps and
+/// its shift is not whole device pixels: its items, snapped in it, would
+/// land between pixels on the page.
+#[cfg(debug_assertions)]
+pub(super) fn assert_whole_shift(frame: usize, class: TransformClass, shift: [f32; 2]) {
+    assert!(
+        !class.snaps() || shift.iter().all(|v| v.fract() == 0.0),
+        "frame {frame} is shifted by {shift:?} device pixels, not whole, under a whole \
+         translation: its snapped items land between pixels on the page (scroll.rs \
+         `frame_shift`, frames_lane_prime.rs `lane_child_at`); reproduce with \
+         `cargo xtask test`"
+    );
 }
 
 /// `inner` cut to `outer`, either `None` for none.
@@ -184,6 +213,9 @@ use lane::{LaneFrames, LaneInk};
 pub(crate) use read::shifted;
 pub(crate) use update::FrameInputs;
 
+#[cfg(test)]
+#[path = "frames_class_tests.rs"]
+mod class_tests;
 #[cfg(test)]
 #[path = "frames_tests.rs"]
 mod tests;

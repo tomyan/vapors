@@ -9,7 +9,7 @@ use vapors_scene::{Item, Quad};
 use vapors_text::{Layout, content_area};
 
 use crate::layout::{BoxRect, InlineRun, InlineSpan};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 
 /// Records and paints `run`'s inline elements, laid out as `layout` in
@@ -38,7 +38,7 @@ pub(crate) fn paint_spans(
             }
             if used.background.a > 0.0 {
                 out.scene.push(Item::Quad(Quad::fill(
-                    snapped(fragment, input.scale),
+                    input.snapped(fragment),
                     used.background,
                 )));
             }

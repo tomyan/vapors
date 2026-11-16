@@ -6,7 +6,7 @@ use vapors_scene::{Color, Item, Quad, Rect, Shadow, TextId};
 
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 use crate::style::BoxShadow;
 
@@ -39,7 +39,7 @@ fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut 
         return;
     }
     out.visible.insert(node);
-    let border_box = snapped(rect, input.scale);
+    let border_box = input.snapped(rect);
     let decoration = &used.decoration;
     let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
     for shadow in decoration.shadows.iter().rev() {

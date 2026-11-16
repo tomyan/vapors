@@ -10,7 +10,7 @@
 use vapors_scene::{Color, Item, Quad};
 
 use crate::layout::{BoxRect, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 
 /// The selection's colour: the focus ring's blue at a third.
@@ -47,19 +47,19 @@ pub(crate) fn paint(
         return;
     }
     for rect in &marks.selection {
-        push(out, origin, *rect, SELECTION, input.scale);
+        push(out, origin, *rect, SELECTION, input);
     }
     for rect in &marks.composing {
         let line = [rect[0], rect[1] + rect[3] - 1.0, rect[2], 1.0];
-        push(out, origin, line, used.text.color, input.scale);
+        push(out, origin, line, used.text.color, input);
     }
     if let Some(caret) = marks.caret {
-        push(out, origin, caret, used.text.color, input.scale);
+        push(out, origin, caret, used.text.color, input);
     }
 }
 
 /// A mark `[x, y, width, height]` from the text's origin, as a quad.
-fn push(out: &mut Painting, origin: BoxRect, mark: [f32; 4], color: Color, scale: f32) {
+fn push(out: &mut Painting, origin: BoxRect, mark: [f32; 4], color: Color, input: &PaintInput<'_>) {
     let rect = BoxRect {
         x: origin.x + mark[0],
         y: origin.y + mark[1],
@@ -70,7 +70,7 @@ fn push(out: &mut Painting, origin: BoxRect, mark: [f32; 4], color: Color, scale
         return;
     }
     out.scene
-        .push(Item::Quad(Quad::fill(snapped(rect, scale), color)));
+        .push(Item::Quad(Quad::fill(input.snapped(rect), color)));
 }
 
 /// Where the field's text starts: its text child's box, else its

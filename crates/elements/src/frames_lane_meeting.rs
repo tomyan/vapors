@@ -50,7 +50,7 @@ impl Frames {
         let template = self.lane_template(base, self.at(base.parent));
         let rows = shared.borrow().children_between(container, from, to);
         let memoise = |(slot, offset): (usize, f64)| {
-            let at = self.lane_child_at(template, base, offset);
+            let at = self.lane_child_at(template, base, (slot, offset));
             self.lanes.memo.borrow_mut().insert(slot, at);
             #[cfg(debug_assertions)]
             self.assert_memoised_folds(slot, at);

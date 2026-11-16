@@ -7,7 +7,7 @@
 use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 use crate::style::Parts;
 
@@ -45,14 +45,9 @@ pub(crate) fn paint(
     if !used.visible {
         return;
     }
-    push_round(
-        out,
-        track_rect(content, parts),
-        parts.track_color,
-        input.scale,
-    );
+    push_round(out, track_rect(content, parts), parts.track_color, input);
     let thumb = thumb_rect(content, parts, range.fraction());
-    push_round(out, thumb, parts.thumb_color, input.scale);
+    push_round(out, thumb, parts.thumb_color, input);
 }
 
 /// The track across the content box, centred vertically.
@@ -79,11 +74,16 @@ fn thumb_rect(content: BoxRect, parts: Parts, fraction: f64) -> BoxRect {
 }
 
 /// A filled rect with fully rounded ends, snapped to device pixels.
-fn push_round(out: &mut Painting, rect: BoxRect, color: vapors_scene::Color, scale: f32) {
+fn push_round(
+    out: &mut Painting,
+    rect: BoxRect,
+    color: vapors_scene::Color,
+    input: &PaintInput<'_>,
+) {
     if rect.width <= 0.0 || rect.height <= 0.0 || color.a <= 0.0 {
         return;
     }
-    let mut quad = Quad::fill(snapped(rect, scale), color);
-    quad.radii = [rect.width.min(rect.height) * scale / 2.0; 4];
+    let mut quad = Quad::fill(input.snapped(rect), color);
+    quad.radii = [rect.width.min(rect.height) * input.scale / 2.0; 4];
     out.scene.push(Item::Quad(quad));
 }

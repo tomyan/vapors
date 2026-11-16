@@ -158,6 +158,6 @@ pub(crate) fn paint(
     }
     let content = crate::clip::content_box(layout_box, border_box);
     let id = ImageId(out.slabs.images.insert(Rc::clone(image)));
-    let rect = crate::paint::snapped(content, input.scale);
+    let rect = input.snapped(content);
     out.scene.push(Item::Image { image: id, rect });
 }

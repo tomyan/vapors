@@ -7,7 +7,7 @@
 
 use rustc_hash::FxHashSet;
 
-use vapors_scene::Rect;
+use vapors_scene::{Rect, TransformClass};
 
 use super::NestedIndex;
 use super::{Frames, Relative, meet};
@@ -168,13 +168,18 @@ impl Frames {
             .clips
             .inner(slot)
             .map(|clip| self.css_rect(outer, clip));
-        self.insert(slot, shift, meet(inner, outer.clip))
+        self.insert((slot, outer.class), shift, meet(inner, outer.clip))
     }
 
-    /// Notes frame `slot` at `shift` under the page clip `clip`; whether
-    /// it differs from what was noted.
-    fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) -> bool {
-        let at = self.frame_at(shift, clip);
+    /// Notes frame `slot`, in a frame of class `class`, at `shift` under
+    /// the page clip `clip`; whether it differs from what was noted.
+    fn insert(
+        &mut self,
+        (slot, class): (usize, TransformClass),
+        shift: [f32; 2],
+        clip: Option<BoxRect>,
+    ) -> bool {
+        let at = self.frame_at((slot, class), shift, clip);
         self.relative.remove(&slot);
         self.by_frame.insert(slot, at) != Some(at)
     }

@@ -20,7 +20,7 @@ pub(crate) fn paint(
     input: &PaintInput<'_>,
     out: &mut Painting,
 ) {
-    let transform = transform(shapes.view_box, content, input.scale);
+    let transform = transform(shapes.view_box, content, input);
     let parts: Vec<_> = shapes
         .parts
         .iter()
@@ -49,10 +49,11 @@ pub(crate) fn paint(
 /// default `xMidYMid meet`), from the content box's origin snapped to a
 /// device pixel, as Chromium places a replaced element's content (and
 /// the icon route snaps its rect).
-fn transform(view_box: [f32; 4], content: BoxRect, scale: f32) -> [f32; 6] {
+fn transform(view_box: [f32; 4], content: BoxRect, input: &PaintInput<'_>) -> [f32; 6] {
     let [vx, vy, vw, vh] = view_box;
+    let scale = input.scale;
     let per_unit = crate::svg_shapes::per_unit(view_box, content, scale);
-    let origin = crate::paint::snapped(content, scale);
+    let origin = input.snapped(content);
     let spare = [
         content.width * scale - vw * per_unit,
         content.height * scale - vh * per_unit,

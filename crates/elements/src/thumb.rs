@@ -6,7 +6,7 @@
 use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 
 /// Space between a thumb and the padding box's edges, CSS px.
@@ -64,7 +64,7 @@ pub(crate) fn paint(
     color.a *= f32::from(alpha) / f32::from(u8::MAX);
     let padding = crate::clip::padding_box(layout_box, border_box);
     for thumb in thumbs(padding, at, max, style.width) {
-        let mut quad = Quad::fill(snapped(thumb, input.scale), color);
+        let mut quad = Quad::fill(input.snapped(thumb), color);
         quad.radii = [style.width * input.scale / 2.0; 4];
         out.scene.push(Item::Quad(quad));
     }

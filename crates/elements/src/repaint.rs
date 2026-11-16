@@ -40,6 +40,8 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
+            #[cfg(debug_assertions)]
+            assert_snapped_whole(kept.all_items(), slot, input);
             kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
             painted.items_built += kept.items();
@@ -57,6 +59,7 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) -> KeptBox {
         self.scratch.slabs = take(&mut painted.slabs);
+        input.class = Some(painted.frames.at(from.frame).class);
         let clip = self.order.clips.own(slot);
         clip_to(clip, input, &mut self.scratch.scene);
         paint_box(self.boxes, self.rects, slot, input, &mut self.scratch);
@@ -77,13 +80,49 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) {
         for &slot in slots {
+            let frame = kept_mut(painted, slot).from.frame;
+            input.class = Some(painted.frames.at(frame).class);
             clip_to(self.order.clips.own(slot), input, &mut self.scratch.scene);
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
+            #[cfg(debug_assertions)]
+            assert_snapped_whole(thumb.items().iter(), slot, input);
             painted.items_built += thumb.items().len();
             kept_mut(painted, slot).set_thumb(thumb);
         }
+    }
+}
+
+/// Panics, naming the slot and the item, when an item of the box in
+/// `slot` that is snapped (`snapped_kind`) is not whole device pixels
+/// in its frame while the frame is a whole translation, so that it
+/// would land between pixels on the page. Text is placed unsnapped and
+/// its glyphs quantised by the painter; a shape's geometry is in its
+/// transform, unsnapped as Chromium paints SVG.
+#[cfg(debug_assertions)]
+fn assert_snapped_whole<'i>(
+    items: impl Iterator<Item = &'i vapors_scene::Item>,
+    slot: usize,
+    input: &PaintInput<'_>,
+) {
+    use crate::kept_shift_items::{snapped_kind, whole_where_finite};
+    if !input.class.is_some_and(vapors_scene::TransformClass::snaps) {
+        return;
+    }
+    for item in items.filter(|item| snapped_kind(item)) {
+        // Relaxed: a non-finite edge is not asked to be whole. An
+        // infinite edge is not between pixels, and the a11y take refuses
+        // a box with one (`AxError::NotFinite`); paint does not yet,
+        // issue #449. That issue's fix, paint refusing the box, retires
+        // this relaxation.
+        assert!(
+            whole_where_finite(item),
+            "box slot {slot}, in a frame of class {:?}, paints {item:?}, not whole device \
+             pixels: snapped items under a whole translation are whole (paint.rs \
+             `snapped`); reproduce with `cargo xtask test`",
+            input.class
+        );
     }
 }
 
