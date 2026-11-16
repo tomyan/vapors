@@ -1,6 +1,8 @@
 //! `cargo xtask scaling`: vapors-perf's scaling judge (properties 1 and
 //! 6 of docs/plans/perf-finish-line.md, and the accessibility ceilings
-//! per row) for every change it knows, in release, on a clean tree.
+//! per row) for every change it knows, built with the `judged` profile
+//! (release, one codegen unit; the workspace `Cargo.toml` says why) on a
+//! clean tree.
 //! Nightly on the dev machine (scripts/nightly-scaling.sh), not in the
 //! gate (Tom, 2026-11-13): GitHub's runners have no GPU.
 
@@ -13,7 +15,16 @@ use crate::{ci, fail, gate, sccache};
 
 /// The release build of vapors-perf took 104 s with the cache warm and
 /// 525 s with no cache and an empty target, 4 jobs at load average 33
-/// (2026-11-13); 30 minutes is over three times the cold build.
+/// (2026-11-13); 30 minutes is over three times the cold build. The
+/// judged profile's single codegen unit costs no more (2026-11-16, 4
+/// jobs, each in an empty `CARGO_TARGET_DIR`):
+/// - no cache (`RUSTC_WRAPPER= cargo build --profile judged -p
+///   vapors-perf`, then `--release`), load 7 to 10: judged 208 s and
+///   676 s of CPU, release 218 s and 721 s; after touching vapors-scene,
+///   42 to 44 s against 34 to 48 s at load 7 to 16;
+/// - sccache warm (`RUSTC_WRAPPER=sccache`, as xtask builds, the cache
+///   filled by a first build), load 11 to 19: judged 18.2 s, release
+///   18.7 s.
 const BUILD_DEADLINE: Duration = Duration::from_mins(30);
 
 /// Every change took 71 s together at load average 20 and 380 s at load
@@ -62,13 +73,13 @@ pub fn steps() -> Vec<Step> {
     let mut build = Step::new(
         "build",
         "cargo",
-        &["build", "--release", "-p", "vapors-perf"],
+        &["build", "--profile", "judged", "-p", "vapors-perf"],
         "fix the build error above",
     );
     build.deadline = Some(BUILD_DEADLINE);
     let mut judge = Step::new(
         "judge",
-        "target/release/vapors-perf",
+        "target/judged/vapors-perf",
         &["60", "10", "--scaling", "all"],
         "each failing change above names its phase and growth per extra row: make that \
          phase's work depend on what changed (docs/plans/perf-finish-line.md, properties 1 \

@@ -108,6 +108,16 @@ cognitive_complexity = "warn"
 [profile.dev]
 debug = "line-tables-only"
 
+# Judged performance runs (`vapors-perf --scaling`, `cargo xtask
+# scaling`, the nightly judge): release with one codegen unit, so a judged
+# number does not move with how the compiler splits the code. lane3
+# measured on 2026-11-15 that 16 units moved Insert's layout by about 64
+# per row with no change in behaviour, where 1 unit showed 2.4.
+# `crates/perf/src/build_profile.rs` refuses a judged run built otherwise.
+[profile.judged]
+inherits = "release"
+codegen-units = 1
+
 # Test builds only: the 3000-row kept_shift tests spend their time in
 # debug-build code and hit nextest's 60 s limit under load; measured in the PR.
 [profile.test]

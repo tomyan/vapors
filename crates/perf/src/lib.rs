@@ -8,6 +8,7 @@
 
 pub mod args;
 pub mod args_off_path;
+pub mod build_profile;
 pub mod circuit;
 pub mod driver;
 pub mod element_memory;

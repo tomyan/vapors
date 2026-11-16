@@ -6,6 +6,7 @@
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, WorkloadSet, options};
+use vapors_perf::build_profile;
 use vapors_perf::frame_kinds::sections;
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::instructions_check::checked_counter;
@@ -29,6 +30,11 @@ fn main() {
 
 #[allow(clippy::too_many_lines)] // the command dispatch, one branch per mode
 fn run() -> Result<(), String> {
+    let options = options(std::env::args().skip(1))?;
+    // a judged run refuses another profile before anything else
+    if options.scaling.is_some() {
+        build_profile::judged(build_profile::BUILT)?;
+    }
     if cfg!(debug_assertions) {
         return Err("a debug build; the baseline is timed in release: \
                     cargo run --release -p vapors-perf"
@@ -43,7 +49,7 @@ fn run() -> Result<(), String> {
         mount,
         mount_memory,
         scene_run,
-    } = options(std::env::args().skip(1))?;
+    } = options;
     if let Some(kind) = scene_run {
         let open = || {
             let gpu = gpu_with(FEATURES);
@@ -107,8 +113,10 @@ fn run() -> Result<(), String> {
 fn print_setup(gpu: &vapors_gpu_harness::Gpu, settings: Settings) {
     print_adapter(gpu);
     println!(
-        "Profile: release; scale 1; warmup {}; runs {}",
-        settings.warmup, settings.runs
+        "Profile: {}; scale 1; warmup {}; runs {}",
+        build_profile::header(),
+        settings.warmup,
+        settings.runs
     );
     println!("Load average at the start: {}\n", load());
 }

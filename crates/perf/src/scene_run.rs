@@ -2,6 +2,12 @@
 //! one-scene example), from its refusals before the first frame to its
 //! verdict (docs/plans/one-scene.md, 3.2): every frame judged, no
 //! warmup (D7 (a)), by its frame-to-idle time (D6 (a)).
+//!
+//! Scene runs are judged against the shipped profile, `release`, on
+//! purpose (lead, 2026-11-16): their 16.7 ms budget is about what users
+//! run. The judged profile, one codegen unit (`build_profile.rs`), is for
+//! the instruction-count growth checks of `--scaling`, where code layout
+//! is noise. The header says which profile a run was built with.
 
 use vapors_gpu_harness::Gpu;
 
@@ -31,9 +37,13 @@ pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
     let gpu = open();
     let start =
         before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
-    println!("Revision: {REVISION}\nShader cache: {}", cache.describe());
     println!(
-        "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
+        "Revision: {REVISION}\nProfile: {}\nShader cache: {}",
+        crate::build_profile::scene_header(crate::build_profile::BUILT),
+        cache.describe()
+    );
+    println!(
+        "Frames: {RUN_FRAMES}, each held to the frame budget, no warmup; load average at the start {start:.2}\n"
     );
     let mut workload = kind.workload().map_err(&reproduce)?;
     let run = Sampler::new(&gpu)
