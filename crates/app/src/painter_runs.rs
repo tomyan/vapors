@@ -41,8 +41,7 @@ impl ScenePainter {
         painted: &Painted,
         (kept, places): (&KeptBatched, &mut BatchPlaces),
     ) -> Result<(), PaintError> {
-        let batches = kept.batched.batches.iter().zip(kept.rows.iter());
-        for (at, ((batch, rows), &key)) in batches.zip(&kept.keys).enumerate() {
+        for (at, batch) in kept.batched.batches.iter().enumerate() {
             let frame = places.frame(at, painted, kept);
             let Some(clipped) =
                 clipped(target, frame.on_page(batch.clip)).filter(|_| !batch.culled)
@@ -51,30 +50,41 @@ impl ScenePainter {
                     .check_clipped(target.device, painted, &batch.run)?;
                 continue;
             };
-            let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
-            let shift = Shift::whole(frame.shift);
-            let moved = Moved {
-                shift,
-                table,
-                offsets,
-                rows,
-            };
-            self.draw_run(&clipped, painted, (&batch.run, key, at), &moved)?;
+            self.draw_placed(&clipped, (painted, kept), (places, at, frame))?;
         }
         Ok(())
+    }
+
+    /// Draws `kept`'s batch `at` under `target` at `frame`, each row at
+    /// its offset in `places`.
+    fn draw_placed(
+        &mut self,
+        target: &Target<'_>,
+        (painted, kept): (&Painted, &KeptBatched),
+        (places, at, frame): (&mut BatchPlaces, usize, vapors_elements::FrameDraw),
+    ) -> Result<(), PaintError> {
+        let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
+        let moved = Moved {
+            shift: Shift::whole(frame.shift),
+            table,
+            offsets,
+            rows: kept.rows.get(at).unwrap_or_default(),
+        };
+        let run = &kept.batched.batches[at].run;
+        self.draw_run(target, painted, (run, kept.keys[at], at), &moved)
     }
 
     /// Each batch's place for this frame: kept from the last when the
     /// paint and view are the same, else worked out again as each batch
     /// is drawn, each lane batch's table kept by key (`painter_rows.rs`).
     fn placed(&mut self, painted: &Painted, view: vapors_scene::Rect, kept: &KeptBatched) {
-        if self.places.current(painted, view) {
+        if self.places.current(painted, view, kept) {
             #[cfg(debug_assertions)]
             self.places.assert_current(painted, kept);
             return;
         }
         self.row_tables.begin();
-        self.places.reset((painted, view), kept.frames.len());
+        self.places.reset((painted, view), kept);
     }
 
     /// Draws `run` with the pipeline for its kind under `target`'s

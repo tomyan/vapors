@@ -51,7 +51,7 @@ pub(crate) struct LaneFrames {
     /// Which setting of the lanes this is: unique across every frames
     /// value, so a reader can tell that the frames, set again by every
     /// paint, are the ones it read before (`Painted::frames_epoch`).
-    epoch: u64,
+    epoch: Epoch,
     /// Lane frames worked out by a fold of their lane since the lanes
     /// were set, for the tests that the priming holds (`lane_folds`).
     folds: std::cell::Cell<usize>,
@@ -99,7 +99,7 @@ impl Frames {
             started: started.to_vec(),
             primed: std::cell::OnceCell::new(),
             folds: std::cell::Cell::new(0),
-            epoch: next_epoch(),
+            epoch: Epoch::default(),
         };
         changed
     }
@@ -169,6 +169,17 @@ impl Frames {
         let container = lanes.container_of(frame)?;
         let base = *self.lanes.bases.get(&container)?;
         Some((base, lanes.frame_offset(container, frame)?))
+    }
+}
+
+/// A frames value's epoch: one no other has had, from when it is made
+/// (`Frames::of`, `Frames::page`) and again at every `set_lanes`.
+#[derive(Debug, PartialEq, Eq)]
+struct Epoch(u64);
+
+impl Default for Epoch {
+    fn default() -> Self {
+        Self(next_epoch())
     }
 }
 

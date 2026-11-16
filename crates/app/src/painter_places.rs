@@ -21,6 +21,10 @@ pub(super) struct BatchPlaces {
     /// The lane batches' tables, each a kilobyte: kept here once, read
     /// by reference, so a place stays a few words.
     tables: Vec<RowOffsets>,
+    /// The keys of the batches the places were reset for, for the debug
+    /// check that the batches drawn are those.
+    #[cfg(debug_assertions)]
+    keys: Vec<vapors_elements::BatchKey>,
 }
 
 /// Where one batch is drawn, each part once worked out: its frame's (or
@@ -38,16 +42,19 @@ impl BatchPlaces {
     /// `painted`: the same paint's frames and view. With neither changed
     /// the kept batches are the same ones (`KeptBatches::for_view`); the
     /// debug check `assert_current` holds them to the paint each frame.
-    pub(super) fn current(&self, painted: &Painted, view: Rect) -> bool {
+    pub(super) fn current(&self, painted: &Painted, view: Rect, kept: &KeptBatched) -> bool {
         self.made_for == Some((painted.frames_epoch(), view))
+            && self.places.len() == kept.frames.len()
     }
 
     /// Places for `count` batches drawn at `view` from `painted`, none
     /// worked out yet.
-    pub(super) fn reset(&mut self, (painted, view): (&Painted, Rect), count: usize) {
+    pub(super) fn reset(&mut self, (painted, view): (&Painted, Rect), kept: &KeptBatched) {
         self.made_for = Some((painted.frames_epoch(), view));
+        #[cfg(debug_assertions)]
+        self.keys.clone_from(&kept.keys);
         self.places.clear();
-        self.places.resize(count, Place::default());
+        self.places.resize(kept.frames.len(), Place::default());
         self.offsets.clear();
         self.tables.clear();
     }
@@ -105,21 +112,30 @@ impl BatchPlaces {
     /// draws `kept`'s batch now: the frames changed under the same epoch.
     #[cfg(debug_assertions)]
     pub(super) fn assert_current(&self, painted: &Painted, kept: &KeptBatched) {
+        assert!(
+            self.keys == kept.keys,
+            "the places kept were made for batches {:?}, and batches {:?} are drawn under the same \
+             paint and view: the batches were made again with no new paint (painter_places.rs \
+             `current`); reproduce with `cargo xtask test`",
+            self.keys,
+            kept.keys
+        );
         for (at, place) in self.places.iter().enumerate() {
             let named = kept.frames[at];
-            let fresh = painted.row_offsets(named, kept.rows.get(at).unwrap_or_default());
             let held = place
                 .rows
                 .map(|((start, end), _)| &self.offsets[start..end]);
+            let fresh = || painted.row_offsets(named, kept.rows.get(at).unwrap_or_default());
             let frame_held = place
                 .frame
                 .is_none_or(|frame| frame == painted.frame_draw(named));
             assert!(
-                frame_held && held.is_none_or(|held| held == fresh),
+                frame_held && held.is_none_or(|held| held == fresh()),
                 "batch {at}'s kept place {place:?} is not where the paint draws it now \
-                 ({:?}, {fresh:?}): the frames changed under the same epoch (frames_lane.rs \
+                 ({:?}, {:?}): the frames changed under the same epoch (frames_lane.rs \
                  `next_epoch`, set by every paint); reproduce with `cargo xtask test`",
-                painted.frame_draw(named)
+                painted.frame_draw(named),
+                fresh()
             );
         }
     }

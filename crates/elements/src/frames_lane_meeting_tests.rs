@@ -186,3 +186,15 @@ fn the_rows_of_a_lane_in_a_framed_row_are_read_without_folding_either_lane() {
     assert!(found > 10, "{found}");
     assert_eq!(folds, 0);
 }
+
+#[test]
+fn frames_made_and_never_given_lanes_have_epochs_of_their_own() {
+    // Given / When
+    let (a, b) = (
+        crate::frames::Frames::page(1.0),
+        crate::frames::Frames::page(1.0),
+    );
+
+    // Then: a painter keeping places by epoch tells them apart
+    assert_ne!(a.epoch(), b.epoch());
+}

@@ -41,7 +41,7 @@ fn rows_page() -> Document {
 fn made(doc: &Document, places: &mut BatchPlaces) {
     let painted = doc.painted().expect("painted");
     let kept = painted.kept_batches(VIEW);
-    places.reset((painted, VIEW), kept.frames.len());
+    places.reset((painted, VIEW), &kept);
     for at in 0..kept.frames.len() {
         places.frame(at, painted, &kept);
         places.rows(at, (painted, &kept), &mut RowTables::default());
@@ -51,7 +51,7 @@ fn made(doc: &Document, places: &mut BatchPlaces) {
 /// Whether `places` are current for `doc`'s batches at `view`.
 fn current(doc: &Document, places: &BatchPlaces, view: Rect) -> bool {
     let painted = doc.painted().expect("painted");
-    places.current(painted, view)
+    places.current(painted, view, &painted.kept_batches(view))
 }
 
 #[test]
@@ -115,4 +115,43 @@ fn places_are_made_again_after_a_paint_that_keeps_the_batches() {
         "other batches: the case is not reached"
     );
     assert!(!current(&doc, &places, VIEW));
+}
+
+#[test]
+fn places_made_for_more_batches_than_are_drawn_are_not_current() {
+    // Given
+    let mut places = BatchPlaces::default();
+    let doc = rows_page();
+    made(&doc, &mut places);
+
+    // When: the batches drawn under the same paint and view are fewer
+    let painted = doc.painted().expect("painted");
+    let mut fewer = painted.kept_batches(VIEW).clone();
+    fewer.frames.pop();
+
+    // Then
+    assert!(!places.current(painted, VIEW, &fewer));
+}
+
+#[test]
+#[should_panic(expected = "the batches were made again with no new paint")]
+fn places_kept_for_other_batches_are_refused() {
+    // Given
+    let mut places = BatchPlaces::default();
+    let doc = rows_page();
+    made(&doc, &mut places);
+
+    // When: as many batches drawn under the same paint and view, keyed
+    // otherwise
+    let painted = doc.painted().expect("painted");
+    let mut other = painted.kept_batches(VIEW).clone();
+    let elsewhere = rows_page();
+    other.keys[0] = elsewhere
+        .painted()
+        .expect("painted")
+        .kept_batches(VIEW)
+        .keys[0];
+
+    // Then
+    places.assert_current(painted, &other);
 }

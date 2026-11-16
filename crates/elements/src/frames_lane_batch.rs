@@ -8,7 +8,7 @@ impl Frames {
     /// Which setting of the lanes these frames hold: another after every
     /// paint, and the same while nothing is painted (`next_epoch`).
     pub(crate) fn epoch(&self) -> u64 {
-        self.lanes.epoch
+        self.lanes.epoch.0
     }
 
     /// The framed lane container whose child frame `frame` is, if it is
