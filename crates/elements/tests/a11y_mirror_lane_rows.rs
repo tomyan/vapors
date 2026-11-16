@@ -67,6 +67,23 @@ fn rows_that_are_nodes_have_their_own_bounds_in_the_mirror() {
 }
 
 #[test]
+fn an_insert_reads_the_same_nodes_on_a_page_four_times_the_size() {
+    // Given
+    let ((small, mut small_model), (large, mut large_model)) = (taken(100, None), taken(400, None));
+
+    // When
+    let (a, b) = (
+        insert_at_top(&small, &mut small_model),
+        insert_at_top(&large, &mut large_model),
+    );
+
+    // Then: the nodes read in full do not grow with the page; each moved
+    // row's button gets its bounds alone
+    assert_eq!(a.nodes_read, b.nodes_read);
+    assert_eq!((a.bounds_only, b.bounds_only), (100, 400));
+}
+
+#[test]
 fn rows_in_a_scrolled_container_have_their_bounds_from_it_in_the_mirror() {
     // Given: 40 rows in a body that scrolls, so each button's parent node
     // is the body, scrolled down by two rows

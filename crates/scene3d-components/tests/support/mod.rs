@@ -62,9 +62,11 @@ pub struct Stage {
     pub log: Rc<RendererLog>,
 }
 
-/// Adds `Sheet`'s compiled style to `doc`, by mounting its one hidden
-/// element under the root, as a test's per-case CSS: a sheet added from
-/// Rust beside the analysed pages is refused (R1b).
+/// Adds `Sheet`'s compiled style to `doc` as a test's per-case CSS, by
+/// mounting the style-only component (a `<style>` and no markup), which
+/// builds nothing: a sheet added from Rust beside the analysed pages is
+/// refused (R1b). Its handle is forgotten, as a dropped component would
+/// dispose of what it mounted, and it mounted nothing.
 #[macro_export]
 macro_rules! add_sheet {
     ($doc:expr, $module:ident :: $sheet:ident) => {{
