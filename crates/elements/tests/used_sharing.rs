@@ -20,7 +20,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[],
     style: None,
-    winners: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with `css` under the rows' scope and `count` keyed rows

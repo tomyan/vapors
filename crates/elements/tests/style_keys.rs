@@ -18,7 +18,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[],
     style: Some("width: 50px"),
-    winners: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with the row's sheet under its scope and one keyed row

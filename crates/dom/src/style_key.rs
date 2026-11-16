@@ -40,9 +40,9 @@ pub struct StyleKey {
     /// ([`StyleKey::shape_refusal`]). Listeners, bindings and
     /// expression attributes are not attributes the key carries.
     pub attributes: &'static [(&'static str, &'static str)],
-    /// What the compiler worked out about the key's cascade; `None` in a
-    /// hand-written key, which the runtime cascades in full.
-    pub winners: Option<&'static crate::KeyWinners>,
+    /// What the compiler worked out about the key's cascade, or why it
+    /// did not.
+    pub winners: crate::Winners,
 }
 
 /// How many `class:` directives one element may have.

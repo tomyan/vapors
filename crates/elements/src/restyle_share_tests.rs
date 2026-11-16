@@ -17,7 +17,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
-    winners: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 fn viewport() -> Viewport {

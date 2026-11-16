@@ -20,7 +20,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[("title", "a row")],
     style: Some("width: 50px"),
-    winners: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static TWICE: StyleKey = StyleKey {
@@ -31,7 +31,7 @@ static TWICE: StyleKey = StyleKey {
     toggles: &["on", "on"],
     attributes: &[],
     style: None,
-    winners: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 /// A document with an element made from `key` under the body.

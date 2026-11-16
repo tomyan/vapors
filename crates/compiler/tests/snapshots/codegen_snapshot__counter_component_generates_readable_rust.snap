@@ -19,12 +19,7 @@ pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp")
 static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
     sheets: &[
         (vapors_dom::SheetRef::UserAgent, 0xe774_afd0_8061_102b),
-        (
-            vapors_dom::SheetRef::Scope(
-                concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp"),
-            ),
-            0x20a6_deea_d601_c3e4,
-        ),
+        (vapors_dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
     ],
     base: &[
         vapors_dom::BaseWinner {
@@ -288,7 +283,7 @@ static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
     toggles: &[],
     style: None,
     attributes: &[],
-    winners: Some(&WINNERS_BUTTON0),
+    winners: vapors_dom::Winners::Compiled(&WINNERS_BUTTON0),
 };
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]

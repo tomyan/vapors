@@ -1,91 +1,144 @@
 //! Check 1 of compiled winners (build-time-styles.md, section 2): a
-//! sheet a key's winners index, when registered, must hash as the
-//! compiler hashed it.
+//! sheet a key's winners index must hash as the compiler hashed it; the
+//! user-agent sheet and the key's own, scoped or global, must be in the
+//! cascade.
 
 use vapors_css::sheet_hash::sheet_hash;
-use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey};
-use vapors_elements::Document;
+use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey, Winners};
+use vapors_elements::{Document, SheetHash};
 use vapors_text::FontSystem;
 
 // with the newlines a `<style>` section's text has
 const CARD: &str = "\n.card { color: red; }\n";
+const OWN: &str = "cards/card.wisp";
 
 const fn key(winners: &'static KeyWinners) -> StyleKey {
     StyleKey {
         site: "cards/card.wisp:3:1",
-        scope: Some("cards/card.wisp"),
+        scope: Some(OWN),
         tag: "div",
         classes: &["card"],
         toggles: &[],
         attributes: &[],
         style: None,
-        winners: Some(winners),
+        winners: Winners::Compiled(winners),
+    }
+}
+
+const fn winners(sheets: &'static [(SheetRef, u64)]) -> KeyWinners {
+    KeyWinners {
+        sheets,
+        base: &[],
+        conditional: &[],
+        shareable: true,
     }
 }
 
 fn document_with_card() -> Document {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style("cards/card.wisp", CARD);
+    doc.add_style(OWN, CARD);
     doc
 }
 
 #[test]
-fn the_runtime_hashes_each_registered_sheet_as_the_compiler_does() {
+fn the_cascade_tells_a_registered_sheet_from_an_absent_one_of_either_kind() {
     // When
     let doc = document_with_card();
 
     // Then
+    let registered = |text| SheetHash::Registered(sheet_hash(text));
     assert_eq!(
         doc.sheet_hash(SheetRef::UserAgent),
-        Some(sheet_hash(vapors_css::user_agent::TEXT))
+        registered(vapors_css::user_agent::TEXT)
     );
+    assert_eq!(doc.sheet_hash(SheetRef::Scope(OWN)), registered(CARD));
     assert_eq!(
-        doc.sheet_hash(SheetRef::Scope("cards/card.wisp")),
-        Some(sheet_hash(CARD))
+        doc.sheet_hash(SheetRef::Scope("cards/other.wisp")),
+        SheetHash::Absent
     );
-    assert_eq!(doc.sheet_hash(SheetRef::Scope("cards/other.wisp")), None);
+    assert_eq!(doc.sheet_hash(SheetRef::Global(OWN)), SheetHash::Absent);
 }
 
 #[test]
-fn a_key_whose_sheets_hash_as_registered_or_are_not_registered_passes() {
+fn a_scope_whose_sheet_was_refused_is_absent_from_the_cascade() {
     // Given
-    static WINNERS: KeyWinners = KeyWinners {
-        sheets: &[(SheetRef::Scope("cards/other.wisp"), 7)],
-        base: &[],
-        conditional: &[],
-        shareable: true,
-    };
-    static KEY: StyleKey = key(&WINNERS);
+    let mut doc = Document::new(FontSystem::bundle_only());
+
+    // When: the sheet does not parse
+    doc.add_style(OWN, ".card { color: red;");
+
+    // Then
+    assert_eq!(doc.sheet_hash(SheetRef::Scope(OWN)), SheetHash::Absent);
+}
+
+#[test]
+fn a_key_whose_sheets_hash_as_registered_or_are_another_absent_scope_passes() {
+    // Given: CARD's hash is not a constant, so the key is leaked
+    let sheets = vec![
+        (SheetRef::Scope(OWN), sheet_hash(CARD)),
+        (SheetRef::Scope("cards/other.wisp"), 7),
+    ];
+    let winners: &'static KeyWinners = Box::leak(Box::new(winners(sheets.leak())));
+    let key: &'static StyleKey = Box::leak(Box::new(key(winners)));
     let doc = document_with_card();
 
     // Then
-    assert_eq!(doc.check_compiled_sheets(&KEY), Ok(()));
+    assert_eq!(doc.check_compiled_sheets(key), Ok(()));
 }
 
 #[test]
-fn a_key_compiled_against_other_text_is_refused_naming_its_site_the_sheet_and_the_fix() {
+fn a_key_compiled_against_other_text_is_refused_naming_both_hashes_as_written() {
     // Given winners read from an older `.card` rule
-    static WINNERS: KeyWinners = KeyWinners {
-        sheets: &[(SheetRef::Scope("cards/card.wisp"), 1)],
-        base: &[],
-        conditional: &[],
-        shareable: true,
-    };
+    static WINNERS: KeyWinners = winners(&[(SheetRef::Scope(OWN), 1)]);
     static KEY: StyleKey = key(&WINNERS);
     let doc = document_with_card();
 
     // When
     let refusal = doc.check_compiled_sheets(&KEY).expect_err("refused");
 
-    // Then
+    // Then: in the generated code's hex
+    let hex = format!("{:016x}", sheet_hash(CARD));
     assert!(refusal.starts_with("cards/card.wisp:3:1: "), "{refusal}");
     assert!(
-        refusal.contains("Scope(\"cards/card.wisp\") with hash 1"),
+        refusal.contains("with hash 0x0000_0000_0000_0001"),
         "{refusal}"
     );
     assert!(
-        refusal.contains(&format!("hashes {}", sheet_hash(CARD))),
+        refusal.contains(&format!("hashes 0x{}_", &hex[..4])),
         "{refusal}"
     );
     assert!(refusal.contains("fix: rebuild the crate"), "{refusal}");
+}
+
+#[test]
+fn a_key_whose_own_scope_is_absent_is_refused_as_two_names_for_one_sheet() {
+    // Given: the compiler named the own sheet otherwise than the mount
+    static WINNERS: KeyWinners = winners(&[(SheetRef::Scope(OWN), 1)]);
+    static KEY: StyleKey = key(&WINNERS);
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_style("cards//card.wisp", CARD);
+
+    // When
+    let refusal = doc.check_compiled_sheets(&KEY).expect_err("refused");
+
+    // Then
+    assert!(refusal.contains("its own sheet"), "{refusal}");
+    assert!(refusal.contains("fix: give both one name"), "{refusal}");
+}
+
+#[test]
+fn a_global_key_whose_own_global_sheet_is_absent_is_refused() {
+    // Given: a key of a global component (no scope); its sheet never added
+    static WINNERS: KeyWinners = winners(&[(SheetRef::Global("corpus/fixtures/x.wisp"), 1)]);
+    static KEY: StyleKey = StyleKey {
+        scope: None,
+        ..key(&WINNERS)
+    };
+    let doc = document_with_card();
+
+    // When
+    let refusal = doc.check_compiled_sheets(&KEY).expect_err("refused");
+
+    // Then
+    assert!(refusal.contains("its own sheet"), "{refusal}");
 }

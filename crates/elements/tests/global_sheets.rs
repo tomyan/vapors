@@ -4,7 +4,7 @@
 
 use vapors_css::sheet_hash::sheet_hash;
 use vapors_dom::{Dom, SheetRef};
-use vapors_elements::{Document, Viewport};
+use vapors_elements::{Document, SheetHash, Viewport};
 use vapors_text::FontSystem;
 
 const SHEET: &str = "corpus/fixtures/card.wisp";
@@ -35,7 +35,7 @@ fn a_global_sheet_styles_unscoped_elements_and_hashes_as_registered() {
     // Then
     assert_eq!(
         doc.sheet_hash(SheetRef::Global(SHEET)),
-        Some(sheet_hash(CARD))
+        SheetHash::Registered(sheet_hash(CARD))
     );
     let p = doc.children(doc.body())[0];
     let style = doc.computed_style(p).expect("styled");

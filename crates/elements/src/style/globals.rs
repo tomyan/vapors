@@ -24,8 +24,9 @@ impl Sheets {
             }
             None => drop(self.globals.insert(sheet.to_owned(), text.to_owned())),
         }
-        if let Err(refused) = self.add_author(sheet, text) {
-            self.refused.push(refused);
+        match self.add_author(sheet, text) {
+            Ok(()) => self.note_hash(super::sheet_hashes::SheetKind::Global, sheet, text),
+            Err(refused) => self.refused.push(refused),
         }
         true
     }

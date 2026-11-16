@@ -26,7 +26,7 @@ pub(crate) fn assemble(
     }
     let global = component.style.is_some() && scope.is_none();
     if global {
-        file.push_str(&sheet_constant(&component.path));
+        file.push_str(&sheet_constant(component.global_sheet_name()));
     }
     file.push_str(&super::style_key::key_statics(keys));
     file.push_str(&props_struct(name, info));
@@ -73,9 +73,10 @@ pub const STYLE: &str = {style:?};
 fn scope_constant(scope: &str) -> String {
     format!(
         "/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
-pub const SCOPE: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?});
+pub const SCOPE: &str = {};
 
-"
+",
+        in_crate(scope)
     )
 }
 
@@ -84,10 +85,18 @@ pub const SCOPE: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?});
 fn sheet_constant(path: &str) -> String {
     format!(
         "/// The name [`STYLE`] is added under, unscoped, by each mount.
-pub const SHEET: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {path:?});
+pub const SHEET: &str = {};
 
-"
+",
+        in_crate(path)
     )
+}
+
+/// A sheet's name as the runtime holds it: `path` after the crate's
+/// name. `SCOPE` and every `SheetRef` the winners write are made here,
+/// so the two cannot name one sheet differently.
+pub(super) fn in_crate(path: &str) -> String {
+    format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {path:?})")
 }
 
 fn props_struct(name: &str, info: &ScriptInfo) -> String {

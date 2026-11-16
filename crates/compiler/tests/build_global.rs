@@ -29,6 +29,36 @@ fn a_globally_styled_component_keeps_its_style_and_scopes_nothing() {
 }
 
 #[test]
+fn a_global_components_winners_name_its_sheet_by_its_path_under_the_build_root() {
+    // Given
+    let (src, out) = dirs("global_winners");
+    write(&src, "card.wisp", STYLED);
+
+    // When
+    compile_dir_into_styled(&src, &out, Styles::Global).unwrap_or_else(|errs| panic!("{errs:?}"));
+
+    // Then: the same on every machine, as a scope's name is (the
+    // elements' sites still hold the absolute path; not this test's)
+    let code = read(&out.join("wisp/card.rs"));
+    let root = src.display().to_string();
+    let sheets = squashed(&code);
+    let sheets = sheets
+        .split("Global(")
+        .skip(1)
+        .chain(sheets.split("SHEET:&str=").skip(1));
+    for named in sheets {
+        assert!(
+            !named.starts_with(&format!("concat!(env!(\"CARGO_PKG_NAME\"),\"/\",\"{root}")),
+            "{code}"
+        );
+    }
+    assert!(
+        squashed(&code).contains(&squashed(&format!("Global({NAME})"))),
+        "{code}"
+    );
+}
+
+#[test]
 fn a_globally_styled_component_registers_its_sheet_under_the_name_its_winners_use() {
     // Given
     let (src, out) = dirs("global_sheet");
@@ -40,12 +70,10 @@ fn a_globally_styled_component_registers_its_sheet_under_the_name_its_winners_us
     // Then: one name, built the same way, in the constant, the mount's
     // registration and the key's winners
     let code = read(&out.join("wisp/card.rs"));
-    let file = format!("{:?}", src.join("card.wisp").display().to_string());
-    let name = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {file})");
     for needle in [
-        format!("pub const SHEET: &str = {name};"),
+        format!("pub const SHEET: &str = {NAME};"),
         "dom.borrow_mut().add_global_style(SHEET, STYLE);".to_owned(),
-        format!("vapors_dom::SheetRef::Global({name})"),
+        format!("vapors_dom::SheetRef::Global({NAME})"),
     ] {
         assert!(
             squashed(&code).contains(&squashed(&needle)),
@@ -53,6 +81,9 @@ fn a_globally_styled_component_registers_its_sheet_under_the_name_its_winners_us
         );
     }
 }
+
+/// The global card's sheet name: its path under the build root.
+const NAME: &str = "concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"src/card.wisp\")";
 
 /// Without whitespace or the trailing commas prettyplease adds when it
 /// wraps a long line.
