@@ -5,8 +5,6 @@
 //! the split falls where the items shown fall, whichever steps are given
 //! (every drawn step, or those the extents index finds showing).
 
-use rustc_hash::{FxHashMap, FxHashSet};
-
 use vapors_scene::{Batched, Item, ROWS_PER_BATCH, Rect};
 
 use super::{BatchRows, Resolved, Sources};
@@ -21,17 +19,22 @@ pub(super) fn rows_batched(
     view: Rect,
 ) -> Vec<(Batched, Vec<BatchRows>)> {
     let template = frames.lane_template_of(container).shift;
-    let mut rows: FxHashMap<usize, Row> = FxHashMap::default();
+    let mut last: Option<(usize, Row)> = None;
     let mut parts = Parts::default();
     for at in run {
-        let row = *rows.entry(at.frame).or_insert_with(|| {
-            let frame = frames.at(at.frame);
-            let offset = [frame.shift[0] - template[0], frame.shift[1] - template[1]];
-            Row {
-                view: view_at(frame, view),
-                offset,
+        let row = match last {
+            Some((frame, row)) if frame == at.frame => row,
+            _ => {
+                let frame = frames.at(at.frame);
+                let offset = [frame.shift[0] - template[0], frame.shift[1] - template[1]];
+                let row = Row {
+                    view: view_at(frame, view),
+                    offset,
+                };
+                last = Some((at.frame, row));
+                row
             }
-        });
+        };
         for (item, clip) in frame_items(boxes, at.step).1 {
             parts.add((at.frame, row), &item, clip);
         }
@@ -48,13 +51,15 @@ struct Row {
 }
 
 /// The parts made so far, the one being filled, each of its batched
-/// items' row frame, and the rows it has an item batched in.
+/// items' row frame, and the rows it holds: counted each time the row of
+/// a batched item changes, which counts a row its items return to twice
+/// (a split early, never a table overrun) and costs no set.
 #[derive(Default)]
 struct Parts {
     done: Vec<(Batched, Vec<usize>)>,
     part: Batched,
     item_rows: Vec<usize>,
-    rows: FxHashSet<usize>,
+    rows: usize,
 }
 
 impl Parts {
@@ -62,14 +67,15 @@ impl Parts {
     /// row's view; the part is closed first when a shown item would
     /// bring it a row past [`ROWS_PER_BATCH`].
     fn add(&mut self, (frame, row): (usize, Row), item: &Item, clip: Option<Rect>) {
+        let new_row = self.item_rows.last() != Some(&frame);
         let shows = !vapors_scene::culled(item, clip, row.view) || is_surface(item);
-        if shows && !self.rows.contains(&frame) && self.rows.len() == ROWS_PER_BATCH {
+        if shows && new_row && self.rows == ROWS_PER_BATCH {
             self.close();
         }
         let in_lane = clip.map(|clip| moved(clip, row.offset));
         if self.part.add_clipped(item, (clip, in_lane), row.view) {
+            self.rows += usize::from(self.item_rows.last() != Some(&frame));
             self.item_rows.push(frame);
-            self.rows.insert(frame);
         }
     }
 
@@ -77,7 +83,7 @@ impl Parts {
     fn close(&mut self) {
         let part = std::mem::take(&mut self.part);
         self.done.push((part, std::mem::take(&mut self.item_rows)));
-        self.rows.clear();
+        self.rows = 0;
     }
 
     /// Every part, each batch with its rows.
@@ -116,17 +122,21 @@ fn rows_of(part: &Batched, item_rows: &[usize]) -> Vec<BatchRows> {
 }
 
 /// The rows of one batch whose items are in row frames `item_rows`: its
-/// rows numbered as they first appear in it.
+/// rows numbered as they first appear in it. A row's items are mostly
+/// consecutive, so the last row is tried first, then the batch's rows
+/// (at most [`ROWS_PER_BATCH`]) in turn.
 fn batch_rows(item_rows: impl Iterator<Item = usize>) -> BatchRows {
-    let mut index: FxHashMap<usize, u32> = FxHashMap::default();
     let mut rows = BatchRows::default();
     for row in item_rows {
-        let next = u32::try_from(rows.frames.len()).expect("under 2^32 rows");
-        let at = *index.entry(row).or_insert(next);
-        if at == next {
+        let last = rows.frames.len().checked_sub(1);
+        let found = last
+            .filter(|&at| rows.frames[at] == row)
+            .or_else(|| rows.frames.iter().rposition(|&frame| frame == row));
+        let at = found.unwrap_or_else(|| {
             rows.frames.push(row);
-        }
-        rows.items.push(at);
+            rows.frames.len() - 1
+        });
+        rows.items.push(u32::try_from(at).expect("under 2^32 rows"));
     }
     rows
 }

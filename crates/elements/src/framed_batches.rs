@@ -8,8 +8,6 @@
 //! painter adds per instance. A lane's run is split at
 //! `vapors_scene::ROWS_PER_BATCH` rows (`framed_batches_rows.rs`).
 
-use rustc_hash::FxHashMap;
-
 use vapors_scene::{Batched, Item, Rect};
 
 use crate::frames::Frames;
@@ -83,15 +81,19 @@ pub(crate) struct Resolved {
     pub(crate) group: BatchFrame,
 }
 
-/// Each of `steps` resolved, each frame's group looked up once.
+/// Each of `steps` resolved, a frame's group looked up once a run of
+/// steps in it (a row's steps are consecutive).
 fn resolved(steps: impl Iterator<Item = Step>, (boxes, frames): Sources<'_>) -> Vec<Resolved> {
-    let mut groups: FxHashMap<usize, BatchFrame> = FxHashMap::default();
-    let mut group_of = |frame: usize| {
-        *groups.entry(frame).or_insert_with(|| {
-            frames
+    let mut last: Option<(usize, BatchFrame)> = None;
+    let mut group_of = |frame: usize| match last {
+        Some((was, group)) if was == frame => group,
+        _ => {
+            let group = frames
                 .lane_container_of(frame)
-                .map_or_else(|| BatchFrame::frame(frame), BatchFrame::lane)
-        })
+                .map_or_else(|| BatchFrame::frame(frame), BatchFrame::lane);
+            last = Some((frame, group));
+            group
+        }
     };
     let resolve = |step| {
         let frame = frame_items(boxes, step).0;
