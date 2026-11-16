@@ -10,6 +10,7 @@ use vapors_dom::NodeId;
 use crate::a11y_error::AxError;
 use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
 use crate::a11y_mirror_index::AxIndex;
+use crate::a11y_mirror_started::Rebounding;
 use crate::a11y_mirror_state::Touched;
 use crate::document::Document;
 use crate::node_map::{NodeMap, NodeSet};
@@ -40,7 +41,13 @@ impl Diff {
         self.nodes.push(new);
     }
 
-    fn kept(&mut self, old: &AxMirrorNode, new: AxMirrorNode, moved: bool) {
+    /// `new`, a node's record with new bounds alone: under the same
+    /// parent, so neither placed nor noted as moved (`a11y_mirror_started`).
+    pub(crate) fn rebounded(&mut self, new: AxMirrorNode) {
+        self.nodes.push(new);
+    }
+
+    pub(crate) fn kept(&mut self, old: &AxMirrorNode, new: AxMirrorNode, moved: bool) {
         if old.parent != new.parent || moved {
             self.to_place.push((new.node, new.parent));
         }
@@ -101,12 +108,19 @@ impl Document {
         index: &AxIndex,
         focus: Option<NodeId>,
     ) -> Result<(Diff, Vec<AxPlace>, usize), AxError> {
-        let candidates = self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
+        let (candidates, read) =
+            self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
         self.ax.counts.nodes_read = candidates.len();
         let mut diff = Diff::default();
         for node in candidates {
             self.ax_classify(node, index, &touched.replaced, &mut diff)?;
         }
+        let rows = self.ax_started_rows(&touched.started);
+        let mut rebounding = Rebounding::new(index, &touched.replaced);
+        let (bounds_only, full) =
+            self.ax_rebound_rows(&rows, &read, (&mut rebounding, &mut diff))?;
+        self.ax.counts.bounds_only = bounds_only;
+        self.ax.counts.nodes_read += full;
         if let Some(node) = focus.filter(|&node| diff.after(node, &self.ax.records) == After::Gone)
         {
             return Err(self.ax_focus_outside(node));
@@ -187,7 +201,7 @@ impl Document {
     }
 
     /// Reads `node` again and notes what differs from its record.
-    fn ax_classify(
+    pub(crate) fn ax_classify(
         &self,
         node: NodeId,
         index: &AxIndex,
