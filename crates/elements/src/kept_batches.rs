@@ -14,11 +14,14 @@
 use vapors_scene::Rect;
 
 use crate::drawn_steps::DrawnSteps;
+use rustc_hash::FxHashMap;
+
 use crate::frame_extents::Extents;
-use crate::framed_batches::{framed_batches, hidden_items};
+use crate::framed_batches::{RowSlots, framed_batches};
 use crate::frames::Frames;
 use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
+use crate::paint_labels::Label;
 use crate::paint_order::Step;
 
 #[cfg(test)]
@@ -41,15 +44,22 @@ pub(crate) struct Sources<'a> {
     pub(crate) frames: &'a Frames,
 }
 
-/// A shown step: its place, the step, and how many items it paints.
-pub(crate) type Shown = (usize, Step, u64);
+/// A shown step: its label, the step, how many items it paints, and its
+/// frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Shown {
+    pub(crate) label: Label,
+    pub(crate) step: Step,
+    pub(crate) items: u64,
+    pub(crate) frame: usize,
+}
 
 /// The shown steps and batches for one view.
 #[derive(Debug)]
 pub(crate) struct KeptBatches {
     pub(crate) view: Rect,
     /// The drawing steps with an item in `view` or a surface, ordered by
-    /// place.
+    /// label.
     shown: Vec<Shown>,
     /// The items of `shown`'s steps.
     shown_items: u64,
@@ -65,51 +75,16 @@ pub(crate) struct KeptBatches {
     /// changed, or paint order was walked. The next draw sorts the
     /// steps again, keeping `batched` for its keys.
     unsorted: bool,
-}
-
-/// The frames whose steps can show in `view`: those whose container's
-/// clip meets it (`frames_nested.rs`), and those holding a step that
-/// spans every view, which a culled surface's batch needs; each once.
-fn frames_to_search(view: Rect, sources: Sources<'_>) -> Vec<usize> {
-    let mut frames = sources.frames.meeting(view);
-    frames.extend(sources.extents.spanning_frames());
-    frames.sort_unstable();
-    frames.dedup();
-    frames
+    /// Each framed lane in the view, by container, as the last search
+    /// met it: what a search after lane rows moved compares its ends with
+    /// (`kept_batches_search.rs`).
+    lanes: FxHashMap<usize, crate::frames::LaneSeen>,
+    /// Each framed lane's rows' slots in its parts' tables, kept while
+    /// the rows are shown (`framed_batches_slots.rs`).
+    slots: RowSlots,
 }
 
 impl KeptBatches {
-    /// The steps of `sources` that show in `view`: in each frame that
-    /// can show in it, the extents index's candidates for the view as it
-    /// falls in the frame, tested item by item.
-    pub(crate) fn of(view: Rect, sources: Sources<'_>) -> Self {
-        #[cfg(test)]
-        BUILDS.with(|builds| builds.set(builds.get() + 1));
-        let mut shown = Vec::new();
-        let boxes = (sources.boxes, sources.frames);
-        // Only the frames whose container's clip meets the view are
-        // searched (`frames_nested.rs`): O(shown frames · log steps).
-        for frame in frames_to_search(view, sources) {
-            let in_frame = sources.frames.view_in(frame, view);
-            let candidates = sources.extents.candidates(frame, in_frame);
-            let showing = candidates.filter(|e| hidden_items(e.step, boxes, view).is_none());
-            shown.extend(showing.map(|e| (e.place, e.step, e.items)));
-        }
-        shown.sort_unstable_by_key(|&(place, ..)| place);
-        #[cfg(debug_assertions)]
-        crate::kept_batches_check::assert_candidates(&shown, view, sources);
-        let shown_items = shown.iter().map(|&(.., items)| items).sum();
-        Self {
-            view,
-            shown,
-            shown_items,
-            shown_culled: 0,
-            batched: None,
-            stale: true,
-            unsorted: false,
-        }
-    }
-
     /// `slot`'s kept batches for `view`, sorted from `sources` when it
     /// holds none, holds them for another view or unsorted; with their
     /// batches made, keeping the keys of equal runs of the last ones.
@@ -118,14 +93,27 @@ impl KeptBatches {
             .as_ref()
             .is_some_and(|kept| kept.view != view || kept.unsorted)
         {
-            let was = slot.take().and_then(|kept| kept.batched);
+            let (batched, slots) = slot
+                .take()
+                .map_or_else(Default::default, |kept| (kept.batched, kept.slots));
             *slot = Some(Self {
-                batched: was,
+                batched,
+                slots,
                 ..Self::of(view, sources)
             });
         }
-        slot.get_or_insert_with(|| Self::of(view, sources))
-            .batches(sources);
+        let kept = slot.get_or_insert_with(|| Self::of(view, sources));
+        // Every draw, sorted afresh or patched (a splice, lane rows
+        // moved, slots painted again): the steps a full search finds.
+        #[cfg(debug_assertions)]
+        crate::kept_batches_check::assert_candidates(&kept.shown, view, sources);
+        kept.batches(sources);
+    }
+
+    /// Whether the steps are to be sorted again at the next draw
+    /// (`UpdateCounts::batch_steps_sorted_again`).
+    pub(crate) fn unsorted(&self) -> bool {
+        self.unsorted
     }
 
     /// Notes that the steps must be sorted again before the next draw: a
@@ -140,13 +128,19 @@ impl KeptBatches {
         self.current().is_some()
     }
 
-    /// The places and steps shown.
+    /// The labels and steps shown.
     #[cfg(test)]
-    pub(crate) fn shown(&self) -> Vec<(usize, Step)> {
+    pub(crate) fn shown(&self) -> Vec<(Label, Step)> {
         self.shown
             .iter()
-            .map(|&(place, step, _)| (place, step))
+            .map(|shown| (shown.label, shown.step))
             .collect()
+    }
+
+    /// Each framed lane's rows' slots, for batching the scene afresh as
+    /// these were batched (the debug check, `Painted::fresh_batches`).
+    pub(crate) fn slots(&self) -> &RowSlots {
+        &self.slots
     }
 
     /// The batches made at the last draw, when no shown step changed
@@ -160,12 +154,13 @@ impl KeptBatches {
     pub(crate) fn batches(&mut self, sources: Sources<'_>) -> &KeptBatched {
         if self.current().is_none() {
             let (shown, boxes) = (&self.shown, (sources.boxes, sources.frames));
-            let (mut batched, frames) =
-                framed_batches(shown, |&(_, step, _)| step, boxes, self.view);
-            self.shown_culled = batched.culled;
-            batched.culled = self.culled(sources.extents);
+            self.slots.keep_only(shown.iter().map(|shown| shown.frame));
+            let slots = (self.view, &mut self.slots);
+            let mut framed = framed_batches(shown, |shown| shown.step, boxes, slots);
+            self.shown_culled = framed.batched.culled;
+            framed.batched.culled = self.culled(sources.extents);
             let was = self.batched.as_ref();
-            self.batched = Some(KeptBatched::keyed((batched, frames), was));
+            self.batched = Some(KeptBatched::keyed(framed, was));
             self.stale = false;
         }
         self.batched.as_ref().expect("made above")
@@ -189,6 +184,8 @@ impl KeptBatches {
 
 #[path = "kept_batches_patch.rs"]
 mod patch;
+#[path = "kept_batches_search.rs"]
+mod search;
 
 #[cfg(test)]
 #[path = "kept_batches_tests.rs"]

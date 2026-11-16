@@ -71,3 +71,67 @@ impl<S: Summary> LaneTree<S> {
         self.free_handles.push(handle.index);
     }
 }
+
+/// What each handle names, by the handle's index: an index read, where a
+/// map by handle hashes (a lane's child slots, read once a child in a
+/// pass along the lane). An entry is the handle's only while its
+/// generation is the handle's.
+#[derive(Debug, Default)]
+pub(crate) struct HandleSlots(Vec<Option<(u32, usize)>>);
+
+impl HandleSlots {
+    /// The slot `handle` names, if it is held.
+    pub(crate) fn get(&self, handle: Handle) -> Option<usize> {
+        let held = self.0.get(handle.index as usize).copied().flatten();
+        held.filter(|&(generation, _)| generation == handle.generation)
+            .map(|(_, slot)| slot)
+    }
+
+    /// Notes that `handle` names `slot`.
+    pub(crate) fn insert(&mut self, handle: Handle, slot: usize) {
+        let at = handle.index as usize;
+        if self.0.len() <= at {
+            self.0.resize(at + 1, None);
+        }
+        self.0[at] = Some((handle.generation, slot));
+    }
+
+    /// The slot the handle at `index` names, for a child the tree holds
+    /// now (`LaneTree::each_start_from`), or a panic naming the index.
+    pub(crate) fn at_index(&self, index: u32) -> usize {
+        let held = self.0.get(index as usize).copied().flatten();
+        held.unwrap_or_else(|| {
+            panic!(
+                "lane handle index {index} names no slot: a child in the tree is missing from \
+                 the lane's slots (lane.rs); reproduce with `cargo xtask test`"
+            )
+        })
+        .1
+    }
+
+    /// Forgets `handle`.
+    pub(crate) fn remove(&mut self, handle: Handle) {
+        if self.get(handle).is_some() {
+            self.0[handle.index as usize] = None;
+        }
+    }
+}
+
+impl std::ops::Index<&Handle> for HandleSlots {
+    type Output = usize;
+
+    /// The slot `handle` names, or a panic naming the handle: a lane
+    /// holds a slot for every handle in its tree.
+    fn index(&self, handle: &Handle) -> &usize {
+        let held = self.0.get(handle.index as usize).and_then(Option::as_ref);
+        let held = held.filter(|(generation, _)| *generation == handle.generation);
+        &held
+            .unwrap_or_else(|| {
+                panic!(
+                    "lane handle {handle:?} names no slot: its child was removed from the lane's \
+                     slots but not its tree (lane.rs); reproduce with `cargo xtask test`"
+                )
+            })
+            .1
+    }
+}

@@ -75,7 +75,11 @@ fn a_changed_row_under_a_changed_body_is_settled_before_the_body_places_it() {
         before: Some(rebuild_block(&mut placed, LAST_ROW, 4, &[5])),
     };
     let (fresh, _) = texts.lay_out(nested(LONGER), Vec::new());
-    let moved = |placed: &Placed| placed.boxes[LAST_ROW].layout.location;
+    // where Taffy puts it: a lane child's start is in its lane
+    let moved = |placed: &Placed| {
+        let layout = &placed.boxes[LAST_ROW].layout;
+        placed.lanes.borrow().taffy_location(LAST_ROW, layout)
+    };
     assert_ne!(moved(&fresh), moved(&placed), "the last row moves down");
 
     // When

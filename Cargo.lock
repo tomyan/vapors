@@ -3245,6 +3245,7 @@ name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
  "glam",
+ "naga",
  "pollster",
  "tracing",
  "vapors-gpu-harness",
@@ -3313,6 +3314,7 @@ version = "0.0.0"
 dependencies = [
  "fontique",
  "log",
+ "naga",
  "parlance",
  "parley",
  "png",

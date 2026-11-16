@@ -38,6 +38,7 @@ pub(crate) fn check_layout_against_fresh(
     layout: Inputs<'_>,
 ) {
     walk(&fresh_layout(source, root, layout), placed);
+    placed.lanes.borrow().assert_starts_written();
 }
 
 /// `root`'s boxes built and laid out with no cache and no lane, so a
@@ -46,7 +47,7 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
     let fresh = Placed {
         boxes: build(source, root).into(),
         slots: Slots::default(),
-        lanes: super::lane::Lanes::default(),
+        lanes: super::lane_set::SharedLanes::default(),
     };
     let viewport = layout.viewport;
     let texts = (layout.fonts, &mut TextCache::default());
@@ -84,7 +85,7 @@ const TOLERANCE: f32 = 1.0 / 1024.0;
 /// How far `a` and `b` may differ when one was summed in f32 over
 /// `terms` terms (above).
 #[allow(clippy::cast_precision_loss)] // child counts, far below 2^24
-fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
+pub(super) fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
     TOLERANCE + terms as f32 * f32::EPSILON / 2.0 * a.abs().max(b.abs())
 }
 
@@ -102,15 +103,18 @@ fn walk(fresh: &Placed, placed: &Placed) {
     }
     let terms = fresh.boxes.len();
     let apart = |a: f32, b: f32| (a - b).abs() > tolerance(a, b, terms);
+    let lanes = placed.lanes.borrow();
     let mut stack = vec![(0, 0)];
     while let Some((index, slot)) = stack.pop() {
-        let (new, kept) = (&fresh.boxes[index].layout, &placed.boxes[slot].layout);
+        let new = &fresh.boxes[index].layout;
+        let mut kept = placed.boxes[slot].layout;
+        kept.location = lanes.taffy_location(slot, &kept);
         if apart(new.size.width, kept.size.width)
             || apart(new.size.height, kept.size.height)
             || apart(new.location.x, kept.location.x)
             || apart(new.location.y, kept.location.y)
         {
-            stale(placed, slot, (new, kept));
+            stale(placed, slot, (new, &kept));
         }
         let new_children = fresh.boxes[index].children.iter().copied();
         stack.extend(new_children.zip(placed.boxes[slot].children.iter().copied()));

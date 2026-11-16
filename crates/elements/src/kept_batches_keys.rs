@@ -4,7 +4,9 @@
 //! equal, so its bytes are neither built nor written again; any other
 //! batch gets a new key. Runs are equal when they are the same to the
 //! bit (`run_bits.rs`), as the bytes kept for them are: `==` would take
-//! -0.0 for 0.0. Batches are matched by place from the start up to the
+//! -0.0 for 0.0; and, for a batch over a lane's rows (4f), when each
+//! item is in the same row, as the bytes hold each item's row. Batches
+//! are matched by place from the start up to the
 //! first place whose runs differ, and after it by place moved by one
 //! offset, so a batch put in or taken out (a background added, say)
 //! leaves the batches after it their keys, and a scroll, which drops
@@ -14,8 +16,9 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use vapors_scene::{Batch, Batched};
+use vapors_scene::Batched;
 
+use crate::framed_batches::{FramedBatched, RowsOfBatches};
 use crate::frames_draw::BatchFrame;
 use crate::run_bits::same_bits;
 
@@ -48,6 +51,9 @@ pub struct KeptBatched {
     pub batched: Batched,
     /// Each batch's frame, by its place in `batched.batches`.
     pub frames: Vec<BatchFrame>,
+    /// Each batch's rows, by its place: empty for a batch in one frame
+    /// (`framed_batches.rs`).
+    pub rows: RowsOfBatches,
     /// Each batch's key, by its place in `batched.batches`.
     pub keys: Vec<BatchKey>,
 }
@@ -56,16 +62,38 @@ impl KeptBatched {
     /// `batched`, in `frames`, with keys: those of `was`'s batches
     /// matched with equal runs, else new ones. A run's bytes are in its
     /// frame's coordinates, so a match in another frame is drawn as is.
-    pub(crate) fn keyed((batched, frames): (Batched, Vec<BatchFrame>), was: Option<&Self>) -> Self {
+    pub(crate) fn keyed(framed: FramedBatched, was: Option<&Self>) -> Self {
         let keys = match was {
-            Some(was) => was.keys_for(&batched),
-            None => batched.batches.iter().map(|_| BatchKey::new()).collect(),
+            Some(was) => was.keys_for(&framed),
+            None => framed
+                .batched
+                .batches
+                .iter()
+                .map(|_| BatchKey::new())
+                .collect(),
         };
         Self {
-            batched,
-            frames,
+            batched: framed.batched,
+            frames: framed.frames,
+            rows: framed.rows,
             keys,
         }
+    }
+
+    /// Whether `self`'s batch at `was` draws the bytes `framed`'s at `now`
+    /// does: the same run to the bit and each item at the same row index.
+    /// The rows' frames are not in the bytes: the painter reads their
+    /// offsets each draw, so a batch whose rows moved keeps its bytes.
+    fn same(&self, was: usize, (framed, now): (&FramedBatched, usize)) -> bool {
+        let (Some(old), Some(new)) = (
+            self.batched.batches.get(was),
+            framed.batched.batches.get(now),
+        ) else {
+            return false;
+        };
+        let (old_rows, new_rows) = (self.rows.get(was), framed.rows.get(now));
+        same_bits(&old.run, &new.run)
+            && old_rows.map(|rows| rows.items) == new_rows.map(|rows| rows.items)
     }
 
     /// A key for each of `batched`'s batches: `self`'s at the same place
@@ -74,20 +102,19 @@ impl KeptBatched {
     /// equal, else at the same place counted from the end when the runs
     /// are equal and the offset matched no other batch with it; else a
     /// new one.
-    fn keys_for(&self, batched: &Batched) -> Vec<BatchKey> {
-        let (was, now) = (&self.batched.batches, &batched.batches);
-        let same = was
-            .iter()
-            .zip(now)
-            .take_while(|(was, now)| same_bits(&was.run, &now.run));
-        let prefix = same.count();
-        let offset = self.offset_after(batched, prefix);
+    fn keys_for(&self, framed: &FramedBatched) -> Vec<BatchKey> {
+        let (was, now) = (&self.batched.batches, &framed.batched.batches);
+        let shared = was.len().min(now.len());
+        let prefix = (0..shared)
+            .take_while(|&at| self.same(at, (framed, at)))
+            .count();
+        let offset = self.offset_after(framed, prefix);
         let keys = (0..now.len()).map(|at| {
             if at < prefix {
                 self.keys[at]
             } else {
-                let moved = self.key_moved(batched, (at, prefix), offset);
-                let from_end = || self.key_from_end(batched, (at, prefix), offset);
+                let moved = self.key_moved(framed, (at, prefix), offset);
+                let from_end = || self.key_from_end(framed, (at, prefix), offset);
                 moved.or_else(from_end).unwrap_or_else(BatchKey::new)
             }
         });
@@ -102,14 +129,11 @@ impl KeptBatched {
     /// in or taken out moves those after it. Only the first
     /// `OFFSET_SEARCH` batches after the prefix are looked for, so the
     /// search is O(shown batches) when nothing matches (a reflow).
-    fn offset_after(&self, batched: &Batched, prefix: usize) -> isize {
-        let (was, now) = (&self.batched.batches, &batched.batches);
-        let in_was = |batch: &Batch| {
-            let after = was.get(prefix..).unwrap_or_default();
-            after.iter().position(|was| same_bits(&was.run, &batch.run))
-        };
-        let after = now.get(prefix..).unwrap_or_default();
-        let mut searched = after.iter().take(OFFSET_SEARCH).enumerate();
+    fn offset_after(&self, framed: &FramedBatched, prefix: usize) -> isize {
+        let (was, now) = (&self.batched.batches, &framed.batched.batches);
+        let in_was = |at: usize| (prefix..was.len()).position(|old| self.same(old, (framed, at)));
+        let after = prefix..now.len().max(prefix);
+        let mut searched = after.take(OFFSET_SEARCH).enumerate();
         let first = searched.find_map(|(at, now)| Some((at, in_was(now)?)));
         first.map_or_else(
             || count(was.len()) - count(now.len()),
@@ -122,13 +146,12 @@ impl KeptBatched {
     /// equal.
     fn key_moved(
         &self,
-        batched: &Batched,
+        framed: &FramedBatched,
         (at, prefix): (usize, usize),
         offset: isize,
     ) -> Option<BatchKey> {
         let from = at.checked_add_signed(offset)?;
-        let was = self.batched.batches.get(from)?;
-        let matched = from >= prefix && same_bits(&was.run, &batched.batches.get(at)?.run);
+        let matched = from >= prefix && self.same(from, (framed, at));
         matched.then(|| self.keys[from])
     }
 }
@@ -140,17 +163,17 @@ impl KeptBatched {
     /// key is kept by one batch at most.
     fn key_from_end(
         &self,
-        batched: &Batched,
+        framed: &FramedBatched,
         (at, prefix): (usize, usize),
         offset: isize,
     ) -> Option<BatchKey> {
-        let from_end = count(self.batched.batches.len()) - count(batched.batches.len());
-        let key = self.key_moved(batched, (at, prefix), from_end)?;
+        let from_end = count(self.batched.batches.len()) - count(framed.batched.batches.len());
+        let key = self.key_moved(framed, (at, prefix), from_end)?;
         let from = at.checked_add_signed(from_end)?;
         let claimant = from
             .checked_add_signed(-offset)
             .filter(|&other| other != at);
-        let claimed = claimant.and_then(|other| self.key_moved(batched, (other, prefix), offset));
+        let claimed = claimant.and_then(|other| self.key_moved(framed, (other, prefix), offset));
         claimed.is_none().then_some(key)
     }
 }

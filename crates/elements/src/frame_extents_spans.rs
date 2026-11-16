@@ -21,7 +21,7 @@ impl Extents {
         let count = self
             .spanning
             .get_mut(&frame)
-            .unwrap_or_else(|| missing(entry.place));
+            .unwrap_or_else(|| missing(entry.label));
         *count -= 1;
         if *count == 0 {
             self.spanning.remove(&frame);

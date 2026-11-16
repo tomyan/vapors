@@ -25,6 +25,7 @@ mod for_block;
 mod format;
 mod handler_capture;
 pub(crate) mod key_parts;
+mod key_winners;
 mod names;
 mod paint_attributes;
 mod prop_suggestion;
@@ -49,6 +50,7 @@ mod unwrap;
 use crate::CompileError;
 use crate::ast::Component;
 use crate::source::Source;
+use crate::styles::OtherSheets;
 use emit::{Emitter, Place};
 pub use props_index::PropsIndex;
 
@@ -58,8 +60,10 @@ fn emit_template<'a>(
     source: &'a Source,
     info: &'a script::ScriptInfo,
     (width, index): (usize, Option<&'a PropsIndex>),
+    winners: Option<&'a key_winners::Winners<'a>>,
 ) -> Result<Emitter<'a>, Vec<CompileError>> {
     let mut emitter = Emitter::new(source, info).with_width(width);
+    emitter.winners = winners;
     if let Some(index) = index {
         emitter = emitter.with_index(index);
     }
@@ -89,7 +93,7 @@ fn digits(n: usize) -> usize {
 /// a signal or prop without a type, a binding that cannot be wired,
 /// or a feature that is deferred (snippets, component children).
 pub fn generate(component: &Component) -> Result<String, CompileError> {
-    generated(component, None)
+    generated(component, None, &OtherSheets::default())
         .map(|(code, _)| code)
         .map_err(|mut errors| errors.remove(0))
 }
@@ -101,7 +105,7 @@ pub fn generate(component: &Component) -> Result<String, CompileError> {
 /// As [`generate`]; and a tag passing a prop its component does not
 /// declare, the first such.
 pub fn generate_with(component: &Component, index: &PropsIndex) -> Result<String, CompileError> {
-    generate_checked(component, index)
+    generate_checked(component, index, &OtherSheets::default())
         .map(|generated| generated.code)
         .map_err(|mut errors| errors.remove(0))
 }
@@ -130,8 +134,9 @@ pub struct Generated {
 pub fn generate_checked(
     component: &Component,
     index: &PropsIndex,
+    others: &OtherSheets,
 ) -> Result<Generated, Vec<CompileError>> {
-    let (code, tags) = generated(component, Some(index))?;
+    let (code, tags) = generated(component, Some(index), others)?;
     if !tags.errors.is_empty() {
         return Err(tags.errors);
     }
@@ -144,13 +149,22 @@ pub fn generate_checked(
 fn generated(
     component: &Component,
     index: Option<&PropsIndex>,
+    others: &OtherSheets,
 ) -> Result<(String, Checked), Vec<CompileError>> {
     let source = Source::new(&component.path, &component.text);
     let info = script::analyse(&source, component.script.as_ref()).map_err(|err| vec![err])?;
-    let mut emitter = emit_template(component, &source, &info, (1, index))?;
+    let analysis = crate::styles::analyse(component, &others.sheets).map_err(|refusal| {
+        // the template's own refusal, worded for it, when codegen has one
+        emit_template(component, &source, &info, (1, index), None)
+            .map_or_else(|own| own, |_| vec![refusal])
+    })?;
+    let hashes = others.hashes_for(component);
+    let own = component.style.as_ref().and(component.scope.as_deref());
+    let winners = key_winners::Winners::new(&analysis, &hashes, own);
+    let mut emitter = emit_template(component, &source, &info, (1, index), Some(&winners))?;
     let width = digits(emitter.names_made().saturating_sub(1));
     if width > 1 {
-        emitter = emit_template(component, &source, &info, (width, index))?;
+        emitter = emit_template(component, &source, &info, (width, index), Some(&winners))?;
     }
     names::check_generated(&source, &emitter.declared(), emitter.generated())
         .map_err(|err| vec![err])?;

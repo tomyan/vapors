@@ -116,6 +116,21 @@ impl Summary for FlexSummary {
         }))
     }
 
+    /// The items' summed margin-box sizes and count.
+    type Walk = (f64, u32);
+
+    fn walk_from(left: &Self) -> (f64, u32) {
+        left.0.map_or((0.0, 0), |left| (left.outer, left.count))
+    }
+
+    fn walk_step((outer, count): (f64, u32), leaf: &Self, gap: f64) -> (f64, (f64, u32)) {
+        let Some(leaf) = leaf.0 else {
+            return (outer + gaps(gap, count), (outer, count));
+        };
+        let start = outer + gaps(gap, count) + leaf.leading;
+        (start, (outer + leaf.outer, count + leaf.count))
+    }
+
     fn start_of(left: &Self, run: &Self, gap: f64) -> f64 {
         let leading = run.0.map_or(0.0, |run| run.leading);
         let before = left

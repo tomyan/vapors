@@ -8,7 +8,10 @@ use std::path::{Path, PathBuf};
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
 use crate::ast::Component;
-use crate::{CompileError, PropsIndex, generate_checked, parse_file_global, parse_file_under};
+use crate::styles::CrateSheets;
+use crate::{
+    CompileError, PropsIndex, generate_checked, parse_file_global_under, parse_file_under,
+};
 
 /// Whether each component's `<style>` is scoped to its own elements,
 /// or added by the app as a global sheet.
@@ -120,8 +123,10 @@ fn generate_all(
     errors: &mut Vec<CompileError>,
 ) -> (Vec<Output>, Vec<String>) {
     let (mut outputs, mut unchecked) = (Vec::new(), Vec::new());
+    let sheets = CrateSheets::of(indexed.iter().map(|file| &file.component));
     for file in indexed {
-        match generate_checked(&file.component, index) {
+        let others = sheets.others_for(&file.component);
+        match generate_checked(&file.component, index, &others) {
             Ok(generated) => {
                 outputs.push((file.target.clone(), generated.code));
                 unchecked.extend(generated.unchecked);
@@ -144,7 +149,7 @@ fn parse_tree(
     for file in &dir.files {
         let component = match root {
             (root, Styles::Scoped) => parse_file_under(&file.path, root),
-            (_, Styles::Global) => parse_file_global(&file.path),
+            (root, Styles::Global) => parse_file_global_under(&file.path, root),
         };
         let mut path = module.to_vec();
         path.push(file.module.clone());

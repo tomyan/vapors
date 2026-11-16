@@ -26,6 +26,14 @@ pub(crate) trait Summary: Copy + Debug + Default + PartialEq {
     fn combine(&self, right: &Self, gap: f64) -> Self;
     /// Where `run`'s first child's border box starts, after `left`.
     fn start_of(left: &Self, run: &Self, gap: f64) -> f64;
+    /// What a walk of starts carries from child to child
+    /// (`each_start_from`): what `start_of` reads of the children before.
+    type Walk: Copy;
+    /// The walk after the children `left`.
+    fn walk_from(left: &Self) -> Self::Walk;
+    /// Where the child `leaf` starts after `walk`, and the walk past it:
+    /// `start_of` and `combine`, carrying only what the next start reads.
+    fn walk_step(walk: Self::Walk, leaf: &Self, gap: f64) -> (f64, Self::Walk);
     /// What `self`'s children reach, from its first child's start.
     fn bounds(&self) -> super::lane_bounds::Bounds;
 }
@@ -193,8 +201,11 @@ impl<S: Summary> LaneTree<S> {
 
 #[path = "lane_tree_handles.rs"]
 mod handles;
+pub(crate) use handles::HandleSlots;
 #[path = "lane_tree_shape.rs"]
 mod shape;
+#[path = "lane_tree_starts.rs"]
+mod starts;
 use handles::Slot;
 
 #[cfg(test)]

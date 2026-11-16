@@ -8,6 +8,12 @@ fn boxes(slots: &[usize]) -> Vec<Step> {
     slots.iter().map(|&slot| Step::Box(slot)).collect()
 }
 
+/// `steps` with `edits` made, the steps alone.
+fn spliced(steps: &[Step], edits: Vec<Edit>) -> Vec<Step> {
+    let labels = crate::paint_labels::afresh(steps.len());
+    spliced_steps((steps, &labels), edits).0
+}
+
 #[test]
 fn an_insertion_and_a_removal_at_the_same_place_keep_the_inserted_steps() {
     // Given: box 2 removed where 9 goes in, after 1
@@ -26,7 +32,7 @@ fn an_insertion_and_a_removal_at_the_same_place_keep_the_inserted_steps() {
     ];
 
     // When
-    let out = spliced_steps(&steps, edits);
+    let out = spliced(&steps, edits);
 
     // Then
     assert_eq!(out, boxes(&[0, 1, 9, 3]));
@@ -55,7 +61,7 @@ fn edits_are_made_at_their_places_before_any_edit() {
     ];
 
     // When
-    let out = spliced_steps(&steps, edits);
+    let out = spliced(&steps, edits);
 
     // Then
     assert_eq!(out, boxes(&[0, 8, 1, 9, 3]));
@@ -80,5 +86,55 @@ fn overlapping_removals_panic_naming_the_step() {
     ];
 
     // When / Then
-    spliced_steps(&steps, edits);
+    spliced(&steps, edits);
+}
+
+#[test]
+fn a_splice_of_two_runs_counts_only_the_kept_labels_its_relabel_moved() {
+    // Given: one row put in, its box step between 10 and 11 (no room)
+    // and its outline step between 2000 and 5000
+    let spliced = vec![10, 0, 11, 1000, 2000, 0, 5000];
+    let steps = boxes(&[0, 9, 1, 2, 3, 8, 4]);
+    let runs = vec![1..2, 5..6];
+
+    // When
+    let done = super::Labelled::of((&steps, spliced), &runs, (&mut 1, &[]));
+
+    // Then: 10 and 11 moved; 1000 and the outline run's placeholder,
+    // past the range, were neither searched nor counted
+    let moved: Vec<Step> = done
+        .edits
+        .relabelled
+        .iter()
+        .map(|&(step, ..)| step)
+        .collect();
+    assert_eq!((moved, done.edits.all), (boxes(&[0, 1]), false));
+    let labels = done.labels;
+    assert_eq!(labels[3..], [1000, 2000, labels[5], 5000]);
+    assert!(
+        labels.windows(2).all(|pair| pair[0] < pair[1]),
+        "{labels:?}"
+    );
+}
+
+#[test]
+fn a_relabel_of_every_label_resets_the_spacing_to_theirs() {
+    // Given: a relabel tries levels up to 3 (ranges of 8 labels), and
+    // 7 labels packed from 1 with a run between the first two, too dense
+    // for any range under its threshold
+    crate::paint_labels::TEST_TOP_LEVEL.with(|top| top.set(Some(3)));
+    let spliced = vec![1, 0, 2, 3, 4, 5, 6, 7];
+    let steps = boxes(&[0, 9, 1, 2, 3, 4, 5, 6]);
+    let mut spacing = 1;
+
+    // When
+    let done = super::Labelled::of(
+        (&steps, spliced),
+        std::slice::from_ref(&(1..2)),
+        (&mut spacing, &[]),
+    );
+
+    // Then
+    assert!(done.edits.all, "every label relabelled");
+    assert_eq!(spacing, crate::paint_labels::spacing(8));
 }

@@ -5,7 +5,7 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::layout::{BoxRect, Content};
+use crate::layout::BoxRect;
 use crate::node_map::NodeSet;
 use crate::placement::{LaidOut, Placed, Placement};
 use crate::scroll::Offsets;
@@ -62,6 +62,9 @@ impl<'a, 'b> Walk<'a, 'b> {
                 states_changed: Vec::new(),
                 count: 0,
                 chained: 0,
+                ranges_measured: 0,
+                unframed: Vec::new(),
+                reframed: false,
             },
         }
     }
@@ -104,21 +107,17 @@ impl<'a, 'b> Walk<'a, 'b> {
         self.placed.count += 1;
         let before = content_origin(self.kept.rects[slot]);
         if mark >= Mark::Scrolled {
-            self.settle(slot);
+            self.settle(slot, mark);
         }
         self.put(slot, origin, mark);
         let inner = content_origin(self.kept.rects[slot]);
-        self.visit_placed_in(slot, inner, mark == Mark::Rebuilt || inner != before);
-    }
-
-    /// Settles the scroll offset of `slot` again, noting it when the
-    /// offset as applied moved.
-    // Exact: an offset kept is the same bits.
-    #[allow(clippy::float_cmp)]
-    fn settle(&mut self, slot: usize) {
-        let offset = self.settled_offset(slot);
-        if std::mem::replace(&mut self.kept.offsets[slot], offset) != offset {
-            self.placed.offsets_moved.push(slot);
+        let reframed = self.frame_lane(slot, inner);
+        self.placed.reframed |= reframed;
+        let rebuilt = mark == Mark::Rebuilt && !self.framed_in_place(slot, inner, before);
+        let moved = rebuilt || reframed || self.children_moved(slot, inner, before);
+        self.visit_placed_in(slot, inner, moved);
+        if !moved && inner != before {
+            self.visit_hoisted_along(slot, inner);
         }
     }
 
@@ -159,41 +158,31 @@ impl<'a, 'b> Walk<'a, 'b> {
     }
 
     /// Writes the rect and padding of `slot`, noting it as moved when
-    /// either changed and it was not built again.
+    /// either changed, or it went in or out of a lane frame, and it was
+    /// not built again. A lane child in a frame of its own has its rect
+    /// in that frame: along the axis, its relative offset alone; any
+    /// other box is where Taffy puts it, a lane child's start added back.
     fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark) {
         let layout = &self.boxes.boxes[slot].layout;
+        let framed = self.lane_framed(slot);
+        let y = if framed {
+            self.boxes.lanes.relative(self.kept.up[slot], slot)
+        } else {
+            origin.1 + self.boxes.lanes.taffy_location(slot, layout).y
+        };
         let rect = BoxRect {
             x: origin.0 + layout.location.x,
-            y: origin.1 + layout.location.y,
+            y,
             width: layout.size.width,
             height: layout.size.height,
         };
-        let changed = rect != self.kept.rects[slot] || layout.padding != self.kept.paddings[slot];
+        let reframed = std::mem::replace(&mut self.kept.framed[slot], framed) != framed;
+        let changed =
+            reframed || rect != self.kept.rects[slot] || layout.padding != self.kept.paddings[slot];
         if changed && mark != Mark::Rebuilt {
             self.placed.moved.push(slot);
         }
         (self.kept.rects[slot], self.kept.paddings[slot]) = (rect, layout.padding);
-    }
-
-    /// The scroll offset of `slot` as applied, settled again: none for
-    /// a box that does not scroll, whose element's offset is dropped.
-    fn settled_offset(&mut self, slot: usize) -> [f32; 2] {
-        let Content::Element(node) = self.boxes.boxes[slot].content else {
-            return [0.0; 2];
-        };
-        if !(self.boxes.scrolls)(slot) {
-            self.scroll.forget(node);
-            return [0.0; 2];
-        }
-        self.settled.insert(node);
-        let scale = self.boxes.scale;
-        let (applied, changed) = self
-            .scroll
-            .settle_box(node, (self.boxes.boxes, slot), scale);
-        if changed {
-            self.placed.states_changed.push(slot);
-        }
-        applied
     }
 }
 
@@ -202,3 +191,8 @@ impl<'a, 'b> Walk<'a, 'b> {
 fn content_origin(rect: BoxRect) -> (f32, f32) {
     (rect.x, rect.y)
 }
+
+#[path = "placement_frames.rs"]
+mod frames;
+#[path = "placement_settle.rs"]
+mod settle;

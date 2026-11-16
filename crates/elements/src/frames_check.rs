@@ -7,7 +7,8 @@
 use crate::frames::{Frames, PAGE};
 use crate::kept_clips::Clips;
 use crate::kept_paint::PaintedFrom;
-use crate::placement_check_page::chain_shift;
+use crate::layout::Lanes;
+use crate::placement_check_page::{chain_shift, lane_offset};
 
 /// Panics, naming the slot, when the two answers to "which boxes are
 /// scroll frames" disagree: the scroll containers frames are made for
@@ -16,7 +17,7 @@ use crate::placement_check_page::chain_shift;
 pub(crate) fn assert_scrollers_agree(
     scrollers: &[usize],
     clips: &Clips,
-    scrolls: &dyn Fn(usize) -> bool,
+    (scrolls, lane_frame): (&dyn Fn(usize) -> bool, &dyn Fn(usize) -> bool),
 ) {
     if let Some(slot) = scrollers.iter().find(|&&slot| !scrolls(slot)) {
         panic!(
@@ -25,16 +26,24 @@ pub(crate) fn assert_scrollers_agree(
              reproduce with `cargo xtask test`"
         );
     }
+    if let Some(slot) = scrollers.iter().find(|&&slot| lane_frame(slot)) {
+        panic!(
+            "slot {slot} is both a scroll frame and a lane frame, which frames name by slot: \
+             a lane whose child scrolls is declined (`LaneFrameScrollingChild`, lane_frame.rs), \
+             and the decline and paint disagree on whether it scrolls; reproduce with \
+             `cargo xtask test`"
+        );
+    }
     if cfg!(debug_assertions) {
         let named = (0..clips.len()).map(|slot| (slot, clips.frame(slot)));
         let stray = named
-            .filter(|&(_, frame)| frame != PAGE)
+            .filter(|&(_, frame)| frame != PAGE && !lane_frame(frame))
             .find(|(_, frame)| !scrollers.contains(frame));
         if let Some((slot, frame)) = stray {
             panic!(
-                "slot {slot} is in scroll frame {frame}, which has no thumb step in paint \
-                 order: the clips (kept_clips.rs) and paint order disagree on the scroll \
-                 containers; reproduce with `cargo xtask test`"
+                "slot {slot} is in frame {frame}, which has no thumb step in paint order and \
+                 is no lane frame: the clips (kept_clips.rs), paint order and placement's lane \
+                 frames (placement_frames.rs) disagree; reproduce with `cargo xtask test`"
             );
         }
     }
@@ -49,12 +58,20 @@ pub(crate) fn assert_scrollers_agree(
 pub(crate) fn assert_frames_follow_placement(
     frames: &Frames,
     from: &PaintedFrom,
-    scrolls: &dyn Fn(usize) -> bool,
+    (scrolls, lanes): (&dyn Fn(usize) -> bool, &Lanes),
 ) {
     if !cfg!(debug_assertions) {
         return;
     }
-    let placed = |frame| chain_shift(&from.placement, scrolls, from.scale, frame);
+    // a scroll frame under a framed row is shifted by the lane offsets
+    // on its chain too; none for one under no framed row
+    let placed = |frame| {
+        let [x, y] = chain_shift(&from.placement, scrolls, from.scale, frame);
+        [
+            x,
+            y + lane_offset(&from.placement, lanes, frame) * from.scale,
+        ]
+    };
     let mut shifts = frames
         .scrollers()
         .map(|(frame, at)| (frame, at.shift, placed(frame)));
@@ -64,6 +81,36 @@ pub(crate) fn assert_frames_follow_placement(
              up the clip chain) but {placed:?} by placement's chain (placement_check_page.rs \
              `chain_shift`): the chains name different scroll containers above it, or one does \
              not shift by `scroll::frame_shift`; reproduce with `cargo xtask test`"
+        );
+    }
+    assert_lane_frames_follow_placement(frames, from, (scrolls, lanes));
+}
+
+/// Panics, naming the lane frame, when paint's shift for a framed lane
+/// child (`frames_lane.rs`) is not placement's: the scroll frames' shift
+/// up its chain and its lane offset (`placement_check_page.rs`
+/// `lane_offset`). O(slots), in a debug build only.
+// Exact: both are sums of whole device pixels.
+#[allow(clippy::float_cmp)]
+fn assert_lane_frames_follow_placement(
+    frames: &Frames,
+    from: &PaintedFrom,
+    (scrolls, lanes): (&dyn Fn(usize) -> bool, &Lanes),
+) {
+    let placement = &from.placement;
+    let lane_children = (0..placement.framed.len()).filter(|&slot| placement.framed[slot]);
+    let chained = |slot: usize| {
+        let [x, y] = chain_shift(placement, scrolls, from.scale, placement.up[slot]);
+        [x, y + lane_offset(placement, lanes, slot) * from.scale]
+    };
+    let mut shifts =
+        lane_children.map(|slot| (slot, frames.resolved_afresh(slot).shift, chained(slot)));
+    if let Some((frame, painted, placed)) = shifts.find(|(_, painted, placed)| painted != placed) {
+        panic!(
+            "lane frame {frame} is shifted {painted:?} by paint (frames_lane.rs, from its \
+             lane's base) but {placed:?} by placement's chain (placement_check_page.rs \
+             `lane_offset`): the base's origin or the lane's start disagree with placement; \
+             reproduce with `cargo xtask test`"
         );
     }
 }

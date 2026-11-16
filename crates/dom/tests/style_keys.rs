@@ -17,6 +17,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[],
     style: Some("height: 24px"),
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 static PLAIN: StyleKey = StyleKey {
@@ -27,6 +28,7 @@ static PLAIN: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 fn dom() -> Rc<RefCell<RecordingDom>> {
@@ -142,6 +144,7 @@ static ROW_AGAIN: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[],
     style: Some("height: 24px"),
+    winners: vapors_dom::Winners::Unanalysed,
 };
 
 #[test]

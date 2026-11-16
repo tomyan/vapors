@@ -14,14 +14,12 @@
 
 use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
-use crate::drawn_steps::DrawnSteps;
-use crate::frame_extents::Extents;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, started};
-use crate::paint_order::Step;
+use crate::paint_partial_drawn::{batches_unsorted, drawn_updated, walked};
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
 use crate::repaint::Repaint;
@@ -44,11 +42,12 @@ pub(crate) fn paint_partial(
         _ => (started, None),
     };
     let kept = kept_order.is_some();
-    let place = &|step| painted.drawn.place_of(step);
-    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
+    let label_of = &|step| painted.drawn.label_of(step);
+    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, label_of);
     let scale = input.scale;
     let frames_moved_now =
         crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
+    let lanes_moved = !changed.started.is_empty();
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -61,8 +60,11 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
+    crate::paint_lane_ink::note_painted(&mut painted, input, (walked(&order), &patched));
     if frames_moved_now {
         frames_moved(&mut painted);
+    } else if lanes_moved {
+        lane_rows_moved(&mut painted, &changed.freed);
     }
     painted.order = order;
     painted
@@ -76,12 +78,12 @@ fn frames_moved(painted: &mut Painted) {
     painted.hits_changed = HitsChanged::Unknown;
 }
 
-/// `painted`'s kept batches, if any, to be sorted again at the next
-/// draw, keeping their keys for the runs made again.
-fn batches_unsorted(painted: &mut Painted) {
-    if let Some(kept) = painted.kept_batches.get_mut() {
-        kept.unsort();
-    }
+/// After only framed lanes' rows moved (started elsewhere): the kept
+/// batches searched again in those lanes, at the view's edges, and the
+/// hover tested again.
+fn lane_rows_moved(painted: &mut Painted, freed: &[(usize, crate::layout::Key)]) {
+    crate::paint_partial_drawn::batches_lanes_moved(painted, freed);
+    painted.hits_changed = HitsChanged::Unknown;
 }
 
 /// The slots whose parts this update paints again, shifts or drops:
@@ -100,67 +102,6 @@ fn patched_slots(
     (slots, with_hits)
 }
 
-/// `painted`'s drawing steps made afresh, its kept batches unsorted and
-/// its hits dropped, when `order` was walked again; else all three patched for
-/// the `patched` slots, the hits for the first `with_hits` only, noting
-/// the hits that changed.
-fn drawn_updated(
-    painted: &mut Painted,
-    order: &KeptOrder,
-    (patched, with_hits): (&[usize], usize),
-) {
-    // After a splice the drawing steps, hits and batches are made afresh
-    // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.reshaped() {
-        painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
-        let places = order.steps.len();
-        painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);
-        batches_unsorted(painted);
-        painted.hits = std::cell::OnceCell::new();
-        painted.hits_changed = HitsChanged::Unknown;
-        return;
-    }
-    painted
-        .drawn
-        .patch(patched.iter().copied(), &painted.kept_boxes);
-    extents_patched(painted, order, patched);
-    painted.hits_changed = match painted.hits.get_mut() {
-        Some(hits) => {
-            let slots = patched[..with_hits].iter().copied();
-            let changed = hits.patch(slots, &painted.drawn, &painted.kept_boxes);
-            HitsChanged::on_page(changed, &painted.frames)
-        }
-        // Only a release build reaches this arm: the debug check gathers
-        // the hits after every paint (`kept_paint_check.rs`). Unknown is
-        // the safe answer either way; a gather is one hit test's cost.
-        None => HitsChanged::Unknown,
-    };
-    batches_patched(painted, patched);
-    let drawn = painted.drawn.take_counts();
-    painted.index_counts = drawn.and(painted.extents.take_counts());
-}
-
-/// `painted`'s extents index patched for the `patched` slots' steps.
-fn extents_patched(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
-    let places_of = |&slot: &usize| painted.drawn.places_of(slot);
-    let steps: Vec<(usize, Step)> = patched.iter().flat_map(places_of).collect();
-    let drawn = (&painted.drawn, order.steps.len());
-    painted.extents.patch(&steps, drawn, &painted.kept_boxes);
-}
-
-/// `painted`'s kept batches, if any, patched for the `patched` slots'
-/// steps.
-fn batches_patched(painted: &mut Painted, patched: &[usize]) {
-    let Some(mut kept) = painted.kept_batches.take() else {
-        return;
-    };
-    let steps = patched
-        .iter()
-        .flat_map(|&slot| painted.drawn.places_of(slot));
-    kept.patch(steps, painted.batch_sources());
-    *painted.kept_batches.get_mut() = Some(kept);
-}
-
 /// `last` for this update, with `started`'s canvas and scale and its
 /// counts cleared; and its paint order, taken.
 fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder>) {
@@ -169,6 +110,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
     (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
+    last.splice_patched = false;
     (last, Some(order))
 }
 
