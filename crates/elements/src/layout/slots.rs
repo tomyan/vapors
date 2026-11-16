@@ -18,6 +18,15 @@ pub(crate) enum Key {
     Text(NodeId, usize),
 }
 
+impl Key {
+    /// The node whose box this is: the element, or the text's node.
+    pub(crate) fn node(self) -> NodeId {
+        match self {
+            Key::Element(node) | Key::Text(node, _) => node,
+        }
+    }
+}
+
 /// The slot each key holds, each slot's key, and the vacant slots.
 #[derive(Default)]
 pub(crate) struct Slots {

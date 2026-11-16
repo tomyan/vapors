@@ -32,6 +32,7 @@ const fn key(winners: Winners) -> StyleKey {
 
 static ANALYSED: StyleKey = key(Winners::Compiled(&WINNERS));
 static HAND_WRITTEN: StyleKey = key(Winners::Unanalysed);
+static COMPONENT_TAG: StyleKey = key(Winners::ComponentTag);
 
 const VIEWPORT: Viewport = Viewport {
     width: 200.0,
@@ -97,20 +98,42 @@ fn an_analysed_element_in_a_document_holding_a_rust_sheet_is_refused_naming_the_
 }
 
 #[test]
-fn a_hand_written_key_beside_a_rust_sheet_is_not_refused_in_either_order() {
-    // Given
-    let (mut before, mut after) = (document(), document());
+fn a_key_without_compiled_winners_beside_a_rust_sheet_is_not_refused_in_either_order() {
+    // a hand-written key, and a component tag's, whose tag its props type
+    // decides: neither is analysed
+    for key in [&HAND_WRITTEN, &COMPONENT_TAG] {
+        // Given
+        let (mut before, mut after) = (document(), document());
+
+        // When
+        before
+            .add_stylesheet("page.css", "div { color: red; }")
+            .expect("added");
+        mounted(&mut before, key);
+        mounted(&mut after, key);
+        let added = after.add_stylesheet("page.css", "div { color: red; }");
+
+        // Then
+        assert!(added.is_ok(), "{:?}: {added:?}", key.winners);
+        assert!(before.update(VIEWPORT).is_ok(), "{:?}", key.winners);
+        assert!(after.update(VIEWPORT).is_ok(), "{:?}", key.winners);
+    }
+}
+
+#[test]
+fn a_refused_rust_sheet_changes_nothing() {
+    // Given an analysed element, updated
+    let mut doc = document();
+    mounted(&mut doc, &ANALYSED);
+    if let Some(errors) = doc.update(VIEWPORT).err() {
+        panic!("{errors:?}");
+    }
+    doc.take_changed();
 
     // When
-    before
-        .add_stylesheet("page.css", "div { color: red; }")
-        .expect("added");
-    mounted(&mut before, &HAND_WRITTEN);
-    mounted(&mut after, &HAND_WRITTEN);
-    let added = after.add_stylesheet("page.css", "div { color: red; }");
+    let refused = doc.add_stylesheet("page.css", "div { color: red; }");
 
-    // Then
-    assert!(added.is_ok(), "{added:?}");
-    assert!(before.update(VIEWPORT).is_ok());
-    assert!(after.update(VIEWPORT).is_ok());
+    // Then: nothing to draw again
+    assert!(refused.is_err());
+    assert!(!doc.take_changed());
 }

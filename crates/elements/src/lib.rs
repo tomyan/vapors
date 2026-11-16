@@ -20,6 +20,7 @@ mod a11y_mirror_place;
 mod a11y_mirror_reach;
 mod a11y_mirror_record;
 mod a11y_mirror_roles;
+mod a11y_mirror_started;
 mod a11y_mirror_state;
 mod a11y_name;
 mod a11y_press;

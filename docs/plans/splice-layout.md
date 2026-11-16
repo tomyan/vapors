@@ -1173,14 +1173,14 @@ slice below measures its cause again before its code.
 
 | Term | Per row | Where | Removed by |
 |---|---|---|---|
-| The a11y touch of started rows | about 100 | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set | 4f-3 |
+| The a11y touch of started rows | about 100; removed by 4i (2) (Insert update 132 to 49 a row) | `update`, `AxMirror::touch_slots`: each started lane expanded into its rows, each row's node put in the touched set; now each lane's range is kept and the take expands it once | 4f-3, folded into 4i (2) |
 | Draws apart per lane frame | (draw calls, not instructions: 51 text draws for 17 rows, against 35) | `draw`, a batch per frame | 4f-2 |
 | Draw over the merge base, after 4f-2e | Idle +2.6%, Insert +4.8%, FlexInsert +7.5% (flat across sizes) | `draw`: the batches phase (the sort, making the batches, the keys) and the painter's per-batch work, per row in view, not per row in the list | later optimisation |
 | Lane batches cut at rows that paint shapes (fold option (b)) | unmeasured (no perf scenario holds shapes): a batch or more a row in view, as each such row's steps split the lane's run; a row with a background, an svg icon and text draws about four batches | `framed_batches.rs` `resolved`: a step that paints a shape is batched in its row's own frame, as the shape and mesh pipelines take no table of row offsets, and batches keep paint order | F2 (the flat scene's transform table, `docs/plans/flat-scene.md`) |
 | Scroll layout | 2857 (`--scaling Scroll`) | `layout`, all in placement (`painted_from`): after a scroll the container is settled (`Offsets::settle_box`) and every child visited (`visit_placed_in`), each child's lane start looked up (`LaneTree::start`, O(log n)) | 4g |
 | Insert placement | about 14 | `layout`, placement: the same visit of every child of the lane container | 4g |
 | Insert box build | about 37 | `layout`, all in the box rebuild (`Document::rebuilt`; laying out is flat): rebuilding the inserted row's owner enumerates every child of it | 4h |
-| Insert accessibility | about 4720 (FlexInsert about 1800) | `accessibility`: the take reads every started row again, as a record's bounds are from its parent node (section 5.3), and makes the take's index afresh (`AxIndex::of`) | 4i |
+| Insert accessibility | about 4720 (FlexInsert about 1800); after 4i about 1230 (FlexInsert about 230), judged | `accessibility`: the take made its index afresh on every insert and remove (`AxIndex::of`, 71% of Insert's take; now patched, 4i (1), #432), and read every started row again in full (now each row's bounds alone, 4i (2)). What is left is one bounds write a moved row: the a11y tree carries every node's bounds, each from its parent node | 4i; then the options below |
 | Remove-frame paint | 0.1 (+3.1% at 10000 rows) | `paint`: most likely `DrawnSteps`' sorted vector, whose removal moves every later entry (a memmove, a fraction of an instruction a row) | 4j |
 | Every term, for lists whose rows have fractional heights | as before lane frames: Insert paint about 12,000, layout about 5000, accessibility about 9300 | the lane is declined (`LaneFramePixel`): a frame's shift is whole device pixels, and a fractional start is not. Rows of 19.2 px (a 16 px font at line-height 1.2) are not whole at scale 1 or 2.75, so this is common. A restyle can flip a list either way (the flip 4e's review found; drift between the lane's and Taffy's sums, issue #348) | 4k |
 
@@ -1203,15 +1203,37 @@ The slices:
   name the one inserted or removed, so the list is edited at that
   place and the other children's slots are not looked up. Accepted
   when `Insert`'s and `FlexInsert`'s box build holds no per-row term.
-- **4i. A lane row's a11y record bounded in its lane frame.** A started
-  row has not moved in its frame; its record's bounds are taken from
-  its frame (resolved as `Frames::at` does) rather than from its parent
-  node, so the take reads the rows the update changed, not every
-  started row, and the take's index is patched, not made afresh.
-  Accepted when `accessibility` for `Insert` and `FlexInsert` holds no
-  per-row term from started rows, the mirror model checks
-  (`a11y_mirror` tests) are unchanged, and the platform a11y bounds
-  equal a full take's.
+- **4i. The a11y take after an insert.** Measured first: 71% of
+  Insert's take was the index made afresh on every insert and remove,
+  26% every started row's record read again in full. (1), #432: the
+  index is patched from the elements whose entries can change (an
+  indexed attribute written, a subtree inserted, moved or removed),
+  checked against a scan in debug builds. (2), with 4f-3: the update
+  keeps each lane's started range; the take expands it once and gives
+  each row nothing else touched its bounds alone (its record's, or its
+  nearest nodes' when it is not a node; before #436 a started row with
+  no role left its nodes' bounds stale, and #436 read them in full).
+  Judged ceilings
+  tightened to Insert 1250, FlexInsert 240, Resize 2480.
+
+  Still per row: each moved row's bounds are rewritten, as the mirror
+  carries every node's bounds from its parent node. Ways to make it
+  independent of the list's length, recorded, not built:
+  - **Bounds relative to a node per lane.** The platform would compose
+    each row's place from a lane node and the row's offset in it, so an
+    insert writes the lane node and the new row. There is no AccessKit
+    here: the platform mirror is the web page's DOM
+    (`crates/platform/src/a11y_mirror_*.rs`), each record an element
+    placed `position: absolute` from its parent's. The in-flow mirror
+    (PR 5 in the comments: rows as static elements of their heights in
+    a lane element, which the browser places) is that option there; a
+    native platform would need per-node transforms, to be checked in its
+    toolkit when one is added.
+  - **Fresh bounds only for rows in or near the view.** Rows far
+    offscreen would keep stale offsets until they come near the view.
+    It needs a check that platforms tolerate it, against the a11y
+    oracle (`ax_oracle --check`) and a screen reader's virtual cursor,
+    which reads offscreen rows.
 - **4j. Drawing steps in blocks.** `DrawnSteps`' vector of drawn steps
   is kept in blocks, as the extents index's entries are (`blocks.rs`),
   so a removal or insert moves one block. Accepted when `paint` is

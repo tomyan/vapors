@@ -4,6 +4,7 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod codegen_style_only;
 mod common;
 #[path = "common/build.rs"]
 mod common_build;

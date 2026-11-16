@@ -47,7 +47,7 @@ fn two_components_mounted_in_either_order_style_alike_from_compiled_winners() {
     // Then
     assert!(before == after, "the styles depend on the mount order");
     assert_eq!(counts.winners_runtime, 0, "{counts:?}");
-    assert!(counts.winners_compiled >= 2, "{counts:?}");
+    assert!(counts.winners_compiled >= 1, "{counts:?}");
 }
 
 #[test]
@@ -55,8 +55,8 @@ fn a_compiled_page_takes_every_keyed_style_from_its_winners() {
     // When
     let (_, counts) = styled(true);
 
-    // Then: the button and the hidden span; html and body are unkeyed
-    assert_eq!(counts.winners_compiled, 2, "{counts:?}");
+    // Then: the button; flex_body builds nothing, and html and body are unkeyed
+    assert_eq!(counts.winners_compiled, 1, "{counts:?}");
     assert_eq!(
         counts.winners_runtime + counts.winners_component_tag,
         0,
