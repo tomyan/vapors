@@ -14,6 +14,7 @@ static WINNERS: KeyWinners = KeyWinners {
     base: &[],
     conditional: &[],
     shareable: true,
+    own: None,
 };
 
 const fn key(winners: Winners) -> StyleKey {
