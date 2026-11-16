@@ -196,9 +196,11 @@ platform/widget/compositing/layer_tree_settings.cc`). A fling stopped by
 the edge last scrolled on the frame that met it, so the fade follows
 300 ms later, as everywhere else. The app waits for the fade's start
 (`Next::WaitUntil`), draws each fade frame, then asks for none. The
-document draws thumbs at an alpha (`Document::set_thumb_opacity`, 256
-steps). Every scroll container's thumbs share the one fade, as they
-shared the flag; Chrome fades each container's own.
+document draws each scroll container's thumbs at its own alpha
+(`Document::set_thumb_opacity_of`, 256 steps), over a floor every
+container shares (`set_thumb_opacity`: 1 while a mouse is in use, 0 on
+touch). Each container fades on its own, as each has its own controller
+in cc: scrolling one list shows and fades only its thumbs.
 
 ## What the Pixel recorded (2026-11-15)
 

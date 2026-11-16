@@ -44,7 +44,8 @@ fn rect(x: f32, y: f32, width: f32, height: f32) -> BoxRect {
 }
 
 /// Paints the thumbs of the scroll container `layout_box` (border box
-/// `border_box`) at the thumbs' alpha now, unless they are hidden.
+/// `border_box`) at the higher of every container's alpha and its own,
+/// unless that is 0.
 pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
@@ -54,12 +55,13 @@ pub(crate) fn paint(
     let Content::Element(node) = layout_box.content else {
         return;
     };
-    let Some((at, max)) = input.scroll.state(node).filter(|_| input.thumb_alpha > 0) else {
+    let alpha = input.thumb_alpha.max(input.scroll.alpha(node));
+    let Some((at, max)) = input.scroll.state(node).filter(|_| alpha > 0) else {
         return;
     };
     let style = input.used[&node].scrollbar;
     let mut color = style.thumb;
-    color.a *= f32::from(input.thumb_alpha) / f32::from(u8::MAX);
+    color.a *= f32::from(alpha) / f32::from(u8::MAX);
     let padding = crate::clip::padding_box(layout_box, border_box);
     for thumb in thumbs(padding, at, max, style.width) {
         let mut quad = Quad::fill(snapped(thumb, input.scale), color);

@@ -8,10 +8,14 @@
 //! (`third_party/blink/renderer/platform/widget/compositing/
 //! layer_tree_settings.cc`). Chromium times the fade from the first
 //! frame after the delay (`last_awaken_time_`); this times it from the
-//! delay's end, which a frame drawn at once makes the same.
+//! delay's end, which a frame drawn at once makes the same. Each scroll
+//! container fades on its own, as each has its own controller in cc.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
+use vapors_dom::NodeId;
+use vapors_elements::Document;
 use vapors_platform::Instant;
 
 /// `scrollbar_fade_delay` on Android.
@@ -66,6 +70,55 @@ impl ThumbFade {
 
     fn fade_start(&self) -> Option<Instant> {
         self.last_scroll.map(|at| at + FADE_DELAY)
+    }
+}
+
+/// Each scroll container's fade, by container.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ThumbFades {
+    by_container: HashMap<NodeId, ThumbFade>,
+}
+
+impl ThumbFades {
+    /// `container` scrolled at `now`.
+    pub(crate) fn scrolled(&mut self, container: NodeId, now: Instant) {
+        self.by_container
+            .entry(container)
+            .or_default()
+            .scrolled(now);
+    }
+
+    /// `container`'s thumbs' opacity at `now`.
+    #[cfg(test)]
+    pub(crate) fn opacity(&self, container: NodeId, now: Instant) -> f32 {
+        self.by_container
+            .get(&container)
+            .map_or(0.0, |fade| fade.opacity(now))
+    }
+
+    /// Each container's thumbs drawn at their opacity at `now`; those
+    /// faded out are drawn hidden once and forgotten.
+    pub(crate) fn apply(&mut self, document: &mut Document, now: Instant) {
+        for (container, fade) in &self.by_container {
+            document.set_thumb_opacity_of(*container, fade.opacity(now));
+        }
+        self.by_container
+            .retain(|_, fade| fade.phase(now) != Phase::Hidden);
+    }
+
+    /// Where the fades are at `now`: fading if any is, else shown until
+    /// the earliest fade start, else hidden.
+    pub(crate) fn phase(&self, now: Instant) -> Phase {
+        let phases = self.by_container.values().map(|fade| fade.phase(now));
+        let mut earliest = None;
+        for phase in phases {
+            match phase {
+                Phase::Fading => return Phase::Fading,
+                Phase::Shown(at) => earliest = Some(earliest.map_or(at, |e: Instant| e.min(at))),
+                Phase::Hidden => {}
+            }
+        }
+        earliest.map_or(Phase::Hidden, Phase::Shown)
     }
 }
 

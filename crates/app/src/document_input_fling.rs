@@ -120,7 +120,7 @@ impl DocumentInput {
     /// frame, before the document's update.
     pub fn advance_fling(&mut self, document: &mut Document, now: Instant) -> bool {
         let running = self.touch.advance(document, now);
-        document.set_thumb_opacity(self.touch.thumb_opacity(now));
+        self.touch.draw_thumbs(document, now);
         self.thumbs = self.touch.thumb_phase(now);
         running
     }

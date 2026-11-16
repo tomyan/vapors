@@ -67,9 +67,8 @@ impl DocumentInput {
                 Document::touch_cancelled(document, id, point);
             }
         }
-        document
-            .borrow_mut()
-            .set_thumb_opacity(self.touch.thumb_opacity(vapors_platform::Instant::now()));
+        self.touch
+            .draw_thumbs(&mut document.borrow_mut(), vapors_platform::Instant::now());
     }
 }
 

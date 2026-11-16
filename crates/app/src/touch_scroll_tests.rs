@@ -78,31 +78,36 @@ fn a_pan_without_a_finger_down_scrolls_nothing() {
 #[test]
 fn thumbs_show_with_a_mouse_and_on_touch_from_each_scroll_then_fade() {
     // Given
-    let (doc, _outer, _inner) = nested();
+    let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
     let ms = |n: u64| at + std::time::Duration::from_millis(n);
     assert_eq!(
-        touch.thumb_opacity(at),
+        touch.thumb_opacity(inner, at),
         1.0,
         "a mouse until a finger touches"
     );
 
     // When / Then: a finger down, not yet scrolling
     touch.down(1, [10.0, 10.0]);
-    assert_eq!(touch.thumb_opacity(at), 0.0);
+    assert_eq!(touch.thumb_opacity(inner, at), 0.0);
 
     // When / Then: the gesture scrolls and ends; the thumbs stay, then
     // fade from 300 ms after the scroll over 300 ms
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], at);
     touch.up(1);
-    assert_eq!(touch.thumb_opacity(ms(10)), 1.0);
-    assert!((touch.thumb_opacity(ms(450)) - 0.5).abs() < 1e-3);
-    assert_eq!(touch.thumb_opacity(ms(600)), 0.0);
+    assert_eq!(touch.thumb_opacity(inner, ms(10)), 1.0);
+    assert_eq!(
+        touch.thumb_opacity(outer, ms(10)),
+        0.0,
+        "only the list that scrolled"
+    );
+    assert!((touch.thumb_opacity(inner, ms(450)) - 0.5).abs() < 1e-3);
+    assert_eq!(touch.thumb_opacity(inner, ms(600)), 0.0);
 
     // When / Then: the mouse again
     touch.mouse();
-    assert_eq!(touch.thumb_opacity(ms(600)), 1.0);
+    assert_eq!(touch.thumb_opacity(inner, ms(600)), 1.0);
 }
 
 #[test]
@@ -195,7 +200,7 @@ fn a_fling_shows_the_thumbs_at_each_frame_it_moves_them() {
     let at = vapors_platform::Instant::now();
     touch.down(1, [10.0, 10.0]);
     touch.up(1);
-    assert_eq!(touch.thumb_opacity(at), 0.0);
+    assert_eq!(touch.thumb_opacity(outer, at), 0.0);
     let curve = crate::fling_curve::FlingCurve::new([0.0, 500.0]).expect("moving");
     touch.fling(Fling::new(outer, curve, at));
 
@@ -204,7 +209,7 @@ fn a_fling_shows_the_thumbs_at_each_frame_it_moves_them() {
     touch.advance(&mut doc.borrow_mut(), frame);
 
     // Then
-    assert_eq!(touch.thumb_opacity(frame), 1.0);
+    assert_eq!(touch.thumb_opacity(outer, frame), 1.0);
 }
 
 #[test]
@@ -226,20 +231,20 @@ fn a_fling_stopped_by_the_edge_fades_the_thumbs_and_does_not_hide_them() {
 
     // Then: shown at full opacity on the stopping frame, fading after
     assert_eq!(offset(&doc, inner), 40.0);
-    assert_eq!(touch.thumb_opacity(frame(stopped)), 1.0);
+    assert_eq!(touch.thumb_opacity(inner, frame(stopped)), 1.0);
     let last_moved = frame(stopped - 1);
     let half = last_moved + std::time::Duration::from_millis(450);
     assert!(
-        (touch.thumb_opacity(half) - 0.5).abs() < 1e-3,
+        (touch.thumb_opacity(inner, half) - 0.5).abs() < 1e-3,
         "{}",
-        touch.thumb_opacity(half)
+        touch.thumb_opacity(inner, half)
     );
 }
 
 #[test]
 fn a_finger_down_does_not_hide_thumbs_still_showing() {
     // Given thumbs shown by a scroll 100 ms ago
-    let (doc, _, _) = nested();
+    let (doc, _, inner) = nested();
     let mut touch = TouchScroll::default();
     let at = vapors_platform::Instant::now();
     touch.down(1, [10.0, 10.0]);
@@ -251,7 +256,7 @@ fn a_finger_down_does_not_hide_thumbs_still_showing() {
 
     // Then they fade on their own time, as Chrome's do
     assert_eq!(
-        touch.thumb_opacity(at + std::time::Duration::from_millis(100)),
+        touch.thumb_opacity(inner, at + std::time::Duration::from_millis(100)),
         1.0
     );
 }

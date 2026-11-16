@@ -56,3 +56,20 @@ fn a_scroll_during_the_fade_shows_the_thumbs_again() {
     assert_eq!(fade.opacity(later), 1.0);
     assert_eq!(fade.phase(later), Phase::Shown(later + FADE_DELAY));
 }
+
+#[test]
+fn each_container_fades_on_its_own_and_the_earliest_start_is_waited_for() {
+    // Given two containers scrolled 100 ms apart
+    let (mut fades, at) = (super::ThumbFades::default(), Instant::now());
+    let (a, b) = (vapors_dom::NodeId(1), vapors_dom::NodeId(2));
+    fades.scrolled(a, at);
+    fades.scrolled(b, at + 100 * MS);
+
+    // Then: each at its own opacity; shown until a's fade starts, then
+    // fading while either does
+    assert!((fades.opacity(a, at + 450 * MS) - 0.5).abs() < 1e-3);
+    assert!((fades.opacity(b, at + 450 * MS) - 5.0 / 6.0).abs() < 1e-3);
+    assert_eq!(fades.phase(at + 10 * MS), Phase::Shown(at + FADE_DELAY));
+    assert_eq!(fades.phase(at + 650 * MS), Phase::Fading);
+    assert_eq!(fades.phase(at + 700 * MS), Phase::Hidden);
+}

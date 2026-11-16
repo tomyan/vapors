@@ -12,7 +12,7 @@ use vapors_elements::{Document, Point};
 use vapors_platform::Instant;
 
 use crate::fling::Fling;
-use crate::thumb_fade::{Phase, ThumbFade};
+use crate::thumb_fade::{Phase, ThumbFades};
 
 /// The gesture under way.
 #[derive(Debug, Default)]
@@ -28,8 +28,8 @@ pub(crate) struct TouchScroll {
     touching: bool,
     /// The fling under way.
     fling: Option<Fling>,
-    /// The touch thumbs' fade, kept across gestures.
-    fade: ThumbFade,
+    /// Each container's touch thumbs' fade, kept across gestures.
+    fades: ThumbFades,
 }
 
 impl TouchScroll {
@@ -40,7 +40,7 @@ impl TouchScroll {
             *self = Self {
                 down: Some(at),
                 touching: true,
-                fade: self.fade,
+                fades: std::mem::take(&mut self.fades),
                 ..Self::default()
             };
         }
@@ -56,11 +56,12 @@ impl TouchScroll {
             let Some(at) = self.down else { return false };
             self.latched = document.scroll_target(at, delta);
         }
-        let moved = self
-            .latched
-            .is_some_and(|container| document.scroll_node_by(container, delta));
+        let Some(container) = self.latched else {
+            return false;
+        };
+        let moved = document.scroll_node_by(container, delta);
         if moved {
-            self.fade.scrolled(now);
+            self.fades.scrolled(container, now);
         }
         moved
     }
@@ -88,7 +89,7 @@ impl TouchScroll {
     fn end_gesture(&mut self) {
         *self = Self {
             touching: self.touching,
-            fade: self.fade,
+            fades: std::mem::take(&mut self.fades),
             released: self.latched,
             fling: self.fling.take(),
             ..Self::default()
@@ -100,21 +101,28 @@ impl TouchScroll {
         self.touching = false;
     }
 
-    /// How opaque scroll thumbs are drawn at `now`: fully while the
-    /// mouse is in use, else as the touch fade has them.
-    pub(crate) fn thumb_opacity(&self, now: Instant) -> f32 {
+    /// Every container's thumbs drawn as they are at `now`: fully while
+    /// the mouse is in use, else each at its own touch fade.
+    pub(crate) fn draw_thumbs(&mut self, document: &mut Document, now: Instant) {
+        document.set_thumb_opacity(if self.touching { 0.0 } else { 1.0 });
+        self.fades.apply(document, now);
+    }
+
+    /// How opaque `container`'s thumbs are at `now`.
+    #[cfg(test)]
+    pub(crate) fn thumb_opacity(&self, container: NodeId, now: Instant) -> f32 {
         if self.touching {
-            self.fade.opacity(now)
+            self.fades.opacity(container, now)
         } else {
             1.0
         }
     }
 
-    /// Where the touch thumbs' fade is at `now` (hidden with the mouse,
-    /// whose thumbs do not fade).
+    /// Where the touch thumbs' fades are at `now` (hidden with the
+    /// mouse, whose thumbs do not fade).
     pub(crate) fn thumb_phase(&self, now: Instant) -> Phase {
         if self.touching {
-            self.fade.phase(now)
+            self.fades.phase(now)
         } else {
             Phase::Hidden
         }
@@ -154,7 +162,7 @@ impl TouchScroll {
         let before = document.scroll_offset(fling.container());
         let running = fling.advance(document, now);
         if document.scroll_offset(fling.container()) != before {
-            self.fade.scrolled(now);
+            self.fades.scrolled(fling.container(), now);
         }
         if !running {
             self.fling = None;
