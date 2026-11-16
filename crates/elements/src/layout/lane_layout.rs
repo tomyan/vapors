@@ -148,6 +148,8 @@ impl BoxTree<'_> {
         if run.is_ok() || aside {
             self.lane_kept(slot, lane);
         } else {
+            // dropped: a change, which a frames' memo built on it must see
+            self.lanes.changes += 1;
             lane.restore_starts(slot, &mut self.boxes);
         }
         K::answer(c, &run?)

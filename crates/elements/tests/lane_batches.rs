@@ -119,14 +119,15 @@ fn batch_keys(doc: &Rc<RefCell<Document>>, view: Viewport) -> Vec<vapors_element
 }
 
 #[test]
-fn a_row_put_in_above_moves_rows_across_the_split_and_the_batches_keep_their_keys() {
-    // Given: 1 px rows, split at 128 rows, drawn
+fn a_row_put_in_above_takes_a_free_slot_and_the_other_rows_batches_keep_their_keys() {
+    // Given: 1 px rows, 301 in view, in three parts' tables (128 slots
+    // each), drawn
     let view = viewport(400.0, 300.0);
     let doc = coloured_rows(400, "1px", view);
     let keys = batch_keys(&doc, view);
 
-    // When: a row put in at the top: the 128th row moves into the second
-    // batch, the 256th into the third
+    // When: a row put in at the top: every row moves down one, the last
+    // leaves the view and gives back its slot in the third part
     {
         let mut doc = doc.borrow_mut();
         let list = doc.children(doc.body())[0];
@@ -136,12 +137,15 @@ fn a_row_put_in_above_moves_rows_across_the_split_and_the_batches_keep_their_key
         doc.insert_before(list, row, Some(first));
     }
 
-    // Then: split as before; each batch draws the same bytes, its items
-    // at the same row indexes, so it keeps its key; and the batches are
-    // those of batching afresh, drawn where the page has each item
-    assert_eq!(batch_rows(&doc, view), [128, 128, 45]);
-    assert_eq!(batch_keys(&doc, view), keys);
-    assert_drawn_afresh(&doc, view, "rows moved across the split");
+    // Then: the new row, in that slot, is a batch of the third part's
+    // table; the rows in the first two parts keep their slots, so their
+    // batches draw the same bytes and keep their keys; the third part's
+    // lost its last row; and the batches are those of batching afresh,
+    // drawn where the page has each item
+    let now = batch_keys(&doc, view);
+    assert_eq!(now.len(), 4, "{:?}", batch_rows(&doc, view));
+    assert_eq!(now[1..3], keys[0..2]);
+    assert_drawn_afresh(&doc, view, "a row put in above three parts");
 }
 
 #[test]

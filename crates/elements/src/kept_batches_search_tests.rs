@@ -176,3 +176,50 @@ fn the_first_row_in_view_taken_out_sorts_the_steps_again() {
     // `KeptBatches::for_view`)
     assert_eq!((counted, builds), (1, 1));
 }
+
+/// The lane batches' tables and each one's items' slots in the batches
+/// drawn of `doc`.
+fn lane_tables(doc: &mut Document) -> Vec<(Vec<usize>, Vec<u32>)> {
+    let painted = doc.update(VIEWPORT).expect("updates");
+    let kept = painted.kept_batches(Rect::new(0.0, 0.0, 300.0, 210.0));
+    let lane = kept.rows.iter().filter(|rows| !rows.items.is_empty());
+    lane.map(|rows| (rows.frames.to_vec(), rows.items.to_vec()))
+        .collect()
+}
+
+#[test]
+fn the_lane_batches_of_a_part_share_one_table() {
+    // Given
+    let (mut doc, _) = scrolled_list();
+
+    // When
+    let tables = lane_tables(&mut doc);
+
+    // Then: one table for every lane batch, so they draw through one
+    // uniform slot
+    assert_ne!(tables.len(), 0);
+    assert!(
+        tables.iter().all(|(table, _)| *table == tables[0].0),
+        "{tables:?}"
+    );
+}
+
+#[test]
+fn a_row_put_in_above_takes_a_free_slot_and_no_other_row_moves_slot() {
+    // Given: the rows in view and their slots
+    let (mut doc, list) = scrolled_list();
+    let before = lane_tables(&mut doc).remove(0).0;
+
+    // When: a row put in at the top: one row leaves the view at the
+    // bottom, one enters at the top
+    let first = doc.children(list)[0];
+    put_row(&mut doc, list, Some(first));
+    let after = lane_tables(&mut doc).remove(0).0;
+
+    // Then: every row in view both times holds the slot it held
+    let slot_of = |table: &[usize], row: usize| table.iter().position(|&held| held == row);
+    let stayed = before.iter().filter(|&&row| after.contains(&row));
+    for &row in stayed {
+        assert_eq!(slot_of(&after, row), slot_of(&before, row), "row {row}");
+    }
+}

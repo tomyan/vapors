@@ -129,7 +129,10 @@ impl Frames {
     /// Frame `frame` from the memo, or made by `make` and memoised until
     /// the next update; no borrow is held while `make` reads other frames.
     pub(super) fn memoised(&self, frame: usize, make: impl FnOnce() -> FrameAt) -> FrameAt {
-        if let Some(&at) = self.lanes.memo.borrow().get(&frame) {
+        let memoised = self.lanes.memo.borrow().get(&frame).copied();
+        if let Some(at) = memoised {
+            #[cfg(debug_assertions)]
+            self.assert_memo_holds(frame, at);
             return at;
         }
         let at = make();

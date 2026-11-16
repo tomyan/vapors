@@ -25,7 +25,14 @@ pub(super) struct BatchPlaces {
     /// check that the batches drawn are those.
     #[cfg(debug_assertions)]
     keys: Vec<vapors_elements::BatchKey>,
+    /// By lane part: its rows' offsets and table, once worked out, which
+    /// each batch of the part shares (`RowsOfBatches::part`).
+    parts: Vec<Option<Rows>>,
 }
+
+/// A batch's rows' offsets, a range of `BatchPlaces::offsets`, and their
+/// table in `BatchPlaces::tables` (none for a batch in one frame).
+type Rows = ((usize, usize), Option<usize>);
 
 /// Where one batch is drawn, each part once worked out: its frame's (or
 /// lane template's) shift and clip; its rows' offsets in
@@ -34,7 +41,7 @@ pub(super) struct BatchPlaces {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct Place {
     frame: Option<FrameDraw>,
-    rows: Option<((usize, usize), Option<usize>)>,
+    rows: Option<Rows>,
 }
 
 impl BatchPlaces {
@@ -57,6 +64,7 @@ impl BatchPlaces {
         self.places.resize(kept.frames.len(), Place::default());
         self.offsets.clear();
         self.tables.clear();
+        self.parts.clear();
     }
 
     /// Where `kept`'s batch `at` is drawn, from `painted` when not yet
@@ -77,20 +85,38 @@ impl BatchPlaces {
         tables: &mut RowTables,
     ) -> (&[[f32; 2]], &RowOffsets) {
         if self.slot(at).rows.is_none() {
-            let rows = kept.rows.get(at).unwrap_or_default();
-            let offsets = painted.row_offsets(kept.frames[at], rows);
-            let table = (!offsets.is_empty()).then(|| {
-                self.tables.push(tables.table(kept.keys[at], &offsets));
-                self.tables.len() - 1
-            });
-            let start = self.offsets.len();
-            self.offsets.extend(offsets);
-            let end = self.offsets.len();
-            self.slot(at).rows = Some(((start, end), table));
+            let part = kept.rows.part(at);
+            let shared = part.and_then(|part| self.parts.get(part).copied().flatten());
+            let rows = shared.unwrap_or_else(|| self.work_out_rows(at, (painted, kept), tables));
+            if let Some(part) = part {
+                if self.parts.len() <= part {
+                    self.parts.resize(part + 1, None);
+                }
+                self.parts[part] = Some(rows);
+            }
+            self.slot(at).rows = Some(rows);
         }
         let ((start, end), table) = self.slot(at).rows.expect("worked out above");
         let table = table.map_or(&RowOffsets::NONE, |table| &self.tables[table]);
         (&self.offsets[start..end], table)
+    }
+
+    /// `kept`'s batch `at`'s rows' offsets and table worked out and kept.
+    fn work_out_rows(
+        &mut self,
+        at: usize,
+        (painted, kept): (&Painted, &KeptBatched),
+        tables: &mut RowTables,
+    ) -> Rows {
+        let rows = kept.rows.get(at).unwrap_or_default();
+        let offsets = painted.row_offsets(kept.frames[at], rows);
+        let table = (!offsets.is_empty()).then(|| {
+            self.tables.push(tables.table(kept.keys[at], &offsets));
+            self.tables.len() - 1
+        });
+        let start = self.offsets.len();
+        self.offsets.extend(offsets);
+        ((start, self.offsets.len()), table)
     }
 
     /// Batch `at`'s place.

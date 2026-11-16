@@ -50,6 +50,7 @@ impl KeptBatches {
             stale: true,
             unsorted: false,
             lanes: lanes_seen(&frames, view, sources),
+            slots: crate::framed_batches::RowSlots::default(),
         }
     }
 

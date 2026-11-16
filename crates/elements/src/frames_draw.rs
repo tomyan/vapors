@@ -95,9 +95,13 @@ impl Frames {
 
     /// Each of `rows`' frames' offset from lane `container`'s template,
     /// device pixels, whole: what the shader adds to the batch's shift.
+    /// A slot no row holds (`NO_ROW`) is at no offset; no item names it.
     pub(crate) fn row_offsets(&self, container: usize, rows: &[usize]) -> Vec<[f32; 2]> {
         let base = self.lane_template_of(container).shift;
         let offset = |&row: &usize| {
+            if row == crate::framed_batches::NO_ROW {
+                return [0.0, 0.0];
+            }
             let shift = self.at(row).shift;
             [shift[0] - base[0], shift[1] - base[1]]
         };

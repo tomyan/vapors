@@ -175,7 +175,7 @@ fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
     // in the list's frame (a debug build compares them with the whole
     // scene's)
     let kept = painted.kept_batches(view).clone();
-    let fresh = painted.scene().framed_batches(view);
+    let fresh = painted.fresh_batches(view);
     assert_eq!(
         (kept.batched, kept.frames, kept.rows),
         (fresh.batched, fresh.frames, fresh.rows)

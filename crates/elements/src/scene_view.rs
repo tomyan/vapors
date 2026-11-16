@@ -8,7 +8,7 @@
 use vapors_scene::{Batched, Item, Rect, Scene};
 
 use crate::drawn_steps::DrawnSteps;
-use crate::framed_batches::FramedBatched;
+use crate::framed_batches::{FramedBatched, RowSlots};
 use crate::frames::Frames;
 use crate::kept_box::KeptBox;
 use crate::kept_hits::FramedHit;
@@ -62,11 +62,13 @@ impl<'a> SceneView<'a> {
 
     /// The batches for a target whose drawable area is `view` (device
     /// pixels) in their scroll frames, with each one's frame, made
-    /// afresh as the kept batches are (`framed_batches.rs`).
-    #[must_use]
-    pub fn framed_batches(&self, view: Rect) -> FramedBatched {
+    /// afresh as the kept batches are (`framed_batches.rs`), each framed
+    /// lane's rows in their slots in `slots` (a copy: the kept batches'
+    /// slots are theirs).
+    pub(crate) fn framed_batches(&self, view: Rect, mut slots: RowSlots) -> FramedBatched {
         let steps: Vec<Step> = self.drawn.steps().collect();
-        crate::framed_batches::framed_batches(&steps, |&step| step, (self.boxes, self.frames), view)
+        let sources = (self.boxes, self.frames);
+        crate::framed_batches::framed_batches(&steps, |&step| step, sources, (view, &mut slots))
     }
 
     /// The items as a flat scene, each under its clip.

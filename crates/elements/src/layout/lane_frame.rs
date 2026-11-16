@@ -77,10 +77,15 @@ fn set(set: &mut FxHashSet<usize>, slot: usize, member: bool) {
 }
 
 /// Whether `value` CSS pixels is a whole number of device pixels at
-/// `scale`.
+/// `scale`, exactly: the product rounds to nothing (`mul_add` gives its
+/// rounding error exactly), so a value like 0.8, not exact in binary,
+/// whose product at 1.25 rounds to 1.0, is not whole. Starts summed from
+/// such values are exact binary fractions, equal whatever the order.
 pub(crate) fn whole(value: f64, scale: f32) -> bool {
-    let device = value * f64::from(scale);
-    device.is_finite() && device.fract() == 0.0
+    let scale = f64::from(scale);
+    let device = value * scale;
+    let exact = value.mul_add(scale, -device) == 0.0;
+    device.is_finite() && exact && device.fract() == 0.0
 }
 
 #[cfg(test)]

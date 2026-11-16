@@ -17,7 +17,7 @@ use crate::drawn_steps::DrawnSteps;
 use rustc_hash::FxHashMap;
 
 use crate::frame_extents::Extents;
-use crate::framed_batches::framed_batches;
+use crate::framed_batches::{RowSlots, framed_batches};
 use crate::frames::Frames;
 use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
@@ -79,6 +79,9 @@ pub(crate) struct KeptBatches {
     /// met it: what a search after lane rows moved compares its ends with
     /// (`kept_batches_search.rs`).
     lanes: FxHashMap<usize, crate::frames::LaneSeen>,
+    /// Each framed lane's rows' slots in its parts' tables, kept while
+    /// the rows are shown (`framed_batches_slots.rs`).
+    slots: RowSlots,
 }
 
 impl KeptBatches {
@@ -90,9 +93,12 @@ impl KeptBatches {
             .as_ref()
             .is_some_and(|kept| kept.view != view || kept.unsorted)
         {
-            let was = slot.take().and_then(|kept| kept.batched);
+            let (batched, slots) = slot
+                .take()
+                .map_or_else(Default::default, |kept| (kept.batched, kept.slots));
             *slot = Some(Self {
-                batched: was,
+                batched,
+                slots,
                 ..Self::of(view, sources)
             });
         }
@@ -131,6 +137,12 @@ impl KeptBatches {
             .collect()
     }
 
+    /// Each framed lane's rows' slots, for batching the scene afresh as
+    /// these were batched (the debug check, `Painted::fresh_batches`).
+    pub(crate) fn slots(&self) -> &RowSlots {
+        &self.slots
+    }
+
     /// The batches made at the last draw, when no shown step changed
     /// since.
     pub(crate) fn current(&self) -> Option<&KeptBatched> {
@@ -142,7 +154,9 @@ impl KeptBatches {
     pub(crate) fn batches(&mut self, sources: Sources<'_>) -> &KeptBatched {
         if self.current().is_none() {
             let (shown, boxes) = (&self.shown, (sources.boxes, sources.frames));
-            let mut framed = framed_batches(shown, |shown| shown.step, boxes, self.view);
+            self.slots.keep_only(shown.iter().map(|shown| shown.frame));
+            let slots = (self.view, &mut self.slots);
+            let mut framed = framed_batches(shown, |shown| shown.step, boxes, slots);
             self.shown_culled = framed.batched.culled;
             framed.batched.culled = self.culled(sources.extents);
             let was = self.batched.as_ref();

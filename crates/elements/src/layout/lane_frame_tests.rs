@@ -77,3 +77,28 @@ fn a_child_that_scrolls_itself_does_not_until_it_stops() {
     facts.note(1, &laid(20.0, [0.0, 0.0]), 1.0, false);
     assert_eq!(facts.framable(0.0, 0.0, 1.0), Ok(()));
 }
+
+#[test]
+fn a_value_whole_only_after_rounding_is_not_whole() {
+    // 0.8 is not exact in binary; its product with 1.25 rounds to 1.0
+    assert!(!whole(0.8, 1.25));
+    assert!(!whole(1.6, 1.25));
+    // exact values are: 4 px at 1.25 and 2.75, half pixels at 2
+    assert!(whole(4.0, 1.25));
+    assert!(whole(4.0, 2.75));
+    assert!(whole(0.5, 2.0));
+}
+
+#[test]
+fn a_gap_whole_only_after_rounding_declines_the_lane() {
+    let facts = FrameFacts::default();
+    assert_eq!(
+        facts.framable(0.8, 0.0, 1.25),
+        Err(LaneDecline::LaneFramePixel)
+    );
+    assert_eq!(
+        facts.framable(0.0, 0.8, 1.25),
+        Err(LaneDecline::LaneFramePixel)
+    );
+    assert_eq!(facts.framable(4.0, 0.0, 1.25), Ok(()));
+}

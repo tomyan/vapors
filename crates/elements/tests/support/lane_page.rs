@@ -51,7 +51,7 @@ pub fn assert_drawn_afresh(doc: &Rc<RefCell<Document>>, view: Viewport, case: &s
     let painted = doc.update(view).expect("updates");
     let rect = vapors_scene::Rect::new(0.0, 0.0, view.width * view.scale, view.height * view.scale);
     let kept = painted.kept_batches(rect).clone();
-    let fresh = painted.scene().framed_batches(rect);
+    let fresh = painted.fresh_batches(rect);
     let kept = (kept.batched, kept.frames, kept.rows);
     assert_eq!(kept, (fresh.batched, fresh.frames, fresh.rows), "{case}");
 }

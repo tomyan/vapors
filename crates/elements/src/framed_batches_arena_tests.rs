@@ -1,43 +1,40 @@
 use super::{BatchRows, RowsOfBatches};
 
 #[test]
-fn each_batch_reads_its_own_rows_numbered_as_they_first_appear() {
-    // Given: a lane batch over rows 7, 7, 8 then 7; one in a frame; a
-    // lane batch over row 9
+fn the_batches_of_a_part_share_its_table() {
+    // Given: a part whose slots hold rows 7, 8 and 9; two batches in it;
+    // then a batch in one frame
     let mut rows = RowsOfBatches::default();
-    rows.start_batch();
-    for row in [7, 7, 8, 7] {
-        rows.push_item(row);
-    }
+    let part = rows.open_part();
+    rows.start_batch(part);
+    rows.push_item(0);
+    rows.push_item(2);
+    rows.start_batch(part);
+    rows.push_item(1);
+    rows.close_part(part, &[7, 8, 9]);
     rows.add_unrowed(1);
-    rows.start_batch();
-    rows.push_item(9);
 
     // When / Then
-    let first = BatchRows {
-        frames: &[7, 8],
-        items: &[0, 0, 1, 0],
-    };
-    let last = BatchRows {
-        frames: &[9],
-        items: &[0],
-    };
-    assert_eq!(
-        rows.iter().collect::<Vec<_>>(),
-        [first, BatchRows::default(), last]
-    );
+    let table: &[usize] = &[7, 8, 9];
+    let expected = [
+        BatchRows {
+            frames: table,
+            items: &[0, 2],
+        },
+        BatchRows {
+            frames: table,
+            items: &[1],
+        },
+        BatchRows::default(),
+    ];
+    assert_eq!(rows.iter().collect::<Vec<_>>(), expected);
 }
 
 #[test]
-fn appended_batches_keep_their_rows() {
+fn appended_batches_keep_their_parts_tables() {
     // Given
-    let mut rows = RowsOfBatches::default();
-    rows.start_batch();
-    rows.push_item(3);
-    let mut more = RowsOfBatches::default();
-    more.start_batch();
-    more.push_item(4);
-    more.push_item(5);
+    let mut rows = RowsOfBatches::one(&[3], &[0]);
+    let more = RowsOfBatches::one(&[4, 5], &[1, 0]);
 
     // When
     rows.append(&more);
@@ -45,7 +42,7 @@ fn appended_batches_keep_their_rows() {
     // Then
     let second = BatchRows {
         frames: &[4, 5],
-        items: &[0, 1],
+        items: &[1, 0],
     };
     assert_eq!(rows.get(1), Some(second));
 }

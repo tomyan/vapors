@@ -18,10 +18,14 @@ use crate::scene_view::frame_items;
 
 #[path = "framed_batches_arena.rs"]
 mod arena;
+pub(crate) use arena::NO_ROW;
 pub use arena::{BatchRows, RowsOfBatches};
 #[path = "framed_batches_rows.rs"]
 mod rows;
+#[path = "framed_batches_slots.rs"]
+mod slots;
 use rows::rows_batched;
+pub(crate) use slots::RowSlots;
 
 /// The batches of a view, each with where its items are and, for a
 /// batch over the rows of a lane, which row each item is in.
@@ -43,12 +47,12 @@ pub(crate) fn framed_batches<T>(
     steps: &[T],
     step: impl Fn(&T) -> Step,
     sources: Sources<'_>,
-    view: Rect,
+    (view, slots): (Rect, &mut RowSlots),
 ) -> FramedBatched {
     let resolved = resolved(steps.iter().map(step), sources);
     let mut batches = FramedBatched::default();
     for run in resolved.chunk_by(|a, b| a.group == b.group) {
-        batches.add_run(run, sources, view);
+        batches.add_run(run, sources, (view, slots));
     }
     batches
 }
@@ -111,11 +115,17 @@ impl<K: PartialEq + Copy, V: Copy> LastSeen<K, V> {
 
 impl FramedBatched {
     /// The batches of `run`, steps of one group, added.
-    fn add_run(&mut self, run: &[Resolved], sources: Sources<'_>, view: Rect) {
+    fn add_run(
+        &mut self,
+        run: &[Resolved],
+        sources: Sources<'_>,
+        (view, slots): (Rect, &mut RowSlots),
+    ) {
         let group = run[0].group;
         match group.0 {
             Framing::Lane(container) => {
-                for (part, rows) in rows_batched(run, (container, sources), view) {
+                let lane = slots.lane(container);
+                for (part, rows) in rows_batched(run, (container, sources), (view, lane)) {
                     self.extend(group, (part, Some(rows)));
                 }
             }

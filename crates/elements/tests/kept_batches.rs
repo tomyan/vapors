@@ -90,7 +90,7 @@ fn assert_list_drawn_afresh(doc: &mut vapors_elements::Document, view: Rect, cas
 /// batching the whole scene afresh in its frames, naming `case`.
 fn assert_framed_afresh(painted: &vapors_elements::Painted, view: Rect, case: &str) {
     let kept = painted.kept_batches(view).clone();
-    let fresh = painted.scene().framed_batches(view);
+    let fresh = painted.fresh_batches(view);
     let kept = (kept.batched, kept.frames, kept.rows);
     assert_eq!(kept, (fresh.batched, fresh.frames, fresh.rows), "{case}");
 }
