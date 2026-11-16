@@ -152,7 +152,7 @@ impl Document {
     fn made_from(&self, placement: Placement, scale: f32) -> PaintedFrom {
         PaintedFrom {
             placement,
-            thumbs_shown: self.thumbs_shown,
+            thumb_alpha: self.thumb_alpha,
             scale,
         }
     }

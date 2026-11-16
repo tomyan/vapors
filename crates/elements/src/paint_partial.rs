@@ -54,7 +54,7 @@ pub(crate) fn paint_partial(
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
     crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
-    let shown_last = kept.then_some(painted.from.thumbs_shown);
+    let shown_last = kept.then_some(painted.from.thumb_alpha);
     let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
     let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
     let mut repaint = Repaint::new(boxes, rects, &order);

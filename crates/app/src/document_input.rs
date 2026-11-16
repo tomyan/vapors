@@ -28,6 +28,8 @@ pub struct DocumentInput {
     /// Where the pointer last moved, in CSS pixels; `None` before.
     pointer: Option<Point>,
     touch: crate::touch_scroll::TouchScroll,
+    /// The touch thumbs' fade at the last frame (`advance_fling`).
+    thumbs: crate::thumb_fade::Phase,
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last reported; `None` once the host showed its own.
     cursor: Option<Cursor>,
@@ -54,6 +56,7 @@ impl DocumentInput {
         Self {
             pointer: None,
             touch: crate::touch_scroll::TouchScroll::default(),
+            thumbs: crate::thumb_fade::Phase::Hidden,
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
             held: route::Held::default(),
@@ -128,6 +131,7 @@ impl DocumentInput {
         platform: &Platform,
     ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
+        let flinging = self.flinging();
         if let Some(action) = action {
             self.act(document, action);
         }
@@ -143,7 +147,8 @@ impl DocumentInput {
         }
         self.paste_if(document, event, platform);
         self.tooltip_event(&document.borrow(), event, action, Instant::now());
-        let changed = document.borrow_mut().take_changed();
+        // a fling the event started needs a frame to move on
+        let changed = document.borrow_mut().take_changed() || (!flinging && self.flinging());
         let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);

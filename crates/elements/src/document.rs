@@ -59,8 +59,8 @@ pub struct Document {
     pub(crate) counts: crate::UpdateCounts,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
-    /// Whether scroll thumbs are drawn now.
-    pub(crate) thumbs_shown: bool,
+    /// How opaque scroll thumbs are drawn now, 0 (hidden) to 255.
+    pub(crate) thumb_alpha: u8,
     /// The images `img` elements show, by name.
     pub(crate) images: crate::images::Images,
     /// What the a11y mirror keeps between takes (R6).
@@ -111,7 +111,7 @@ impl Document {
             checks: crate::kept_checks::KeptChecks::default(),
             counts: crate::UpdateCounts::default(),
             scroll: crate::scroll::Offsets::default(),
-            thumbs_shown: true,
+            thumb_alpha: u8::MAX,
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
             sinks: crate::node_map::NodeMap::default(),

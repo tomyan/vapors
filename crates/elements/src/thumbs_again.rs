@@ -14,15 +14,15 @@ use crate::kept_order::KeptOrder;
 use crate::paint::PaintInput;
 
 /// [`thumbs_again`] for an update painting `order` with `input`, whose
-/// last paint showed thumbs as `shown_last`, or `None` when nothing was
+/// last paint drew thumbs at `shown_last` alpha, or `None` when nothing was
 /// kept.
 pub(crate) fn of_update(
     order: &KeptOrder,
     painted: (&[(usize, BoxFrom)], &[usize]),
     changed: &ChangedSlots,
-    (shown_last, input): (Option<bool>, &PaintInput<'_>),
+    (shown_last, input): (Option<u8>, &PaintInput<'_>),
 ) -> Vec<usize> {
-    let every = shown_last != Some(input.thumbs_shown);
+    let every = shown_last != Some(input.thumb_alpha);
     let scrolls = |slot| input.stackings.scrolls(slot);
     thumbs_again(&order.thumbs, painted, changed, every, &scrolls)
 }

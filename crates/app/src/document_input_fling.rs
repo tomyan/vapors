@@ -66,9 +66,8 @@ impl DocumentInput {
     /// The gesture's finger lifted at `at` moving at `velocity` (CSS
     /// px/s, the scroll's way): the container the gesture scrolled
     /// flings from then, as Chromium's `GestureDetector` decides on
-    /// `Action::UP`. The thumbs, hidden at the lift, show again for the
-    /// fling: that change asks the host for the frame that moves it on.
-    /// Its time is the platform's handling time (`velocity_tracker.rs`
+    /// `Action::UP`. Starting it asks the host for the frame that moves
+    /// it on (`DocumentInput::handle`). Its time is the platform's handling time (`velocity_tracker.rs`
     /// says why), where Chromium starts at the last scroll update's.
     pub(super) fn released(&mut self, document: &Document, velocity: [f32; 2], at: Instant) {
         // `fling` clamps to the maximum; the minimum is checked first, on
@@ -115,13 +114,23 @@ impl DocumentInput {
         Ok(())
     }
 
-    /// The fling under way moved on to `now`; whether one is still
-    /// running, so the host draws another frame. An app showing the
-    /// document calls this once a frame, before the document's update.
+    /// The fling under way moved on to `now`, and the touch thumbs'
+    /// fade with it; whether a fling is still running, so the host draws
+    /// another frame. An app showing the document calls this once a
+    /// frame, before the document's update.
     pub fn advance_fling(&mut self, document: &mut Document, now: Instant) -> bool {
         let running = self.touch.advance(document, now);
-        document.set_thumbs_shown(self.touch.thumbs_shown());
+        self.touch.draw_thumbs(document, now);
+        self.thumbs = self.touch.thumb_phase(now);
         running
+    }
+
+    /// Where the touch thumbs' fade was at the last `advance_fling`: the
+    /// host draws a frame at once while they fade, and at the fade's
+    /// start while shown.
+    #[must_use]
+    pub(crate) fn thumb_phase(&self) -> crate::thumb_fade::Phase {
+        self.thumbs
     }
 
     /// Whether a fling is running.

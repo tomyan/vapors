@@ -29,8 +29,9 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) clip: Option<BoxRect>,
     /// Each scroll container's offset and range, for its thumbs.
     pub(crate) scroll: &'a crate::scroll::Offsets,
-    /// Whether thumbs are drawn now (on touch, only while scrolling).
-    pub(crate) thumbs_shown: bool,
+    /// How opaque thumbs are drawn now, 0 (hidden) to 255 (on touch they
+    /// show while scrolling and fade after).
+    pub(crate) thumb_alpha: u8,
     /// The document's run-time shapes, which elements that paint shapes
     /// acquire from.
     pub(crate) shapes: &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
@@ -60,7 +61,7 @@ impl<'a> PaintInput<'a> {
             scale: from.scale,
             clip: None,
             scroll,
-            thumbs_shown: from.thumbs_shown,
+            thumb_alpha: from.thumb_alpha,
             shapes,
         }
     }

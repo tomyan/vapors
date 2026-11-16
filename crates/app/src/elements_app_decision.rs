@@ -5,6 +5,7 @@ use vapors_platform::{Instant, Next};
 
 use super::ElementsApp;
 use crate::painter::{ScenePainter, SurfaceState};
+use crate::thumb_fade::Phase;
 
 /// What `next_after_frame` found at the end of a frame.
 // each bool is an independent reason, printed by a failing check; an
@@ -28,20 +29,33 @@ pub struct FrameDecision {
     pub tooltip_changed: bool,
     /// A fling is running (`DocumentInput::flinging`).
     pub flinging: bool,
+    /// The touch thumbs are fading (`thumb_fade.rs`).
+    pub thumbs_fading: bool,
+    /// When the shown touch thumbs start to fade.
+    pub thumbs_fade_at: Option<Instant>,
 }
 
 impl FrameDecision {
     /// Whether any reason holds: the app draws again at once.
     #[must_use]
     pub fn wants_frame(self) -> bool {
-        self.document_changed || self.surface_invalidated || self.surfaces_want || self.flinging
+        self.document_changed
+            || self.surface_invalidated
+            || self.surfaces_want
+            || self.flinging
+            || self.thumbs_fading
     }
 
-    /// The next frame: at once when a reason holds, else at the
-    /// tooltip's deadline, else on the next change.
+    /// The next frame: at once when a reason holds, else at the earlier
+    /// of the tooltip's deadline and the thumbs' fade start, else on the
+    /// next change.
     #[must_use]
     pub fn next(self) -> Next {
-        match (self.wants_frame(), self.tooltip_deadline) {
+        let deadline = [self.tooltip_deadline, self.thumbs_fade_at]
+            .into_iter()
+            .flatten()
+            .min();
+        match (self.wants_frame(), deadline) {
             (true, _) => Next::Continue,
             (false, Some(deadline)) => Next::WaitUntil(deadline),
             (false, None) => Next::Wait,
@@ -65,6 +79,11 @@ impl ElementsApp {
             tooltip_deadline: self.input.tooltip_deadline(),
             tooltip_changed: self.input.take_tooltip_changed(),
             flinging: self.input.flinging(),
+            thumbs_fading: self.input.thumb_phase() == Phase::Fading,
+            thumbs_fade_at: match self.input.thumb_phase() {
+                Phase::Shown(at) => Some(at),
+                _ => None,
+            },
         };
         self.decision.next()
     }
@@ -134,5 +153,45 @@ mod tests {
 
         // Then
         assert_eq!(flinging.next(), Next::Continue);
+    }
+}
+
+#[cfg(test)]
+mod thumb_tests {
+    use std::time::Duration;
+
+    use vapors_platform::{Instant, Next};
+
+    use super::FrameDecision;
+
+    #[test]
+    fn fading_thumbs_draw_again_at_once() {
+        // Given
+        let fading = FrameDecision {
+            thumbs_fading: true,
+            ..FrameDecision::default()
+        };
+
+        // Then
+        assert_eq!(fading.next(), Next::Continue);
+    }
+
+    #[test]
+    fn shown_thumbs_wait_for_the_earlier_of_their_fade_and_the_tooltip() {
+        // Given fades and tooltips due before and after each other
+        let soon = Instant::now() + Duration::from_millis(100);
+        let later = soon + Duration::from_millis(200);
+        let waits = |fade_at, tooltip| {
+            FrameDecision {
+                thumbs_fade_at: Some(fade_at),
+                tooltip_deadline: Some(tooltip),
+                ..FrameDecision::default()
+            }
+            .next()
+        };
+
+        // Then
+        assert_eq!(waits(soon, later), Next::WaitUntil(soon));
+        assert_eq!(waits(later, soon), Next::WaitUntil(soon));
     }
 }

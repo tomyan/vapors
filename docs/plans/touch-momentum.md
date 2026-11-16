@@ -177,6 +177,38 @@ flings the container the gesture scrolled.
   off-axis velocity of a mostly straight fling; the recorded flings are
   vertical lists, where it changes nothing.
 
+## Thumbs on touch (Tom, 2026-11-15)
+
+Tom on the first page: the thumb vanished at once when a scroll ended,
+and at once when a scroll met the top or bottom. The cause: on touch the
+thumbs were an on/off flag, "a gesture is scrolling or a fling runs";
+a fling meeting the edge ends that frame, so the flag went off and the
+thumb vanished, as at a fling's natural end or a lift with no fling.
+
+`crates/app/src/thumb_fade.rs` now draws them as Chrome on Android does
+(cc's `ANDROID_OVERLAY` animator, `cc/input/
+scrollbar_animation_controller.cc`): each scroll update, the drag's or
+the fling's, shows them at full opacity at once (there is no fade in),
+and 300 ms after the last update they fade out linearly over 300 ms
+(`scrollbar_fade_delay` and `scrollbar_fade_duration`,
+`InitializeScrollbarFadeAndDelay` in `third_party/blink/renderer/
+platform/widget/compositing/layer_tree_settings.cc`). A fling stopped by
+the edge last scrolled on the frame that met it, so the fade follows
+300 ms later, as everywhere else. The app waits for the fade's start
+(`Next::WaitUntil`), draws each fade frame, then asks for none. The
+document draws each scroll container's thumbs at its own alpha
+(`Document::set_thumb_opacity_of`, 256 steps), over a floor every
+container shares (`set_thumb_opacity`: 1 while a mouse is in use, 0 on
+touch). Each container fades on its own, as each has its own controller
+in cc: scrolling one list shows and fades only its thumbs.
+
+Two gaps are open. Until the first touch the floor is a mouse's (1),
+so the first finger down hides every thumb at once (#405); Chrome on
+Android shows none at load. And only a touch drag or a fling shows the
+thumbs on touch, where cc shows them for every scroll it applies (#406).
+While a mouse is in use the containers' own fades are dropped, so no
+fade asks for frames under the mouse's floor.
+
 ## What the Pixel recorded (2026-11-15)
 
 27 recordings by Tom on the Pixel 9 Pro, Chrome 157, Android, device

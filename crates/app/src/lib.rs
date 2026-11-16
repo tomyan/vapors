@@ -28,6 +28,7 @@ mod shape_store;
 mod shape_store_meshes;
 mod shape_store_runtime;
 mod surface;
+mod thumb_fade;
 mod tooltip;
 mod tooltip_box;
 mod tooltip_error;

@@ -138,4 +138,22 @@ fn gpu_a_flicked_list_coasts_after_the_finger_lifts_and_then_rests() {
     );
     assert_eq!(nexts[0], Next::Continue);
     assert_eq!(nexts.last(), Some(&Next::Wait));
+    thumbs_waited_faded_and_went_idle(&nexts);
+}
+
+/// After the coast's last frame the app waits for the thumbs' fade
+/// (`Next::WaitUntil`, 300 ms after the last scroll), draws each frame
+/// of the 300 ms fade, then asks for none.
+fn thumbs_waited_faded_and_went_idle(nexts: &[Next]) {
+    let waits = nexts.iter().position(|n| matches!(n, Next::WaitUntil(_)));
+    let idle = nexts.iter().position(|n| *n == Next::Wait);
+    let (Some(waits), Some(idle)) = (waits, idle) else {
+        panic!("no wait for the fade, or never idle: {nexts:?}");
+    };
+    let fade_frames = &nexts[waits..idle];
+    assert!(
+        fade_frames.contains(&Next::Continue),
+        "no fade frames: {nexts:?}"
+    );
+    assert!(nexts[idle..].iter().all(|n| *n == Next::Wait), "{nexts:?}");
 }

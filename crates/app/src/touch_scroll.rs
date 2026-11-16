@@ -3,14 +3,16 @@
 //! where the finger went down, takes every later pan, and a pan past
 //! its end goes nowhere rather than out to the next one (F2c S9). It
 //! also keeps the input mode for scroll thumbs: shown while a mouse is
-//! in use, and on touch only while a gesture or its fling scrolls. A
-//! fling (`fling.rs`) runs until it ends or a finger goes down.
+//! in use, and on touch shown by each scroll, the gesture's or its
+//! fling's, then faded (`thumb_fade.rs`). A fling (`fling.rs`) runs
+//! until it ends or a finger goes down.
 
 use vapors_dom::NodeId;
 use vapors_elements::{Document, Point};
 use vapors_platform::Instant;
 
 use crate::fling::Fling;
+use crate::thumb_fade::{Phase, ThumbFades};
 
 /// The gesture under way.
 #[derive(Debug, Default)]
@@ -26,6 +28,8 @@ pub(crate) struct TouchScroll {
     touching: bool,
     /// The fling under way.
     fling: Option<Fling>,
+    /// Each container's touch thumbs' fade, kept across gestures.
+    fades: ThumbFades,
 }
 
 impl TouchScroll {
@@ -36,6 +40,7 @@ impl TouchScroll {
             *self = Self {
                 down: Some(at),
                 touching: true,
+                fades: std::mem::take(&mut self.fades),
                 ..Self::default()
             };
         }
@@ -45,14 +50,20 @@ impl TouchScroll {
     }
 
     /// The fingers moved the content by `delta` (CSS pixels, as a scroll
-    /// delta); whether a container moved.
-    pub(crate) fn pan(&mut self, document: &mut Document, delta: [f32; 2]) -> bool {
+    /// delta) at `now`; whether a container moved.
+    pub(crate) fn pan(&mut self, document: &mut Document, delta: [f32; 2], now: Instant) -> bool {
         if self.latched.is_none() {
             let Some(at) = self.down else { return false };
             self.latched = document.scroll_target(at, delta);
         }
-        self.latched
-            .is_some_and(|container| document.scroll_node_by(container, delta))
+        let Some(container) = self.latched else {
+            return false;
+        };
+        let moved = document.scroll_node_by(container, delta);
+        if moved {
+            self.fades.scrolled(container, now);
+        }
+        moved
     }
 
     /// Finger `id` lifted or was taken away; the gesture ends when no
@@ -78,6 +89,7 @@ impl TouchScroll {
     fn end_gesture(&mut self) {
         *self = Self {
             touching: self.touching,
+            fades: std::mem::take(&mut self.fades),
             released: self.latched,
             fling: self.fling.take(),
             ..Self::default()
@@ -89,9 +101,42 @@ impl TouchScroll {
         self.touching = false;
     }
 
-    /// Whether scroll thumbs are drawn now.
-    pub(crate) fn thumbs_shown(&self) -> bool {
-        !self.touching || self.latched.is_some() || self.fling.is_some()
+    /// Every container's thumbs drawn as they are at `now`: fully while
+    /// the mouse is in use, else each at its own touch fade.
+    pub(crate) fn draw_thumbs(&mut self, document: &mut Document, now: Instant) {
+        if self.touching {
+            document.set_thumb_opacity(0.0);
+            self.fades.apply(document, now);
+        } else {
+            document.set_thumb_opacity(1.0);
+            self.fades.hide_all(document);
+        }
+    }
+
+    /// How many containers' fades are left.
+    #[cfg(test)]
+    pub(crate) fn fades_left(&self) -> usize {
+        self.fades.len()
+    }
+
+    /// How opaque `container`'s thumbs are at `now`.
+    #[cfg(test)]
+    pub(crate) fn thumb_opacity(&self, container: NodeId, now: Instant) -> f32 {
+        if self.touching {
+            self.fades.opacity(container, now)
+        } else {
+            1.0
+        }
+    }
+
+    /// Where the touch thumbs' fades are at `now` (hidden with the
+    /// mouse, whose thumbs do not fade).
+    pub(crate) fn thumb_phase(&self, now: Instant) -> Phase {
+        if self.touching {
+            self.fades.phase(now)
+        } else {
+            Phase::Hidden
+        }
     }
 
     /// The container the gesture that just ended scrolled, if any, for
@@ -122,10 +167,14 @@ impl TouchScroll {
 
     /// The fling moved on to `now`; whether one is still running.
     pub(crate) fn advance(&mut self, document: &mut Document, now: Instant) -> bool {
-        let running = self
-            .fling
-            .as_mut()
-            .is_some_and(|f| f.advance(document, now));
+        let Some(fling) = self.fling.as_mut() else {
+            return false;
+        };
+        let before = document.scroll_offset(fling.container());
+        let running = fling.advance(document, now);
+        if document.scroll_offset(fling.container()) != before {
+            self.fades.scrolled(fling.container(), now);
+        }
         if !running {
             self.fling = None;
         }
