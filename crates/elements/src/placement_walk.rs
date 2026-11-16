@@ -62,6 +62,7 @@ impl<'a, 'b> Walk<'a, 'b> {
                 states_changed: Vec::new(),
                 count: 0,
                 chained: 0,
+                ranges_measured: 0,
                 unframed: Vec::new(),
                 reframed: false,
             },
@@ -106,7 +107,7 @@ impl<'a, 'b> Walk<'a, 'b> {
         self.placed.count += 1;
         let before = content_origin(self.kept.rects[slot]);
         if mark >= Mark::Scrolled {
-            self.settle(slot);
+            self.settle(slot, mark);
         }
         self.put(slot, origin, mark);
         let inner = content_origin(self.kept.rects[slot]);
