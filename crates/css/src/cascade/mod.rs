@@ -7,6 +7,7 @@
 
 mod buckets;
 mod collect;
+mod compiled;
 mod compute;
 mod compute_resolve;
 mod compute_source;
@@ -25,6 +26,7 @@ mod restyle;
 mod share;
 mod supports;
 
+pub use compiled::CompiledRules;
 pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, SVG_TAGS, declarations_of};
 pub use share::{Unshareable, rule_indices_for_key, unshareable};
 pub(crate) use {collect::rank, compute::initial, compute::resolve_for};

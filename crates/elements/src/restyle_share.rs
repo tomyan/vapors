@@ -49,9 +49,7 @@ impl Document {
             return Ok((self.compute_own(node, viewport)?, Path::Unkeyed));
         };
         if !self.shareable(key) {
-            let style = self.compute_own(node, viewport)?;
-            self.check_winners(node, key, &style);
-            return Ok((style, Path::Unshareable));
+            return Ok((self.compute_keyed(node, key, viewport)?, Path::Unshareable));
         }
         self.shared_style(node, key, viewport)
     }
@@ -72,15 +70,18 @@ impl Document {
             }
             return Ok((style, Path::Shared));
         }
-        let style = self.compute_own(node, viewport)?;
-        self.check_winners(node, key, &style);
+        let style = self.compute_keyed(node, key, viewport)?;
         let parent = self.parent_style(node);
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.insert(share_key, Rc::clone(&style), parent);
         Ok((style, Path::Computed))
     }
 
-    fn compute_own(&self, node: NodeId, viewport: Viewport) -> Result<Rc<Counted>, ElementError> {
+    pub(crate) fn compute_own(
+        &self,
+        node: NodeId,
+        viewport: Viewport,
+    ) -> Result<Rc<Counted>, ElementError> {
         let kept = self.kept.as_ref().expect("restyle sets it");
         let parent = self.parent(node).map(|p| kept.styles.of(p));
         let style =
@@ -153,14 +154,6 @@ impl Document {
             .collect()
     }
 
-    /// Debug builds: the key's compiled winners against the style the
-    /// cascade computed (`style::winners_oracle`).
-    fn check_winners(&self, node: NodeId, key: &StyleKey, style: &Counted) {
-        if cfg!(debug_assertions) {
-            self.sheets.check_winners(key, &self.describe(node), style);
-        }
-    }
-
     /// The oracle: `shared` must equal the style computed for `node`
     /// alone.
     fn check_shared(
@@ -202,6 +195,10 @@ impl UpdateCounts {
         self.styles_computed = 0;
         self.styles_unkeyed = 0;
         self.styles_unshareable = 0;
+        self.winners_compiled = 0;
+        self.winners_runtime = 0;
+        self.winners_component_tag = 0;
+        self.winners_foreign = 0;
         self.used_shared = 0;
         self.used_derived = 0;
     }

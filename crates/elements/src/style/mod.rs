@@ -29,6 +29,7 @@ pub use sheet_hashes::SheetHash;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
+mod compiled_rules;
 mod sizes;
 mod styles;
 mod surface;
@@ -37,7 +38,6 @@ mod text_style;
 mod used;
 mod used_share;
 mod values;
-mod winners_oracle;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 

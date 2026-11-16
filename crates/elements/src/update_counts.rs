@@ -45,6 +45,20 @@ pub struct UpdateCounts {
     /// its elements can match reads siblings or descendants, or sits
     /// under `@container`.
     pub styles_unshareable: usize,
+    /// Restyled keyed elements whose style was computed from their
+    /// key's compiled winners (`restyle_compiled`); 0 when the restyle
+    /// failed, as the counts above.
+    pub winners_compiled: usize,
+    /// Restyled elements of a hand-written key (`Winners::Unanalysed`),
+    /// computed by the full cascade: generated code that stops emitting
+    /// winners shows here.
+    pub winners_runtime: usize,
+    /// Restyled elements of a component tag's key
+    /// (`Winners::ComponentTag`), computed by the full cascade.
+    pub winners_component_tag: usize,
+    /// Of `winners_compiled`, those another crate's sheet reaches,
+    /// whose rules were matched on the element as well.
+    pub winners_foreign: usize,
     /// Computed style allocations alive after the update: the share
     /// table's entries and every element styled for itself.
     pub styles_live: usize,

@@ -45,6 +45,9 @@ pub(crate) struct Shared {
     pub(crate) shareable: HashMap<usize, bool>,
     /// The used styles of shared computed styles, cleared with them.
     pub(crate) used: super::SharedUsed,
+    /// By key address: its compiled winners as this cascade's rules, or
+    /// why they were refused (`restyle_compiled`).
+    pub(crate) compiled: HashMap<usize, Result<crate::restyle_compiled::CompiledKey, String>>,
 }
 
 impl Shared {
