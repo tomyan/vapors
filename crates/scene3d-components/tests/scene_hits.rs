@@ -28,19 +28,25 @@ fn the_mesh_under_the_pointer_is_the_target() {
     assert_eq!(rig.hit_names(CORNER).0, "gpu-surface");
 }
 
+/// A case's name and what adds its sheet.
+type Case = (&'static str, fn(&Rig));
+
 #[test]
 fn a_mesh_whose_anchor_does_not_take_the_pointer_passes_the_hit_to_the_surface() {
-    let cases = [
-        ("pointer-events: none", ".left { pointer-events: none; }"),
-        ("hidden", ".left { visibility: hidden; }"),
+    // each case's CSS a compiled sheet (tests/pages): a sheet added from
+    // Rust beside the analysed page is refused (R1b)
+    let cases: [Case; 2] = [
+        ("pointer-events: none", |rig| {
+            crate::add_sheet!(rig.doc, left_untouchable::LeftUntouchable);
+        }),
+        ("hidden", |rig| {
+            crate::add_sheet!(rig.doc, left_hidden::LeftHidden);
+        }),
     ];
-    for (case, css) in cases {
+    for (case, add) in cases {
         // Given
         let rig = Rig::new();
-        rig.doc
-            .borrow_mut()
-            .add_stylesheet("test.css", css)
-            .unwrap();
+        add(&rig);
         rig.updated();
 
         // When

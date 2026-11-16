@@ -3,12 +3,14 @@
 //! compiled winners cannot see the sheet. A hand-written key, without
 //! winners, is not analysed.
 
-use vapors_dom::{Dom, KeyWinners, SheetRef, StyleKey, Winners};
+use vapors_dom::{Dom, KeyWinners, StyleKey, Winners};
 use vapors_elements::{Document, ElementError, Viewport};
 use vapors_text::FontSystem;
 
+// referencing no sheet, every rule is ranked at run time, so the debug
+// winners oracle (style::winners_oracle) has no base winner to hold
 static WINNERS: KeyWinners = KeyWinners {
-    sheets: &[(SheetRef::UserAgent, 0)],
+    sheets: &[],
     base: &[],
     conditional: &[],
     shareable: true,
