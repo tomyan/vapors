@@ -66,9 +66,9 @@ fn user_agent_rules() -> Vec<RuleRef> {
 fn updated(key: &'static StyleKey) {
     let mut doc = Document::new(FontSystem::bundle_only());
     if key.scope.is_some() {
-        doc.add_style(OWN, CARD);
+        doc.add_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     } else {
-        doc.add_global_style(OWN, CARD);
+        doc.add_global_style(vapors_dom::CompiledSheet::for_tests(OWN, CARD));
     }
     let body = doc.body();
     let node = doc.create_keyed_element(key);

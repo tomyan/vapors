@@ -37,6 +37,7 @@ mod script_syntax;
 mod script_uses;
 mod shell;
 mod shell_methods;
+mod shell_sheet;
 mod snippet_list;
 mod snippet_params;
 mod snippets;

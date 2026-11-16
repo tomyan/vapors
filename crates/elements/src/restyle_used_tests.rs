@@ -40,7 +40,10 @@ fn two_rows() -> (Document, [NodeId; 2]) {
 /// The same, with `css` under the rows' scope.
 fn rows_styled(css: &str) -> (Document, [NodeId; 2]) {
     let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_style("vapors-perf/ui/mount_row.wisp", css);
+    doc.add_style(vapors_dom::CompiledSheet::for_tests(
+        "vapors-perf/ui/mount_row.wisp",
+        css,
+    ));
     let body = doc.body();
     let rows = [(); 2].map(|()| {
         let row = doc.create_keyed_element(&ROW);
