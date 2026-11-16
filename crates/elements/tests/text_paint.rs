@@ -4,7 +4,7 @@
 //! text underlined; a field
 //! without a width is refused.
 
-mod support;
+use crate::support;
 
 use support::text_page::{click, key, page};
 use support::{document, element, refusals};

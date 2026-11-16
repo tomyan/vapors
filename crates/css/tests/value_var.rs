@@ -1,6 +1,6 @@
 //! `var()` substitution (`src/value/var.rs`). Translated from sumi `vars_test.go`; unresolved and cyclic references are refused.
 
-mod support;
+use crate::support;
 
 use support::value_var::{expand, ok};
 use vapors_css::value::VarError;

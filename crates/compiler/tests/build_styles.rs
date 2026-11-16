@@ -3,8 +3,7 @@
 //! in the `.wisp` file: a style that does not parse, and a `:global()`
 //! where the scoping cannot honour it.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use std::path::Path;
 

@@ -6,7 +6,7 @@
 //! condition that declined (`SpliceDecline`) and also matches a full
 //! update through the oracle.
 
-mod support;
+use crate::support;
 
 use support::splice_page::{assert_declined, inserted, matches_full, page, updated};
 use vapors_dom::Dom;

@@ -4,7 +4,7 @@
 //! `iterable`. Conditions and iterables are raw Rust (no auto-unwrap),
 //! as in sumi.
 
-mod common;
+use crate::common;
 
 use common::{element, expr, if_block, literal, parse_err, parse_ok, text_parts};
 

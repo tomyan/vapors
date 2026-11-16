@@ -3,7 +3,7 @@
 //! unkeyed or could not share, and what differs in the key (a toggled
 //! class, a state, an attribute a sheet selects) ends the sharing.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, StyleKey};

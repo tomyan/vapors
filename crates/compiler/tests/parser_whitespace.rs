@@ -3,7 +3,7 @@
 //! contains a newline and is one space otherwise; a run containing
 //! anything else is kept as written. A hole stays its own part.
 
-mod common;
+use crate::common;
 
 use common::{element, expr, literal, parse_ok, text_parts};
 

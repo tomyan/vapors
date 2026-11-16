@@ -1,6 +1,6 @@
 //! `transition` and `animation` shorthands (`src/property/shorthand_motion.rs`).
 
-mod support;
+use crate::support;
 
 use support::property_shorthand::longhands;
 use support::refusal;

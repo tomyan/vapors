@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
-
+autotests = false
 [dependencies]
 syn.workspace = true
 prettyplease.workspace = true
@@ -25,3 +25,8 @@ path = "src/bin/wisp_check.rs"
 
 [lints]
 workspace = true
+
+# The integration tests as one binary (scripts/one-test-binary.sh)
+[[test]]
+name = "tests"
+path = "tests/main.rs"

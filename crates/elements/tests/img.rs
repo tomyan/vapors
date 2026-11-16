@@ -1,7 +1,7 @@
 //! `img` (F2c S10): an element showing an image registered with the
 //! document by name, sized by its natural size and aspect ratio.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, NodeId};

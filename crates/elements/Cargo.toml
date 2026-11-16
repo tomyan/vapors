@@ -13,6 +13,7 @@ publish = false
 # `grid` (default): CSS grid layout (taffy's grid), about 54 KiB of brotli
 # wasm in touché's page (docs/design/text-stack-size.md). Without it,
 # `display: grid` and the grid properties are refused, naming it.
+autotests = false
 [features]
 default = ["complex-script-breaks", "grid"]
 complex-script-breaks = ["vapors-text/complex-script-breaks"]
@@ -42,3 +43,8 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+# The integration tests as one binary (scripts/one-test-binary.sh)
+[[test]]
+name = "tests"
+path = "tests/main.rs"

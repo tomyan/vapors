@@ -5,7 +5,7 @@
 //! field, `focus` and `focusin` on the button, then `blur` and
 //! `focusout` on the field, and a typed key reaches the button.
 
-mod support;
+use crate::support;
 
 use std::rc::Rc;
 

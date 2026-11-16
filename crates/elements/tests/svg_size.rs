@@ -4,7 +4,7 @@
 //! keeps them unless it grows, shrinks or has a basis. Each expected
 //! size was measured in headless Chromium 155 with the same markup.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{PATH, SVG, with_attributes};
 use support::{document, element, viewport};

@@ -4,7 +4,7 @@
 //! on the rows; an edit that makes the row taller lays the column out
 //! again. Each update is checked by the correctness oracle.
 
-mod support;
+use crate::support;
 
 use support::flex_list::{FlexList, ROW_MARGIN, flex_list, list_viewport};
 use support::oracle::assert_matches_full;

@@ -626,6 +626,24 @@ The order:
    `mod support`). If the link time is what section 1.3 predicts, land
    it; the same for app (54), css (59) and compiler (43). No source
    change; nextest's per-test timeouts still apply per test.
+   Done 2026-11-16 for all four (`scripts/one-test-binary.sh`, measured
+   by `scripts/test-build-time.sh`: one `touch src/lib.rs`, then
+   `cargo test -p <crate> --no-run --timings`, 4 jobs, no sccache, no
+   incremental). Before, at load 5 to 19; after, at load 6:
+
+   | crate | wall before | wall after | test units before | test units after |
+   |---|---|---|---|---|
+   | elements | 122.1 s | 35.0 s | 207, 402.7 s | 2, 41.8 s |
+   | app | 34.0 s | 33.8 s | 63, 93.1 s | 2, 18.0 s |
+   | css | 28.0 s | 8.0 s | 70, 69.6 s | 2, 4.6 s |
+   | compiler | 17.8 s | 8.8 s | 51, 35.3 s | 3, 3.9 s |
+
+   app's wall time is its library's (the test units ran beside it);
+   its test units' CPU fell by four fifths. The tests run are the same
+   in number, plus one per crate: `every_test_file_is_a_module` refuses
+   a file under `tests/` that `tests/main.rs` does not declare. A test's
+   nextest id is now `<file>::<function>`, so the tiers split on a
+   `gpu_` id or a `gpu_` function name (`xtask/src/steps_tiers.rs`).
 2. **The module-boundary check.** `cargo xtask check-modules`: reads
    `clusters.txt` (moved to `.config/`), builds the cluster graph the
    way `modgraph.py` does, and refuses an edge the file's `allowed`

@@ -3,7 +3,7 @@
 //! would read a default that may be wrong. The refusal names the role,
 //! the name and what is missing.
 
-mod support;
+use crate::support;
 
 use support::mirror::page_with;
 use vapors_elements::AxError;

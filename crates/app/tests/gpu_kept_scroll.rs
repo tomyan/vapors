@@ -5,8 +5,7 @@
 //! are those of the scrolled page drawn by a painter that kept nothing,
 //! with each row where the scroll puts it in device pixels (scale 2).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_app::FrameCounts;

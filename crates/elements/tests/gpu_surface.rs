@@ -3,7 +3,7 @@
 //! its children, under its ancestors' clip; nothing when hidden or
 //! empty. What it refuses: `gpu_surface_refused.rs`.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::Dom;

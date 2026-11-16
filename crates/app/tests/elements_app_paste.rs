@@ -14,8 +14,7 @@ use vapors_platform::{
     App, Clipboard, ClipboardDone, ClipboardImage, ClipboardText, Event, Platform,
 };
 
-#[path = "support/paste_page.rs"]
-mod paste_page;
+use crate::support_paste_page as paste_page;
 
 use paste_page::{click_field, field};
 

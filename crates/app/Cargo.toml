@@ -10,6 +10,7 @@ publish = false
 
 # `complex-script-breaks` (default): vapors-text's, forwarded so an app
 # can turn it off (crates/text/Cargo.toml).
+autotests = false
 [features]
 default = ["complex-script-breaks", "grid"]
 complex-script-breaks = ["vapors-text/complex-script-breaks", "vapors-elements/complex-script-breaks"]
@@ -47,3 +48,8 @@ vapors-elements = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true
+
+# The integration tests as one binary (scripts/one-test-binary.sh)
+[[test]]
+name = "tests"
+path = "tests/main.rs"

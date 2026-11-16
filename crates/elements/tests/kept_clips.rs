@@ -4,7 +4,7 @@
 //! A debug build also compares the kept clips with fresh ones on every
 //! update that paints (`kept_paint_check.rs`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::{Dom, NodeId};

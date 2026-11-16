@@ -4,7 +4,7 @@
 //! used-style table and what it derived, and a refused element's
 //! refusals still name it.
 
-mod support;
+use crate::support;
 
 use support::{document, refusals, viewport};
 use vapors_dom::{Dom, NodeId, StyleKey};

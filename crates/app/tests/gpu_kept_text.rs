@@ -4,8 +4,7 @@
 //! colour, whose freed text id may be issued again to the new layout, is
 //! built again from the new layout.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, bare_document, update};
 use vapors_app::FrameCounts;

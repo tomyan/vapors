@@ -3,7 +3,7 @@
 //! control (or its parent), then every input path that can fire it.
 //! No path may panic, and the document must still update.
 
-mod support;
+use crate::support;
 
 use std::cell::Cell;
 use std::panic::{self, AssertUnwindSafe};

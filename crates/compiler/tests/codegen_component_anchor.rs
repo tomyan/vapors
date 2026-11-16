@@ -4,8 +4,7 @@
 //! component returns from `anchor_element` (docs/plans/css-for-3d.md,
 //! D1(b), slice C1). The attributes are not props.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated, generated_with, refusal};
 

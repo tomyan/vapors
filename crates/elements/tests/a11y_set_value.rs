@@ -3,7 +3,7 @@
 //! a range's value clamped and snapped, a number's kept as given, and
 //! one `input` and one `change` when the value moved, none when not.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

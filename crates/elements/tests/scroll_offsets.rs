@@ -3,7 +3,7 @@
 //! applied in whole device pixels; kept between updates; set by
 //! `Document::scroll_to`.
 
-mod support;
+use crate::support;
 
 use support::element;
 use support::scroll_list::{at, list, scroll, top};

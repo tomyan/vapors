@@ -2,8 +2,7 @@
 //! inactive as a wholly clipped one is, its backing released and its
 //! renderer not called, and active again when it comes back into view.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{RED, Rig, Solid, document, update};
 use vapors_dom::Dom;

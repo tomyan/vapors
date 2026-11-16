@@ -2,8 +2,7 @@
 //! frame wrote to the GPU and the draw calls it issued, by run kind:
 //! counted where the painter's pipelines issue them, with no readback.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

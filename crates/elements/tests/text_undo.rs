@@ -5,7 +5,7 @@
 //! after it, each with `input`. The order against Chromium is pinned by
 //! the corpus's `undo.events`.
 
-mod support;
+use crate::support;
 
 use support::text_page::{
     click, control, key, key_with, page, selection, settle, type_text, value,

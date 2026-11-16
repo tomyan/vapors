@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::support::{BLUE, Log, RED, Solid, app_frame, document};
+use crate::support_surface::{BLUE, Log, RED, Solid, app_frame, document};
 use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_gpu_harness::{Gpu, gpu};

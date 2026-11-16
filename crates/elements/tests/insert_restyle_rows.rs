@@ -4,7 +4,7 @@
 //! from one run of `assert_middle_insert_counts(3000)`, 22 s in debug
 //! under load: too slow to run on every `cargo xtask ci`.
 
-mod support;
+use crate::support;
 
 use support::rows_page::{RowsPage, row_before, rows_page, rows_viewport};
 

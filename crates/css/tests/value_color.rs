@@ -1,7 +1,5 @@
 //! Colour conversions (`src/value/color.rs`): Oklab round trips.
 
-mod support;
-
 use vapors_css::value::Color;
 use vapors_scene::Color as Rgba;
 

@@ -7,7 +7,7 @@
 //! `cargo nextest run -p vapors-elements --test sparse_updates
 //! --no-capture` prints the table.
 
-mod support;
+use crate::support;
 
 use support::oracle::assert_matches_full;
 use support::rows_page::{EDITS, Edit, RowsPage, rows_page, rows_viewport};

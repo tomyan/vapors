@@ -2,8 +2,7 @@
 //! the component's own events, declared to the tree, cloned into the
 //! handlers that use it; written any other way it is refused.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, generated_with, refusal};
 

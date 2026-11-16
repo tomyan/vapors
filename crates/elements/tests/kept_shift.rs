@@ -7,7 +7,7 @@
 //! painted again, never shifted on a guess. A debug build checks every
 //! shifted paint against a fresh one inside `update` (`kept_paint.rs`).
 
-mod support;
+use crate::support;
 
 use support::oracle::assert_matches_full;
 use support::rows_page::{RowsPage, rows_page, rows_viewport};

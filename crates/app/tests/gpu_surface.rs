@@ -3,8 +3,7 @@
 //! an ancestor's rectangular clip, beneath UI painted after it, one
 //! renderer per surface; a surface with no renderer is refused by name.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, SIZE, Solid, WHITE, document, pixel, update};
 use vapors_app::{PaintError, SurfaceSize};

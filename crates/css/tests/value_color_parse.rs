@@ -1,6 +1,6 @@
 //! Colour syntax (`src/value/color_parse.rs`). Translated from sumi `color_test.go`; ANSI keywords are their sRGB values.
 
-mod support;
+use crate::support;
 
 use support::value_color::{rgb_near, srgb};
 use vapors_css::value::{Color, ColorScheme, parse_color_text};

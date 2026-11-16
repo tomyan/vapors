@@ -2,7 +2,7 @@
 //! offset that `Document::scroll_by` at a point moves, which moves their
 //! content and what is hit there.
 
-mod support;
+use crate::support;
 
 use support::scroll_list::{at, list, scroll, top};
 

@@ -1,6 +1,6 @@
 //! Attribute selectors (`src/selector/attribute.rs`). Translated from sumi `selector_attr_test.go` and `resolve_attr_test.go`.
 
-mod support;
+use crate::support;
 
 use support::{matches_chain, selector};
 use vapors_css::selector::{AttributeOperator, matches};

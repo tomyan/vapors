@@ -3,7 +3,7 @@
 //! keys go to the node focused first. Disabled, hidden and covered
 //! nodes are refused by name.
 
-mod support;
+use crate::support;
 
 use support::drive::{log, node, shared, target, update};
 use support::roles_page::{button, labelled, page};

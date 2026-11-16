@@ -1,7 +1,7 @@
 //! Hit testing against the last update: edges, `pointer-events: none`,
 //! `visibility: hidden`, and nothing before the first update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

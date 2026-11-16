@@ -5,7 +5,7 @@
 //! the scroll reads it again, so its record follows; a hoisted node in
 //! no scrolled frame is not read.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

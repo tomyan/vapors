@@ -4,8 +4,7 @@
 //! elements mounted and removed a thousand times leave the cache's
 //! entries, the store's bytes and the GPU buffer flat.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_dom::Dom;

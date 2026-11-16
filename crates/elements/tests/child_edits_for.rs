@@ -3,7 +3,7 @@
 //! first), takes the edit on an insert and a remove: empty text makes
 //! no box and is passed over (review of #285, M2).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

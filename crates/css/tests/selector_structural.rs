@@ -1,6 +1,6 @@
 //! Structural pseudo-classes and `:has()` (`src/selector/structural.rs`). Translated from sumi `structural_test.go`.
 
-mod support;
+use crate::support;
 
 use support::{selector, siblings};
 use vapors_css::selector::matches;

@@ -3,8 +3,7 @@
 
 #![cfg(not(target_family = "wasm"))]
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use std::process::{Command, Output};
 

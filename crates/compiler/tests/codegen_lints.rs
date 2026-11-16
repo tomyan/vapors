@@ -5,8 +5,7 @@
 //! and never on a statement or expression the user wrote. The compiled
 //! examples crate is the check that the whole file passes.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated, generated_with};
 

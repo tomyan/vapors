@@ -2,7 +2,7 @@
 //! selector left unscoped (vapors-elements does the scoping). The
 //! engine itself matches and weighs it as `:is(list)`.
 
-mod support;
+use crate::support;
 
 use support::{matches_chain, refusal, selector};
 use vapors_css::selector::PseudoClass;

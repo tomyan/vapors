@@ -5,7 +5,7 @@
 //! one, its own and its neighbours' alike. The result matches a full
 //! recomputation (`support::oracle`).
 
-mod support;
+use crate::support;
 
 use std::{cell::RefCell, rc::Rc};
 use support::oracle::assert_matches_full;

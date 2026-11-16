@@ -2,8 +2,7 @@
 //! makes each surface's backing at its laid-out size (one-scene F0); a
 //! frame 0 at another size remakes them, and says so.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

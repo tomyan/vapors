@@ -3,8 +3,7 @@
 //! locals or failing to compile in `OUT_DIR`. Raw identifiers are refused
 //! the same way.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated, generated_with, refusal};
 

@@ -4,7 +4,7 @@
 //! gone. And focus on an element the tree leaves out is refused, named
 //! (230-M1): a reader would hear nothing.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

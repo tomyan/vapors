@@ -5,7 +5,7 @@
 //! else, or a second attach, is refused naming the owner; a detach
 //! gives the takes back.
 
-mod support;
+use crate::support;
 
 use support::roles_page::page;
 use vapors_elements::{AxError, Document};

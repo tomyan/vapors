@@ -2,7 +2,7 @@
 //! carry it: text that is no command is refused as `bad_command`,
 //! naming why, and a reply is JSON with its problem at the top level.
 
-mod support;
+use crate::support;
 
 use serde_json::Value;
 use support::drive::shared;

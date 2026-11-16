@@ -4,7 +4,7 @@
 //! without `href` is no link. The app takes the address
 //! (`Document::take_navigation`) and the platform goes there.
 
-mod support;
+use crate::support;
 
 use support::link_page::{click, key, page, taken};
 use vapors_dom::{Dom, Event};

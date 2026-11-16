@@ -1,7 +1,7 @@
 //! The tooltip a node shows: the nearest title from the node up, as
 //! Chromium finds it, with whitespace as its tooltip shows it.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text};
 use vapors_dom::{Dom, NodeId};

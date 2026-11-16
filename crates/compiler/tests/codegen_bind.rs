@@ -3,8 +3,7 @@
 //! the property from the signal; a handler for the same event beside
 //! a binding is refused naming both.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::{assert_has, assert_lacks, generated_with, refusal};
 

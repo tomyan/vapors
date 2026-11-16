@@ -4,7 +4,7 @@
 //! does not also act on it. The order against Chromium is pinned by the
 //! corpus's `number.events`.
 
-mod support;
+use crate::support;
 
 use support::number_page::{click, key, page, type_text, value};
 use vapors_elements::{Document, Modifiers};

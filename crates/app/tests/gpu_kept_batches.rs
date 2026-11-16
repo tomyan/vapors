@@ -6,8 +6,7 @@
 //! box whose edge rounds to -0.0 and then to 0.0 has its batch written
 //! again (its bytes differ in the sign bit).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_app::FrameCounts;

@@ -1,8 +1,7 @@
 //! GPU tier: `frame_counts` for the counter demo's idle frame, and an
 //! icon's attribution to `icons` rather than `texts` (IU1 PR 3).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, update};
 use vapors_app::ScenePainter;

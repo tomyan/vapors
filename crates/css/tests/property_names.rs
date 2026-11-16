@@ -1,6 +1,6 @@
 //! Property name checks (`src/property/names.rs`): unknown names, sumi extras, unexpanded shorthands.
 
-mod support;
+use crate::support;
 
 use support::refusal;
 

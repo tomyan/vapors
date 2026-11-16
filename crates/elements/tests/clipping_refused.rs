@@ -1,6 +1,6 @@
 //! What `overflow` cannot do yet (F2c S8, S9), refused naming it.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, text};
 use vapors_dom::Dom;

@@ -2,8 +2,7 @@
 //! a generated file and a module in `wisp.rs`; every refusal in every
 //! file is reported, and nothing is half-written.
 
-#[path = "common/build.rs"]
-mod build;
+use crate::common_build as build;
 
 use build::{COUNTER, dirs, read, write};
 use vapors_compiler::build::compile_dir_into;
