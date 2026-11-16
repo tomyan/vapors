@@ -55,14 +55,14 @@ and `tables.md` was made from them by `scripts/first-frame-table.sh`.
   of the Mount page takes its style from compiled winners
   (`winners_runtime` 0, pinned by `crates/perf` mount tests). This did
   not make the first frame cheaper. Against the indicative figures taken
-  while #428 was reviewed (revision 555839d3f849, the harness on main
-  before B2, load 6 to 8,
-  so their times are not comparable), the judged instructions at 10,000
+  while #428 was reviewed (revision 555839d3f849, a work-in-progress
+  commit on #428's branch, before B2; load 6 to 8, so their times are not
+  comparable), the judged instructions at 10,000
   rows moved: start style 429.9 M to 448.3 M (+4.3%), layout 2,261.0 M to
   2,291.4 M (+1.3%), paint 312.5 M to 326.7 M (+4.5%), mount 307.5 M to
-  318.8 M (+3.7%). The revisions differ by more than B2 to B3b (the lane
-  work of #439 to #443 merged between them), so this file does not
-  attribute the change; the compiled path still computes each element's
+  318.8 M (+3.7%). The revisions differ by more than B2 to B3b (`git log
+  555839d3f849..160b9663` lists other merged work, lane layout among
+  it), so this file does not attribute the change; the compiled path still computes each element's
   values, and verifies one element per key per state against the full
   cascade.
 - **Where the first frame goes:** `App::start` is 92% of the wait at
