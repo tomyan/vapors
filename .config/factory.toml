@@ -49,6 +49,14 @@ https = "8446"
 # threshold = "12"
 # deadline_minutes = "10"
 
+[targets]
+# The most a worktree's build directory may hold before every build
+# xtask starts is refused (xtask/src/target_cap.rs, which says how it is
+# measured), naming the command that empties it. CLAUDE.md's budget per
+# target is 80 GB; on 2026-11-15 one passed it twice and the disk
+# reached 95%.
+max_gb = "80"
+
 [files]
 # The file-length rule's hard limit (the `files` step of `lint` and `ci`).
 # The guideline of about 200 is `[quality] file_lines` below; a file
