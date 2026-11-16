@@ -180,7 +180,7 @@ fn each_change_is_judged_as_the_brief_says() {
     assert_eq!(Judged::of(RowChange::Resize), resize);
     let scroll = Judged::AccessibilityPerRow {
         ceiling: SCROLL_A11Y_PER_ROW,
-        flat: &[],
+        flat: &["layout"],
     };
     assert_eq!(Judged::of(RowChange::Scroll), scroll);
     let scroll_size = Judged::AccessibilityPerRow {

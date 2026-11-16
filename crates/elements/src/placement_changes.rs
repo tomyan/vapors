@@ -25,6 +25,8 @@ pub(crate) struct Placed {
     pub(crate) count: usize,
     /// In-flow children chained before the walk (`chain_children`).
     pub(crate) chained: usize,
+    /// Scroll containers whose range was measured from their content.
+    pub(crate) ranges_measured: usize,
     /// The lane containers placed whose children could not be frames
     /// of their own, with why (`placement_frames.rs`).
     pub(crate) unframed: Vec<(usize, crate::lane_decline::LaneDecline)>,

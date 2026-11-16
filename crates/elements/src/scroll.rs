@@ -98,12 +98,38 @@ impl Offsets {
         (boxes, lanes, index): (&[LayoutBox], &Lanes, usize),
         scale: f32,
     ) -> ([f32; 2], bool) {
+        let offset = self.clamped(node, (boxes, lanes), index);
+        self.settled_to(node, offset, scale)
+    }
+
+    /// As [`settle_box`](Self::settle_box) for `node`, a container that
+    /// only scrolled since it was last settled: clamped to the range it
+    /// kept, which only a new layout changes (4g), not measured again.
+    ///
+    /// # Panics
+    /// When `node` kept no offset: a container is scrolled only when it
+    /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
+    /// never settled.
+    pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
+        let max = self.by_node.get(&node).map(|kept| kept.max);
+        let max = max.unwrap_or_else(|| {
+            panic!(
+                "scroll container {node:?} is marked as only scrolled but kept no offset, so \
+                 no range to clamp to: a box marked Scrolled was never settled \
+                 (placement_marks.rs); reproduce with `cargo xtask test`"
+            )
+        });
+        let offset = self.clamped_to(node, max);
+        self.settled_to(node, offset, scale)
+    }
+
+    /// `offset` kept for `node`; it as applied at `scale`, and whether it
+    /// or its thumbs' alpha differs from when last settled (exact).
+    fn settled_to(&mut self, node: NodeId, offset: Offset, scale: f32) -> ([f32; 2], bool) {
         let was = self
             .by_node
-            .get(&node)
+            .insert(node, offset)
             .map(|o| (bits(o.settled), o.settled_alpha));
-        let offset = self.clamped(node, (boxes, lanes), index);
-        self.by_node.insert(node, offset);
         let now = (bits(offset.settled), offset.settled_alpha);
         (applied(offset.at, scale), was != Some(now))
     }
@@ -129,7 +155,11 @@ impl Offsets {
     }
 
     fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
-        let max = range(laid, index);
+        self.clamped_to(node, range(laid, index))
+    }
+
+    /// `node`'s offset clamped to `max`, its range.
+    fn clamped_to(&self, node: NodeId, max: [f32; 2]) -> Offset {
         let at = self.get(node).unwrap_or_default();
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
@@ -232,3 +262,7 @@ fn content_end((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2]
             ]
         })
 }
+
+#[cfg(test)]
+#[path = "scroll_tests.rs"]
+mod tests;
