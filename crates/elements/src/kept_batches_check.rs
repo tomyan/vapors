@@ -53,7 +53,7 @@ pub(crate) fn assert_candidates(shown: &[Shown], view: vapors_scene::Rect, sourc
     let every: Vec<_> = sources.drawn.labelled().filter(in_view).collect();
     let found: Vec<_> = shown
         .iter()
-        .map(|&(label, step, _)| (label, step))
+        .map(|shown| (shown.label, shown.step))
         .collect();
     let longest = every.len().max(found.len());
     let Some(at) = (0..longest).find(|&at| every.get(at) != found.get(at)) else {

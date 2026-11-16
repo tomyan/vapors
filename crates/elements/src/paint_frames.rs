@@ -115,6 +115,7 @@ fn made_afresh(
     if spliced {
         made.take_lane_ink(&mut painted.frames);
     }
+    made.keep_lane_bases(&painted.frames);
     !std::mem::replace(&mut painted.frames, made).same_frames(&painted.frames)
 }
 

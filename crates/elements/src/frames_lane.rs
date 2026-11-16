@@ -66,6 +66,13 @@ impl Frames {
     /// containers in `bases`, from `shared`; whether any base changed
     /// (a container moved along its axis moves every frame it holds,
     /// with no row placed or started again).
+    /// The lane bases `from` was set with, carried into frames made
+    /// afresh: `set_lanes` then answers whether the bases changed since
+    /// the last update, not since these frames were made with none.
+    pub(crate) fn keep_lane_bases(&mut self, from: &Frames) {
+        self.lanes.bases.clone_from(&from.lanes.bases);
+    }
+
     pub(crate) fn set_lanes(
         &mut self,
         shared: SharedLanes,

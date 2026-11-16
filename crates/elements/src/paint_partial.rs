@@ -46,8 +46,8 @@ pub(crate) fn paint_partial(
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, label_of);
     let scale = input.scale;
     let frames_moved_now =
-        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept))
-            || !changed.started.is_empty();
+        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
+    let lanes_moved = !changed.started.is_empty();
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -63,6 +63,8 @@ pub(crate) fn paint_partial(
     crate::paint_lane_ink::note_painted(&mut painted, input, (walked(&order), &patched));
     if frames_moved_now {
         frames_moved(&mut painted);
+    } else if lanes_moved {
+        lane_rows_moved(&mut painted);
     }
     painted.order = order;
     painted
@@ -73,6 +75,14 @@ pub(crate) fn paint_partial(
 /// at the next draw and the hover is tested again.
 fn frames_moved(painted: &mut Painted) {
     batches_unsorted(painted);
+    painted.hits_changed = HitsChanged::Unknown;
+}
+
+/// After only framed lanes' rows moved (started elsewhere): the kept
+/// batches searched again in those lanes, at the view's edges, and the
+/// hover tested again.
+fn lane_rows_moved(painted: &mut Painted) {
+    crate::paint_partial_drawn::batches_lanes_moved(painted);
     painted.hits_changed = HitsChanged::Unknown;
 }
 
