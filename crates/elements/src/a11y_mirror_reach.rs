@@ -3,7 +3,9 @@
 //! (whose own ancestors are in), and the nodes referring by id to it or
 //! to an ancestor; an element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
-//! stayed (absolutely positioned); a node named by an id whose element
+//! stayed (absolutely positioned), and so does a row a lane start moved
+//! that is not a node, as their bounds are from a node above the row;
+//! a node named by an id whose element
 //! changed, the nodes focus left and came to, and the hoisted nodes in
 //! the frame of a scroll container scrolled, are read as well.
 
@@ -37,7 +39,7 @@ impl Document {
         for &node in &touched.nodes {
             self.ax_reach(node, index, &mut add);
         }
-        for &wrapper in &touched.replaced {
+        for &wrapper in touched.replaced.iter().chain(&touched.started) {
             self.ax_wrapped_nodes(wrapper, &mut add);
         }
         for &node in renamed.iter().chain(&touched.renamed) {
@@ -90,8 +92,10 @@ impl Document {
     }
 
     /// The nearest nodes under `wrapper` when it is not a node itself:
-    /// moved with it, with their boxes kept, so no touch names them. A
-    /// wrapper that is a node moves them with its own placement.
+    /// moved with it, an inserted element or a row a lane start moved,
+    /// with their boxes kept, so no touch names them, and their bounds
+    /// from a node above `wrapper`. A wrapper that is a node moves them
+    /// with its own placement.
     fn ax_wrapped_nodes(&self, wrapper: NodeId, add: &mut impl FnMut(NodeId) -> bool) {
         if self.ax.records.contains_key(&wrapper) || !self.contains(wrapper) {
             return;
