@@ -38,10 +38,6 @@ struct Out {
     @location(3) @interpolate(flat) colour: vec4<f32>,
     // the rect's corner radii, rx and ry
     @location(4) @interpolate(flat) radii: vec2<f32>,
-    // the instance's affine, a, b, c, d and e, f, which the scene's
-    // fragment stage reads to take its Jacobian
-    @location(5) @interpolate(flat) linear: vec4<f32>,
-    @location(6) @interpolate(flat) shift: vec2<f32>,
 }
 
 // How far past the shape the quad reaches, device pixels: the ramp's
@@ -81,8 +77,6 @@ fn vertex_out(instance: Instance, local: vec2<f32>, position: vec4<f32>) -> Out 
     out.radii = instance.radius.xz;
     out.form = instance.form;
     out.colour = instance.colour;
-    out.linear = instance.linear;
-    out.shift = instance.shift.xy;
     return out;
 }
 

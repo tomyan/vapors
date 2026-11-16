@@ -18,18 +18,29 @@ use scene::{coverage_3d, rounded_rect_distance};
 use screen::{Outline, circle_outline, ramp_by_distance, rounded_rect_outline};
 
 /// How far a band pixel of the circle may be from 0.5 minus its screen
-/// distance: the ramp takes the distance in shape units over the map at
-/// the fragment, exact to first order across the half-pixel band;
-/// measured on 2026-11-16 at most 0.0223 with the analytic map (0.039
-/// with this adapter's fine derivatives), and the readback's 8 bits.
-const CIRCLE_DISTANCE: f32 = 0.025;
+/// distance. The ramp takes the distance in shape units over the map at
+/// the fragment, exact to first order across the half-pixel band.
+/// Measured on 2026-11-16 on this box's two adapters: Intel UHD Graphics
+/// 630 (Mesa ANV) 0.0223, lavapipe 0.0184; the larger and two 8-bit
+/// steps, 0.030. This adapter's fine derivatives gave 0.039, which the
+/// bound still refuses.
+const CIRCLE_DISTANCE: f32 = 0.030;
 
 /// The same for the stroked frame, whose inner corners' radius (1 shape
 /// unit, 0.65 device pixel) bends within the band, so the distance's
-/// first-order step parts from the outline more: measured 0.046 with the
-/// analytic map (0.041 with derivatives, so this case does not tell the
-/// two apart; the circle does), and 8 bits.
-const FRAME_DISTANCE: f32 = 0.05;
+/// first-order step parts from the outline more. Measured: ANV 0.0460,
+/// lavapipe 0.0460; the larger and two 8-bit steps, 0.055. Derivatives
+/// gave 0.041, so this case does not tell the two maps apart; the circle
+/// does.
+const FRAME_DISTANCE: f32 = 0.055;
+
+/// The band pixels each case judges, measured on both adapters: 42 for
+/// the circle, 38 for the frame. A check judging fewer has lost pixels.
+const JUDGED: [usize; 2] = [42, 38];
+
+/// How to run this test.
+const REPRODUCE: &str =
+    "reproduce: cargo nextest run -p vapors-renderer --test gpu_closed_forms_3d_distance";
 
 fn turned_plane() -> (Mat4, Mat4) {
     let lens = vapors_scene3d::Projection::perspective(45f32.to_radians(), 0.1, 100.0)
@@ -76,7 +87,7 @@ fn gpu_closed_forms_at_60_degrees_ramp_by_their_distance_on_the_screen() {
             FRAME_DISTANCE,
         ),
     ];
-    for (what, shape, outlines, inside, bound) in cases {
+    for ((what, shape, outlines, inside, bound), floor) in cases.into_iter().zip(JUDGED) {
         // When
         let drawn = coverage_3d(SIDE, &[shape], turned_plane().0, turned_plane().1);
         let expected = ramp_by_distance(SIDE, (&outlines, inside), small, turned_plane());
@@ -92,13 +103,15 @@ fn gpu_closed_forms_at_60_degrees_ramp_by_their_distance_on_the_screen() {
             .map(|(d, e)| (d - e).abs())
             .fold(0.0, f32::max);
         assert!(
-            judged.len() > 20,
-            "{what}: {} band pixels judged",
+            judged.len() >= floor,
+            "{what}: {} band pixels judged, under the {floor} measured; fix: the band's \
+             selection in support/screen_distance.rs; {REPRODUCE}",
             judged.len()
         );
         assert!(
             worst <= bound,
-            "{what}: a band pixel is {worst} from 0.5 minus its screen distance"
+            "{what}: a band pixel is {worst} from 0.5 minus its screen distance; fix: the \
+             scene's fragment map (closed_forms_3d.wgsl, `fs_main`); {REPRODUCE}"
         );
     }
 }

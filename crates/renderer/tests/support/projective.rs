@@ -105,8 +105,19 @@ pub fn reds(pixels: &[u8]) -> Vec<f32> {
 
 /// Where plane point `q` lands on a `side` square target, device pixels
 /// (+Y down), under `view_projection` and `world`.
+///
+/// # Panics
+/// When `q` is at or behind the eye, where a projection mirrors or has no
+/// screen point: an oracle placing such a point would judge against a
+/// wrong outline, so it refuses, naming the point.
 pub fn on_screen(side: u32, (view_projection, world): (Mat4, Mat4), q: [f32; 2]) -> [f32; 2] {
     let clip = view_projection * world * glam::Vec4::new(q[0], q[1], 0.0, 1.0);
+    assert!(
+        clip.w > 0.0,
+        "plane point {q:?} is at or behind the eye (clip w {}), so it has no screen point; fix: \
+         give the oracle only points in front, or clip its outline at the near plane",
+        clip.w
+    );
     #[allow(clippy::cast_precision_loss)] // test sizes are small
     let side = side as f32;
     [

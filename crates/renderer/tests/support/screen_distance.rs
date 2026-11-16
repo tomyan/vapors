@@ -30,8 +30,9 @@ pub fn circle_outline(centre: [f32; 2], radius: f32) -> Outline {
 }
 
 /// A rect at `origin` of `size` with corners of `radius`, grown by
-/// `offset` all round (its corners' radius grown alike), 1024 points a
-/// corner and 1024 a side.
+/// `offset` all round (its corners' radius grown alike): 1024 points a
+/// corner, each side the one chord between its corners' ends, exact
+/// since lines stay lines under the projection.
 pub fn rounded_rect_outline(origin: [f32; 2], size: [f32; 2], radius: f32, offset: f32) -> Outline {
     let r = radius + offset;
     let (x0, y0) = (origin[0] + radius, origin[1] + radius);

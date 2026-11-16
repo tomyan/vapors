@@ -16,26 +16,47 @@
 // is a sub-pixel sliver).
 fn projective_padding(instance: Instance, local: vec2<f32>) -> vec2<f32> {
     let j = screen_jacobian(instance.linear, instance.shift.xy, local);
-    // Edge-on, the columns are parallel and the pad unbounded. The ratio
-    // is the sine of the angle between them, independent of the view
-    // box's scale: under 1e-6 the plane is within 6e-5 degrees of
-    // edge-on, a sliver under a millionth of the shape's width on screen.
-    let det = abs(j.x * j.w - j.y * j.z);
-    if (det <= 1e-6 * length(j.xy) * length(j.zw)) {
+    // Edge-on the pad is unbounded (`edge_on`).
+    if (edge_on(j)) {
         return vec2(0.0);
     }
+    let det = abs(j.x * j.w - j.y * j.z);
     return MARGIN * vec2(length(j.zw), length(j.xy)) / det;
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
+fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> SceneOut {
     let box = local_box(instance);
     let at = quad_corner(vertex);
     let corner = mix(box.xy, box.zw, at);
     let pad = projective_padding(instance, corner);
     let local = corner + (at * 2.0 - 1.0) * pad;
     let position = to_clip() * vec4(on_plane(instance.linear, instance.shift.xy, local), 0.0, 1.0);
-    return vertex_out(instance, local, position);
+    return scene_out(vertex_out(instance, local, position), instance);
+}
+
+// What the scene's fragment stage reads: the page's `Out`, and the
+// instance's shape-to-clip columns (`shape_to_clip`), from which it takes
+// its Jacobian; the page's stages do not carry them.
+struct SceneOut {
+    @builtin(position) position: vec4<f32>,
+    @location(0) local: vec2<f32>,
+    @location(1) @interpolate(flat) params: vec3<f32>,
+    @location(2) @interpolate(flat) form: vec4<f32>,
+    @location(3) @interpolate(flat) colour: vec4<f32>,
+    @location(4) @interpolate(flat) radii: vec2<f32>,
+    @location(5) @interpolate(flat) to_clip_x: vec4<f32>,
+    @location(6) @interpolate(flat) to_clip_y: vec4<f32>,
+    @location(7) @interpolate(flat) to_clip_origin: vec4<f32>,
+}
+
+fn scene_out(page: Out, instance: Instance) -> SceneOut {
+    let k = shape_to_clip(instance.linear, instance.shift.xy);
+    return SceneOut(page.position, page.local, page.params, page.form, page.colour, page.radii, k[0], k[1], k[2]);
+}
+
+fn page_out(in: SceneOut) -> Out {
+    return Out(in.position, in.local, in.params, in.form, in.colour, in.radii);
 }
 
 // The shape units per device pixel, right and down, from the analytic
@@ -44,16 +65,15 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
 // projection: `dpdx` may be fine or coarse, at the implementation's
 // choice, and either way it is the Jacobian half a pixel or more from
 // the fragment, an error of first order in the pixel step (#422's
-// review; modelled at D1's 60 degree pose: 0.027 of coverage at the
-// band's edge with fine derivatives, 0.041 with coarse). A fragment
-// exists only in front of the eye, so the Jacobian is singular only
-// edge-on, where the plane is a line on the screen: nothing is drawn.
+// review; modelled at D1's 60 degree pose, the circle and frame of
+// gpu_closed_forms_3d_distance.rs at 3 units: 0.027 of coverage at the
+// band's edge with fine derivatives, 0.041 with coarse). No guard: a
+// fragment exists only where the plane has area on the screen and in
+// front of the eye, so its Jacobian is never `edge_on` and 1 / det is
+// finite; the edge-on case is the vertex stage's.
 @fragment
-fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    let j = screen_jacobian(in.linear, in.shift, in.local);
+fn fs_main(in: SceneOut) -> @location(0) vec4<f32> {
+    let j = jacobian_at(mat3x4(in.to_clip_x, in.to_clip_y, in.to_clip_origin), in.local);
     let det = j.x * j.w - j.y * j.z;
-    if (det == 0.0) {
-        return vec4(in.colour.rgb, 0.0);
-    }
-    return covered(in, vec2(j.w, -j.y) / det, vec2(-j.z, j.x) / det);
+    return covered(page_out(in), vec2(j.w, -j.y) / det, vec2(-j.z, j.x) / det);
 }
