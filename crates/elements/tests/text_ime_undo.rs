@@ -3,7 +3,7 @@
 //! read): the field takes them, and one Control+Z after the commit goes
 //! back to the text before the composition, as on the web.
 
-mod support;
+use crate::support;
 
 #[path = "../../platform/src/ime_cases.rs"]
 mod ime_cases;

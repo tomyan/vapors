@@ -3,7 +3,7 @@
 //! gathered afresh (M11); otherwise the hover stands as it was. While
 //! an element holds the mouse capture, the hover stays on it.
 
-mod support;
+use crate::support;
 
 use support::pointer::{quad_colours, setup, update};
 use vapors_dom::{Dom, Event};

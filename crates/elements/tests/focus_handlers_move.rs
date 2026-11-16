@@ -7,7 +7,7 @@
 //! a blur handler are from reading Blink's `Document::SetFocusedElement`
 //! (not probed in the corpus).
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

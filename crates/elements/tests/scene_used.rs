@@ -4,7 +4,7 @@
 //! update naming the declaration, the property and what to use instead;
 //! a value inherited from HTML is no declaration and is not refused.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, NodeId};

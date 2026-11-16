@@ -3,7 +3,7 @@
 //! device px is refused before layout, naming the element, both sizes
 //! and the fix.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_refused, icon};
 use support::{refusals_at, viewport};

@@ -1,7 +1,5 @@
 //! `calc()` parsing and type checks (`src/value/calc_parse.rs`). Translated from sumi `calc_test.go` where it refused.
 
-mod support;
-
 use vapors_css::value::{CalcKind, parse_calc_text};
 
 #[test]

@@ -5,7 +5,7 @@
 //! range's drag ends with `pointercancel` and no `change`, and a move
 //! after the return drags nothing.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

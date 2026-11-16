@@ -3,8 +3,7 @@
 //! changes, render only when invalidated, resized or animating, drop on
 //! unmount; a hidden surface is inactive; failures refuse the frame.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, Solid, document, pixel, update};
 use vapors_app::{MountError, PaintError};

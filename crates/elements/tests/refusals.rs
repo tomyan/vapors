@@ -1,7 +1,7 @@
 //! What the tree does not implement yet is refused by update, naming
 //! the element, the property or tag, and the slice that brings it.
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals, viewport};
 use vapors_dom::{Dom, Event};

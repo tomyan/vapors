@@ -1,7 +1,7 @@
 //! `bolder` and `lighter` compute to a number from the inherited weight
 //! (CSS Fonts 4 section 2.2.1's table).
 
-mod support;
+use crate::support;
 
 use support::css_at;
 

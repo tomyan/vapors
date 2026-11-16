@@ -64,8 +64,10 @@ fn gpu_a_plane_facing_the_camera_at_one_unit_a_pixel_draws_as_the_page_does() {
             .zip(&scene)
             .map(|(p, s)| (p - s).abs())
             .fold(0.0, f32::max);
+        // in whole 8-bit steps, so the step's own float form (1/255 read
+        // back as 0.0039216) is not a hair over it
         assert!(
-            worst <= 1.0 / 255.0,
+            (worst * 255.0).round() <= 1.0,
             "{what}: a pixel differs from the page's by {worst}"
         );
     }

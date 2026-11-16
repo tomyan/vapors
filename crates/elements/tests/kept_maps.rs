@@ -5,7 +5,7 @@
 //! compares the kept maps with freshly built ones on every update that
 //! paints (`kept_paint_check.rs`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};

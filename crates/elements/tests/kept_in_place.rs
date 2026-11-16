@@ -6,7 +6,7 @@
 //! every update's paint, hits and maps with a full paint's
 //! (`kept_paint_check.rs`).
 
-mod support;
+use crate::support;
 
 use support::rows_page::{EDITS, rows_page, rows_viewport};
 use support::{document, element, viewport};

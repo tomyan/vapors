@@ -1,6 +1,6 @@
 //! At-rules (`src/parse/at_rules.rs`). Translated from sumi `style_atrule_test.go` and `media_test.go`; unknown at-rules are refused rather than dropped.
 
-mod support;
+use crate::support;
 
 use support::{prop, refusal, sheet};
 

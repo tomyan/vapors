@@ -2,7 +2,7 @@
 //! for stdio, a socket and a page call: a command in, a reply out, and a
 //! refusal a reply naming the problem.
 
-mod support;
+use crate::support;
 
 use serde_json::{Value, json};
 use support::drive::{node, shared, update};

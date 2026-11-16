@@ -3,7 +3,7 @@
 //! (`docs/plans/splice.md`, section (b)). Each case also matches a
 //! full update.
 
-mod support;
+use crate::support;
 
 use support::element;
 use support::narrow_list::{List, ROWS, VIEW, list};

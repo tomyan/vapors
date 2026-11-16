@@ -2,7 +2,7 @@
 //! elements changed since (IU3 PR 3a): each change that can add or drop
 //! a refusal is seen by the next update.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{PATH, icon, with_attributes};
 use support::{document, element, refusals_at, text, viewport};

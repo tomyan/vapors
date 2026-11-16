@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
+autotests = false
 
 # `complex-script-breaks` (default): vapors-text's, forwarded so an app
 # can turn it off (crates/text/Cargo.toml).
@@ -47,3 +48,8 @@ vapors-elements = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true
+
+# The integration tests as one binary (scripts/one-test-binary.sh)
+[[test]]
+name = "tests"
+path = "tests/main.rs"

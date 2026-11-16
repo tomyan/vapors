@@ -3,7 +3,7 @@
 //! answers whether it was cancelled, as `dispatchEvent` from a click
 //! handler does in a browser.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

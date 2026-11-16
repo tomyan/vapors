@@ -3,7 +3,7 @@
 //! the nested owner is laid out again (review-v217 finding 1). Each
 //! case matches a full update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

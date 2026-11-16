@@ -5,8 +5,7 @@
 //! form) and triangle (a mesh) are where the insert puts the row (scale
 //! 2).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{BLUE, RED, Rig, document, pixel, update};
 use vapors_dom::{Dom, NodeId};

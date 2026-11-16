@@ -4,7 +4,7 @@
 //! that depend on being inline wait until the parent is shown, and
 //! showing it checks them again.
 
-mod support;
+use crate::support;
 
 use support::hidden_page::{assert_accepted, assert_accepted_at, assert_refused, page, row};
 use support::{element, text};

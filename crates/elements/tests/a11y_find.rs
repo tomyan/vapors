@@ -3,7 +3,7 @@
 //! more than one, is refused naming the role, the name and the
 //! candidates, never answered with the first.
 
-mod support;
+use crate::support;
 
 use support::roles_page::{button, labelled, page};
 use support::viewport;

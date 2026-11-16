@@ -2,7 +2,7 @@
 //! before the release, `:hover` while captured, capture asked for with
 //! no active pointer, and a second `pointerdown` while captured.
 
-mod support;
+use crate::support;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

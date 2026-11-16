@@ -2,7 +2,7 @@
 //! margins, stretched across a flex line as Chromium's is; a mark in
 //! `--vapors-mark-color` when checked, inset a quarter of the box.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::Dom;

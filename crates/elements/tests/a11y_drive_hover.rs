@@ -3,7 +3,7 @@
 //! unavailable, so a driver does not retry the action. A command with
 //! a field it does not have is refused naming the field.
 
-mod support;
+use crate::support;
 
 use support::drive::{log, node, shared, target};
 use support::roles_page::page;

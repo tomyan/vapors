@@ -2,7 +2,7 @@
 //! yet, naming its slice; a part's custom property of another shape,
 //! named where it is declared; `disabled="false"`; a boolean `value`.
 
-mod support;
+use crate::support;
 
 use support::{element, refusals};
 use vapors_dom::{Dom, PropertyValue};

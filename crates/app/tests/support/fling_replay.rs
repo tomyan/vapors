@@ -19,7 +19,7 @@ use vapors_renderer::clear;
 use vapors_scene::Color;
 use vapors_text::FontSystem;
 
-use crate::fling_transcript::{List, Transcript};
+use super::fling_transcript::{List, Transcript};
 
 /// One of Chrome's frames, with Chrome's scroll offset and vapors'.
 pub struct Compared {

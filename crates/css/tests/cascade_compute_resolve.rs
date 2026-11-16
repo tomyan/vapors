@@ -1,6 +1,6 @@
 //! Value resolution (`src/cascade/compute_resolve.rs`): calc at compute time.
 
-mod support;
+use crate::support;
 
 use support::{computed, css};
 

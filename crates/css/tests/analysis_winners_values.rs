@@ -2,8 +2,7 @@
 //! properties and `var()`, other sheets, undeclared properties, value
 //! constancy and sharing.
 
-#[path = "support/winners.rs"]
-mod support;
+use crate::support_winners as support;
 
 use support::{constant, longhand, page, winners};
 use vapors_css::analysis::{Constancy, Match, Sheet, Winner, analyse};

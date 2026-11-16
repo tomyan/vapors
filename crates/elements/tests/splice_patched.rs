@@ -8,7 +8,7 @@
 //! afresh after every update (`kept_paint_check.rs`), and each case
 //! matches a full update.
 
-mod support;
+use crate::support;
 
 use support::lane_page::{assert_drawn_afresh, header_list};
 use support::narrow_list::{ROWS, VIEW};

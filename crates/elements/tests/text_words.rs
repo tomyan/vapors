@@ -6,7 +6,7 @@
 //! clicks (`vapors-app`'s `Clicks`); Chromium's answers for the same
 //! presses are pinned by the corpus's `words.events`.
 
-mod support;
+use crate::support;
 
 use std::num::NonZeroU32;
 

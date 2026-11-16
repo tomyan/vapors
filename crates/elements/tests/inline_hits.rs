@@ -2,7 +2,7 @@
 //! the pointer, and the gap between them, inside the line boxes but
 //! outside the content areas, is the block's.
 
-mod support;
+use crate::support;
 
 use support::{document, element, text, viewport};
 

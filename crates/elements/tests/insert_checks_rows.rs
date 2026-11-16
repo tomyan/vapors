@@ -5,7 +5,7 @@
 //! check that reads a text child (right-to-left text) is the text
 //! node's own (`check.rs`).
 
-mod support;
+use crate::support;
 
 use support::rows_page::{row_before, rows_page, rows_viewport};
 use vapors_dom::Dom;

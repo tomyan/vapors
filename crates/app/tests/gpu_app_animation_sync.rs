@@ -1,8 +1,7 @@
 //! GPU tier: a `stop_animation` made while a frame runs, after its
 //! paint, takes effect in that frame's decision (docs/gpu-surface.md).
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

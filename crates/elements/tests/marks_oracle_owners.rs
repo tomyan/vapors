@@ -3,7 +3,7 @@
 //! inside an inline span, a parent turned flex, and a calc restyled to
 //! an equal computed style in the update that lays it out again. Each matches a full update.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

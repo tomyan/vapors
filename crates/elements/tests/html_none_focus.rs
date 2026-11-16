@@ -6,7 +6,7 @@
 //! (the fixup runs before a key, review-fable-input M5), so the rest
 //! find nothing focused, as the settle would have left it
 //! (`Document::settle_focus`, `tests/focus_fixup.rs`).
-mod support;
+use crate::support;
 
 use support::text_page::{Page, click, key, page, shift, type_text};
 use support::viewport;

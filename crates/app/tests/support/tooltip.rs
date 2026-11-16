@@ -4,7 +4,7 @@
 // each test crate including this uses a part of it
 #![allow(dead_code)]
 
-use super::support::{SIZE, pixel};
+use crate::support_surface::{SIZE, pixel};
 
 pub const GREEN: [u8; 4] = [0, 255, 0, 255];
 

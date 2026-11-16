@@ -2,7 +2,7 @@
 //! HTML element vocabulary, self-closing and void tags, and the refusal
 //! of the removed `<box>` and `<text>` tags.
 
-mod common;
+use crate::common;
 
 use common::{element, parse_err, parse_ok, parts, text_parts};
 

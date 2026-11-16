@@ -4,8 +4,7 @@
 //! builds every text batch again, matching a painter that never kept
 //! bytes, and the frame after it builds none.
 
-#[path = "support/surface.rs"]
-mod support;
+use crate::support_surface as support;
 
 use support::{Rig, bare_document, update};
 use vapors_app::FrameCounts;

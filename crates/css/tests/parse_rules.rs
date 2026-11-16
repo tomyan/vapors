@@ -1,6 +1,6 @@
 //! Rules (`src/parse/rules.rs`). Translated from sumi `parser/style/style_test.go` and `style_edge_test.go`; terminal properties became their CSS equivalents.
 
-mod support;
+use crate::support;
 
 use support::{prop, sheet};
 use vapors_css::selector::{Combinator, PseudoClass};

@@ -4,8 +4,7 @@
 //! runtime would refuse, and a required one that is absent. A bound
 //! value is left to the update.
 
-#[path = "common/codegen.rs"]
-mod codegen;
+use crate::common_codegen as codegen;
 
 use codegen::refusal;
 

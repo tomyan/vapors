@@ -2,7 +2,7 @@
 //! `maxTextureDimension2D` once the document knows it, and against
 //! WebGPU's guaranteed 8192 until then.
 
-mod support;
+use crate::support;
 
 use support::document;
 use vapors_scene::{RgbaImage, Size};

@@ -10,7 +10,7 @@
 // row heights of 24 and a content height of 72,000: exact in f32
 #![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

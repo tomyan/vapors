@@ -3,8 +3,7 @@
 //! still in progress) does not take the place of a slow one ahead of it.
 #![cfg(not(target_family = "wasm"))]
 
-#[path = "support/paste_page.rs"]
-mod paste_page;
+use crate::support_paste_page as paste_page;
 
 use std::rc::Rc;
 use std::sync::Arc;

@@ -2,7 +2,7 @@
 //! updates (docs/icons.md, Paint): the second scene's item holds the new
 //! icon and colour, not the first's.
 
-mod support;
+use crate::support;
 
 use support::svg_page::icon;
 use support::viewport;

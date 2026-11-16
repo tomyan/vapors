@@ -5,7 +5,7 @@
 //! as in SVG and Chromium. What they refuse is in
 //! `svg_basic_shape_refusals.rs`.
 
-mod support;
+use crate::support;
 
 use support::svg_shapes_page::{CIRCLE, RECT, drawn, page, rgb};
 use vapors_dom::Dom;

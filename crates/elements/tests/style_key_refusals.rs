@@ -6,7 +6,7 @@
 //! from every update while the element is in the tree, naming the
 //! site and the fix; none panics.
 
-mod support;
+use crate::support;
 
 use support::{document, viewport};
 use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE, StyleKey};

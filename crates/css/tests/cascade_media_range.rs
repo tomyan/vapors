@@ -1,6 +1,6 @@
 //! Media range syntax (`src/cascade/media_range.rs`). vapors-specific.
 
-mod support;
+use crate::support;
 
 use support::cascade_media::{BLACK, RED, color_under};
 use support::env;

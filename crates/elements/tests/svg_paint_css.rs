@@ -3,7 +3,7 @@
 //! presentation attributes below every rule, as Chromium ranks them,
 //! and a change after the first paint rebuilds the icon.
 
-mod support;
+use crate::support;
 
 use support::svg_page::{assert_accepted, icon};
 use vapors_dom::Dom;

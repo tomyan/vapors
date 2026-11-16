@@ -3,7 +3,7 @@
 //! refusal it carried does not refuse the next update as unmarked
 //! (`style_checks.rs`, `walked`).
 
-mod support;
+use crate::support;
 
 use support::{document, element, refusals_at, text, viewport};
 use vapors_dom::Dom;

@@ -3,7 +3,7 @@
 //! control takes, such as a shortcut, is not, so the app gets it, as a
 //! browser gives the page's shortcuts the keys no control takes.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

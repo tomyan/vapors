@@ -6,7 +6,7 @@
 //! compares the kept clip tree, clips and chains with fresh ones
 //! (`kept_paint_check.rs`), so a missed change panics there too.
 
-mod support;
+use crate::support;
 
 use support::{document, element, viewport};
 use vapors_dom::{Dom, NodeId};

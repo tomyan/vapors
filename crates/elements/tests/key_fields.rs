@@ -4,7 +4,7 @@
 //! ignores a held key's repeats. The plain `key_pressed` sends no code
 //! and no repeat.
 
-mod support;
+use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;

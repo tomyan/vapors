@@ -5,7 +5,7 @@
 //! it runs on (`Document::set_shortcut_modifier`); until it does, the
 //! target OS's (`text_field.rs` and `number_select_all.rs` pin Control).
 
-mod support;
+use crate::support;
 
 use support::{number_page, text_page};
 use vapors_dom::{Dom, PropertyValue};

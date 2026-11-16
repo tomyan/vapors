@@ -4,7 +4,7 @@
 //! range takes nothing. The order against Chromium is pinned by the
 //! corpus's `range.events`; these pin the values and the edges.
 
-mod support;
+use crate::support;
 
 use support::range_page::{key, page, page_with_second, value};
 use vapors_dom::{Dom, Event};
