@@ -209,9 +209,7 @@ Android shows none at load. And only a touch drag or a fling shows the
 thumbs on touch, where cc shows them for every scroll it applies (#406).
 While a mouse is in use the containers' own fades are dropped, so no
 fade asks for frames under the mouse's floor.
-document draws thumbs at an alpha (`Document::set_thumb_opacity`, 256
-steps). Every scroll container's thumbs share the one fade, as they
-shared the flag; Chrome fades each container's own.
+
 ## Boost (PR 3)
 
 `crates/app/src/fling_booster.rs` ports Chromium's `FlingBooster`
@@ -244,11 +242,16 @@ starts itself (`ElementsApp::fling`) neither boosts nor is boosted.
 
 Every unboosted start is at most 4046 px/s; every boosted start less
 the previous start (3540 to 4970) is a release like those.
-`touch_scroll_chain_tests.rs` replays each of these nine links: the previous coast
-from its fitted start, the next touch at its recorded time with the
-drag as Chrome scrolled it, then the release; the booster must start
-the next fling at its fitted velocity, so it boosts exactly the five
-links Chrome boosted. 010 and 016, the fastest coasts, were boosted:
+`touch_scroll_chain_tests.rs` replays each of these nine links: the
+previous coast from its fitted start, the next touch at its recorded
+time with the drag as Chrome scrolled it, then a release at the
+velocity of the finger's last two recorded touch positions, taken from
+the recording alone. The booster must boost exactly the five links
+Chrome boosted, by the previous start. A tenth link is a variant, 008 to
+009 with the lift 60 ms after the drag's last frame, which the rule does
+not boost; no recorded link lifts outside the window. A booster that
+always boosts, one that never does, and one with no window each fail
+it. 010 and 016, the fastest coasts, were boosted:
 when 010's finger landed, 009 still coasted at 5977 px/s the same way,
 and 010 started at 13 264 = 4436 + 8828 (009's start); 016 started at
 15 562 = 4608 + 10 954 (015's), with 015 at 6534 px/s at the touch.
@@ -262,8 +265,13 @@ the recordings exceeds AOSP's 8000 before the boost.
   not cap it; its curve keeps its precision at any speed, and this
   curve's 0.1 px steps are lost past about 124 000 px/s. Only a chain of
   a dozen boosts at the maximum reaches it.
-- **RELAXED, times:** the window is judged on the times events are
-  handled (winit gives none), as the release velocity is.
+- **RELAXED, times:** the window and the 150 px/s check run on the
+  times events are handled (winit gives none), as the release velocity
+  does; declared in `fling_booster.rs`, retired by #403.
+- **One booster per window**, as in Chromium: a coast in one scroll
+  container can boost a fling in another.
+- **A refused start** (the container no longer scrolls) resets the
+  booster, as Chromium resets it on every path that starts no fling.
 
 ## What the Pixel recorded (2026-11-15)
 

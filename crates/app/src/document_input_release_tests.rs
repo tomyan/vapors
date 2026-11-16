@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_dom::NodeId;
+use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 use vapors_platform::{Event, Instant, Platform, TouchPhase};
 
@@ -182,4 +182,35 @@ fn a_boosted_release_starts_above_the_maximum_unclamped() {
     assert_eq!(input.touch.boost_from(), [0.0, 11_000.0]);
     let speed = input.touch.fling_starting_speed().expect("flinging");
     assert!(speed > 10_500.0, "{speed}");
+}
+
+#[test]
+fn a_release_refused_leaves_nothing_to_boost_from() {
+    // Given a drag on the outer list, then the list no longer scrolls
+    // by the time its release arrives
+    let (doc, outer, _) = nested();
+    let (mut input, platform) = (DocumentInput::new(), Platform::detached());
+    for event in [
+        touch(TouchPhase::Started, 80.0),
+        touch(TouchPhase::Moved, 55.0),
+        Event::Pan { dx: 0.0, dy: -25.0 },
+        touch(TouchPhase::Ended, 55.0),
+    ] {
+        input.give(&doc, &event, &platform).expect("placed");
+    }
+    doc.borrow_mut().set_attribute(outer, "class", "tail");
+    doc.borrow_mut()
+        .update(vapors_elements::Viewport {
+            width: 200.0,
+            height: 200.0,
+            scale: 1.0,
+        })
+        .expect("updates");
+
+    // When the release is refused (NotAScroller)
+    input.released(&doc.borrow(), [0.0, 3000.0], Instant::now());
+
+    // Then no fling runs, and none can be boosted from it
+    assert!(!input.flinging());
+    assert_eq!(input.touch.boost_from(), [0.0, 0.0]);
 }

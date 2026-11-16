@@ -73,9 +73,10 @@ impl Fling {
         x.hypot(y)
     }
 
-    /// The velocity at the last frame that moved the fling, CSS px/s.
-    pub(crate) fn velocity(&self) -> [f32; 2] {
-        self.velocity
+    /// The velocity at the last frame that sent a delta, CSS px/s;
+    /// `None` before the first.
+    pub(crate) fn sent_velocity(&self) -> Option<[f32; 2]> {
+        self.last_sent.map(|_| self.velocity)
     }
 
     /// The fling moved on to `now`; whether it is still running.

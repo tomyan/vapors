@@ -78,6 +78,13 @@ const MIN_FLING_SPEED: f32 = 50.0;
 /// would reach it.
 pub const CURVE_SPEED_LIMIT: f32 = 100_000.0;
 
+/// Whether the curve carries a fling at `velocity`: no faster than
+/// [`CURVE_SPEED_LIMIT`]. The one test, which the start refuses by and
+/// the booster caps to.
+pub(crate) fn curve_carries(velocity: [f32; 2]) -> bool {
+    velocity[0].hypot(velocity[1]) <= CURVE_SPEED_LIMIT
+}
+
 /// `velocity` with each axis clamped to [`MAX_FLING_SPEED`].
 fn clamped(velocity: [f32; 2]) -> [f32; 2] {
     velocity.map(|v| v.clamp(-MAX_FLING_SPEED, MAX_FLING_SPEED))
@@ -102,6 +109,10 @@ impl DocumentInput {
         // `FlingBooster` adds it after `GestureDetector` clamps
         let boosted = self.touch.boosted(velocity, at);
         if let Err(refused) = self.start(document, container, boosted, at) {
+            // no fling runs, so nothing may boost from it, as Chromium
+            // resets the booster on every path that starts none
+            // (`FlingController::UpdateCurrentFlingState`)
+            self.touch.forget_boost();
             report_error(&format!("a touch fling did not start: {refused}"));
         }
     }
@@ -142,7 +153,7 @@ impl DocumentInput {
         velocity: [f32; 2],
         at: Instant,
     ) -> Result<(), FlingError> {
-        if velocity[0].hypot(velocity[1]) > CURVE_SPEED_LIMIT {
+        if !curve_carries(velocity) {
             return Err(FlingError::TooFast(velocity));
         }
         if document.scroll_offset(container).is_none() {

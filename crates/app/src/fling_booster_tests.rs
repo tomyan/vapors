@@ -249,3 +249,20 @@ fn a_chain_of_boosts_past_the_curves_limit_runs_at_the_limit() {
     // Chromium, declared at the cap)
     assert_eq!(started, [0.0, crate::document_input::CURVE_SPEED_LIMIT]);
 }
+
+#[test]
+fn a_diagonal_sum_past_the_limit_is_capped_within_what_the_start_accepts() {
+    // Given a start whose boosted sum is diagonal and past the limit
+    // ([2072.08, 136 911.06], where plain f32 scaling rounds past it)
+    let mut stream = Stream::new();
+    stream.fling([2000.0, 95_000.0]);
+    stream.boosting_scroll();
+
+    // When
+    let started = stream.fling([72.08, 41_911.06]);
+
+    // Then: the start's own test passes, along the sum's direction
+    assert!(crate::document_input::curve_carries(started), "{started:?}");
+    let ratio = (started[0] / started[1]) / (2072.08 / 136_911.06);
+    assert!((ratio - 1.0).abs() < 1e-4, "{started:?}");
+}

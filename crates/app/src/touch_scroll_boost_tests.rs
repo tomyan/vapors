@@ -8,7 +8,7 @@ use vapors_platform::Instant;
 use super::TouchScroll;
 use crate::fling::Fling;
 use crate::fling_curve::FlingCurve;
-use crate::scroll_fixture::nested;
+use crate::scroll_fixture::{nested, offset};
 
 const MS: Duration = Duration::from_millis(1);
 
@@ -121,5 +121,53 @@ fn a_drag_longer_than_the_window_keeps_it_open_while_it_moves() {
     let started = touch.boosted([0.0, 2000.0], start + MS * 156);
 
     // Then: each move reopened the 50 ms window
+    assert_eq!(started, [0.0, 3000.0]);
+}
+
+#[test]
+fn a_coast_in_one_list_boosts_a_fling_in_another_as_chromium_does() {
+    // Given the outer list coasting down at 3000 px/s
+    let (doc, outer, inner) = nested();
+    let start = Instant::now();
+    let mut touch = TouchScroll::default();
+    let velocity = touch.boosted([0.0, 3000.0], start);
+    touch.fling(Fling::new(
+        outer,
+        FlingCurve::new(velocity).expect("moving"),
+        start,
+    ));
+    touch.advance(&mut doc.borrow_mut(), start + MS * 16);
+
+    // When a finger in the inner list drags down and releases at 2000
+    touch.down(1, [10.0, 10.0], start + MS * 30);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], start + MS * 40);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0], start + MS * 50);
+    touch.up(1, start + MS * 55);
+    let started = touch.boosted([0.0, 2000.0], start + MS * 56);
+
+    // Then: one booster per window, no container compared
+    assert_eq!(started, [0.0, 5000.0]);
+    assert!(offset(&doc, inner) > 0.0);
+}
+
+#[test]
+fn a_coast_cut_before_its_first_frame_moved_still_boosts_at_its_start() {
+    // Given a 1000 px/s fling drawn once at its start, which sends nothing
+    let (doc, outer, _) = nested();
+    let start = Instant::now();
+    let mut touch = TouchScroll::default();
+    let velocity = touch.boosted([0.0, 1000.0], start);
+    touch.fling(Fling::new(
+        outer,
+        FlingCurve::new(velocity).expect("moving"),
+        start,
+    ));
+    touch.advance(&mut doc.borrow_mut(), start);
+
+    // When a finger cuts it and flicks on down
+    let started = cut_and_flick(&mut touch, &doc, start, 10, 10.0, 2000.0);
+
+    // Then: the booster kept the start velocity, as Chromium's does
+    // until its first progress
     assert_eq!(started, [0.0, 3000.0]);
 }

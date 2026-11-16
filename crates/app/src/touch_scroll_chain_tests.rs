@@ -3,10 +3,18 @@
 //! link replays the previous coast from its fitted start, frame by
 //! frame, then the next touch at its recorded time with its drag as
 //! Chrome scrolled it (each frame's `scrollTop` change while the finger
-//! was down), and releases a fling. The booster must boost exactly the
-//! links Chrome boosted: started at the next coast's fitted velocity,
-//! fed the release that velocity implies (less the previous start when
-//! Chrome boosted).
+//! was down), and releases a fling at a velocity taken from the
+//! recording alone: the finger's last two recorded touch moves. The
+//! booster must boost exactly the links Chrome boosted, by the previous
+//! start.
+//!
+//! Which links Chrome boosted is read from the recordings, not from the
+//! booster: a boosted coast started beyond any unboosted start (at most
+//! 4046 px/s) and its start less the previous start is a release like
+//! the unboosted ones (3540 to 4970 px/s). One link is a variant: 008 ->
+//! 009 with the lift moved 60 ms after the drag's last frame, past the
+//! 50 ms window, which Chrome's rule does not boost; no recorded link
+//! lifts outside the window.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -23,20 +31,19 @@ use super::TouchScroll;
 use crate::fling::Fling;
 use crate::fling_curve::FlingCurve;
 
-/// Each link: previous recording, next, and whether Chrome boosted the
-/// next (its start is beyond any unboosted start in the recordings, at
-/// most 3290 px/s, and its start less the previous start is a release
-/// like theirs).
-const LINKS: &[(&str, &str, bool)] = &[
-    ("002", "003", false),
-    ("004", "005", false),
-    ("007", "008", false),
-    ("008", "009", true),
-    ("009", "010", true),
-    ("013", "014", true),
-    ("014", "015", true),
-    ("015", "016", true),
-    ("018", "019", false),
+/// Each link: previous recording, next, ms the lift is moved later than
+/// recorded, and whether Chrome boosted the next (module doc).
+const LINKS: &[(&str, &str, f64, bool)] = &[
+    ("002", "003", 0.0, false),
+    ("004", "005", 0.0, false),
+    ("007", "008", 0.0, false),
+    ("008", "009", 0.0, true),
+    ("008", "009", 60.0, false),
+    ("009", "010", 0.0, true),
+    ("013", "014", 0.0, true),
+    ("014", "015", 0.0, true),
+    ("015", "016", 0.0, true),
+    ("018", "019", 0.0, false),
 ];
 
 fn json(name: &str, suffix: &str) -> Value {
@@ -98,12 +105,14 @@ fn f(value: f64) -> f32 {
 }
 
 /// The link replayed: the velocity the next fling started at.
-fn replayed(previous: &str, next: &str, boosted: bool) -> (f32, f32) {
-    let (before, coast, after, next_coast) = (
+/// The link replayed with its lift `late` ms after the recorded one:
+/// the release (from the recording) and the velocity the next fling
+/// started at, and the previous start.
+fn replayed(previous: &str, next: &str, late: f64) -> [f32; 3] {
+    let (before, coast, after) = (
         json(previous, ".json"),
         json(previous, ".coast.json"),
         json(next, ".json"),
-        json(next, ".coast.json"),
     );
     let (doc, list) = page(&before["list"]);
     let origin = number(&coast, "start_ms") - 100.0;
@@ -111,18 +120,19 @@ fn replayed(previous: &str, next: &str, boosted: bool) -> (f32, f32) {
     let at = |t: f64| base + Duration::from_secs_f64((t - origin) / 1000.0);
     let mut touch = TouchScroll::default();
     let previous_start = f(number(&coast, "velocity"));
+    let start = number(&coast, "start_ms");
     doc.borrow_mut()
         .scroll_to(list, [0.0, f(number(&coast, "start_top"))]);
-    let velocity = touch.boosted([0.0, previous_start], at(number(&coast, "start_ms")));
+    let velocity = touch.boosted([0.0, previous_start], at(start));
     touch.fling(Fling::new(
         list,
         FlingCurve::new(velocity).expect("moving"),
-        at(number(&coast, "start_ms")),
+        at(start),
     ));
     let down = events(&after, "touchstart", "y")[0];
     for (t, _) in events(&before, "frame", "top")
         .into_iter()
-        .filter(|(t, _)| *t >= number(&coast, "start_ms") && *t < down.0)
+        .filter(|(t, _)| *t >= start && *t < down.0)
     {
         touch.advance(&mut doc.borrow_mut(), at(t));
     }
@@ -131,13 +141,25 @@ fn replayed(previous: &str, next: &str, boosted: bool) -> (f32, f32) {
         .last()
         .expect("a touchend")
         .0;
-    let next_start = f(number(&next_coast, "velocity"));
-    let release = if boosted {
-        next_start - previous_start
-    } else {
-        next_start
+    let release = released_at(&after);
+    [
+        release,
+        touch.boosted([0.0, release], at(up + late))[1],
+        previous_start,
+    ]
+}
+
+/// The release velocity the recording gives, CSS px/s the scroll's way:
+/// the finger's last two recorded touch positions (the start and the
+/// moves Chrome delivered to the page).
+fn released_at(after: &Value) -> f32 {
+    let mut moves = events(after, "touchstart", "y");
+    moves.extend(events(after, "touchmove", "y"));
+    moves.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let [.., (t0, y0), (t1, y1)] = moves[..] else {
+        panic!("fewer than two touch positions");
     };
-    (touch.boosted([0.0, release], at(up))[1], next_start)
+    f(-(y1 - y0) / (t1 - t0) * 1000.0)
 }
 
 /// The finger down at `down` and its drag as Chrome scrolled it: each
@@ -170,10 +192,18 @@ fn drag(
 #[test]
 fn the_booster_boosts_the_links_chrome_boosted_and_no_others() {
     let mut found = Vec::new();
-    for &(previous, next, boosted) in LINKS {
-        let (started, chrome) = replayed(previous, next, boosted);
-        if (started - chrome).abs() > 0.5 {
-            found.push(format!("{previous} -> {next}: started at {started}, Chrome at {chrome} (boosted: {boosted})"));
+    for &(previous, next, late, chrome_boosted) in LINKS {
+        let [release, started, previous_start] = replayed(previous, next, late);
+        let expected = if chrome_boosted {
+            release + previous_start
+        } else {
+            release
+        };
+        if (started - expected).abs() > 0.5 {
+            found.push(format!(
+                "{previous} -> {next} (lift {late} ms late): released at {release}, started at {started}; Chrome {}",
+                if chrome_boosted { "boosted it" } else { "did not boost it" }
+            ));
         }
     }
     assert!(found.is_empty(), "{}", found.join("\n"));

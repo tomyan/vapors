@@ -218,7 +218,11 @@ impl TouchScroll {
         if document.scroll_offset(fling.container()) != before {
             self.fades.scrolled(fling.container(), now);
         }
-        self.booster.progress(fling.velocity());
+        // as `ObserveProgressFling`, only once a delta was sent: until
+        // then the booster keeps the start velocity
+        if let Some(velocity) = fling.sent_velocity() {
+            self.booster.progress(velocity);
+        }
         if !running {
             // a fling that ended, or met the edge, boosts nothing
             // (`ProgressFling` and `StopFlingingIfNecessary` reset it)

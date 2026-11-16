@@ -195,6 +195,7 @@ fn point_of(action: Action) -> Option<Point> {
 mod act;
 #[path = "document_input_fling.rs"]
 mod fling;
+pub(crate) use fling::curve_carries;
 pub use fling::{CURVE_SPEED_LIMIT, FlingError, MAX_FLING_SPEED};
 #[path = "document_input_keys.rs"]
 mod keys;

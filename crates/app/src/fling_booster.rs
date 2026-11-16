@@ -10,13 +10,22 @@
 //!
 //! Not ported: `prevent_boosting` on a fling cancel, and the source
 //! device and modifier checks (every boosted fling here is a touch's);
-//! another input stopping the fling resets the booster instead.
+//! another input stopping the fling resets the booster instead. As in
+//! Chromium, one booster serves the window: a coast in one scroll
+//! container can boost a fling in another.
+//!
+//! RELAXED: the window and the 150 px/s check run on the times events
+//! are handled (`DocumentInput` stamps them), not the touches' own, as
+//! Chromium's do. A page that stalls between a finger down and its first
+//! move can let the window lapse where Chromium would boost, and moves
+//! handled together, under 1 ms apart, skip the speed check. Retired by
+//! #403 (real touch times).
 
 use std::time::Duration;
 
 use vapors_platform::Instant;
 
-use crate::document_input::CURVE_SPEED_LIMIT;
+use crate::document_input::{CURVE_SPEED_LIMIT, curve_carries};
 
 /// `kMinBoostFlingSpeedSquare`'s root, CSS px/s.
 const MIN_BOOST_FLING_SPEED: f32 = 350.0;
@@ -156,12 +165,19 @@ impl FlingBooster {
 /// dozen boosts at the maximum would pass the speed past which this
 /// curve loses its 0.1 px steps, so the chain's fling runs at the limit
 /// rather than being refused.
+/// Scaling in `f32` can round a hair past the limit; each further step
+/// shrinks it by one part in 2^23 until the start's own test
+/// (`curve_carries`) passes.
 fn capped(velocity: [f32; 2]) -> [f32; 2] {
-    let speed = velocity[0].hypot(velocity[1]);
-    if speed <= CURVE_SPEED_LIMIT {
+    if curve_carries(velocity) {
         return velocity;
     }
-    velocity.map(|v| v * CURVE_SPEED_LIMIT / speed)
+    let speed = velocity[0].hypot(velocity[1]);
+    let mut scaled = velocity.map(|v| v * (CURVE_SPEED_LIMIT / speed));
+    while !curve_carries(scaled) {
+        scaled = scaled.map(|v| v * (1.0 - f32::EPSILON));
+    }
+    scaled
 }
 
 fn add(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
