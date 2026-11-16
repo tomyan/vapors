@@ -66,6 +66,17 @@ pub fn dir(name: &str) -> Scratch {
     Scratch(Some(made.expect("a scratch directory under the temp dir")))
 }
 
+/// A new, empty build directory for a test's step, to set as its
+/// `CARGO_TARGET_DIR`: every step is capped on the directory it builds
+/// into (`target_cap.rs`), and a test's step, which builds nothing, was
+/// otherwise capped on the worktree's own target and refused whenever
+/// that was near the limit. Keep it alive while the step runs.
+pub fn target() -> (Scratch, (String, String)) {
+    let target = dir("target");
+    let env = ("CARGO_TARGET_DIR".to_owned(), target.display().to_string());
+    (target, env)
+}
+
 /// A new file named `xtask-<name>-<random>`, removed when dropped.
 pub fn file(name: &str) -> tempfile::TempPath {
     let made = tempfile::Builder::new()

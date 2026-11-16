@@ -20,6 +20,18 @@ pub fn workspace_root(here: &Path) -> Result<PathBuf, String> {
         })
 }
 
+/// The `CARGO_TARGET_DIR` `command` builds with: its own when it sets
+/// one, none when it removes it, else the one xtask inherited.
+pub fn command_target_dir(command: &std::process::Command) -> Option<std::ffi::OsString> {
+    let own = command
+        .get_envs()
+        .find(|(name, _)| *name == "CARGO_TARGET_DIR");
+    match own {
+        Some((_, value)) => value.map(std::ffi::OsStr::to_os_string),
+        None => std::env::var_os("CARGO_TARGET_DIR"),
+    }
+}
+
 /// The directory cargo builds into: `cargo_target_dir` when set (taken
 /// from the current directory when relative, as cargo takes it), else
 /// `<root>/target`; `None` when it does not exist yet.

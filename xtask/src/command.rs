@@ -48,6 +48,13 @@ fn spawn(step: &Step) -> Result<Child, String> {
     // steps compile that could fall behind. sccache's own step is the
     // exception, since it is the check.
     if step.program != "sccache" {
+        // the step's own build directory first, so the cap measures
+        // where it builds
+        let own = step
+            .env
+            .iter()
+            .filter(|(name, _)| name == "CARGO_TARGET_DIR");
+        command.envs(own.map(|(name, value)| (name, value)));
         crate::sccache::apply(&mut command)?;
     }
     command

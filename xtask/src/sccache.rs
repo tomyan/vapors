@@ -56,7 +56,7 @@ pub struct Stats {
 pub fn apply(command: &mut Command) -> Result<(), String> {
     // the cap first: it needs no server, and an over-full disk can be
     // why one would not start
-    crate::target_cap::check()?;
+    crate::target_cap::check(crate::target_cap::command_target_dir(command).as_deref())?;
     ready()?;
     command.envs(ENV);
     Ok(())
