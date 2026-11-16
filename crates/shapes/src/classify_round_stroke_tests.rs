@@ -4,7 +4,7 @@
 //! the closed form's outline is the distance to the path's. That
 //! includes a stroke wider than the corners, whose inner edge has sharp
 //! corners. The closed form's distance is `round_corners`' formula in
-//! `closed_forms.wgsl`. The path's is taken to its outline as zeno
+//! `closed_forms_shared.wgsl`. The path's is taken to its outline as zeno
 //! draws it: lines, and arcs as cubics within 2.7e-4 of the radius,
 //! each cubic cut into 250 lines. Elliptical corners are held to the
 //! exact distance by the renderer's sweep (`gpu_closed_forms_exact.rs`).

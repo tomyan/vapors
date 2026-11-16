@@ -9,7 +9,7 @@ use vapors_scene::{Item, Rect, Shape};
 use vapors_shapes::{Geometry, transformed_box};
 
 /// How far outside the outline the closed-form ramp covers, device
-/// pixels (`closed_forms.wgsl`: coverage 0.5 minus the distance).
+/// pixels (`closed_forms_shared.wgsl`: coverage 0.5 minus the distance).
 const RAMP: f32 = 0.5;
 
 /// Slack for f32 rounding of the transformed corners.

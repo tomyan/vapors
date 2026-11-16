@@ -17,6 +17,10 @@ vapors-scene.workspace = true
 vapors-shapes.workspace = true
 
 [dev-dependencies]
+# matrices for the scene-pass shape tests (tests/support/projective.rs):
+# the scene's own projection, so the tests see the matrices it draws with
+glam.workspace = true
+vapors-scene3d.workspace = true
 vapors-gpu-harness.workspace = true
 pollster.workspace = true
 

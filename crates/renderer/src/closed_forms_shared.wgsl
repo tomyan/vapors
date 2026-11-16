@@ -1,4 +1,5 @@
-// Closed-form shapes: a rect with round corners or an ellipse, in
+// Closed-form shapes, the part shared by the page's vertex stage
+// (closed_forms_2d.wgsl) and the scene's (closed_forms_3d.wgsl): a rect with round corners or an ellipse, in
 // its own units, under an affine transform to device pixels; filled, or
 // stroked centred on the outline. Coverage is 0.5 minus the signed
 // distance to the outline in device pixels, clamped: 0.5 on the
@@ -35,15 +36,6 @@ struct Out {
     @location(4) @interpolate(flat) radii: vec2<f32>,
 }
 
-// The target's size, and the shift of the scroll frame the instances
-// are in, added to their positions (device pixels, whole).
-struct View {
-    size: vec2<f32>,
-    shift: vec2<f32>,
-}
-
-@group(0) @binding(0) var<uniform> view: View;
-
 // How far past the shape the quad reaches, device pixels: the ramp's
 // outer half needs half; the rest is slack for the rasteriser.
 const MARGIN: f32 = 1.0;
@@ -61,30 +53,21 @@ fn local_box(instance: Instance) -> vec4<f32> {
     return vec4(lo - half_stroke, hi + half_stroke);
 }
 
-// The padding in local units along x and y that moves each edge of the
-// box MARGIN device pixels out, perpendicular to it, under any affine
-// map: an edge x = const runs along column (c, d), and moving it by p
-// along x moves it p |det| / |(c, d)| across. The CPU refuses a
-// transform with no area before it reaches here.
-fn padding(linear: vec4<f32>) -> vec2<f32> {
-    let det = abs(linear.x * linear.w - linear.y * linear.z);
-    return MARGIN * vec2(length(linear.zw), length(linear.xy)) / det;
-}
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
+// The corner of the instance's quad a vertex is, in 0..1 each way: two
+// triangles.
+fn quad_corner(vertex: u32) -> vec2<f32> {
     var corners = array<vec2<f32>, 6>(
         vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
         vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0),
     );
-    let box = local_box(instance);
-    let pad = padding(instance.linear);
-    let local = mix(box.xy - pad, box.zw + pad, corners[vertex]);
-    let m = instance.linear;
-    let pixel = vec2(m.x * local.x + m.z * local.y, m.y * local.x + m.w * local.y) + instance.shift.xy;
-    let on_target = pixel + view.shift;
+    return corners[vertex];
+}
+
+// What the fragment stage reads of a vertex at `local` (shape units)
+// placed at `position`.
+fn vertex_out(instance: Instance, local: vec2<f32>, position: vec4<f32>) -> Out {
     var out: Out;
-    out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
+    out.position = position;
     out.local = local;
     out.params = vec3(instance.shift.z, instance.shift.w, instance.radius.y);
     out.radii = instance.radius.xz;

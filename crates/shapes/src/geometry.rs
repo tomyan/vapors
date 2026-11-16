@@ -12,7 +12,7 @@ use crate::mesh_check::check_mesh;
 pub enum Geometry<'a> {
     /// An axis-aligned rectangle, rounded when `radius` is not zero,
     /// drawn by the closed-form pipeline's distance
-    /// (`crates/renderer/src/closed_forms.wgsl`).
+    /// (`crates/renderer/src/closed_forms_shared.wgsl`).
     Rect {
         /// Its top-left corner.
         origin: [f32; 2],

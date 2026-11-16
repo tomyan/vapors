@@ -20,7 +20,10 @@ impl ClosedFormPipeline {
             device,
             format,
             "closed forms",
-            include_str!("closed_forms.wgsl"),
+            concat!(
+                include_str!("closed_forms_2d.wgsl"),
+                include_str!("closed_forms_shared.wgsl")
+            ),
             5,
         ))
     }
