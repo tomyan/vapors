@@ -234,6 +234,10 @@ impl TouchScroll {
 mod tests;
 
 #[cfg(test)]
+#[path = "touch_scroll_thumb_tests.rs"]
+mod thumb_tests;
+
+#[cfg(test)]
 #[path = "touch_scroll_boost_tests.rs"]
 mod boost_tests;
 
