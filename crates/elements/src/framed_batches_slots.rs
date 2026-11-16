@@ -29,18 +29,17 @@ impl RowSlots {
         self.lanes.entry(container).or_default()
     }
 
-    /// Every slot held by a row not among `shown` (each lane row of a
-    /// step shown, with its lane's container) given back, so each lane
-    /// holds slots for its own rows shown alone; lanes with none held
-    /// dropped.
-    pub(crate) fn keep_only(&mut self, shown: impl Iterator<Item = (usize, usize)>) {
-        let mut by_lane: FxHashMap<usize, FxHashSet<usize>> = FxHashMap::default();
-        for (row, container) in shown {
-            by_lane.entry(container).or_default().insert(row);
-        }
-        let none = FxHashSet::default();
-        for (container, lane) in &mut self.lanes {
-            lane.keep_only(by_lane.get(container).unwrap_or(&none));
+    /// Every slot held by a row not among `shown` (the frames of the
+    /// steps shown) given back, and lanes with none held dropped. One set
+    /// serves every lane: a frame shown as another lane's row (a box moved
+    /// between lanes) keeps its slot here until it leaves the view, which
+    /// draws nothing wrong, as this lane's batches no longer name it.
+    /// Testing each frame's lane costs about 4k instructions an insert
+    /// frame on `FlexInsert` (#423's review, L2).
+    pub(crate) fn keep_only(&mut self, shown: impl Iterator<Item = usize>) {
+        let shown: FxHashSet<usize> = shown.collect();
+        for lane in self.lanes.values_mut() {
+            lane.keep_only(&shown);
         }
         self.lanes.retain(|_, lane| !lane.of.is_empty());
     }
