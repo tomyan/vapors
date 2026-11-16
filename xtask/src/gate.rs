@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 #[path = "gate_floor.rs"]
-mod floor;
+pub(crate) mod floor;
 
 use crate::config::Config;
 use crate::gate_plan::{PlannedStep, Sources, plan};

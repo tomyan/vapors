@@ -84,8 +84,10 @@ plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` 
 `.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
 ci` runs go at once on the machine, and the next waits for a slot,
 naming who holds them. A worktree's `target` lives under
-`~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
-the directory:
+`~/.cache`, never the `/tmp` tmpfs, and holds at most 80 GB (the lead's
+limit, set after the disk filled on 2026-11-09): every build xtask starts
+is refused over it (`[targets] max_gb`, `xtask/src/target_cap.rs`). When
+its PR merges, empty it and keep the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
 
 ## Rules
