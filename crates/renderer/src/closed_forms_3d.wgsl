@@ -20,14 +20,11 @@
 // is a sub-pixel sliver).
 fn projective_padding(instance: Instance, local: vec2<f32>) -> vec2<f32> {
     let j = screen_jacobian(instance.linear, instance.shift.xy, local);
-    // Edge-on, the columns are parallel and the pad unbounded. The ratio
-    // is the sine of the angle between them, independent of the view
-    // box's scale: under 1e-6 the plane is within 6e-5 degrees of
-    // edge-on, a sliver under a millionth of the shape's width on screen.
-    let det = abs(j.x * j.w - j.y * j.z);
-    if (det <= 1e-6 * length(j.xy) * length(j.zw)) {
+    // Edge-on the pad is unbounded (`edge_on`).
+    if (edge_on(j)) {
         return vec2(0.0);
     }
+    let det = abs(j.x * j.w - j.y * j.z);
     return MARGIN * vec2(length(j.zw), length(j.xy)) / det;
 }
 

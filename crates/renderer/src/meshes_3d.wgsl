@@ -15,12 +15,10 @@
 fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
     let at = corner_of(t, corner);
     let j = screen_jacobian(item.linear, item.place.xy, at);
-    let det = j.x * j.w - j.y * j.z;
     var moved = vec2(0.0);
-    // Edge-on (the columns parallel, as closed_forms_3d.wgsl's padding
-    // takes it, independent of the view box's scale) or behind the eye
-    // (j zero): no move.
-    if (abs(det) > 1e-6 * length(j.xy) * length(j.zw)) {
+    // Edge-on, or behind the eye (`edge_on`): no move.
+    if (!edge_on(j)) {
+        let det = j.x * j.w - j.y * j.z;
         moved = local_move(corner_normals(t, corner), corner_kind(t, corner), j, 1.0 / det);
     }
     let local = at + moved;
@@ -31,17 +29,10 @@ fn vs_main(@builtin(vertex_index) corner: u32, t: Triangle, item: Item) -> Out {
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
     let l = screen_jacobian(in.linear, in.shift, in.local);
+    // No guard: a fragment exists only where the plane has area on the
+    // screen and in front of the eye (the rasteriser clips the rest), so
+    // its Jacobian is never `edge_on` and 1 / det is finite. The edge-on
+    // case is the vertex stage's (`gpu_a_plane_seen_edge_on_draws_nothing`).
     let det = l.x * l.w - l.y * l.z;
-    // A fragment exists only in front of the eye (the rasteriser clips the
-    // rest), so the Jacobian is zero or singular only edge-on, where the
-    // plane is a line on the screen: coverage 0, which is what an edge-on
-    // plane shows, not an approximation. It keeps 1 / det finite; a
-    // fragment needs area on the screen, which an edge-on plane has none
-    // of, so no test reaches it (`gpu_a_plane_seen_edge_on_draws_nothing`
-    // passes with it removed, the vertex stage's guard being the one that
-    // case needs).
-    if (det == 0.0) {
-        return vec4(in.colour.rgb, 0.0);
-    }
     return covered(in, inverse_transpose(l, 1.0 / det), l);
 }

@@ -38,6 +38,9 @@ pub fn cpu_coverage(mesh: &[MeshTriangle], transform: [f32; 6]) -> Vec<f32> {
         .collect()
 }
 
+/// How to run the tests that use this oracle.
+const REPRODUCE: &str = "reproduce: cargo nextest run -p vapors-renderer -E 'binary(gpu_mesh_insides) | binary(gpu_mesh_corner_sweep) | binary(gpu_meshes_3d)'";
+
 /// The most a band pixel may differ from the CPU drawing: a ramp of
 /// 1/2 - d differs from a box filter by up to 0.043 on a straight edge
 /// (at 45 degrees the box is (1/sqrt 2 - d)^2, and |d^2 - (sqrt 2 - 1) d|
@@ -115,13 +118,17 @@ pub fn assert_band_matches(
     for (x, y, centre) in pixel_centres() {
         let drawn = coverage[(y * SIDE + x) as usize];
         if let Some(failure) = band.judge(centre, drawn, (y * SIDE + x) as usize) {
-            panic!("{what}: pixel ({x}, {y}) covered {drawn}; {failure}");
+            panic!(
+                "{what}: pixel ({x}, {y}) covered {drawn}; {failure}; fix: the mesh shader's \
+                 wedge distances (meshes_shared.wgsl, `wedge`) or the bound's source; {REPRODUCE}"
+            );
         }
         judged += usize::from(band.judged(centre));
     }
     assert!(
         judged > 0,
-        "{what}: the band check judged no pixel: is the placement the one drawn?"
+        "{what}: the band check judged no pixel; fix: pass the placement the mesh was drawn \
+         under; {REPRODUCE}"
     );
 }
 

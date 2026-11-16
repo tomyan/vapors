@@ -53,3 +53,14 @@ fn screen_jacobian(linear: vec4<f32>, shift: vec2<f32>, local: vec2<f32>) -> vec
     let along_y = per_x * linear.z + per_y * linear.w;
     return vec4(along_x, along_y);
 }
+
+// Whether a screen Jacobian `j` (as `screen_jacobian` gives it) is
+// edge-on: its columns parallel, or zero behind the eye. The test is the
+// sine of the angle between the columns, independent of the view box's
+// scale: under 1e-6 the plane is within 6e-5 degrees of edge-on, a
+// sliver under a millionth of the shape's width on screen. The one
+// answer every scene stage asks.
+fn edge_on(j: vec4<f32>) -> bool {
+    let det = abs(j.x * j.w - j.y * j.z);
+    return det <= 1e-6 * length(j.xy) * length(j.zw);
+}
