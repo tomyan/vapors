@@ -1,0 +1,53 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Adapter type: IntegratedGpu
+Timestamp queries: true
+Profile: judged (release, codegen-units 1, no override the build could see); scale 1; warmup 10; runs 60
+Load average at the start: 1.84 6.32 12.28
+
+scaling-changes: Class
+scaling-splices: 1000 rows: 71 frames, 0 splices, 0 patched, paint_relabelled 0, paint_relabel_all 0
+scaling-splices: 3000 rows: 71 frames, 0 splices, 0 patched, paint_relabelled 0, paint_relabel_all 0
+scaling-splices: 10000 rows: 71 frames, 0 splices, 0 patched, paint_relabelled 0, paint_relabel_all 0
+### Scaling, Class, add frames (median instructions per frame)
+
+| phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
+|---|---|---|---|---|---|
+| accessibility | 20341 | 20305 | 20153 | -0.0 | -0.0 |
+| batches | 1161 | 1161 | 1161 | 0.0 | 0.0 |
+| draw | 974671 | 975747 | 974413 | 0.5 | -0.2 |
+| encode | 654534 | 654924 | 653069 | 0.2 | -0.3 |
+| frame (CPU) | 1610619 | 1612679 | 1609329 | 1.0 | -0.5 |
+| input | 1336 | 1336 | 1336 | 0.0 | 0.0 |
+| layout | 74780 | 74966 | 75934 | 0.1 | 0.1 |
+| paint | 86621 | 86714 | 86001 | 0.0 | -0.1 |
+| record | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| style | 416129 | 417124 | 415047 | 0.5 | -0.3 |
+| submit | 32125 | 32069 | 32046 | -0.0 | -0.0 |
+| tasks | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| tick | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| update | 590509 | 591563 | 589962 | 0.5 | -0.2 |
+| write | 0 | 0 | 0 | 0.0 | 0.0 |
+
+### Scaling, Class, remove frames (median instructions per frame)
+
+| phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
+|---|---|---|---|---|---|
+| accessibility | 20341 | 20305 | 20153 | -0.0 | -0.0 |
+| batches | 1161 | 1161 | 1161 | 0.0 | 0.0 |
+| draw | 974761 | 975065 | 974389 | 0.2 | -0.1 |
+| encode | 654652 | 654245 | 653225 | -0.2 | -0.1 |
+| frame (CPU) | 1609613 | 1610522 | 1608169 | 0.5 | -0.3 |
+| input | 1336 | 1336 | 1336 | 0.0 | 0.0 |
+| layout | 74778 | 74872 | 75419 | 0.0 | 0.1 |
+| paint | 86116 | 86262 | 85517 | 0.1 | -0.1 |
+| record | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| style | 415612 | 416300 | 414536 | 0.3 | -0.3 |
+| submit | 31884 | 31698 | 31648 | -0.1 | -0.0 |
+| tasks | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| tick | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| update | 589386 | 590306 | 588456 | 0.5 | -0.3 |
+| write | 0 | 0 | 0 | 0.0 | 0.0 |
+
+scaling: pass, every Class, add frames phase within 2% or 5000 instructions of its 1000-row count
+scaling: pass, every Class, remove frames phase within 2% or 5000 instructions of its 1000-row count
+scaling-result: Class pass

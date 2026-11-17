@@ -18,6 +18,7 @@ use crate::value::{Color, Context, Length, Value, substitute_vars};
 
 use super::compute_resolve::{computed_form, resolve};
 use super::compute_source::{source, value_of};
+use super::declared::Declared;
 use crate::{Error, Position, Result};
 
 /// The initial value of every longhand, parsed once: the one table the
@@ -77,7 +78,8 @@ pub(crate) fn style(
         .longhands
         .iter()
         .map(|w| w.as_ref().map(|c| (c.sheet, c.position)))
-        .collect();
+        .collect::<Vec<_>>();
+    let declared = Declared::of(&positions, parent);
     Ok(ComputedStyle {
         values,
         custom,
@@ -85,6 +87,7 @@ pub(crate) fn style(
         root_font_size,
         color,
         positions,
+        declared,
     })
 }
 

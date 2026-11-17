@@ -7,6 +7,8 @@
 mod compiled_mount_order;
 mod compiled_sharing;
 mod compiled_winners;
+mod honoured_compiled;
+mod honoured_declared;
 mod rust_sheets_refused;
 mod support;
 

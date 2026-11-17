@@ -5,6 +5,7 @@
 //! does not.
 
 mod cascade_compiled;
+mod cascade_declared;
 mod support;
 #[path = "support/classify.rs"]
 mod support_classify;

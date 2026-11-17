@@ -1,3 +1,5 @@
+use vapors_css::property::PropertyId;
+
 use super::*;
 
 #[test]

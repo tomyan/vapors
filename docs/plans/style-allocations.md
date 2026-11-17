@@ -94,7 +94,12 @@ style through `Reader` (`values.rs:194-242`):
 | U-d | `style/honoured.rs:169`, `restyle_pass.rs:195-200` | `check_honoured`'s vec (empty: no allocation); the `refused` and `used` map inserts (no growth after the mount) | 0 |
 
 U-a is U1's (`build-time-styles.md`: properties read by index, no
-`format!`). U-b and U-c go with it (section 4).
+`format!`). U-b and U-c go with it (section 4). U-c and the
+`check_honoured` walk over the table (about half of `used` per
+element, sampled 2026-11-13) are done by slice B: `check_honoured`
+visits only the longhands a declaration reached
+(`ComputedStyle::declared_ids`), and the grid readers allocate nothing
+for the initial values (`docs/perf/style-declared-2026-11-13.md`).
 
 ### 1.3 Per edit, around the restyle
 

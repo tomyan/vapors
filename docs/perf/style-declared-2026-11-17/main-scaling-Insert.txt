@@ -1,0 +1,53 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Adapter type: IntegratedGpu
+Timestamp queries: true
+Profile: judged (release, codegen-units 1, no override the build could see); scale 1; warmup 10; runs 60
+Load average at the start: 1.84 6.32 12.28
+
+scaling-changes: Insert
+scaling-splices: 1000 rows: 71 frames, 71 splices, 71 patched, paint_relabelled 0, paint_relabel_all 0
+scaling-splices: 3000 rows: 71 frames, 71 splices, 71 patched, paint_relabelled 0, paint_relabel_all 0
+scaling-splices: 10000 rows: 71 frames, 71 splices, 71 patched, paint_relabelled 0, paint_relabel_all 0
+### Scaling, Insert, insert frames (median instructions per frame)
+
+| phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
+|---|---|---|---|---|---|
+| accessibility | 1311185 | 3711864 | 12348935 | 1200.3 | 1233.9 |
+| batches | 104117 | 104463 | 101925 | 0.2 | -0.4 |
+| draw | 1058459 | 1059339 | 1053390 | 0.4 | -0.8 |
+| encode | 653938 | 654074 | 652654 | 0.1 | -0.2 |
+| frame (CPU) | 3132897 | 5533420 | 14176200 | 1200.3 | 1234.7 |
+| input | 1336 | 1336 | 1336 | 0.0 | 0.0 |
+| layout | 141021 | 140021 | 149876 | -0.5 | 1.4 |
+| paint | 187370 | 185113 | 193982 | -1.1 | 1.3 |
+| record | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| style | 395800 | 398125 | 390778 | 1.2 | -1.0 |
+| submit | 33448 | 33581 | 33519 | 0.1 | -0.0 |
+| tasks | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| tick | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| update | 737939 | 736608 | 749318 | -0.7 | 1.8 |
+| write | 0 | 0 | 0 | 0.0 | 0.0 |
+
+### Scaling, Insert, remove frames (median instructions per frame)
+
+| phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
+|---|---|---|---|---|---|
+| accessibility | 1295125 | 3736877 | 12493011 | 1220.9 | 1250.9 |
+| batches | 104524 | 105063 | 102444 | 0.3 | -0.4 |
+| draw | 1059311 | 1058805 | 1055741 | -0.3 | -0.4 |
+| encode | 654743 | 654328 | 654245 | -0.2 | -0.0 |
+| frame (CPU) | 2615246 | 5055711 | 13816812 | 1220.2 | 1251.6 |
+| input | 1336 | 1336 | 1336 | 0.0 | 0.0 |
+| layout | 61476 | 60101 | 61339 | -0.7 | 0.2 |
+| paint | 153219 | 152094 | 159419 | -0.6 | 1.0 |
+| record | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| style | 7701 | 7701 | 7701 | 0.0 | 0.0 |
+| submit | 32773 | 32820 | 32662 | 0.0 | -0.0 |
+| tasks | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| tick | 1325 | 1325 | 1325 | 0.0 | 0.0 |
+| update | 236681 | 234286 | 242776 | -1.2 | 1.2 |
+| write | 0 | 0 | 0 | 0.0 | 0.0 |
+
+scaling: pass, Insert, insert frames accessibility within 1250 instructions per extra row and style flat; the other phases are reported, not judged: property 3 (the splice step) is not built
+scaling: pass, Insert, remove frames accessibility within 1250 instructions per extra row and style flat; the other phases are reported, not judged: property 3 (the splice step) is not built
+scaling-result: Insert pass
