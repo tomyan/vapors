@@ -38,6 +38,14 @@ and makes `HEAD /api/hello` once (no key) and
 `POST /v1/messages?beta=true`, retried against a 401 until the 60 s
 timeout. Nothing else reached the base URL.
 
+Live, slice 2 (2026-11-17, cents of credit): a one-word brief through the
+proxy ended `done` with the proxy's count equal to the CLI's ($0.0041,
+then $0.0005 with the prompt cached). The check that holds the two counts
+together failed on the second run with the skill's cache-read price for
+Sonnet 5.5 ($0.20); the CLI prices it at $0.10, which
+`[api_build.prices]` now holds. With the CLI's budget raised, a proxy
+budget of $0.001 refused the session's second request.
+
 ## Fences, proven on every run
 
 Before a session starts, `api-build` runs each probe inside the sandbox
@@ -53,10 +61,10 @@ commit).
 
 ## Slices
 
-1. **Sandbox and relay** (this PR): the bwrap arguments, `xtask
+1. **Sandbox and relay** (#467): the bwrap arguments, `xtask
    api-relay-inner` (the relay and the session's parent), the builder's clone,
    and `cargo xtask api-fences <name>`, which proves the fences above.
-2. **Proxy, key and budget**: the harness server's API route, the price
+2. **Proxy, key and budget** (built): the harness server's API route, the price
    table in `.config/factory.toml` (a model with no price is refused),
    `cargo xtask api-build` running the session; the key probe against the
    live key file.

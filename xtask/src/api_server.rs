@@ -1,78 +1,139 @@
 //! The harness server (`docs/plans/api-builder.md`): outside the sandbox,
-//! on the one socket the session can reach. It reads each request's head
-//! and answers by its route; a request it has no route for is refused
-//! with 403 and logged. Slice 1 has one route, the probe of the way in;
-//! the API, `ask_lead` and `request_push` follow.
+//! on the one socket the session can reach. It reads each request
+//! (`api_http.rs`) and answers by its route: the way-in probe, and, when
+//! the run has a key, `POST /v1/messages` and `/v1/messages/count_tokens`
+//! forwarded to the API with it (`api_upstream.rs`), counted against the
+//! budget (`api_budget.rs`). A request with no route is refused with 403
+//! and logged.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use crate::api_budget::Budget;
+use crate::api_http::Request;
+use crate::ux_secret::Secret;
+
 /// The path the fences' way-in probe asks for.
 pub const PING: &str = "/api-build/ping";
 
-/// How long a request's head may take to arrive: the session's client
-/// sends it at once, so 30 s is reached only by a stalled connection.
-const HEAD_DEADLINE: Duration = Duration::from_secs(30);
+/// How long a request may take to arrive whole: the session's client
+/// sends it at once over a local socket, so 30 s is reached only by a
+/// stalled connection.
+const REQUEST_DEADLINE: Duration = Duration::from_secs(30);
 
-/// What the server refused, for the run's summary.
-pub type Refused = Arc<Mutex<Vec<String>>>;
+/// The API route's key, budget and staging directory.
+pub struct Proxy {
+    pub secret: Secret,
+    pub budget: Budget,
+    /// Private, outside the sandbox: each request's body is staged here.
+    pub staging: PathBuf,
+}
 
-/// Serves `socket` on a thread for as long as the run lasts; the
-/// requests it refused.
+/// What the server routes with, and what it refused, for the summary.
+#[derive(Default)]
+pub struct Routes {
+    pub proxy: Option<Proxy>,
+    pub refused: Mutex<Vec<String>>,
+    staged: AtomicU64,
+}
+
+impl Routes {
+    /// Routes with the API forwarded through `proxy`.
+    pub fn with(proxy: Proxy) -> Self {
+        Self {
+            proxy: Some(proxy),
+            ..Self::default()
+        }
+    }
+}
+
+/// Serves `socket` with `routes` on a thread for as long as the run lasts.
 ///
 /// # Errors
 ///
 /// The socket cannot be bound, naming it.
-pub fn serve(socket: &Path) -> Result<Refused, String> {
+pub fn serve(socket: &Path, routes: Arc<Routes>) -> Result<(), String> {
     let listener = UnixListener::bind(socket)
         .map_err(|e| format!("binding the harness socket {}: {e}", socket.display()))?;
-    let refused = Refused::default();
-    let log = Arc::clone(&refused);
     thread::spawn(move || {
         for stream in listener.incoming().flatten() {
-            let log = Arc::clone(&log);
-            thread::spawn(move || answered(stream, &log));
+            let routes = Arc::clone(&routes);
+            thread::spawn(move || answered(stream, &routes));
         }
     });
-    Ok(refused)
+    Ok(())
 }
 
-fn answered(stream: UnixStream, refused: &Refused) {
-    let _ = stream.set_read_timeout(Some(HEAD_DEADLINE));
-    let Ok(reader) = stream.try_clone() else {
-        return;
+fn answered(mut stream: UnixStream, routes: &Routes) {
+    let _ = stream.set_read_timeout(Some(REQUEST_DEADLINE));
+    let request = stream
+        .try_clone()
+        .map_err(|e| e.to_string())
+        .and_then(|reader| crate::api_http::read(&mut BufReader::new(reader)));
+    let request = match request {
+        Ok(request) => request,
+        Err(why) => return refuse(&mut stream, routes, &format!("a request not read: {why}")),
     };
-    let mut line = String::new();
-    if BufReader::new(reader).read_line(&mut line).is_err() {
-        refuse(stream, refused, "a request whose head did not arrive");
-        return;
-    }
-    let request = line.trim().to_owned();
-    match request.split(' ').take(2).collect::<Vec<_>>()[..] {
-        ["GET", PING] => reply(stream, "200 OK", "pong"),
-        _ => refuse(stream, refused, &request),
+    let line = format!("{} {}", request.method, request.target);
+    match (request.method.as_str(), request.path(), &routes.proxy) {
+        ("GET", PING, _) => reply(&mut stream, "200 OK", "pong"),
+        ("POST", "/v1/messages" | "/v1/messages/count_tokens", Some(proxy)) => {
+            proxied(&mut stream, routes, proxy, &request);
+        }
+        _ => refuse(&mut stream, routes, &line),
     }
 }
 
-fn refuse(stream: UnixStream, refused: &Refused, request: &str) {
-    eprintln!("api-build: refused `{request}`: the harness has no route for it");
-    if let Ok(mut log) = refused.lock() {
-        log.push(request.to_owned());
+/// `request` forwarded, counted when it is a message.
+fn proxied(stream: &mut UnixStream, routes: &Routes, proxy: &Proxy, request: &Request) {
+    let model = serde_json::from_slice::<serde_json::Value>(&request.body)
+        .ok()
+        .and_then(|body| body["model"].as_str().map(str::to_owned))
+        .unwrap_or_default();
+    let price = match proxy.budget.admit(&model) {
+        Ok(price) => price,
+        Err(why) => return refuse(stream, routes, &why),
+    };
+    let staged = proxy.staging.join(format!(
+        "{}.json",
+        routes.staged.fetch_add(1, Ordering::Relaxed)
+    ));
+    match crate::api_upstream::forward(request, &proxy.secret, &staged, stream) {
+        Ok(forwarded)
+            if request.path() == "/v1/messages" && (200..300).contains(&forwarded.status) =>
+        {
+            let why = format!("a {} from /v1/messages with no usage", forwarded.status);
+            proxy.budget.charge(price, forwarded.usage, &why);
+        }
+        Ok(_) => {}
+        Err(why) => {
+            eprintln!(
+                "api-build: forwarding `{} {}` failed: {why}",
+                request.method, request.target
+            );
+            reply(stream, "502 Bad Gateway", &why);
+        }
     }
-    reply(
-        stream,
-        "403 Forbidden",
-        "the harness has no route for this request",
-    );
 }
 
-fn reply(mut stream: UnixStream, status: &str, body: &str) {
+fn refuse(stream: &mut UnixStream, routes: &Routes, why: &str) {
+    eprintln!("api-build: refused: {why}");
+    if let Ok(mut log) = routes.refused.lock() {
+        log.push(why.to_owned());
+    }
+    let body =
+        serde_json::json!({"type": "error", "error": {"type": "permission_error", "message": why}});
+    reply(stream, "403 Forbidden", &body.to_string());
+}
+
+fn reply(stream: &mut UnixStream, status: &str, body: &str) {
     let response = format!(
-        "HTTP/1.1 {status}\r\ncontent-type: text/plain\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
         body.len()
     );
     if let Err(error) = stream.write_all(response.as_bytes()) {

@@ -31,6 +31,19 @@ pub enum Command {
         /// The builder's name: ASCII letters, digits and `-`.
         name: String,
     },
+    /// Build a slice with a headless session billed to the API, in the
+    /// sandbox, counted against `<budget>` dollars (docs/plans/api-builder.md).
+    ApiBuild {
+        /// The builder's name: ASCII letters, digits and `-`.
+        name: String,
+        /// The brief: the session's prompt.
+        brief: PathBuf,
+        /// The most it may spend, in dollars, counted by the proxy.
+        budget: f64,
+        /// The model, which must have a price in `[api_build.prices]`.
+        #[arg(long, default_value = "claude-sonnet-5-5")]
+        model: String,
+    },
     /// Inside an API builder's sandbox: relay loopback `port` to the
     /// harness socket and run the command.
     #[command(hide = true)]

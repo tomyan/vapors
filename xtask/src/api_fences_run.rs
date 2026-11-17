@@ -41,8 +41,20 @@ fn made_and_proven(builder: &Builder) -> Result<Vec<String>, String> {
 
 fn proven(builder: &Builder, objects: PathBuf) -> Result<Vec<String>, String> {
     let host = host(objects)?;
-    crate::api_server::serve(&builder.socket())?;
-    let inside = |script: &str| inside(builder, &host, script);
+    let routes = std::sync::Arc::new(crate::api_server::Routes::default());
+    crate::api_server::serve(&builder.socket(), routes)?;
+    proven_on(builder, &host)
+}
+
+/// Builder's fences and way in proven, the harness server already on its
+/// socket; a line for each.
+///
+/// # Errors
+///
+/// A fence broken, a probe that cannot show its escape, or the way in or
+/// the toolchain not working inside.
+pub fn proven_on(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
+    let inside = |script: &str| inside(builder, host, script);
     let key_file = builder.home.join(KEY_FILE);
     let escapes = Escapes {
         hidden: builder.root().join("escape-probe"),
@@ -57,7 +69,11 @@ fn proven(builder: &Builder, objects: PathBuf) -> Result<Vec<String>, String> {
 }
 
 /// The paths outside the sandbox reads.
-fn host(objects: PathBuf) -> Result<Host, String> {
+///
+/// # Errors
+///
+/// This binary's path or the CLI not found.
+pub fn host(objects: PathBuf) -> Result<Host, String> {
     let xtask = std::env::current_exe().map_err(|e| format!("finding this xtask binary: {e}"))?;
     Ok(Host {
         xtask,
@@ -80,18 +96,19 @@ fn claude() -> Result<PathBuf, String> {
 
 /// `script` run by bash inside builder's sandbox, under the relay.
 fn inside(builder: &Builder, host: &Host, script: &str) -> Result<Ran, String> {
-    let mut command = Command::new("bwrap");
-    command.args(arguments(builder, host, RELAY_PORT));
-    command.arg(Path::new(BIN).join("xtask"));
-    command.args([
-        "api-relay-inner",
-        "--port",
-        &RELAY_PORT.to_string(),
-        "--socket",
-    ]);
-    command.arg(builder.socket());
-    command.args(["--", "bash", "-c", script]);
-    ran(command)
+    ran(sandboxed(builder, host, &["bash", "-c", script]))
+}
+
+/// `command` to run inside builder's sandbox, under the relay.
+pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Command {
+    let mut bwrap = Command::new("bwrap");
+    bwrap.args(arguments(builder, host, RELAY_PORT));
+    bwrap.arg(Path::new(BIN).join("xtask"));
+    let port = RELAY_PORT.to_string();
+    bwrap.args(["api-relay-inner", "--port", &port, "--socket"]);
+    bwrap.arg(builder.socket());
+    bwrap.arg("--").args(command);
+    bwrap
 }
 
 /// The way in: a request through the relay reaches the harness server.
@@ -137,7 +154,12 @@ fn removed(builder: &Builder) {
     }
 }
 
-fn home() -> Result<PathBuf, String> {
+/// The home directory.
+///
+/// # Errors
+///
+/// `HOME` unset.
+pub fn home() -> Result<PathBuf, String> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| "HOME is not set: the builder's directories are under it".to_owned())
