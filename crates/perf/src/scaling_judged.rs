@@ -6,6 +6,7 @@
 
 use crate::rows::RowChange;
 use crate::scaling::PhaseSeries;
+use crate::scaling_reported::{Owner, SPLICE_D, SPLICE_LAYOUT_3B};
 
 /// The accessibility phase's ceiling for `Insert`, instructions per
 /// extra row from 1000 rows: recorded at 8859 (1000 to 10,000 rows,
@@ -80,6 +81,17 @@ pub const SCROLL_SIZE_A11Y_PER_ROW: u64 = 1;
 /// an allocator decision), then 2% again.
 pub const FLEX_TEXT_FRAME_PERCENT: u64 = 3;
 
+/// What `PositionedInsert` waits for: Insert's rule. Measured judged
+/// (2026-11-17, `docs/perf/w6-positioned-2026-11-17.md`): layout about
+/// 10,100, paint about 13,200 and accessibility about 6,900 instructions
+/// per extra row. The fixed footer is an out-of-flow child of the body,
+/// so the body's lane is declined (`LaneDecline::OutOfFlowChild`, pinned
+/// by `crates/elements/tests/positioned_rows.rs`).
+const INSERT_RULE: Judged = Judged::AccessibilityPerRow {
+    ceiling: INSERT_A11Y_PER_ROW,
+    flat: &["style"],
+};
+
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Judged {
@@ -105,6 +117,15 @@ pub enum Judged {
         /// Phases whose cost may not grow with the rows.
         flat: &'static [&'static str],
     },
+    /// Nothing judged: the change's work grows with the page today.
+    /// `owner` is the plan slice that makes it pass `target`, and the run
+    /// fails once it does (`scaling_reported.rs`).
+    Reported {
+        /// The slice that turns its judging on.
+        owner: Owner,
+        /// The rule it is judged by from then.
+        target: &'static Judged,
+    },
 }
 
 impl Judged {
@@ -116,14 +137,23 @@ impl Judged {
                 phase: "frame (CPU)",
                 percent: FLEX_TEXT_FRAME_PERCENT,
             },
-            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::HoveredClass => {
-                Self::EveryPhase
-            }
+            RowChange::Idle
+            | RowChange::Text
+            | RowChange::Class
+            | RowChange::HoveredClass
+            | RowChange::PositionedClass => Self::EveryPhase,
             // style flat since docs/perf/insert-style-2026-11-13.md
-            RowChange::Insert => Self::AccessibilityPerRow {
-                ceiling: INSERT_A11Y_PER_ROW,
-                flat: &["style"],
+            RowChange::PositionedInsert => Self::Reported {
+                owner: SPLICE_LAYOUT_3B,
+                target: &INSERT_RULE,
             },
+            // after splice-layout 3b as well, which removes the same
+            // layout and accessibility terms as PositionedInsert's
+            RowChange::PositionedStackedInsert => Self::Reported {
+                owner: SPLICE_D,
+                target: &INSERT_RULE,
+            },
+            RowChange::Insert => INSERT_RULE,
             RowChange::FlexInsert => Self::AccessibilityPerRow {
                 ceiling: FLEX_INSERT_A11Y_PER_ROW,
                 flat: &["style"],

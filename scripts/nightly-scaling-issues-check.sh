@@ -33,7 +33,7 @@ check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected 
 
 reset
 check "changes listed" "$(expected_changes "$fixture" | xargs)" \
-  "Class FlexInsert FlexText HoveredClass Idle Insert Resize Scroll ScrollSize Text"
+  "Class FlexInsert FlexText HoveredClass Idle Insert PositionedClass PositionedInsert PositionedStackedInsert Resize Scroll ScrollSize Text"
 check "changes failed" "$(changes_that "$fixture" fail | xargs)" "Class HoveredClass Text"
 check "a block is its change's alone" "$(change_block "$fixture" Class | grep -c '74854')" 0
 printf '%s\n' "scaling-error-begin: Text" mine "scaling-error-end: Text" \
@@ -58,13 +58,19 @@ check "changed parts retitle the issue" "$(calls 'issue edit 12')$(calls 'Retitl
 reset; head -n "$(grep -n 'scaling-result: Class fail' "$fixture" | cut -d: -f1)" "$fixture" >"$work/cut.log"
 report_results "$work/cut.log" abc 1
 check "a judge stopped partway names what it did not judge" \
-  "$(calls 'no result for FlexInsert HoveredClass Insert Resize Scroll ScrollSize')" 1
+  "$(calls 'no result for FlexInsert HoveredClass Insert PositionedClass PositionedInsert PositionedStackedInsert Resize Scroll ScrollSize')" 1
 
 reset; report_results "$fixture" abc 1
 check "a complete run with failures files no runner issue" "$(calls "title $runner_title")" 0
 
 reset; printf '13\tNightly scaling: Removed: paint\n' >"$FAKE_OPEN"; report_results "$fixture" abc 1
 check "a change no longer judged has its issue closed" "$(calls 'issue close 13')" 1
+
+reset; printf '16\tNightly scaling: PositionedInsert: x\n' >"$FAKE_OPEN"
+listed=$(report_results "$fixture" abc 1)
+check "a reported change records no pass" "$([ -f "$state/pass/PositionedInsert" ] && echo recorded)" ""
+check "and leaves its issue as it is" "$(calls 'issue close 16')$(calls 'issue comment 16')" "00"
+check "and the run lists it" "$(grep -c 'reported, not judged: PositionedInsert (docs/plans/splice-layout.md slice 3b)' <<<"$listed")" 1
 
 reset; grep -v 'scaling-' "$fixture" >"$work/drift.log"; report_results "$work/drift.log" abc 0
 check "a pass without result lines is a runner issue" "$(calls 'no scaling-changes line')" 1

@@ -59,6 +59,7 @@ pub mod scaling_all;
 pub mod scaling_judged;
 pub mod scaling_kinds;
 pub mod scaling_report;
+pub mod scaling_reported;
 pub mod scaling_run;
 pub mod scene_judge;
 pub mod scene_kind;

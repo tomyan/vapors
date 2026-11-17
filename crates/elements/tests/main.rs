@@ -170,6 +170,7 @@ mod pointer_dispatch;
 mod pointer_hit;
 mod pointer_states;
 mod positioned;
+mod positioned_rows;
 mod range_keys;
 mod range_paint;
 mod range_pointer;
