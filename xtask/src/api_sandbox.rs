@@ -124,6 +124,9 @@ fn environment(builder: &Builder, port: u16) -> Vec<String> {
         ("SCCACHE_DIR", text(&builder.home.join(".cache/sccache"))),
         ("ANTHROPIC_BASE_URL", format!("http://127.0.0.1:{port}")),
         ("ANTHROPIC_API_KEY", DUMMY_KEY.into()),
+        // ask_lead waits up to 31 minutes (api_mcp_inner.rs); the CLI's
+        // MCP tool timeout must outlast it
+        ("MCP_TOOL_TIMEOUT", (35 * 60 * 1000).to_string()),
     ];
     let mut args = Vec::new();
     for (name, value) in variables {

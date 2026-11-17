@@ -64,11 +64,13 @@ commit).
 1. **Sandbox and relay** (#467): the bwrap arguments, `xtask
    api-relay-inner` (the relay and the session's parent), the builder's clone,
    and `cargo xtask api-fences <name>`, which proves the fences above.
-2. **Proxy, key and budget** (built): the harness server's API route, the price
+2. **Proxy, key and budget** (#469): the harness server's API route, the price
    table in `.config/factory.toml` (a model with no price is refused),
    `cargo xtask api-build` running the session; the key probe against the
    live key file.
-3. **`ask_lead`**: the MCP server inside; `q<N>.md` written and its path
+3. **`ask_lead`** (built; live 2026-11-17: the session asked "What
+   colour?", the answer file said `blue`, and the session replied
+   `blue`): the MCP server inside; `q<N>.md` written and its path
    logged, `a<N>.md` read, 30 minutes, then `BLOCKED.md` and stop.
 4. **`request_push`**: `cargo xtask ci` in a fresh sandbox, the path and
    400-line checks, the push from outside with the hook skipped (declared

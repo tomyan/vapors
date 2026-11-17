@@ -55,11 +55,15 @@ fn ran(order: &Order<'_>) -> Result<(Vec<String>, Ended), String> {
     let (main, objects) = crate::api_clone::main_repository()?;
     crate::api_clone::make(&builder, &main, &format!("api/{}", builder.name))?;
     let staging = private(&builder.root().join("requests"))?;
-    let routes = Arc::new(Routes::with(Proxy {
-        secret,
-        budget,
-        staging,
-    }));
+    let asks = crate::api_ask::Asks::new(private(&builder.root().join("questions"))?);
+    let routes = Arc::new(Routes::with(
+        Proxy {
+            secret,
+            budget,
+            staging,
+        },
+        asks,
+    ));
     crate::api_server::serve(&builder.socket(), Arc::clone(&routes))?;
     let host = host(objects)?;
     let mut lines = proven_on(&builder, &host)?;

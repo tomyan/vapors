@@ -44,6 +44,13 @@ pub enum Command {
         #[arg(long, default_value = "claude-sonnet-5-5")]
         model: String,
     },
+    /// Inside an API builder's sandbox: the session's MCP server,
+    /// posting tool calls through the relay on loopback `port`.
+    #[command(hide = true)]
+    ApiMcpInner {
+        #[arg(long)]
+        port: u16,
+    },
     /// Inside an API builder's sandbox: relay loopback `port` to the
     /// harness socket and run the command.
     #[command(hide = true)]

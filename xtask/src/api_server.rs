@@ -3,8 +3,8 @@
 //! (`api_http.rs`) and answers by its route: the way-in probe, and, when
 //! the run has a key, `POST /v1/messages` and `/v1/messages/count_tokens`
 //! forwarded to the API with it (`api_upstream.rs`), counted against the
-//! budget (`api_budget.rs`). A request with no route is refused with 403
-//! and logged.
+//! budget (`api_budget.rs`); and `ask_lead`'s questions (`api_ask.rs`).
+//! A request with no route is refused with 403 and logged.
 
 use std::io::{BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -20,6 +20,9 @@ use crate::ux_secret::Secret;
 
 /// The path the fences' way-in probe asks for.
 pub const PING: &str = "/api-build/ping";
+
+/// The path `ask_lead` posts to (`api_mcp_inner.rs`).
+const ASK: &str = "/api-build/ask";
 
 /// How long a request may take to arrive whole: the session's client
 /// sends it at once over a local socket, so 30 s is reached only by a
@@ -38,15 +41,19 @@ pub struct Proxy {
 #[derive(Default)]
 pub struct Routes {
     pub proxy: Option<Proxy>,
+    /// Where `ask_lead`'s questions go (`api_ask.rs`).
+    pub asks: Option<crate::api_ask::Asks>,
     pub refused: Mutex<Vec<String>>,
     staged: AtomicU64,
 }
 
 impl Routes {
-    /// Routes with the API forwarded through `proxy`.
-    pub fn with(proxy: Proxy) -> Self {
+    /// Routes with the API forwarded through `proxy` and questions
+    /// written for the lead in `asks`.
+    pub fn with(proxy: Proxy, asks: crate::api_ask::Asks) -> Self {
         Self {
             proxy: Some(proxy),
+            asks: Some(asks),
             ..Self::default()
         }
     }
@@ -85,7 +92,23 @@ fn answered(mut stream: UnixStream, routes: &Routes) {
         ("POST", "/v1/messages" | "/v1/messages/count_tokens", Some(proxy)) => {
             proxied(&mut stream, routes, proxy, &request);
         }
+        ("POST", ASK, _) if routes.asks.is_some() => asked(&mut stream, routes, &request),
         _ => refuse(&mut stream, routes, &line),
+    }
+}
+
+/// `ask_lead`: the question in the body, the answer or why there is none.
+fn asked(stream: &mut UnixStream, routes: &Routes, request: &Request) {
+    let question = serde_json::from_slice::<serde_json::Value>(&request.body)
+        .ok()
+        .and_then(|body| body["question"].as_str().map(str::to_owned))
+        .filter(|question| !question.trim().is_empty());
+    let (Some(question), Some(asks)) = (question, &routes.asks) else {
+        return refuse(stream, routes, "an ask_lead call with no question");
+    };
+    match asks.ask(&question, crate::api_ask::ANSWER_DEADLINE) {
+        Ok(answer) => reply(stream, "200 OK", &answer),
+        Err(why) => reply(stream, "504 Gateway Timeout", &why),
     }
 }
 
