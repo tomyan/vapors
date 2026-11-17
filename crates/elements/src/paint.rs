@@ -46,6 +46,10 @@ pub(crate) struct PaintInput<'a> {
     /// whether its edges are snapped (`input.snapped`); set by `Repaint`
     /// before each box (`frames.rs` `FrameAt::class`).
     pub(crate) class: Option<TransformClass>,
+    /// The boxes whose border box, items or clips hold a coordinate that
+    /// is not finite in device pixels: painted, then refused by the
+    /// update after paint (`paint_refusals.rs`), never shown.
+    pub(crate) unresolvable: Vec<crate::paint_refusals::NotPlaced>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -78,6 +82,7 @@ impl<'a> PaintInput<'a> {
             placement: &from.placement,
             lanes,
             class: None,
+            unresolvable: Vec::new(),
         }
     }
 
@@ -168,6 +173,14 @@ pub(crate) fn snapped(rect: BoxRect, scale: f32) -> Rect {
         half_up((rect.x + rect.width) * scale),
         half_up((rect.y + rect.height) * scale),
     )
+}
+
+/// Whether every edge of `rect` is finite: a box placed in device
+/// pixels, rather than one paint refuses (`PaintInput::unresolvable`).
+pub(crate) fn finite(rect: Rect) -> bool {
+    [rect.left, rect.top, rect.right, rect.bottom]
+        .iter()
+        .all(|edge| edge.is_finite())
 }
 
 /// `v` rounded to the nearest whole number, a half up, as Chromium's

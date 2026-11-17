@@ -6,7 +6,7 @@
 use vapors_scene::{Item, Rect, TransformClass};
 
 use crate::kept_box::KeptBox;
-use crate::kept_shift_items::{rect_whole_where_finite, snapped_kind, whole_where_finite};
+use crate::kept_shift_items::{rect_whole, snapped_kind, whole_snapped};
 use crate::paint::PaintInput;
 
 /// Panics, naming the slot and the item, when the box in `slot`, its
@@ -40,7 +40,7 @@ pub(crate) fn assert_snapped_whole<'i>(
     }
     for item in items.filter(|item| snapped_kind(item)) {
         assert!(
-            whole_where_finite(item),
+            whole_snapped(item),
             "box slot {slot}, in a frame of class {:?}, paints {item:?}, not whole device \
              pixels: snapped items under a whole translation are whole (paint.rs \
              `snapped`); reproduce with `cargo xtask test`",
@@ -69,11 +69,10 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         panic!("box slot {slot}'s outline paints {item:?}, not a ring quad (paint_outline.rs)")
     };
     assert!(
-        rect_whole_where_finite(border_box),
+        rect_whole(border_box),
         "box slot {slot}'s outline ring is grown from {border_box:?}, not whole device pixels \
          (paint.rs `snapped`); reproduce with `cargo xtask test`"
     );
-    // relaxed for infinite box edges until #449 (`ring_grown_evenly`)
     assert!(
         ring_grown_evenly(ring.rect, border_box),
         "box slot {slot}'s outline ring {:?} is not grown evenly from its border box \
@@ -83,38 +82,20 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
 }
 
 /// Whether `ring` is `border_box` grown by one reach on every side, to
-/// [`REACH_TOLERANCE`]. Every reach must be finite, so a NaN one fails.
-///
-/// Relaxed: a side whose box edge is infinite has no reach, and is
-/// asked only that the ring's edge is the same infinity. Paint does not
-/// yet refuse such a box (issue #449); that issue's fix, paint refusing
-/// the box, retires this, as it retires `whole_or_infinite`'s.
+/// [`REACH_TOLERANCE`]. Every reach must be finite, so a NaN or an
+/// infinite one fails: paint refuses a box whose border box or ring is
+/// not finite before this check (`repaint.rs`, issue #449).
 fn ring_grown_evenly(ring: Rect, border_box: Rect) -> bool {
-    let sides = [
-        (border_box.left, ring.left, border_box.left - ring.left),
-        (border_box.top, ring.top, border_box.top - ring.top),
-        (border_box.right, ring.right, ring.right - border_box.right),
-        (
-            border_box.bottom,
-            ring.bottom,
-            ring.bottom - border_box.bottom,
-        ),
+    let reaches = [
+        border_box.left - ring.left,
+        border_box.top - ring.top,
+        ring.right - border_box.right,
+        ring.bottom - border_box.bottom,
     ];
-    // Exact: an infinity is compared with an infinity of the same sign.
-    #[allow(clippy::float_cmp)]
-    let infinite_matched =
-        |&(edge, ring_edge, _): &(f32, f32, f32)| !edge.is_infinite() || ring_edge == edge;
-    if !sides.iter().all(infinite_matched) {
-        return false;
-    }
-    let mut reaches = sides
+    let first = reaches[0];
+    reaches
         .iter()
-        .filter(|(edge, _, _)| !edge.is_infinite())
-        .map(|&(_, _, reach)| reach);
-    let Some(first) = reaches.next() else {
-        return true;
-    };
-    first.is_finite() && reaches.all(|reach| (reach - first).abs() <= REACH_TOLERANCE)
+        .all(|reach| reach.is_finite() && (reach - first).abs() <= REACH_TOLERANCE)
 }
 
 fn snaps(input: &PaintInput<'_>) -> bool {

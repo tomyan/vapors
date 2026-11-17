@@ -8,6 +8,7 @@ use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, clip_to, paint_box};
+use crate::paint_refusals::{NotPlaced, PartKind};
 use crate::painted::Painted;
 use crate::painting::Painting;
 
@@ -40,13 +41,14 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
-            #[cfg(debug_assertions)]
-            crate::repaint_check::assert_painted_whole(
-                &kept,
-                input.snapped(self.rects[slot]),
-                slot,
-                input,
-            );
+            let border_box = input.snapped(self.rects[slot]);
+            match not_placed(&kept, border_box) {
+                Some(part) => input.unresolvable.push(NotPlaced { slot, part }),
+                #[cfg(debug_assertions)]
+                None => crate::repaint_check::assert_painted_whole(&kept, border_box, slot, input),
+                #[cfg(not(debug_assertions))]
+                None => {}
+            }
             input.class = None;
             kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
@@ -92,13 +94,31 @@ impl<'a> Repaint<'a> {
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
-            #[cfg(debug_assertions)]
-            crate::repaint_check::assert_snapped_whole(thumb.items().iter(), slot, input);
+            if thumb.non_finite().is_some() {
+                let part = PartKind::Thumb;
+                input.unresolvable.push(NotPlaced { slot, part });
+            } else {
+                #[cfg(debug_assertions)]
+                crate::repaint_check::assert_snapped_whole(thumb.items().iter(), slot, input);
+            }
             input.class = None;
             painted.items_built += thumb.items().len();
             kept_mut(painted, slot).set_thumb(thumb);
         }
     }
+}
+
+/// What of a box's paint holds a coordinate that is not finite: its
+/// border box, its own step's items or clips, or its outline ring;
+/// `None` when every one is finite.
+fn not_placed(kept: &KeptBox, border_box: vapors_scene::Rect) -> Option<PartKind> {
+    if !crate::paint::finite(border_box) {
+        return Some(PartKind::BorderBox);
+    }
+    if let Some(found) = kept.own.scene.non_finite() {
+        return Some(PartKind::Own(found.kind));
+    }
+    kept.outline().non_finite().map(|_| PartKind::Outline)
 }
 
 /// Slot `slot`'s kept paint, or a panic naming the slot.

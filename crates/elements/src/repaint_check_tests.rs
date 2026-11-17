@@ -34,12 +34,13 @@ fn a_nan_reach_from_a_finite_box_is_not_even() {
 }
 
 #[test]
-fn a_side_whose_box_edge_is_infinite_is_not_asked_for_a_reach() {
-    // Given: the box's right edge infinite (issue #449), so the ring's is
+fn a_ring_on_an_infinite_box_edge_is_not_even() {
+    // Given: the box's right edge infinite, and the ring's; paint refuses
+    // such a box before this check (issue #449), so no reach is skipped
     let wide = Rect::new(0.0, 0.0, f32::INFINITY, 30.0);
 
-    // Then: the other three reaches are compared
-    assert!(ring_grown_evenly(
+    // Then
+    assert!(!ring_grown_evenly(
         Rect::new(-4.5, -4.5, f32::INFINITY, 34.5),
         wide
     ));
@@ -81,36 +82,26 @@ fn a_nan_in_a_later_reach_is_not_even() {
 }
 
 #[test]
-fn an_infinite_left_edge_compares_the_other_three_reaches() {
-    // Given: the left edge infinite, so the first reach compared is the
-    // top's
-    let wide = Rect::new(f32::NEG_INFINITY, 0.0, 90.0, 30.0);
-
-    // Then
-    assert!(ring_grown_evenly(
-        Rect::new(f32::NEG_INFINITY, -4.5, 94.5, 34.5),
-        wide
-    ));
-    assert!(!ring_grown_evenly(
-        Rect::new(f32::NEG_INFINITY, -4.5, 95.0, 34.5),
-        wide
-    ));
-}
-
-#[test]
-fn a_box_infinite_on_every_side_is_even_only_with_the_same_infinities() {
+fn an_infinite_edge_on_any_side_is_not_even_with_the_same_infinity_on_the_ring() {
+    // Given: paint refuses these boxes first (issue #449), so the check
+    // skips no reach, as it did before that refusal existed
+    let left = Rect::new(f32::NEG_INFINITY, 0.0, 90.0, 30.0);
     let everywhere = Rect::new(
         f32::NEG_INFINITY,
         f32::NEG_INFINITY,
         f32::INFINITY,
         f32::INFINITY,
     );
-    assert!(ring_grown_evenly(everywhere, everywhere));
-    let flipped = Rect::new(
-        f32::INFINITY,
-        f32::NEG_INFINITY,
-        f32::INFINITY,
-        f32::INFINITY,
-    );
-    assert!(!ring_grown_evenly(flipped, everywhere));
+    let cases = [
+        (Rect::new(f32::NEG_INFINITY, -4.5, 94.5, 34.5), left),
+        (everywhere, everywhere),
+    ];
+
+    // Then
+    for (ring, border_box) in cases {
+        assert!(
+            !ring_grown_evenly(ring, border_box),
+            "{ring:?} on {border_box:?}"
+        );
+    }
 }
