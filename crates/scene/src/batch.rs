@@ -136,7 +136,9 @@ impl Batched {
         {
             let at = last.run.len();
             if last.run.push(item) {
-                last.clips.push(u32::try_from(at).unwrap_or(u32::MAX), clip);
+                let at = u32::try_from(at)
+                    .expect("a batch of more than u32::MAX items: split the run (batch.rs push)");
+                last.clips.push(at, clip);
                 return;
             }
         }

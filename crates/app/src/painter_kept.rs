@@ -83,10 +83,29 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let rows = moved.rows.items();
         let Some((frame, clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
+        let drawn = self.draw_retained_at(
+            (target, painted),
+            (run, key, at),
+            moved,
+            (frame, &clips, rows_base),
+        );
+        self.clips.runs = clips; // the scratch back, for the next batch
+        drawn
+    }
+
+    /// [`draw_retained`](Self::draw_retained) at the table entries
+    /// worked out for it.
+    fn draw_retained_at(
+        &mut self,
+        (target, painted): (&Target<'_>, &Painted),
+        (run, key, at): (&Run, BatchKey, usize),
+        moved: &Moved<'_>,
+        (frame, clips, rows_base): (u32, &[(u32, u32)], u32),
+    ) -> Result<(), PaintError> {
+        let rows = moved.rows.items();
         // image and surface bytes name no entry: their draw's uniform does
         let named = if matches!(run, Run::Images(_) | Run::Surfaces(_)) {
             0
@@ -97,7 +116,7 @@ impl ScenePainter {
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, ((named, &clips), rows, moved.offsets.len()), key, at),
+            (run, ((named, clips), rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
@@ -147,9 +166,10 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let Some((frame, _no_clips, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
+        self.clips.runs = clips; // text keeps the scissor until F3.1b
         let parts = (&mut self.text, &mut self.atlas);
         let rows = (frame, moved.rows.items(), moved.offsets.len());
         let kept = self

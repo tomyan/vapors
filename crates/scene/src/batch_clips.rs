@@ -22,7 +22,19 @@ impl Clips {
 
     /// Item `at`, the next, under `clip`: a new run when it differs from
     /// the last item's.
+    ///
+    /// # Panics
+    ///
+    /// When `at` is not past the last run's first item: the runs must
+    /// rise, each item reading the last run at or before it.
     pub fn push(&mut self, at: u32, clip: Option<Rect>) {
+        let last_first = self.0.last().map_or(0, |&(first, _)| first);
+        assert!(
+            at > last_first,
+            "clip runs {:?} given item {at}: items are pushed in order, after the last run's \
+             first (batch_clips.rs)",
+            self.0
+        );
         if self.last() != clip {
             self.0.push((at, clip));
         }

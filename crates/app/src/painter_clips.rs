@@ -5,11 +5,11 @@
 //! frame's entry in the transform table. Set every frame it is drawn, so
 //! a frame entry that moved is followed (item 4); kept while drawn and
 //! given back after a frame that does not draw it, before the frame
-//! entries are (item 2's order). F3.1 joins no batches across clips yet,
-//! so a batch draws under one entry; text and image batches keep the
-//! scissor until F3.1b moves them onto the table, which retires the
-//! agreement check below. A clip's edges are whole device pixels until
-//! F4a (`assert_whole`).
+//! entries are (item 2's order). A batch joined across clips (step 2)
+//! names an entry for each run of its items under one clip; text and
+//! image batches keep the scissor until F3.1b moves them onto the table,
+//! which retires the agreement check below. A clip's edges are whole
+//! device pixels until F4a (`assert_whole`).
 
 use std::collections::HashMap;
 
@@ -23,6 +23,9 @@ pub(super) struct Clips {
     held: HashMap<(BatchFrame, [u32; 4]), Held>,
     /// Counts the frames: an entry drawn in this one has it as `drawn`.
     frame: u64,
+    /// The scratch a batch's clip entries are worked out in, reused batch
+    /// after batch so a frame allocates none (`painter_kept_entries.rs`).
+    pub(super) runs: Vec<(u32, u32)>,
 }
 
 /// An entry held: where, the frame entry it names, and the frame that
@@ -44,6 +47,7 @@ impl Clips {
             table: ClipTable::new(device, "painter clips"),
             held: HashMap::new(),
             frame: 0,
+            runs: Vec::new(),
         }
     }
 

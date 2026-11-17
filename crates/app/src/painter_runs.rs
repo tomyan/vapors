@@ -6,7 +6,7 @@
 
 use vapors_elements::{BatchKey, KeptBatched, Painted};
 use vapors_renderer::Target;
-use vapors_scene::{Rect, Run};
+use vapors_scene::{Clips, Rect, Run};
 
 use super::ScenePainter;
 use super::errors::PaintError;
@@ -65,7 +65,7 @@ impl ScenePainter {
         batch: &vapors_scene::Batch,
         frame: vapors_elements::FrameDraw,
     ) -> Target<'t> {
-        if scissor_clip(&batch.run, batch.clips.union()).is_none() {
+        if scissor_clip(&batch.run, &batch.clips).is_none() {
             return clipped(target, frame.on_page(None))
                 .expect("inside the batch's clip on the page, so inside the frame's clip");
         }
@@ -149,11 +149,28 @@ fn assert_parallel(kept: &KeptBatched) {
     );
 }
 
-/// The clip of a batch's own, `clip`, that its scissor cuts to: none
-/// for a run on the clip table ([`Run::clipped_by_table`], the one
-/// answer), whose scissor is its frame's clip only; `clip` for the rest.
-pub(super) fn scissor_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
-    if run.clipped_by_table() { None } else { clip }
+/// The clip of a batch's own, of its items' `clips`, that its scissor
+/// cuts to: none for a run on the clip table ([`Run::clipped_by_table`],
+/// the one answer), whose scissor is its frame's clip only; the one clip
+/// every item has for the rest.
+///
+/// # Panics
+///
+/// When a run the scissor clips has items under more than one clip: the
+/// scissor would widen to their union and let each item past its own
+/// (vapors-scene `batch.rs` `push` joins only runs on the clip table).
+pub(super) fn scissor_clip(run: &Run, clips: &Clips) -> Option<Rect> {
+    if run.clipped_by_table() {
+        return None;
+    }
+    clips.uniform().unwrap_or_else(|| {
+        panic!(
+            "a {run:?} batch the scissor clips has items under several clips {:?}: only runs on \
+             the clip table join across clips (vapors-scene batch.rs `push`); reproduce with \
+             `cargo xtask test`",
+            clips.runs()
+        )
+    })
 }
 
 /// The clip a batch's items under `clip` read from the clip table: `clip`

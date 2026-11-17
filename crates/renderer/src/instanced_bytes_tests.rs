@@ -53,7 +53,7 @@ fn each_item_names_the_clip_entry_of_its_run() {
     let quads = [two_quads()[0]; 3];
 
     // When
-    let bytes = QuadPipeline::bytes_in(&quads, (9, &[(1, 7)]), &[]);
+    let bytes = QuadPipeline::bytes_in(&quads, (9, &[(0, 0), (1, 7)]), &[]);
 
     // Then: each instance's clip index, after its row and frame
     let clip = |item: usize| bytes[item * 144 + 136..item * 144 + 140].to_vec();
@@ -63,7 +63,15 @@ fn each_item_names_the_clip_entry_of_its_run() {
 }
 
 #[test]
-#[should_panic(expected = "quads: clip runs [(1, 7), (1, 8)] for 2 items")]
+#[should_panic(expected = "quads: clip runs [(0, 7), (1, 8), (1, 9)] for 2 items")]
 fn clip_runs_out_of_order_are_refused() {
-    let _ = QuadPipeline::bytes_in(&two_quads(), (0, &[(1, 7), (1, 8)]), &[]);
+    let _ = QuadPipeline::bytes_in(&two_quads(), (0, &[(0, 7), (1, 8), (1, 9)]), &[]);
+}
+
+#[test]
+#[should_panic(
+    expected = "quads: clip runs [(1, 7)] for 2 items: the first run must start at item 0"
+)]
+fn clip_runs_that_leave_the_first_item_out_are_refused() {
+    let _ = QuadPipeline::bytes_in(&two_quads(), (0, &[(1, 7)]), &[]);
 }

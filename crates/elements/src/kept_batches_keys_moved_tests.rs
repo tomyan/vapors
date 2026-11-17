@@ -4,7 +4,7 @@
 
 use vapors_scene::{Batched, Rect};
 
-use super::tests::{batches, keyed, quad};
+use super::tests::{batches, keyed, split_item};
 
 /// A batch per row of `rows`, each a quad under a clip other than its
 /// neighbours': what a list in a view shows.
@@ -18,7 +18,7 @@ fn rows_of(rows: &[u8]) -> Batched {
         at.is_multiple_of(2)
             .then(|| Rect::new(0.0, 0.0, 90.0, 90.0))
     };
-    let row = |(at, &row): (usize, &u8)| (quad(f32::from(row), row), clip(at));
+    let row = |(at, &row): (usize, &u8)| (split_item(f32::from(row), row), clip(at));
     batches(&rows.iter().enumerate().map(row).collect::<Vec<_>>())
 }
 
