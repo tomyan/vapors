@@ -4,10 +4,12 @@
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
 mod api_budget;
+mod api_build_drain;
 mod api_build_report;
 mod api_build_run;
 mod api_build_setup;
 mod api_clone;
+mod api_curls;
 mod api_fds;
 mod api_fences;
 mod api_fences_run;

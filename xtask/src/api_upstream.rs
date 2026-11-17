@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use crate::api_curls::Curls;
 use crate::api_http::Request;
 use crate::api_usage::{Counted, Scan};
 use crate::ux_secret::Secret;
@@ -91,32 +92,35 @@ impl Drop for Staged {
 /// passed the key guard and the escaping.
 pub fn forward(
     request: &Request,
-    secret: &Secret,
+    (secret, curls): (&Secret, &Curls),
     staged: &Staged,
     client: &mut impl Write,
 ) -> Result<Forwarded, String> {
-    forward_by("curl", request, (secret, staged), client)
+    forward_by("curl", request, (secret, staged, curls), client)
 }
 
 /// [`forward`] with `program` as curl, for the tests' stand-ins.
 fn forward_by(
     program: &str,
     request: &Request,
-    (secret, staged): (&Secret, &Staged),
+    (secret, staged, curls): (&Secret, &Staged, &Curls),
     client: &mut impl Write,
 ) -> Result<Forwarded, String> {
     let mut curl = started(program, request, (secret, &staged.0))?;
+    curls.started(&curl);
     let stdout = curl.stdout.take().ok_or("curl's stdout was not opened")?;
     let mut response = BufReader::new(stdout);
-    let status =
-        passed_head(&mut response, client).map_err(|why| ended(&mut curl, secret, &why))?;
+    let status = passed_head(&mut response, client)
+        .map_err(|why| ended(&mut curl, (secret, curls), &why))?;
     let mut scan = Scan::default();
     let client_gone = !streamed(&mut response, client, &mut scan);
     if client_gone {
         let _ = curl.kill(); // the session stopped reading; curl's output goes nowhere
     }
     drop(response);
-    let exit = curl.wait().map_err(|e| format!("waiting for curl: {e}"))?;
+    let exit = curls
+        .reaped(&mut curl)
+        .map_err(|e| format!("waiting for curl: {e}"))?;
     let counted = match (client_gone, exit.success()) {
         (true, _) => Counted::Cut("the session stopped reading the response".into()),
         (false, false) => Counted::Cut(format!("curl ended with {exit} after the response head")),
@@ -260,9 +264,9 @@ fn streamed(response: &mut impl Read, client: &mut impl Write, scan: &mut Scan) 
 }
 
 /// curl's failure, after `why`, its output guarded.
-fn ended(curl: &mut Child, secret: &Secret, why: &str) -> String {
+fn ended(curl: &mut Child, (secret, curls): (&Secret, &Curls), why: &str) -> String {
     let _ = curl.kill(); // it may have ended already
-    let _ = curl.wait(); // reaped; its stderr is read below
+    let _ = curls.reaped(curl); // its stderr is read below
     let mut said = String::new();
     if let Some(mut stderr) = curl.stderr.take() {
         let _ = stderr.read_to_string(&mut said);

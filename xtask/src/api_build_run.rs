@@ -91,39 +91,12 @@ fn session(
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     let session = sandboxed(builder, host, &words)?;
     let ended = crate::api_session::run(session, (order.brief, &result), &proxy.budget)?;
-    drained(proxy);
+    let drained = crate::api_build_drain::drained(
+        &proxy.budget,
+        (&|| proxy.in_flight(), &proxy.curls),
+        crate::api_build_drain::DRAIN_DEADLINE,
+    );
     let (lines, agreed) =
         crate::api_build_report::summary(&ended, (&result, builder), routes, proxy);
-    Ok((lines, ended, agreed))
+    Ok((lines, ended, drained.and(agreed)))
 }
-
-/// How long the requests still in flight when the session ends may take
-/// to settle: each one's writes to the session, now gone, fail at once or
-/// within the server's 60 s write bound, and it settles then; 90 s covers
-/// that.
-const DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(90);
-
-/// No more requests admitted, and those in flight given until
-/// [`DRAIN_DEADLINE`] to settle, so the summary counts them (review of
-/// #476-#478, L6); any still in flight then are reported by the summary.
-fn drained(proxy: &Proxy) {
-    proxy.budget.close("the session has ended");
-    waited(&|| proxy.in_flight(), DRAIN_DEADLINE);
-}
-
-/// Until `in_flight` says none, or `deadline` passes; whether none were
-/// left.
-fn waited(in_flight: &dyn Fn() -> usize, deadline: std::time::Duration) -> bool {
-    let started = std::time::Instant::now();
-    while in_flight() > 0 {
-        if started.elapsed() >= deadline {
-            return false;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    true
-}
-
-#[cfg(test)]
-#[path = "api_build_run_tests.rs"]
-mod tests;

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::api_budget::Budget;
+use crate::api_curls::Curls;
 use crate::api_http::Request;
 use crate::api_server::{Reader, Routes, refuse, reply};
 use crate::api_upstream::Staged;
@@ -25,6 +26,8 @@ pub struct Proxy {
     pub budget: Budget,
     /// Private, outside the sandbox: each request's body is staged here.
     pub staging: PathBuf,
+    /// The curls in flight, for the drain to end (`api_build_drain.rs`).
+    pub curls: Curls,
     staged: AtomicU64,
     in_flight: AtomicUsize,
 }
@@ -41,6 +44,7 @@ impl Proxy {
             secret,
             budget,
             staging,
+            curls: Curls::default(),
             staged: AtomicU64::new(0),
             in_flight: AtomicUsize::new(0),
         }
@@ -129,8 +133,9 @@ fn forwarded(
     body: &[u8],
 ) -> (u16, Counted) {
     let number = proxy.staged.fetch_add(1, Ordering::Relaxed);
-    let sent = Staged::new(proxy.staging.join(format!("{number}.json")), body)
-        .and_then(|staged| crate::api_upstream::forward(request, &proxy.secret, &staged, stream));
+    let sent = Staged::new(proxy.staging.join(format!("{number}.json")), body).and_then(|staged| {
+        crate::api_upstream::forward(request, (&proxy.secret, &proxy.curls), &staged, stream)
+    });
     match sent {
         Ok(forwarded) => (forwarded.status, forwarded.counted),
         Err(why) => {

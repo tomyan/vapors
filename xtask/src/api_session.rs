@@ -101,14 +101,37 @@ fn escaped_lines(stderr: std::process::ChildStderr) {
 
 /// Each line of `from` written to `to` as `session: <line>`, escaped.
 fn escaped_to(from: impl std::io::Read, to: &mut impl std::io::Write) {
-    use std::io::BufRead;
-    for line in std::io::BufReader::new(from)
-        .split(b'\n')
-        .map_while(Result::ok)
-    {
+    let mut from = std::io::BufReader::new(from);
+    while let Some(line) = bounded_line(&mut from) {
         let line = String::from_utf8_lossy(&line);
         if writeln!(to, "session: {}", crate::api_refusals::escaped(&line)).is_err() {
             return; // the terminal is gone; nothing is left to protect
+        }
+    }
+}
+
+/// The most bytes of one stderr line held: the rest, to its newline, is
+/// read and dropped, so a process that writes without a newline cannot
+/// grow xtask's memory, which is outside the scope's limit (review of
+/// #476-#478, N4). `api_refusals::escaped` prints 200 characters of it.
+const LINE_BYTES: usize = 4096;
+
+/// The next line of `from` without its newline, at most [`LINE_BYTES`];
+/// a last line with no newline too; `None` at the end or on an error.
+fn bounded_line(from: &mut impl std::io::BufRead) -> Option<Vec<u8>> {
+    let mut line = Vec::new();
+    loop {
+        let buffer = from.fill_buf().ok()?;
+        if buffer.is_empty() {
+            return (!line.is_empty()).then_some(line);
+        }
+        let newline = buffer.iter().position(|&byte| byte == b'\n');
+        let taken = newline.map_or(buffer.len(), |at| at + 1);
+        let room = LINE_BYTES.saturating_sub(line.len());
+        line.extend_from_slice(&buffer[..newline.unwrap_or(taken).min(room)]);
+        from.consume(taken);
+        if newline.is_some() {
+            return Some(line);
         }
     }
 }
