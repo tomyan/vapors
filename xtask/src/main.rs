@@ -17,9 +17,11 @@ mod api_fences_works;
 mod api_host;
 mod api_http;
 mod api_inner;
+mod api_limits;
 mod api_paths;
 #[allow(dead_code, reason = "constructed by api-build, the next PR")]
 mod api_prices;
+mod api_refusals;
 mod api_sandbox;
 mod api_server;
 #[allow(dead_code, reason = "constructed by api-build, the next PR")]

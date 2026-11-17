@@ -12,8 +12,8 @@
 use std::io::{BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -39,7 +39,7 @@ const CONNECTIONS: usize = 64;
 pub struct Routes {
     /// The API route, when the run has a key.
     pub proxy: Option<Proxy>,
-    pub refused: Mutex<Vec<String>>,
+    pub refused: crate::api_refusals::Refusals,
     /// `HEAD /api/hello` answered here.
     pub hellos: AtomicU64,
 }
@@ -140,13 +140,7 @@ impl Read for Deadlined {
 /// `why` logged and kept for the summary, and the session told, as the
 /// API words an error, so the CLI shows it.
 pub fn refuse(stream: &mut UnixStream, routes: &Routes, why: &str) {
-    eprintln!("api-build: refused: {why}");
-    match routes.refused.lock() {
-        Ok(mut log) => log.push(why.to_owned()),
-        Err(_) => {
-            eprintln!("api-build: the refusal log's lock was poisoned; this refusal is only here");
-        }
-    }
+    routes.refused.push(why);
     let body =
         serde_json::json!({"type": "error", "error": {"type": "permission_error", "message": why}});
     reply(stream, "403 Forbidden", &body.to_string());

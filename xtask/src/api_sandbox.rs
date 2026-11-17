@@ -20,6 +20,17 @@ pub const BIN: &str = "/opt/api-build";
 /// port is free there.
 pub const RELAY_PORT: u16 = 8080;
 
+/// The most the sandbox's /tmp may hold: a tmpfs is memory, and without a
+/// size it may take half the host's. Measured 2026-11-17: the ci steps
+/// inside used at most 20 KB of /tmp (sampled every 5 s); 1 GiB leaves room
+/// for a test that writes large scratch files and bounds one that loops.
+const TMP_BYTES: &str = "1073741824";
+
+/// The most the home tmpfs may hold: the mountpoints of the binds and
+/// the CLI's own config, a few MB; 256 MiB bounds what a session can
+/// write there.
+const HOME_BYTES: &str = "268435456";
+
 /// The key the session sees: not a key. The harness adds the real one
 /// outside (`docs/plans/api-builder.md`).
 pub const DUMMY_KEY: &str = "sk-ant-api-build-dummy";
@@ -55,6 +66,10 @@ fn isolation() -> Vec<String> {
         "--unshare-ipc",
         "--unshare-uts",
         "--unshare-cgroup",
+        // its own user namespace, in which it may make no other: nested
+        // user namespaces widen the kernel surface a session can reach
+        "--unshare-user",
+        "--disable-userns",
         "--die-with-parent",
         "--new-session",
         "--clearenv",
@@ -71,7 +86,7 @@ fn system(render_nodes: &[PathBuf]) -> Vec<String> {
         ]));
     }
     args.extend(words(&[
-        "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+        "--proc", "/proc", "--dev", "/dev", "--size", TMP_BYTES, "--tmpfs", "/tmp",
     ]));
     for node in render_nodes {
         args.extend(bind("--dev-bind", node, node));
@@ -83,7 +98,8 @@ fn system(render_nodes: &[PathBuf]) -> Vec<String> {
 
 /// The home directory hidden, then what is bound back into it.
 fn home(builder: &Builder, host: &Host) -> Vec<String> {
-    let mut args = vec!["--tmpfs".into(), text(&builder.home)];
+    let mut args = words(&["--size", HOME_BYTES, "--tmpfs"]);
+    args.push(text(&builder.home));
     for read_only in read_only(builder, host) {
         args.extend(bind("--ro-bind", &read_only, &read_only));
     }
