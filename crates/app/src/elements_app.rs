@@ -30,6 +30,8 @@ pub struct ElementsApp {
     painter: Option<ScenePainter>,
     /// The painter's atlas; `None` sizes it for the device.
     atlas: Option<vapors_text::AtlasConfig>,
+    /// The samples its painter draws at (`docs/plans/flat-scene-f7.md`).
+    samples: vapors_renderer::Samples,
     /// Surface renderers, before and after the painter exists.
     surfaces: AppSurfaces,
     failure: Failure,
@@ -84,6 +86,7 @@ impl ElementsApp {
             document,
             painter: None,
             atlas: None,
+            samples: vapors_renderer::Samples::One,
             surfaces: AppSurfaces::default(),
             failure: Failure::default(),
             input: DocumentInput::new(),

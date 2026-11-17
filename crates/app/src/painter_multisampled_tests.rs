@@ -1,8 +1,8 @@
-//! GPU tier: the painter's 4x textures are one for each target view a
-//! frame draws to, the same texture while each frame draws to the view,
-//! a new one at a new size, dropped after a frame that does not draw to
-//! the view, and none at 1 sample; a target naming its own
-//! multisampled view is refused.
+//! GPU tier: the painter's 4x textures are one for each viewport size a
+//! frame draws at, the same texture while each frame draws at the size
+//! whatever view it is given, a new one at a new size, the old dropped,
+//! and none at 1 sample; a target naming its own multisampled view is
+//! refused.
 
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu};
@@ -61,35 +61,51 @@ fn page() -> Document {
 }
 
 #[test]
-fn gpu_a_4_sample_painter_keeps_a_views_texture_while_each_frame_draws_to_it() {
+fn gpu_a_4_sample_painter_keeps_one_texture_for_frames_into_new_views_of_one_size() {
     // Given
     let gpu = gpu();
-    let (mut painter, mut doc, view) = (painter(&gpu, Samples::Four), page(), view_of(&gpu, 32));
+    let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
 
-    // When: two frames into one view
-    draw_into((&gpu, &mut painter, &mut doc), (&view, 32), None);
-    let first = painter.multisampled.held_for(&view).expect("held");
-    draw_into((&gpu, &mut painter, &mut doc), (&view, 32), None);
+    // When: two frames, each into a new view of a 32 square, as an app's
+    // surface gives
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
+    let first = painter.multisampled.held_at((32, 32)).expect("held");
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
 
     // Then: the same texture, the only one
-    assert_eq!(painter.multisampled.held_for(&view), Some(first));
+    assert_eq!(painter.multisampled.held_at((32, 32)), Some(first));
     assert_eq!(painter.multisampled.held(), 1);
 }
 
 #[test]
-fn gpu_a_frame_into_another_view_drops_the_first_views_texture() {
+fn gpu_a_frame_at_a_new_size_makes_a_texture_and_drops_the_old() {
     // Given
     let gpu = gpu();
     let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
-    let (first, second) = (view_of(&gpu, 32), view_of(&gpu, 32));
 
-    // When: a frame into each, the same size
-    draw_into((&gpu, &mut painter, &mut doc), (&first, 32), None);
-    draw_into((&gpu, &mut painter, &mut doc), (&second, 32), None);
+    // When
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 16), 16),
+        None,
+    );
 
-    // Then: the second's texture alone, not the first's shared
-    assert!(painter.multisampled.held_for(&first).is_none());
-    assert!(painter.multisampled.held_for(&second).is_some());
+    // Then
+    assert!(painter.multisampled.held_at((32, 32)).is_none());
+    assert!(painter.multisampled.held_at((16, 16)).is_some());
     assert_eq!(painter.multisampled.held(), 1);
 }
 

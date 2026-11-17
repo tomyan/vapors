@@ -77,19 +77,21 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    between, or a flush) loads it, so the texture is stored at the end
    of every pass, and every pass resolves (Q3).
    - **Owner and key.** The painter owns its 4x textures, one for each
-     target view it draws to, at the viewport's size (not the texture's,
-     so a view of a smaller mip level gets a texture of that level's
-     size). Keyed by size alone, two views of one size would share one,
-     and a pass loading it would resolve the other view's frame (#472's
-     review, M1).
-   - **Lifetime.** A texture is made on the first draw to its view,
-     kept while each frame draws to that view, and dropped after a frame
+     viewport size it draws at (not the texture's size, so a view of a
+     smaller mip level gets a texture of that level's size). Keyed by
+     target view (#472's review, M1), the texture was made again every
+     frame, since an app makes a new view of its surface's texture each
+     frame: 41.5 MB a frame at the Pixel 9 Pro's 1080 x 2400, which took
+     the phone down (2026-11-17). Keyed by size, two views of one size
+     share it, so each records the view its frame was cleared for, and a
+     pass loading it for another view is refused: its resolve would put
+     that view's frame on this one. `FrameCounts::multisampled_made`
+     counts the textures made each frame.
+   - **Lifetime.** A texture is made on the first draw at its size,
+     kept while each frame draws at that size, and dropped after a frame
      that does not, the rule kept bytes and table entries already
-     follow. Each `draw` is a frame, so a painter drawing two targets in
-     an app frame remakes each one's texture on each call, and a tooltip
-     on a view after another view's `draw` meets a fresh texture, which
-     F7a1's uncleared-load check refuses. A resize is a new size: the old
-     texture goes after the first frame at the new size.
+     follow. A resize is a new size: the old texture goes after the
+     first frame at the new size.
    - **Where.** `Target` gains the 4x view beside the target's view
      (`None` at 1x). `FrameEncoder::begin` passes both to
      `OpenPass::begin`, which attaches the 4x view with the target's

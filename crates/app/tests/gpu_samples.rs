@@ -4,7 +4,8 @@
 //! where a triangle's edge crosses it, so shapes off the pixel grid
 //! differ at their edges (the demos, identical, are in `gpu_demos.rs`);
 //! a tooltip at 4 samples draws as at 1; and a tooltip on a view after
-//! another view's frame is refused, not drawn over that view's.
+//! another view's frame is refused, not drawn over that view's: the two
+//! share the size's 4x texture, which holds the other's frame.
 
 use vapors_renderer::Samples;
 
@@ -138,7 +139,7 @@ fn gpu_a_tooltip_at_4_samples_draws_as_at_1() {
 }
 
 #[test]
-#[should_panic(expected = "which this frame's encoder has not cleared")]
+#[should_panic(expected = "its resolve would put that view's frame on this one")]
 fn gpu_a_tooltip_on_a_view_after_another_views_frame_at_4_samples_is_refused() {
     // Given: two views of one size, one encoder
     let mut doc = tooltip_page();
@@ -177,4 +178,63 @@ fn gpu_a_tooltip_on_a_view_after_another_views_frame_at_4_samples_is_refused() {
     let _ = rig
         .painter
         .draw_tooltip(&on(&first), &mut doc, &tooltip, Some([2.0, 2.0]));
+}
+
+/// 600 frames of an app at 4 samples into one 64-pixel surface texture,
+/// a class toggled before each so every frame paints: each frame's 4x
+/// textures made (`FrameCounts::multisampled_made`).
+fn made_per_frame() -> Vec<u64> {
+    let gpu = vapors_gpu_harness::gpu();
+    let mut doc = document(
+        ".on { background-color: #f00; } div { height: 8px; }",
+        &[(None, "div", "")],
+    );
+    update(&mut doc, 1.0);
+    let div = doc.children(doc.body())[0];
+    let shared = std::rc::Rc::new(std::cell::RefCell::new(doc));
+    let mut app =
+        vapors_app::ElementsApp::new(std::rc::Rc::clone(&shared)).with_samples(Samples::Four);
+    let start = vapors_platform::Start {
+        width: 64,
+        height: 64,
+        ..crate::support_surface::start_rig::start_at(&gpu)
+    };
+    vapors_platform::App::start(&mut app, &start).expect("starts");
+    let texture = vapors_renderer::clear(
+        &gpu.device,
+        &gpu.queue,
+        64,
+        64,
+        vapors_scene::Color::default(),
+    );
+    let now = vapors_platform::Instant::now();
+    (0..600u64)
+        .map(|index| {
+            let class = if index % 2 == 0 { "on" } else { "" };
+            shared.borrow_mut().set_attribute(div, "class", class);
+            let frame = vapors_platform::Frame {
+                adapter: &gpu.adapter,
+                device: &gpu.device,
+                queue: &gpu.queue,
+                texture: &texture,
+                index,
+                scale_factor: 1.0,
+                now,
+            };
+            let _ = vapors_platform::App::frame(&mut app, &frame);
+            app.frame_counts().multisampled_made
+        })
+        .collect()
+}
+
+#[test]
+fn gpu_an_app_at_4_samples_makes_one_4x_texture_over_600_frames_at_one_size() {
+    // When: the app makes a new view of the surface's texture each frame
+    let made = made_per_frame();
+
+    // Then: one, on the first frame (each one made is 16 bytes a device
+    // pixel: 41.5 MB a frame at the Pixel 9 Pro's 1080 x 2400 when it
+    // was made every frame, 2026-11-17)
+    assert_eq!(made[0], 1);
+    assert_eq!(made.iter().sum::<u64>(), 1, "{:?}", &made[..8]);
 }

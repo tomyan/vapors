@@ -48,7 +48,7 @@ impl ScenePainter {
         );
         let text_size = [layout.width(), layout.height()].map(|v| v.ceil() / scale);
         let placed = tooltip_box(&style, text_size, anchor, window, scale)?;
-        let multisampled = self.multisampled.view_for(target);
+        let multisampled = self.multisampled.view_for(target, super::Use::Load);
         let target = super::attached(*target, multisampled.as_ref());
         self.draw_box(&target, &placed, &layout)
     }
