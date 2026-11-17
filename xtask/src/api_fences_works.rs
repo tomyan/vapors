@@ -20,7 +20,7 @@ pub struct Works {
 pub enum Expected {
     /// Exactly this.
     Is(String),
-    /// None of these lines: the host's own values.
+    /// As many lines as these, and none of them: the host's own values.
     NoneOf(Vec<String>),
 }
 
@@ -61,9 +61,12 @@ impl Expected {
     fn met(&self, output: &str) -> bool {
         match self {
             Self::Is(expected) => output == expected,
-            Self::NoneOf(host) => !output
-                .lines()
-                .any(|line| host.iter().any(|value| value == line)),
+            Self::NoneOf(host) => {
+                output.lines().count() == host.len()
+                    && !output
+                        .lines()
+                        .any(|line| host.iter().any(|value| value == line))
+            }
         }
     }
 }
@@ -92,7 +95,7 @@ pub fn host_namespaces() -> Result<Vec<String>, String> {
 }
 
 /// The namespaces bwrap unshares (`api_sandbox.rs` `isolation`).
-pub const NAMESPACES: [&str; 5] = ["ipc", "net", "pid", "uts", "cgroup"];
+pub const NAMESPACES: [&str; 6] = ["ipc", "net", "pid", "uts", "cgroup", "user"];
 
 #[cfg(test)]
 #[path = "api_fences_works_tests.rs"]

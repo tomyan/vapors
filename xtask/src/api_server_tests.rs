@@ -9,7 +9,7 @@ use super::{Routes, answered};
 /// `request` sent, the server's answer to it, and what it refused.
 fn exchanged(request: &[u8]) -> (String, Vec<String>) {
     let (answer, routes) = exchanged_with(request);
-    let log = routes.refused.lock().expect("the log").clone();
+    let (log, _) = routes.refused.kept();
     (answer, log)
 }
 
