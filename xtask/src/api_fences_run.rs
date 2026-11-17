@@ -15,6 +15,7 @@ use crate::api_sandbox::{BIN, Host, RELAY_PORT, arguments};
 /// Proves builder `name`'s fences.
 pub fn run(name: &str) -> ExitCode {
     let proven = crate::api_fds::refuse_inherited()
+        .and_then(|()| crate::api_limits::no_core_dumps())
         .and_then(|()| crate::api_host::home())
         .and_then(|home| Builder::new(name, &home))
         .and_then(|builder| made_and_proven(&builder));
@@ -37,14 +38,31 @@ pub fn run(name: &str) -> ExitCode {
 fn made_and_proven(builder: &Builder) -> Result<Vec<String>, String> {
     let (main, objects) = crate::api_clone::main_repository()?;
     crate::api_clone::make(builder, (&main, &objects), &branch(builder))?;
-    let proven = crate::api_host::host(objects).and_then(|host| proven(builder, &host));
+    let routes = std::sync::Arc::new(crate::api_server::Routes::default());
+    let proven = crate::api_server::serve(&builder.socket(), std::sync::Arc::clone(&routes))
+        .and_then(|()| crate::api_host::host(objects))
+        .and_then(|host| proven(builder, &host))
+        .map(|mut lines| {
+            let (kept, count) = routes.refused.kept();
+            lines.push(format!(
+                "the harness refused {count} requests during the fences: {}",
+                kept.join("; ")
+            ));
+            lines
+        });
     let removed = removed(builder);
     let lines = proven?;
     removed.map(|()| lines)
 }
 
-fn proven(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
-    crate::api_server::serve(&builder.socket())?;
+/// Builder's fences proven and what must work inside checked, the
+/// harness server already on its socket; a line for each.
+///
+/// # Errors
+///
+/// A fence broken, a probe that cannot show its escape, or a check that
+/// fails inside.
+pub fn proven(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
     let inside = |script: &str| inside(builder, host, script);
     let key_file = builder.home.join(KEY_FILE);
     let escapes = Escapes {
@@ -118,24 +136,32 @@ pub fn branch(builder: &Builder) -> String {
 /// [`SENTINEL`] first.
 fn inside(builder: &Builder, host: &Host, script: &str) -> Result<Ran, String> {
     let script = format!("echo '{SENTINEL}'; {script}");
-    let mut command = sandboxed(builder, host, &["bash", "-c", &script]);
+    let mut command = sandboxed(builder, host, &["bash", "-c", &script])?;
     command.env(CANARY.0, CANARY.1);
     ran(command)
 }
 
 /// `command` to run inside builder's sandbox, under the relay, its stdin
-/// /dev/null.
-pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Command {
-    let mut bwrap = Command::new("bwrap");
-    bwrap
+/// /dev/null, within the scope's limits (`api_limits.rs`).
+///
+/// # Errors
+///
+/// This process holding a descriptor the sandbox would inherit
+/// (`api_fds.rs`): checked here, so no caller can start a sandbox without
+/// the check.
+pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Result<Command, String> {
+    crate::api_fds::refuse_inherited()?;
+    let mut scoped = crate::api_limits::scope(&host.xtask);
+    scoped
+        .arg("bwrap")
         .args(arguments(builder, host, RELAY_PORT))
         .stdin(Stdio::null());
-    bwrap.arg(Path::new(BIN).join("xtask"));
+    scoped.arg(Path::new(BIN).join("xtask"));
     let port = RELAY_PORT.to_string();
-    bwrap.args(["api-relay-inner", "--port", &port, "--socket"]);
-    bwrap.arg(builder.socket());
-    bwrap.arg("--").args(command);
-    bwrap
+    scoped.args(["api-relay-inner", "--port", &port, "--socket"]);
+    scoped.arg(builder.socket());
+    scoped.arg("--").args(command);
+    Ok(scoped)
 }
 
 /// The builder's directories removed.

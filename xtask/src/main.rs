@@ -3,16 +3,34 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+mod api_budget;
+mod api_build_drain;
+mod api_build_report;
+mod api_build_run;
+mod api_build_setup;
 mod api_clone;
+mod api_curls;
 mod api_fds;
 mod api_fences;
 mod api_fences_run;
 mod api_fences_works;
 mod api_host;
+mod api_http;
 mod api_inner;
+mod api_json_strict;
+mod api_limits;
 mod api_paths;
+mod api_prices;
+mod api_refusals;
+mod api_request_content;
+mod api_request_policy;
 mod api_sandbox;
 mod api_server;
+mod api_server_proxy;
+mod api_session;
+mod api_tool_prompt;
+mod api_upstream;
+mod api_usage;
 mod builds;
 mod builds_config;
 mod builds_tree;
@@ -177,6 +195,21 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::ApiFences { name } => return api_fences_run::run(&name),
+        Command::ApiBuild {
+            name,
+            brief,
+            budget,
+            model,
+        } => {
+            let order = api_build_run::Order {
+                name: &name,
+                brief: &brief,
+                budget,
+                model: &model,
+            };
+            return api_build_run::run(&order);
+        }
+        Command::ApiScoped { command } => return api_limits::scoped(&command),
         Command::ApiRelayInner {
             port,
             socket,

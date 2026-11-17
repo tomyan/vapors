@@ -108,6 +108,7 @@ fn reaches(escapes: &Escapes<'_>) -> Vec<Probe> {
             "see a process outside",
             format!("test -e /proc/{}", std::process::id()),
         ),
+        probe("make a user namespace", "unshare --user true".into()),
         probe(
             "push",
             format!("git -C {} {push}", quoted(escapes.clone_dir)),
@@ -161,7 +162,8 @@ fn checked(probe: &Probe, inside: &dyn Fn(&str) -> Result<Ran, String>) -> Resul
         return Err(format!(
             "the sandbox did not run probe {:?}: it never said {SENTINEL:?} ({}); the \
              sandbox's arguments are api_sandbox.rs",
-            probe.name, output.said
+            probe.name,
+            crate::api_refusals::escaped(&output.said)
         ));
     }
     if escaped(probe, &output) {
@@ -171,7 +173,9 @@ fn checked(probe: &Probe, inside: &dyn Fn(&str) -> Result<Ran, String>) -> Resul
         return Err(format!(
             "fence broken, {}: inside the sandbox `{}` succeeded ({}); the sandbox's arguments \
              are api_sandbox.rs; reproduce with `cargo xtask api-fences <name>`",
-            probe.name, probe.script, output.said
+            probe.name,
+            probe.script,
+            crate::api_refusals::escaped(&output.said)
         ));
     }
     Ok(format!("fence held: {}", probe.name))
@@ -191,7 +195,9 @@ fn control(probe: &Probe) -> Result<(), String> {
     Err(format!(
         "probe cannot show an escape, {}: outside the sandbox `{}` failed too ({}); fix what \
          stops it outside (the network, the key file, git's credentials) and run again",
-        probe.name, probe.script, output.said
+        probe.name,
+        probe.script,
+        crate::api_refusals::escaped(&output.said)
     ))
 }
 
