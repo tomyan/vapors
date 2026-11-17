@@ -28,6 +28,7 @@ mod api_sandbox;
 mod api_server;
 mod api_server_proxy;
 mod api_session;
+mod api_tool_prompt;
 mod api_upstream;
 mod api_usage;
 mod builds;
