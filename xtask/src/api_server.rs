@@ -89,7 +89,7 @@ fn accepted(listener: &UnixListener, routes: &Arc<Routes>) {
 /// How long a write to the session may block: the CLI reads a streamed
 /// response as it arrives, so a write that waits 60 s means the session
 /// stopped reading, and the request ends (review of #476-#478, M1).
-const WRITE_DEADLINE: Duration = Duration::from_secs(60);
+pub const WRITE_DEADLINE: Duration = Duration::from_secs(60);
 
 /// A request's reader: everything it reads ends by the request's
 /// deadline.
