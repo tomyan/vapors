@@ -600,7 +600,7 @@ is checked against what it found.
 | R1 | The shade factor (D4): a per-vertex shade in `Meshes` geometry, multiplied by the node's colour in `shader.wgsl` | Pixel tests: a cube with shades 0.65 and 1.0 on two faces under one CSS colour; the ground and object check still passes | 3D PR 5 (shares `meshes.rs`) | IU4, S rows |
 | R2 | The ground material (D5): an application material on a mesh node (a WGSL fragment given by the app, reading world position from the scene's view-projection); the racer's ground shader ported to it | The racer's ground drawn through it matches `track.wgsl`'s colours at sample points on road, kerb, verge and grass, within 1 per channel | R1 | IU4, S rows |
 | R3a1 | Built (2026-11-17, see 2.2). The racer's world in `.wisp`: root group, camera, ground, merged scenery, car group, on a test page beside the racer | The ground and object check on the racer's geometry in both cameras, which covers the tilted and rotated views R2b does not (R2b compares straight down only) and the root group's mirror (2.2); scene draw calls pinned (about 11, 2.2) | R2, 3D PRs 4 and 5 | S rows |
-| R3a2 | Built (2026-11-17). The racer moves to it; `Track` and its files deleted; the tests in 2.2 moved. The racer draws at 4 samples (`Racer::new`, until F10); its world is `ui/racer_world.wisp`, mounted beside the HUD by `app/world.rs`; the Track's pictures are kept as golden PNGs (`crates/racer/tests/golden`); `ElementsApp::preparing` keeps the racer's writes before a frame from waking another. A race standing still renders nothing. The 60 s run at 1 and 4 samples is `docs/perf/scene-run-r3a2-2026-11-17.md` (F8's "before"): at 4 samples one cold run's frame 0 took 18.7 ms, over the budget F0 met on the Track | Every moved test passes; idle frames render nothing; browser scripts pass by hand | R3a1 | S rows |
+| R3a2 | Built (2026-11-17). The racer moves to it; `Track` and its files deleted; the tests in 2.2 moved. The racer draws at 4 samples (`Racer::new`, until F10); its world is `ui/racer_world.wisp`, mounted beside the HUD by `app/world.rs`; the Track's pictures are kept as golden PNGs (`crates/racer/tests/golden`); `ElementsApp::preparing` keeps the racer's writes before a frame from waking another. A race standing still renders nothing. The 60 s run at 1 and 4 samples is `docs/perf/scene-run-r3a2-2026-11-17.md` (F8's "before"): at 4 samples one cold run's frame 0 took 18.7 ms, over the budget F0 met on the Track, until each surface renders once at `App::start` (d3974489): then frame 0 takes 6.1 to 6.2 ms cold at 1 sample, the Track's, and 8.1 to 8.2 ms at 4, the 4x frame's own GPU time | Every moved test passes; idle frames render nothing; browser scripts pass by hand | R3a1 | S rows |
 | R3b | CSS on the craft: `--craft-body`, the livery enum, brake-light meshes with `class:braking`, `:hover` (2.4) | Pixel tests per rule (the brake lights brighten while braking); each change counted: no geometry, one uniform per changed node | R3a2, 3D PR 4b | S rows |
 | S7 | Not built. Tom, 2026-11-16: property 9 is judged on the flat scene; S7 and the SceneRenderer decal route are not built; the decal comes as F9. | | | |
 | S8 | Not built: as S7 | | | |
@@ -731,3 +731,18 @@ built for it.
 - The frame budget adds scene draws (about 11 meshes, 2.2, plus decal
   shapes: to be measured in R3a1 and R4) to the 25 the racer draws
   today (`baseline-2026-11-10.md`, after ed08432).
+
+## 7. Open items
+
+- **Compiled styles for scene anchors** (lead, L73, 2026-11-17). A scene
+  component's anchor takes no compiled winners. With no `class`,
+  `class:` or `style` it takes the component crate's own key, declared
+  `Winners::Unanalysed`, since that crate is compiled without the app's
+  sheets. With one, the compiler gives a `Winners::ComponentTag` key,
+  since the analysis does not see the tag the props type gives the
+  anchor (`MeshProps::ANCHOR_TAG`, in another crate). The racer's world
+  has 14 such anchors, styled by the full cascade (#490). The follow-up:
+  the compiler reads another crate's props (their `ANCHOR_TAG`), and
+  emits a key for every component tag, so both are analysed against the
+  page's sheets. That also closes the build warnings "`<Mesh>` is not a
+  component in this directory, so its props are not checked".
