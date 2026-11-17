@@ -23,7 +23,7 @@ fn exchanged(request: &[u8]) -> (String, Vec<String>) {
     // its answer; the answer is what came before
     let _ = client.read_to_end(&mut answer);
     let answer = String::from_utf8_lossy(&answer).into_owned();
-    let log = refused.lock().expect("the log").clone();
+    let (log, _) = refused.kept();
     (answer, log)
 }
 

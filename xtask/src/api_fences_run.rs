@@ -44,7 +44,18 @@ fn made_and_proven(builder: &Builder) -> Result<Vec<String>, String> {
 }
 
 fn proven(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
-    crate::api_server::serve(&builder.socket())?;
+    let refused = crate::api_server::serve(&builder.socket())?;
+    let mut lines = fenced(builder, host)?;
+    let (kept, count) = refused.kept();
+    lines.push(format!(
+        "the harness refused {count} requests during the fences: {}",
+        kept.join("; ")
+    ));
+    Ok(lines)
+}
+
+/// The fences proven and the inside checked, the server on its socket.
+fn fenced(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
     let inside = |script: &str| inside(builder, host, script);
     let key_file = builder.home.join(KEY_FILE);
     let escapes = Escapes {
@@ -118,24 +129,32 @@ pub fn branch(builder: &Builder) -> String {
 /// [`SENTINEL`] first.
 fn inside(builder: &Builder, host: &Host, script: &str) -> Result<Ran, String> {
     let script = format!("echo '{SENTINEL}'; {script}");
-    let mut command = sandboxed(builder, host, &["bash", "-c", &script]);
+    let mut command = sandboxed(builder, host, &["bash", "-c", &script])?;
     command.env(CANARY.0, CANARY.1);
     ran(command)
 }
 
 /// `command` to run inside builder's sandbox, under the relay, its stdin
-/// /dev/null.
-pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Command {
-    let mut bwrap = Command::new("bwrap");
-    bwrap
+/// /dev/null, within the scope's limits (`api_limits.rs`).
+///
+/// # Errors
+///
+/// This process holding a descriptor the sandbox would inherit
+/// (`api_fds.rs`): checked here, so no caller can start a sandbox without
+/// the check.
+pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Result<Command, String> {
+    crate::api_fds::refuse_inherited()?;
+    let mut scoped = crate::api_limits::scope();
+    scoped
+        .arg("bwrap")
         .args(arguments(builder, host, RELAY_PORT))
         .stdin(Stdio::null());
-    bwrap.arg(Path::new(BIN).join("xtask"));
+    scoped.arg(Path::new(BIN).join("xtask"));
     let port = RELAY_PORT.to_string();
-    bwrap.args(["api-relay-inner", "--port", &port, "--socket"]);
-    bwrap.arg(builder.socket());
-    bwrap.arg("--").args(command);
-    bwrap
+    scoped.args(["api-relay-inner", "--port", &port, "--socket"]);
+    scoped.arg(builder.socket());
+    scoped.arg("--").args(command);
+    Ok(scoped)
 }
 
 /// The builder's directories removed.

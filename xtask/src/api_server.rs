@@ -9,8 +9,8 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -31,7 +31,7 @@ const REQUEST_DEADLINE: Duration = Duration::from_secs(30);
 const CONNECTIONS: usize = 64;
 
 /// What the server refused, for the run's summary.
-pub type Refused = Arc<Mutex<Vec<String>>>;
+pub type Refused = Arc<crate::api_refusals::Refusals>;
 
 /// Serves `socket` on a thread for as long as the run lasts; the
 /// requests it refused.
@@ -129,13 +129,7 @@ impl Read for Deadlined {
 }
 
 fn refuse(stream: &mut UnixStream, refused: &Refused, why: &str) {
-    eprintln!("api-build: refused: {why}");
-    match refused.lock() {
-        Ok(mut log) => log.push(why.to_owned()),
-        Err(_) => {
-            eprintln!("api-build: the refusal log's lock was poisoned; this refusal is only here");
-        }
-    }
+    refused.push(why);
     reply(
         stream,
         "403 Forbidden",
