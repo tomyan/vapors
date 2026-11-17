@@ -2,9 +2,10 @@
 //! index alone. Two kinds of change, as real pages make them: a click on
 //! a HUD button every 2 s, cycling through the three lights, each
 //! toggling its cube's `lit` class; and changes the page makes itself
-//! from its time signal: the group turning every frame, the third cube
-//! hidden in every other 5 s span, the night token on in every other
-//! 15 s span. And the pointer resting over the cubes in every other 10 s
+//! from its time signal: the group turning every frame and the night
+//! token on in every other 15 s span. The cubes stay: a demo whose cube
+//! came and went read as a fault (Tom, 2026-11-17); a hidden mesh's draw
+//! and uniform are pinned in vapors-scene3d-components. And the pointer resting over the cubes in every other 10 s
 //! span, where the group's `:hover` (docs/plans/css-for-3d.md C4) colours
 //! the middle cube.
 
@@ -22,9 +23,6 @@ pub const CUBES: usize = 3;
 
 /// Frames between clicks: 2 s.
 const CLICK_EVERY: usize = 125;
-
-/// The span the third cube is shown, then hidden, in turn.
-const GONE_SPAN: Duration = Duration::from_secs(5);
 
 /// The span the night token is off, then on, in turn.
 const NIGHT_SPAN: Duration = Duration::from_secs(15);
@@ -61,8 +59,6 @@ pub const GROUND_AT_NIGHT: [u8; 3] = [0x1d, 0x23, 0x40];
 pub struct Expected {
     /// Each cube's `lit` class.
     pub lit: [bool; CUBES],
-    /// Whether the third cube is hidden.
-    pub gone: bool,
     /// Whether the night token is on.
     pub night: bool,
     /// Whether the pointer rests over the cubes.
@@ -82,12 +78,6 @@ pub fn time_of(frame: usize) -> Duration {
 #[must_use]
 pub fn click_at(frame: usize) -> Option<usize> {
     (frame > 0 && frame.is_multiple_of(CLICK_EVERY)).then(|| (frame / CLICK_EVERY - 1) % CUBES)
-}
-
-/// Whether the third cube is hidden at `time`.
-#[must_use]
-pub fn gone(time: Duration) -> bool {
-    span_odd(time, GONE_SPAN)
 }
 
 /// Whether the night token is on at `time`.
@@ -122,7 +112,6 @@ pub fn expected(frame: usize) -> Expected {
     let time = time_of(frame);
     Expected {
         lit,
-        gone: gone(time),
         night: night(time),
         hovered: pointing(time),
     }
@@ -135,7 +124,8 @@ impl Expected {
         if self.night { GROUND_AT_NIGHT } else { GROUND }
     }
 
-    /// Cube `cube`'s colour and whether it is shown.
+    /// Cube `cube`'s colour and whether it is shown: always, now that no
+    /// cube is hidden.
     #[must_use]
     pub fn cube(&self, cube: usize) -> ([u8; 3], bool) {
         let colour = match (cube == HOVER_CUBE && self.hovered, self.lit[cube]) {
@@ -143,7 +133,7 @@ impl Expected {
             (false, true) => LIT,
             (false, false) => CUBE_COLOURS[cube],
         };
-        (colour, !(cube == CUBES - 1 && self.gone))
+        (colour, true)
     }
 }
 
@@ -157,8 +147,6 @@ pub fn changes_at(frame: usize) -> Vec<String> {
     };
     let now = expected(frame);
     let flips = [
-        (before.gone != now.gone)
-            .then(|| format!("cube 3 {}", if now.gone { "hidden" } else { "shown" })),
         (before.night != now.night)
             .then(|| format!("night {}", if now.night { "on" } else { "off" })),
         (before.hovered != now.hovered).then(|| {

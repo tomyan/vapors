@@ -1,11 +1,12 @@
 //! GPU tier (lavapipe): the example driven by its script for the first
-//! 1,880 frames of the run, past the first click, the first hide, and
-//! the night coming and going. Every frame its scheduled classes reach the meshes
+//! 1,880 frames of the run, past the first click and the night coming
+//! and going. Every frame its scheduled classes reach the meshes
 //! (`script::confirm`), and the scene's work is what the changes cost:
-//! one 80-byte uniform per shown cube a frame (the group turns), none for
-//! a hidden one, 80 more for the ground in the frame the night token
-//! changes, no geometry after the first frame, one draw fewer while a
-//! cube is hidden. Counts, never times.
+//! one 80-byte uniform per cube a frame (the group turns), 80 more for
+//! the ground in the frame the night token changes, no geometry after
+//! the first frame, a draw per mesh. Counts, never times. (A hidden
+//! mesh's dropped draw and uniform are pinned in
+//! vapors-scene3d-components, `gpu_scene_components.rs`.)
 
 use vapors_app::GpuWork;
 use vapors_gpu_harness::Gpu;
@@ -54,12 +55,11 @@ fn frame(scene: &mut OneScene, gpu: &Gpu, start: Instant, index: usize) -> (Next
     (next, scene.frame_counts().surfaces)
 }
 
-/// The uniform bytes frame `index` writes after the first: each shown
-/// cube, and the ground when the night token changed.
+/// The uniform bytes frame `index` writes after the first: each cube,
+/// and the ground when the night token changed.
 fn bytes_due(index: usize) -> u64 {
     let (now, before) = (expected(index), expected(index - 1));
-    let cubes = CUBES as u64 - u64::from(now.gone);
-    MESH_BYTES * (cubes + u64::from(now.night != before.night))
+    MESH_BYTES * (CUBES as u64 + u64::from(now.night != before.night))
 }
 
 #[test]
@@ -88,8 +88,11 @@ fn gpu_the_scripted_changes_reach_the_meshes_at_the_cost_the_schedule_predicts()
         confirm(&scene, index).expect("confirmed");
         assert_eq!(next, Next::Continue, "frame {index} asks for the next");
         assert_eq!(work.buffer_bytes, bytes_due(index), "frame {index}");
-        let shown = 1 + CUBES as u64 - u64::from(expected(index).gone);
-        assert_eq!(work.draw_calls, composition + shown, "frame {index}");
+        assert_eq!(
+            work.draw_calls,
+            composition + 1 + CUBES as u64,
+            "frame {index}"
+        );
     }
 }
 

@@ -16,9 +16,10 @@ pub const ERROR_ID: &str = "error";
 /// an element, so the status line stays the page's own.
 pub const ADAPTER_ID: &str = "adapter";
 /// The id a readout for a run by hand is written to when the page has
-/// such an element: the demo bar's line, above the canvas, so it covers
-/// no control of the app's.
-pub const READOUT_ID: &str = "demo-line";
+/// such an element: the demo bar's readout row, above the canvas, so it
+/// covers no control of the app's, and a row of its own, wrapped in full
+/// at a phone's width (`crates/web-demo/index.html`).
+pub const READOUT_ID: &str = "demo-readout";
 
 /// What kind of line is being reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,7 +128,7 @@ mod tests {
             (Report::Startup, Some(ADAPTER_ID), "adapter"),
             (Report::Startup, Some(ERROR_ID), "status"),
             (Report::Startup, None, "status"),
-            (Report::Readout, Some(READOUT_ID), "demo-line"),
+            (Report::Readout, Some(READOUT_ID), "demo-readout"),
             (Report::Readout, Some(ERROR_ID), "status"),
             (Report::Readout, None, "status"),
         ];

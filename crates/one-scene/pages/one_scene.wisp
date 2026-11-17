@@ -1,7 +1,7 @@
 <script>
 use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, MeshProps, Scene, SceneProps};
 use crate::parts::{at, looking, turning};
-use crate::schedule::{gone, night};
+use crate::schedule::night;
 
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
@@ -42,7 +42,6 @@ button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px sol
 .lit { color: #f1c40f; }
 /* the group's 3D hover (C4): the pointer over any of its cubes */
 .spin:hover .two { color: #e67e22; }
-.gone { visibility: hidden; }
 </style>
 
 <div class="stage" class:night={night(time.get())}>
@@ -53,7 +52,7 @@ button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px sol
     <Group class="spin" transform={turning(time)}>
       <Mesh geometry={cube.clone()} class="one" class:lit={lit1.get()} transform={at(-2.0, 0.0, 0.0)} />
       <Mesh geometry={cube.clone()} class="two" class:lit={lit2.get()} transform={at(0.0, 0.0, 0.0)} />
-      <Mesh geometry={cube.clone()} class="three" class:lit={lit3.get()} class:gone={gone(time.get())} transform={at(2.0, 0.0, 0.0)} />
+      <Mesh geometry={cube.clone()} class="three" class:lit={lit3.get()} transform={at(2.0, 0.0, 0.0)} />
     </Group>
   </Scene>
   <div class="hud">
