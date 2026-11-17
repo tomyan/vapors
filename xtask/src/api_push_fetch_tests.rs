@@ -179,7 +179,10 @@ fn a_tree_git_would_refuse_to_check_out_is_refused_at_the_fetch() {
     let blob = git(&clone, &["rev-parse", "HEAD:a.txt"]).expect("a blob");
     let mut tree = b"100644 ..\0".to_vec();
     tree.extend((0..20).map(|at| u8::from_str_radix(&blob[at * 2..at * 2 + 2], 16).expect("hex")));
+    // the environment cleared, as a git hook exports GIT_DIR (CLAUDE.md)
     let mut hash = std::process::Command::new("git")
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
         .args(["hash-object", "-t", "tree", "--literally", "-w", "--stdin"])
         .current_dir(&clone)
         .stdin(std::process::Stdio::piped())
