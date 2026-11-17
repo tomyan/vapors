@@ -234,6 +234,12 @@ The six recommendations of the first draft are taken:
 - **F3.1:** the table, `clip.wgsl`, `MAX_CLIP_CHAIN`, rectangle clips
   moved from the scissor to the table, batches joined across clips
   within a frame, W10, and W1 and W4's counts.
+- **F3.1b (owns the split):** the image and text pipelines on the clip
+  table, on F2.2 (the lead, 2026-11-17). Until it lands, quads, shadows
+  and shapes take their clip from the table while text and images keep
+  the scissor, and a debug check holds the two together
+  (`painter_clips.rs` `assert_agrees`); F3.1b retires the scissor path
+  and that check.
 - **F3.2:** rounded clips with the radii rules, the four refusals
   retired (each test converted into a test of the clip drawn), the
   elliptical refusal, the Chromium fixture, hit testing.
@@ -267,3 +273,45 @@ Each check is proven by a break.
 1. **Joining across frames (F3.3).** F3.1 joins within a frame and
    keeps today's scissor (item 10). Recommended: decide F3.3 on W4's
    numbers after F3.1, not now.
+
+## As built: F3.1, the clip table (step 1)
+
+- **Scope.** The instanced pipelines (quads, shadows, closed forms), the
+  ones on F2.1's tables; text and images are F3.1b's. Batches still
+  split on a clip change: joining them across clips within a frame is
+  F3.1's second step, with W1 and W4's counts.
+- **Renderer.** The transform table is made a generic `Table<V>`
+  (`table.rs`, `table_entries.rs`), `TransformTable = Table<Matrix>` as
+  before, and `ClipTable = Table<ClipEntry>` (`clip_table.rs`), item
+  1's 48 bytes. `MAX_CLIP_CHAIN` moved to `vapors-scene`, which both
+  elements and the renderer read, and the WGSL prelude is generated
+  from it (`clip_prelude`).
+- **Coverage without derivatives.** `clip.wgsl` takes each link's
+  coverage with the one-pixel ramp `quads.wgsl` takes for a box's edge,
+  not `fwidth`: every frame is a whole translation before F4a, so the
+  walk holds no derivative at all (item 7's finding stands, and does
+  not arise).
+- **The poison.** A given-back entry carries flag bit 1, which the shader
+  tests: a NaN rectangle alone is not enough, as `clamp` of NaN is not
+  defined to give 0 and a shader compiler may assume no NaN (a test
+  showed the NaN-only poison covering pixels). Its write is made at the
+  end of the frame that gives the entry back, so an idle frame writes
+  nothing; a scroll writes the entry of a clip entering the view and
+  the poison of one leaving it.
+- **Keys.** The painter keys an entry by the batch's frame and the clip's
+  rectangle in that frame, as the scene gives them, rather than by the
+  clipping box's slot, which the painter does not see; one entry per
+  distinct clip in a frame. With no parents yet (the frame's clip is
+  still the scissor) and lane batches' clips already moved into the
+  lane's coordinates, the row-relative flag is unused until item 3's
+  lane sharing.
+- **Tests.** `vapors-renderer` `gpu_clip_table.rs` (a quad clipped to an
+  entry, clip 0, a clip moving with its frame, a chain of two, a
+  row-relative clip, a given-back entry covering nothing);
+  `vapors-app` `gpu_clip_entries.rs` (clip writes on the first frame, a
+  scroll and an idle frame; a clip scrolled away and back; a resized
+  clip under kept bytes; text and a quad sharing a clip in a scrolled
+  frame) and `painter_clips_tests.rs` (an entry following its frame's
+  entry; a frame entry given back under a held clip refused). Pixels
+  unchanged on every Chromium comparison and `gpu_*` test.
+
