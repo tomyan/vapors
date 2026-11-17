@@ -27,7 +27,7 @@ impl MeshPipeline {
     /// sample).
     #[must_use]
     pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
-        let (binding, pass) = (TableBinding::new(device, "meshes"), pass.into());
+        let (binding, pass) = (TableBinding::new(device, "meshes", false), pass.into());
         Self {
             pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), pass),
             samples: pass.samples,
@@ -81,7 +81,7 @@ impl MeshPipeline {
         (table, rows_base): (&mut TransformTable, u32),
         (entries, drawn): (&mut MeshEntries, &[&MeshEntry]),
     ) {
-        self.binding.adopt(table, target.queue);
+        self.binding.adopt((table, None), target.queue);
         self.draw_from(target, kept, (Some(table), rows_base), (entries, drawn));
     }
 
@@ -100,7 +100,9 @@ impl MeshPipeline {
         };
         let run = Draws {
             pipeline: (&self.pipeline, self.samples),
-            bind_group: self.binding.group(target, table, &self.work),
+            bind_group: self
+                .binding
+                .group(target, table.map(|table| (table, None)), &self.work),
             viewport,
             items: self.kept.slice(target.encoder, kept),
             triangles: entries.slices(target, drawn),

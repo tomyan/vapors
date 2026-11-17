@@ -54,19 +54,39 @@ pub struct BuildScriptReport {
 /// script. On a refusal it prints each as `error: file:line:col: message` and
 /// exits with status 1, which fails the build.
 pub fn compile_dir(src: impl AsRef<Path>) {
-    run(src.as_ref(), Styles::Scoped);
+    run(src.as_ref(), None, Styles::Scoped);
+}
+
+/// [`compile_dir`] into `OUT_DIR/<under>/`, so a crate can compile a
+/// second directory beside its first (the racer's test pages beside its
+/// UI): include it with
+/// `include!(concat!(env!("OUT_DIR"), "/<under>/wisp.rs"))`. `under`
+/// must be one plain directory name; anything else (empty, absolute,
+/// `..`, a separator) would write outside `OUT_DIR` and is refused.
+/// Every build of the crate compiles it, release and wasm included.
+pub fn compile_dir_under(src: impl AsRef<Path>, under: &str) {
+    run(src.as_ref(), Some(under), Styles::Scoped);
 }
 
 /// [`compile_dir`] for components whose `<style>` the app adds as a
 /// global sheet: nothing is scoped. The layout corpus uses it, so its
 /// CSS means what Chromium reads.
 pub fn compile_dir_global(src: impl AsRef<Path>) {
-    run(src.as_ref(), Styles::Global);
+    run(src.as_ref(), None, Styles::Global);
 }
 
-fn run(src: &Path, styles: Styles) {
+fn run(src: &Path, under: Option<&str>, styles: Styles) {
     let src = resolve_src(src, std::env::var_os("CARGO_MANIFEST_DIR"));
-    let report = styled_report(&src, std::env::var_os("OUT_DIR"), styles);
+    let report = match under.map(out_dir_under).transpose() {
+        Ok(under) => {
+            let out_dir = std::env::var_os("OUT_DIR").map(|out| match under {
+                Some(under) => Path::new(&out).join(under).into_os_string(),
+                None => out,
+            });
+            styled_report(&src, out_dir, styles)
+        }
+        Err(refusal) => failed(&src, vec![refusal]),
+    };
     for line in &report.stdout {
         println!("{line}");
     }
@@ -130,6 +150,17 @@ fn failed(src: &Path, stderr: Vec<String>) -> BuildScriptReport {
     }
 }
 
+/// `under`, when it is one plain directory name; otherwise the refusal.
+fn out_dir_under(under: &str) -> Result<&str, String> {
+    let mut parts = Path::new(under).components();
+    match (parts.next(), parts.next()) {
+        (Some(std::path::Component::Normal(_)), None) => Ok(under),
+        _ => Err(format!(
+            "error: compile_dir_under({under:?}): name one plain directory under OUT_DIR, such as \"pages\"; this one would write elsewhere"
+        )),
+    }
+}
+
 fn missing_out_dir() -> String {
     "error: OUT_DIR is not set: call vapors_compiler::build::compile_dir from the crate's build.rs, where cargo sets it".to_string()
 }
@@ -148,5 +179,23 @@ pub(crate) fn path_error(path: &Path, message: impl Into<String>) -> CompileErro
         line: 1,
         col: 1,
         message: message.into(),
+    }
+}
+
+#[cfg(test)]
+mod under_tests {
+    use super::out_dir_under;
+
+    #[test]
+    fn one_plain_directory_name_is_taken() {
+        assert_eq!(out_dir_under("pages"), Ok("pages"));
+    }
+
+    #[test]
+    fn a_name_that_would_write_outside_out_dir_is_refused_naming_it() {
+        for under in ["", "/tmp", "..", "a/b", "../pages"] {
+            let refused = out_dir_under(under).expect_err(under);
+            assert!(refused.contains(&format!("{under:?}")), "{refused}");
+        }
     }
 }

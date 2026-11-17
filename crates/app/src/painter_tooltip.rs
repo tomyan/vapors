@@ -20,7 +20,10 @@ impl ScenePainter {
     /// `--tooltip-*` properties and placed by [`crate::place_tooltip`]:
     /// at `hotspot` (from [`crate::DocumentInput::tooltip_hotspot`]) for
     /// a pointer tooltip, at its element's border box for a keyboard one.
-    /// Call it after the scene, each frame a tooltip is shown.
+    /// Call it after the scene, each frame a tooltip is shown, with the
+    /// target `draw` was given: at 4 samples, the same `TextureView`
+    /// value (or a clone of it), not another view of the texture, or it
+    /// panics (`painter_multisampled.rs`).
     ///
     /// # Errors
     ///
@@ -48,7 +51,7 @@ impl ScenePainter {
         );
         let text_size = [layout.width(), layout.height()].map(|v| v.ceil() / scale);
         let placed = tooltip_box(&style, text_size, anchor, window, scale)?;
-        let multisampled = self.multisampled.view_for(target);
+        let multisampled = self.multisampled.view_for(target, super::Use::Load);
         let target = super::attached(*target, multisampled.as_ref());
         self.draw_box(&target, &placed, &layout)
     }

@@ -15,6 +15,7 @@ vapors-scene3d.workspace = true
 wgpu.workspace = true
 
 [dev-dependencies]
+naga.workspace = true
 vapors-gpu-harness.workspace = true
 
 [lints]

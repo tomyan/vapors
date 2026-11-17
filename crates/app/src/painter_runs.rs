@@ -50,9 +50,26 @@ impl ScenePainter {
                     .check_clipped(target.device, painted, &batch.run)?;
                 continue;
             };
-            self.draw_placed(&clipped, (painted, kept), (places, at, frame))?;
+            let scissor = Self::scissor((target, &clipped), batch, frame);
+            self.draw_placed(&scissor, (painted, kept), (places, at, frame))?;
         }
         Ok(())
+    }
+
+    /// The scissor batch `batch` is drawn under: for quads,
+    /// shadows and shapes, only the frame's clip, their own clip coming
+    /// from the clip table as coverage (flat-scene F3.1); for the rest,
+    /// `batch_scissor`, the batch's clip on the page, as before, until F3.1b.
+    fn scissor<'t>(
+        (target, batch_scissor): (&Target<'t>, &Target<'t>),
+        batch: &vapors_scene::Batch,
+        frame: vapors_elements::FrameDraw,
+    ) -> Target<'t> {
+        if on_the_clip_table(&batch.run) {
+            return clipped(target, frame.on_page(None))
+                .expect("inside the batch's clip on the page, so inside the frame's clip");
+        }
+        *batch_scissor
     }
 
     /// Draws `kept`'s batch `at` under `target` at `frame`, each row at
@@ -70,6 +87,8 @@ impl ScenePainter {
             offsets,
             rows_key,
             rows: kept.rows.get(at).unwrap_or_default(),
+            clip: kept.batched.batches[at].clip,
+            draw: frame,
         };
         let run = &kept.batched.batches[at].run;
         self.draw_run(target, painted, (run, kept.keys[at], at), &moved)
@@ -128,4 +147,11 @@ fn assert_parallel(kept: &KeptBatched) {
         lengths.1,
         lengths.2
     );
+}
+
+/// Whether `run`'s items take their clip from the clip table (flat-scene
+/// F3.1): quads, shadows and closed-form shapes, the pipelines on F2.1's
+/// tables.
+fn on_the_clip_table(run: &Run) -> bool {
+    matches!(run, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
 }

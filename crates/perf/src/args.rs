@@ -7,6 +7,7 @@ pub use crate::args_measure::Measure;
 use crate::args_measure::refuse_scaling_with_others;
 pub use crate::args_off_path::WorkloadSet;
 use crate::args_off_path::refuse_off_path_with_modes;
+use crate::args_samples::{refuse_samples_with_modes, samples_of};
 use crate::rows::RowChange;
 use crate::run::Settings;
 use crate::scene_kind::SceneKind;
@@ -18,7 +19,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions|--counters] [--off-path] \
                      [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] [--first-frame <rows>] \
-                     [--scene-run [racer|one-scene]]; --scaling needs `--profile judged` in place of `--release`";
+                     [--scene-run [racer|one-scene]] [--samples 1|4]; --scaling needs `--profile judged` in place of `--release`";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -48,6 +49,8 @@ pub struct Options {
     /// the racer, or the scene named after the flag; no counts, no other
     /// flag.
     pub scene_run: Option<SceneKind>,
+    /// The samples the full run's painters draw at (`--samples`).
+    pub samples: vapors_renderer::Samples,
 }
 
 /// The options `args` name, without the program's name.
@@ -61,6 +64,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
     while let Some(arg) = args.next() {
         flags.take(arg, &mut args)?;
     }
+    let samples = flags.samples()?;
     let Flags {
         counts,
         only,
@@ -71,6 +75,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         mount_memory,
         first_frame,
         scene_run,
+        samples: _,
     } = flags;
     refuse_scaling_with_others(scaling.is_some(), only.is_some(), measure)?;
     refuse_off_path_with_modes(
@@ -102,6 +107,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         mount_memory,
         first_frame,
         scene_run,
+        samples,
     })
 }
 
@@ -116,9 +122,24 @@ struct Flags {
     mount_memory: Option<usize>,
     first_frame: Option<usize>,
     scene_run: Option<SceneKind>,
+    samples: Option<vapors_renderer::Samples>,
 }
 
 impl Flags {
+    /// The samples given, 1 if none; refused with a mode that replaces
+    /// the full run, other than a scene run.
+    fn samples(&self) -> Result<vapors_renderer::Samples, String> {
+        let modes = [
+            ("--off-path", self.set == WorkloadSet::OffPath),
+            ("--scaling", self.scaling.is_some()),
+            ("--mount", self.mount),
+            ("--mount-memory", self.mount_memory.is_some()),
+            ("--first-frame", self.first_frame.is_some()),
+        ];
+        refuse_samples_with_modes(self.samples, modes)?;
+        Ok(self.samples.unwrap_or(vapors_renderer::Samples::One))
+    }
+
     /// Records `arg`, taking its value from `rest` when it has one.
     fn take(&mut self, arg: String, rest: &mut impl Iterator<Item = String>) -> Result<(), String> {
         match arg.as_str() {
@@ -128,6 +149,10 @@ impl Flags {
             "--counters" => self.measure = self.measure.and(Measure::Counters)?,
             "--off-path" => self.set = WorkloadSet::OffPath,
             "--mount" => self.mount = true,
+            "--samples" if self.samples.is_some() => {
+                return Err(format!("--samples given twice: {USAGE}"));
+            }
+            "--samples" => self.samples = Some(samples_of(rest.next().as_deref())?),
             "--scene-run" => return self.scene_run(rest),
             "--mount-memory" => self.mount_memory = Some(rows_of("--mount-memory", rest.next())?),
             "--first-frame" => self.first_frame = Some(rows_of("--first-frame", rest.next())?),

@@ -17,7 +17,7 @@ use crate::scene::{buffer, reds, scene_pixels};
 
 const EVERY_FRAGMENT: &str = "
 @fragment
-fn fs_footprint(in: Out) -> @location(0) vec4<f32> {
+fn fs_footprint(in: SceneOut) -> @location(0) vec4<f32> {
     return vec4(1.0);
 }
 ";

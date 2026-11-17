@@ -33,6 +33,10 @@ pub const WORKFLOW: &str = ".github/workflows/ci.yml";
 
 /// Run the gate.
 pub fn run(reporter: &Reporter) -> ExitCode {
+    let switch = std::env::var_os(crate::steps::DENY_OFFLINE);
+    if let Err(why) = crate::steps::refuse_deny_offline(switch.as_deref()) {
+        return refuse(&why);
+    }
     crate::priority::enter_gate();
     let worktree =
         std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());

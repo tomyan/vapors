@@ -96,6 +96,24 @@ fn gpu_a_transform_signal_change_writes_one_uniform_and_uploads_no_geometry() {
 }
 
 #[test]
+fn gpu_a_lens_change_writes_the_camera_alone_and_redraws() {
+    // Given
+    let gpu = vapors_gpu_harness::gpu();
+    let (mut rig, idle) = settled(&gpu);
+
+    // When: the lens twice as wide, so the 1-unit square spans 8 pixels
+    let wider = vapors_scene3d::Projection::orthographic(8.0, 0.1, 100.0).unwrap();
+    rig.signals.lens.set(wider);
+    let (_, widened, pixels) = frame(&mut rig.app, &gpu);
+
+    // Then
+    assert_eq!(widened.buffer_bytes, idle.buffer_bytes + CAMERA_BYTES);
+    assert_eq!(widened.texture_bytes, 0);
+    assert_eq!(pixel(&pixels, 32, 32), RED);
+    assert_ne!(pixel(&pixels, 26, 32), RED);
+}
+
+#[test]
 fn gpu_an_idle_frame_writes_nothing() {
     // Given
     let gpu = vapors_gpu_harness::gpu();

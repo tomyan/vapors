@@ -89,7 +89,7 @@ fn prepared(order: &Order<'_>) -> Result<(Builder, Arc<Routes>, PathBuf), String
     let questions = crate::api_build_setup::private(&builder.root().join("questions"))?;
     let routes = Arc::new(Routes {
         proxy: Some(Proxy::new(secret, budget, staging)),
-        asks: Some(crate::api_ask::Asks::new(questions)),
+        asks: Some(crate::api_ask::Asks::for_run(&questions, &run_id())?),
         ..Routes::default()
     });
     Ok((builder, routes, objects))
@@ -122,4 +122,13 @@ fn session(
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     let session = sandboxed(builder, host, &words)?;
     crate::api_session::run(session, (order.brief, &result), &proxy.budget)
+}
+
+/// This run's name among the builder's runs: when it started and its
+/// process, unique on the machine.
+fn run_id() -> String {
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("run-{}-{}", since.as_secs(), std::process::id())
 }

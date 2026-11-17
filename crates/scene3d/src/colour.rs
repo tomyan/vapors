@@ -1,4 +1,5 @@
-//! A mesh's colour until materials come (3D lane slice 3).
+//! A mesh's colour: what it is drawn in, or what its application material
+//! is given (`material.rs`).
 
 use crate::SceneError;
 use crate::error::finite_scalar;

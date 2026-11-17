@@ -59,13 +59,15 @@ pub(crate) struct RunBytes {
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
 pub(crate) fn run_bytes(
-    (run, frame, rows): (&Run, u32, &[u32]),
+    (run, frame, rows): (&Run, (u32, u32), &[u32]),
     shapes: &ShapeStore,
 ) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {
         let run = shapes
             .mesh_instances(items, rows)
             .map_err(PaintError::Shape)?;
+        // meshes take no clip entry: their clip is the scissor until F3.1b
+        let (frame, _no_clip) = frame;
         let bytes = MeshPipeline::bytes_in(&run.instances, frame, &run.rows);
         return Ok(RunBytes {
             bytes,

@@ -3,7 +3,9 @@
 use crate::FrameError;
 use crate::geometry::Uploaded;
 use vapors_app::WorkCounter;
-use vapors_scene3d::{Colour, GeometryHandle, GeometryId, Meshes, NodeId, NodeKind, Scene};
+use vapors_scene3d::{
+    Colour, GeometryHandle, GeometryId, MaterialId, Meshes, NodeId, NodeKind, Scene,
+};
 
 /// A mesh node to draw.
 pub(crate) struct MeshNode {
@@ -15,6 +17,9 @@ pub(crate) struct MeshNode {
     pub(crate) colour: Colour,
     /// Drawn (`Scene::visible`); a hidden mesh keeps its slot.
     pub(crate) visible: bool,
+    /// The application material it is drawn with (`Scene::material`),
+    /// or none for its colour.
+    pub(crate) material: Option<MaterialId>,
 }
 
 /// Every mesh node under the root, parents before children, each
@@ -39,37 +44,69 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
     if !meshes.issued(geometry) {
         return Err(FrameError::ForeignGeometry { node, geometry });
     }
+    let material = scene.material(node)?;
+    if let Some(material) = material.filter(|&material| !meshes.issued_material(material)) {
+        return Err(FrameError::ForeignMaterial { node, material });
+    }
     Ok(Some(MeshNode {
         node,
         geometry,
         handle,
         colour,
         visible: scene.visible(node)?,
+        material,
     }))
+}
+
+/// Refuses a node naming a material its `Meshes` was given after the
+/// renderer built its `built` material pipelines at mount (the id names
+/// the material's label).
+pub(crate) fn materials_built(nodes: &[MeshNode], built: usize) -> Result<(), FrameError> {
+    let late = nodes.iter().find_map(|mesh| {
+        mesh.material
+            .filter(|material| material.index() >= built)
+            .map(|m| (mesh, m))
+    });
+    match late {
+        Some((mesh, material)) => Err(FrameError::MaterialMissing {
+            node: mesh.node,
+            material,
+            built,
+        }),
+        None => Ok(()),
+    }
 }
 
 /// What one pass draws with.
 pub(crate) struct Pass<'a> {
-    pub(crate) pipeline: &'a wgpu::RenderPipeline,
+    /// The colour pipeline, and each material's in `Meshes`' order.
+    pub(crate) pipelines: (&'a wgpu::RenderPipeline, &'a [wgpu::RenderPipeline]),
     pub(crate) camera: &'a wgpu::BindGroup,
     pub(crate) slots: &'a wgpu::BindGroup,
-    pub(crate) colour: &'a wgpu::TextureView,
+    /// The view drawn into: the multisampled one at 4 samples, resolved
+    /// into the backing's, else the backing's.
+    pub(crate) colour: (Option<&'a wgpu::TextureView>, &'a wgpu::TextureView),
     pub(crate) depth: &'a wgpu::TextureView,
     /// Counts each draw.
     pub(crate) work: &'a WorkCounter,
 }
 
+/// One mesh's draw: its material's place (none for its colour), its
+/// slot offset and its geometry.
+pub(crate) type Draw<'a> = (Option<usize>, u32, &'a Uploaded);
+
 /// Clears the backing to transparent and the depth to far, then draws
-/// each `(slot offset, geometry)`.
-pub(crate) fn record(
-    encoder: &mut wgpu::CommandEncoder,
-    pass: &Pass<'_>,
-    draws: &[(u32, &Uploaded)],
-) {
+/// each of `draws`, setting the pipeline where the material changes.
+pub(crate) fn record(encoder: &mut wgpu::CommandEncoder, pass: &Pass<'_>, draws: &[Draw<'_>]) {
     let mut render = begin(encoder, pass);
-    render.set_pipeline(pass.pipeline);
     render.set_bind_group(0, pass.camera, &[]);
-    for (offset, geometry) in draws {
+    let mut set = None;
+    for (material, offset, geometry) in draws {
+        if set != Some(*material) {
+            let (colour, materials) = pass.pipelines;
+            render.set_pipeline(material.map_or(colour, |at| &materials[at]));
+            set = Some(*material);
+        }
         render.set_bind_group(1, pass.slots, &[*offset]);
         render.set_vertex_buffer(0, geometry.vertices.slice(..));
         render.set_index_buffer(geometry.indices.slice(..), wgpu::IndexFormat::Uint32);
@@ -81,15 +118,7 @@ pub(crate) fn record(
 fn begin<'e>(encoder: &'e mut wgpu::CommandEncoder, pass: &Pass<'_>) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("scene3d"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: pass.colour,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
+        color_attachments: &[Some(colour_attachment(pass.colour))],
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
             view: pass.depth,
             depth_ops: Some(wgpu::Operations {
@@ -102,4 +131,26 @@ fn begin<'e>(encoder: &'e mut wgpu::CommandEncoder, pass: &Pass<'_>) -> wgpu::Re
         occlusion_query_set: None,
         multiview_mask: None,
     })
+}
+
+/// The pass clears its colour to transparent each frame. At 4 samples
+/// it draws into the multisampled view and resolves into the backing's,
+/// discarding the samples: nothing loads them.
+fn colour_attachment<'a>(
+    (multisampled, backing): (Option<&'a wgpu::TextureView>, &'a wgpu::TextureView),
+) -> wgpu::RenderPassColorAttachment<'a> {
+    let store = if multisampled.is_some() {
+        wgpu::StoreOp::Discard
+    } else {
+        wgpu::StoreOp::Store
+    };
+    wgpu::RenderPassColorAttachment {
+        view: multisampled.unwrap_or(backing),
+        depth_slice: None,
+        resolve_target: multisampled.map(|_| backing),
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            store,
+        },
+    }
 }

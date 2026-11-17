@@ -4,7 +4,7 @@
 //! offset into one buffer).
 
 use vapors_app::SURFACE_FORMAT;
-use vapors_scene3d::VERTEX_BYTES;
+use vapors_scene3d::{MATERIAL_WGSL, Material, VERTEX_BYTES};
 
 /// The depth buffer's format.
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -12,14 +12,20 @@ pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth3
 pub(crate) use vapors_renderer::projective::{CAMERA_BYTES, NODE_BYTES as MESH_BYTES};
 use vapors_renderer::projective::{PROJECTIVE_WGSL, ProjectiveLayouts};
 
-/// What `mount` builds once.
+/// What `mount` builds once: the colour pipeline, and one for each
+/// application material its `Meshes` held then, in their order.
 pub(crate) struct Pipeline {
     pub(crate) render: wgpu::RenderPipeline,
+    pub(crate) materials: Vec<wgpu::RenderPipeline>,
     pub(crate) layouts: ProjectiveLayouts,
 }
 
 impl Pipeline {
-    pub(crate) fn new(device: &wgpu::Device) -> Self {
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        materials: &[Material],
+        samples: vapors_renderer::Samples,
+    ) -> Self {
         let layouts = ProjectiveLayouts::new(device);
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene3d"),
@@ -27,24 +33,53 @@ impl Pipeline {
             immediate_size: 0,
         });
         let source = [PROJECTIVE_WGSL, include_str!("shader.wgsl")].concat();
-        let shader = vapors_renderer::pipelines::shader_module(
-            device,
-            wgpu::ShaderModuleDescriptor {
-                label: Some("scene3d"),
-                source: wgpu::ShaderSource::Wgsl(source.into()),
-            },
-        );
+        let shader = shader(device, "scene3d", source);
+        let materials = materials
+            .iter()
+            .map(|material| material_pipeline(device, (&layout, material), samples))
+            .collect();
         Self {
-            render: render_pipeline(device, &layout, &shader),
+            render: render_pipeline(device, (&layout, &shader), ("vs_main", "fs_main"), samples),
+            materials,
             layouts,
         }
     }
 }
 
+/// The pipeline drawing meshes with `material`, at the pass's `samples`.
+fn material_pipeline(
+    device: &wgpu::Device,
+    (layout, material): (&wgpu::PipelineLayout, &Material),
+    samples: vapors_renderer::Samples,
+) -> wgpu::RenderPipeline {
+    let own = material.wgsl.as_str();
+    let source = [
+        PROJECTIVE_WGSL,
+        MATERIAL_WGSL,
+        own,
+        include_str!("material.wgsl"),
+    ]
+    .concat();
+    let shader = shader(device, material.label, source);
+    let entries = ("vs_material", "fs_material");
+    render_pipeline(device, (layout, &shader), entries, samples)
+}
+
+fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderModule {
+    vapors_renderer::pipelines::shader_module(
+        device,
+        wgpu::ShaderModuleDescriptor {
+            label: Some(label),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
+        },
+    )
+}
+
 fn render_pipeline(
     device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    shader: &wgpu::ShaderModule,
+    (layout, shader): (&wgpu::PipelineLayout, &wgpu::ShaderModule),
+    (vertex, fragment_entry): (&str, &str),
+    samples: vapors_renderer::Samples,
 ) -> wgpu::RenderPipeline {
     let buffers = [Some(wgpu::VertexBufferLayout {
         array_stride: VERTEX_BYTES as u64,
@@ -58,14 +93,14 @@ fn render_pipeline(
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: Some("vs_main"),
+                entry_point: Some(vertex),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &buffers,
             },
-            fragment: Some(fragment(shader)),
+            fragment: Some(fragment(shader, fragment_entry)),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: Some(depth_test()),
-            multisample: wgpu::MultisampleState::default(),
+            multisample: samples.state(),
             multiview_mask: None,
             cache: None,
         },
@@ -83,10 +118,10 @@ const TARGETS: [Option<wgpu::ColorTargetState>; 1] = [Some(wgpu::ColorTargetStat
     write_mask: wgpu::ColorWrites::ALL,
 })];
 
-fn fragment(shader: &wgpu::ShaderModule) -> wgpu::FragmentState<'_> {
+fn fragment<'a>(shader: &'a wgpu::ShaderModule, entry: &'a str) -> wgpu::FragmentState<'a> {
     wgpu::FragmentState {
         module: shader,
-        entry_point: Some("fs_main"),
+        entry_point: Some(entry),
         compilation_options: wgpu::PipelineCompilationOptions::default(),
         targets: &TARGETS,
     }

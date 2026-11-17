@@ -1,7 +1,9 @@
 //! What a builder's branch may change before the harness pushes it
 //! (`docs/plans/api-builder.md`, the lead's answer 8): only files under
 //! the allowed paths (`crates/` and `docs/` unless the run names more),
-//! no binary file, and at most [`LINE_CAP`] lines changed, the PR rule.
+//! no binary file, no symlink or submodule, and at most [`LINE_CAP`]
+//! lines changed, the PR rule. The diff is read with `-z`, so a path is
+//! its bytes, never git's quoting (review of slice 4, L1).
 
 /// The paths a branch may change unless the run names more: `xtask/`,
 /// `.config/`, `.github/`, hooks and `rust-toolchain.toml` change what
@@ -12,24 +14,25 @@ pub const ALLOWED: [&str; 2] = ["crates/", "docs/"];
 /// PR rule (about 400).
 pub const LINE_CAP: u64 = 400;
 
-/// `git diff --numstat` of the branch against its base, checked; the
-/// lines changed.
+/// File modes refused: a symlink can point a checkout outside the tree,
+/// and a gitlink names another repository.
+const MODES: [(&str, &str); 2] = [("120000", "a symlink"), ("160000", "a submodule")];
+
+/// The branch's diff against its base, checked: `numstat` is
+/// `git diff --numstat -z`, `raw` is `git diff --raw -z`, both
+/// `--no-renames`. The lines changed.
 ///
 /// # Errors
 ///
-/// A file outside `allowed`, a binary file, or more than [`LINE_CAP`]
-/// lines, each listed; or a numstat line of a shape this does not read.
-pub fn checked(numstat: &str, allowed: &[String]) -> Result<u64, String> {
+/// Every refusal, listed: a path outside `allowed` or with a `..`, `.`
+/// or `.git` part, a binary file, a symlink or submodule, more than
+/// [`LINE_CAP`] lines; or output of a shape this does not read.
+pub fn checked(numstat: &str, raw: &str, allowed: &[String]) -> Result<u64, String> {
+    let mut refused = modes(raw)?;
     let mut lines = 0;
-    let mut refused = Vec::new();
-    for row in numstat.lines().filter(|row| !row.trim().is_empty()) {
+    for row in numstat.split('\0').filter(|row| !row.is_empty()) {
         let (added, removed, path) = fields(row)?;
-        if !allowed
-            .iter()
-            .any(|prefix| path.starts_with(prefix.as_str()))
-        {
-            refused.push(format!("{path} is outside {}", allowed.join(", ")));
-        }
+        refused.extend(path_refused(path, allowed));
         match (added.parse::<u64>(), removed.parse::<u64>()) {
             (Ok(added), Ok(removed)) => lines += added + removed,
             _ => refused.push(format!("{path} is binary")),
@@ -51,16 +54,76 @@ fn fields(row: &str) -> Result<(&str, &str, &str), String> {
     match (parts.next(), parts.next(), parts.next()) {
         (Some(added), Some(removed), Some(path)) => Ok((added, removed, path)),
         _ => Err(format!(
-            "a `git diff --numstat` line this does not read: {row:?}"
+            "a `git diff --numstat -z` record this does not read: {row:?}"
         )),
     }
 }
 
-/// The allowed paths: [`ALLOWED`] and those the run names.
-pub fn allowed(named: &[String]) -> Vec<String> {
-    let mut all: Vec<String> = ALLOWED.map(str::to_owned).to_vec();
-    all.extend(named.iter().cloned());
-    all
+/// Why `path` may not change, if it may not.
+fn path_refused(path: &str, allowed: &[String]) -> Option<String> {
+    if path.contains('\u{fffd}') {
+        return Some(format!("{path:?} is not UTF-8"));
+    }
+    if path
+        .split('/')
+        .any(|part| matches!(part, "" | "." | ".." | ".git"))
+    {
+        return Some(format!("{path:?} has an empty, `.`, `..` or `.git` part"));
+    }
+    if !allowed
+        .iter()
+        .any(|prefix| path.starts_with(prefix.as_str()))
+    {
+        return Some(format!("{path} is outside {}", allowed.join(", ")));
+    }
+    None
+}
+
+/// `git diff --raw -z`'s records (`:<old> <new> <ids> <status>\0<path>\0`):
+/// one refusal for each symlink or submodule, before or after.
+fn modes(raw: &str) -> Result<Vec<String>, String> {
+    let mut records = raw.split('\0').filter(|part| !part.is_empty());
+    let mut refused = Vec::new();
+    while let Some(header) = records.next() {
+        let path = records
+            .next()
+            .ok_or_else(|| format!("a `git diff --raw -z` record with no path: {header:?}"))?;
+        let mut fields = header.trim_start_matches(':').split(' ');
+        let (old, new) = (
+            fields.next().unwrap_or_default(),
+            fields.next().unwrap_or_default(),
+        );
+        if let Some((_, what)) = MODES.iter().find(|(mode, _)| *mode == old || *mode == new) {
+            refused.push(format!("{path} is {what}"));
+        }
+    }
+    Ok(refused)
+}
+
+/// The allowed paths: [`ALLOWED`] and those the run names, each a
+/// relative directory prefix ending in `/`.
+///
+/// # Errors
+///
+/// A named path that is empty, absolute, has a `..` part, or does not end
+/// in `/` (so `xtask` cannot also allow `xtask-other/`).
+pub fn allowed(named: &[String]) -> Result<Vec<String>, String> {
+    let bad = |path: &String| {
+        path.starts_with('/')
+            || !path.ends_with('/')
+            || path.len() < 2
+            || path.split('/').any(|part| part == "..")
+    };
+    if let Some(path) = named.iter().find(|path| bad(path)) {
+        return Err(format!(
+            "--allow {path:?}: name a relative directory ending in `/`, such as `xtask/`"
+        ));
+    }
+    Ok(ALLOWED
+        .iter()
+        .map(|&path| path.to_owned())
+        .chain(named.iter().cloned())
+        .collect())
 }
 
 #[cfg(test)]

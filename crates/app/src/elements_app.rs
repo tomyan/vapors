@@ -30,6 +30,8 @@ pub struct ElementsApp {
     painter: Option<ScenePainter>,
     /// The painter's atlas; `None` sizes it for the device.
     atlas: Option<vapors_text::AtlasConfig>,
+    /// The samples its painter draws at (`docs/plans/flat-scene-f7.md`).
+    samples: vapors_renderer::Samples,
     /// Surface renderers, before and after the painter exists.
     surfaces: AppSurfaces,
     failure: Failure,
@@ -58,6 +60,8 @@ pub struct ElementsApp {
     start: start::StartRecord,
     /// Times frames on the GPU (`elements_app_timing.rs`).
     timer: AppTimer,
+    /// The GPU-time line written once a second, for a run by hand.
+    readout: Option<readout::GpuReadout>,
     /// The a11y mirror, when attached (`elements_app_a11y.rs`).
     a11y: a11y::A11yMirror,
 }
@@ -84,6 +88,7 @@ impl ElementsApp {
             document,
             painter: None,
             atlas: None,
+            samples: vapors_renderer::Samples::One,
             surfaces: AppSurfaces::default(),
             failure: Failure::default(),
             input: DocumentInput::new(),
@@ -97,6 +102,7 @@ impl ElementsApp {
             render_passes: 0,
             start: start::StartRecord::default(),
             timer: AppTimer::default(),
+            readout: None,
             a11y: a11y::A11yMirror::default(),
         }
     }
@@ -199,6 +205,8 @@ mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_readout.rs"]
+mod readout;
 #[path = "elements_app_shown.rs"]
 mod shown;
 #[path = "elements_app_start.rs"]

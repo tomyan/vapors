@@ -5,12 +5,14 @@
 // each test crate including this uses a part of it
 #![allow(dead_code)]
 
-use vapors_renderer::{Target, TransformTable, translation};
+use vapors_renderer::{ClipTable, Target, TransformTable, translation};
 
 /// A table, its frame entry, and its rows' first entry (0, the identity,
 /// for no rows).
 pub struct Table {
     pub transforms: TransformTable,
+    /// A clip table of no clips, which kept draws bind.
+    pub clips: ClipTable,
     pub frame: u32,
     pub rows_base: u32,
 }
@@ -32,6 +34,7 @@ pub fn table(target: &Target<'_>, shift: [f32; 2], rows: &[[f32; 2]]) -> Table {
     };
     Table {
         transforms: table,
+        clips: ClipTable::new(target.device, "test clips"),
         frame,
         rows_base,
     }

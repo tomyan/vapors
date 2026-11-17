@@ -20,6 +20,12 @@ pub(super) struct Moved<'a> {
     /// or the batch's own.
     pub(super) rows_key: BatchKey,
     pub(super) rows: BatchRows<'a>,
+    /// The batch's clip in its frame, device pixels: the clip entry its
+    /// shadow, quad and shape items name (`painter_clips.rs`).
+    pub(super) clip: Option<vapors_scene::Rect>,
+    /// The frame as the scissor path reads it, for the check that the
+    /// clip table agrees with it (`painter_clips.rs` `assert_agrees`).
+    pub(super) draw: vapors_elements::FrameDraw,
 }
 
 impl Moved<'_> {
