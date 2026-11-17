@@ -42,11 +42,13 @@ impl Request {
     }
 }
 
-/// The request `reader` holds.
+/// The request `reader` holds, head and body: for the tests, as the
+/// server reads the two apart.
 ///
 /// # Errors
 ///
 /// A request this shape does not cover, or the reader failing.
+#[cfg(test)]
 pub fn read(reader: &mut impl BufRead) -> Result<Request, String> {
     let mut request = read_head(reader)?;
     read_body(reader, &mut request)?;

@@ -86,10 +86,27 @@ fn accepted(listener: &UnixListener, routes: &Arc<Routes>) {
     }
 }
 
-/// One request read and answered.
+/// How long a write to the session may block: the CLI reads a streamed
+/// response as it arrives, so a write that waits 60 s means the session
+/// stopped reading, and the request ends (review of #476-#478, M1).
+const WRITE_DEADLINE: Duration = Duration::from_secs(60);
+
+/// A request's reader: everything it reads ends by the request's
+/// deadline.
+pub type Reader = BufReader<Deadlined>;
+
+/// One request read and answered. The head is read first; a body is read
+/// only by a route that takes one, once it has room for it (L4).
 pub fn answered(stream: &mut UnixStream, routes: &Routes) {
-    let request = match read(stream) {
-        Ok(request) => request,
+    if let Err(error) = stream.set_write_timeout(Some(WRITE_DEADLINE)) {
+        return refuse(
+            stream,
+            routes,
+            &format!("a connection whose writes cannot be bounded: {error}"),
+        );
+    }
+    let (mut reader, request) = match head(stream) {
+        Ok(read) => read,
         Err(why) => return refuse(stream, routes, &why),
     };
     match (request.method.as_str(), request.path(), &routes.proxy) {
@@ -99,7 +116,7 @@ pub fn answered(stream: &mut UnixStream, routes: &Routes) {
             reply(stream, "200 OK", "");
         }
         ("POST", "/v1/messages" | "/v1/messages/count_tokens", Some(proxy)) => {
-            crate::api_server_proxy::proxied(stream, routes, proxy, &request);
+            crate::api_server_proxy::proxied(stream, (&mut reader, request), routes, proxy);
         }
         _ => refuse(
             stream,
@@ -109,19 +126,22 @@ pub fn answered(stream: &mut UnixStream, routes: &Routes) {
     }
 }
 
-/// The request, read whole within [`REQUEST_DEADLINE`].
-fn read(stream: &UnixStream) -> Result<Request, String> {
+/// The request's head, read within [`REQUEST_DEADLINE`], and the reader
+/// that holds the rest.
+fn head(stream: &UnixStream) -> Result<(Reader, Request), String> {
     let reader = Deadlined {
         stream: stream
             .try_clone()
             .map_err(|e| format!("a connection not read: {e}"))?,
         until: Instant::now() + REQUEST_DEADLINE,
     };
-    crate::api_http::read(&mut BufReader::new(reader))
+    let mut reader = BufReader::new(reader);
+    let request = crate::api_http::read_head(&mut reader)?;
+    Ok((reader, request))
 }
 
 /// A stream whose reads all end by one instant, however the bytes drip.
-struct Deadlined {
+pub struct Deadlined {
     stream: UnixStream,
     until: Instant,
 }
