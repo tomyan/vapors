@@ -86,8 +86,10 @@ fn prepared(order: &Order<'_>) -> Result<(Builder, Arc<Routes>, PathBuf), String
     let branch = crate::api_fences_run::branch(&builder);
     crate::api_clone::make(&builder, (&main, &objects), &branch)?;
     let staging = crate::api_build_setup::private(&builder.root().join("requests"))?;
+    let questions = crate::api_build_setup::private(&builder.root().join("questions"))?;
     let routes = Arc::new(Routes {
         proxy: Some(Proxy::new(secret, budget, staging)),
+        asks: Some(crate::api_ask::Asks::new(questions)),
         ..Routes::default()
     });
     Ok((builder, routes, objects))

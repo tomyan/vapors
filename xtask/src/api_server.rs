@@ -3,8 +3,8 @@
 //! (`api_http.rs`) within a deadline, and answers by its route: the
 //! way-in probe; `HEAD /api/hello`, the CLI's connectivity check,
 //! answered here with 200, never forwarded and never keyed, and counted
-//! (the lead, L13); and, when the run has a key, the API
-//! (`api_server_proxy.rs`). A request with no route is refused with 403
+//! (the lead, L13); `ask_lead`'s questions (`api_server_ask.rs`); and,
+//! when the run has a key, the API (`api_server_proxy.rs`). A request with no route is refused with 403
 //! and logged. Whatever the session sends, the server holds a bounded
 //! request, for a bounded time, on a bounded number of connections
 //! (review of #467, M3).
@@ -39,6 +39,9 @@ const CONNECTIONS: usize = 64;
 pub struct Routes {
     /// The API route, when the run has a key.
     pub proxy: Option<Proxy>,
+    /// Where `ask_lead`'s questions go (`api_ask.rs`), when the run has a
+    /// session.
+    pub asks: Option<crate::api_ask::Asks>,
     pub refused: crate::api_refusals::Refusals,
     /// `HEAD /api/hello` answered here.
     pub hellos: AtomicU64,
@@ -117,6 +120,9 @@ pub fn answered(stream: &mut UnixStream, routes: &Routes) {
         }
         ("POST", "/v1/messages" | "/v1/messages/count_tokens", Some(proxy)) => {
             crate::api_server_proxy::proxied(stream, (&mut reader, request), routes, proxy);
+        }
+        ("POST", crate::api_server_ask::ASK, _) => {
+            crate::api_server_ask::asked(stream, (&mut reader, request), routes);
         }
         _ => refuse(
             stream,

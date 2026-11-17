@@ -93,7 +93,9 @@ commit).
    API route, the session and `cargo xtask api-build`. A model with no
    price in `[api_build.prices]` is refused, and the run fails when the
    proxy's count and the CLI's reported cost differ.
-3. **`ask_lead`**: the MCP server inside; `q<N>.md` written and its path
+3. **`ask_lead`** (built; live 2026-11-17: the session asked "What
+   colour?", the answer file said `blue`, and the session replied
+   `blue`): the MCP server inside; `q<N>.md` written and its path
    logged, `a<N>.md` read, 30 minutes, then `BLOCKED.md` and stop.
 4. **`request_push`**: `cargo xtask ci` in a fresh sandbox, the path and
    400-line checks, the push from outside with the hook skipped (declared

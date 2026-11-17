@@ -20,8 +20,27 @@ pub const SESSION_DEADLINE: Duration = Duration::from_hours(4);
 const POLL: Duration = Duration::from_secs(1);
 
 /// The tools the session may use without asking: everything a builder
-/// needs, as the sandbox, not the tool list, is the fence.
-const TOOLS: [&str; 6] = ["Bash", "Read", "Edit", "Write", "Glob", "Grep"];
+/// needs, as the sandbox, not the tool list, is the fence; and the
+/// harness's, from the MCP server below.
+const TOOLS: [&str; 7] = [
+    "Bash",
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "mcp__harness__ask_lead",
+];
+
+/// The harness's MCP server, the trusted xtask inside, posting through
+/// the relay; the only MCP server the session loads.
+fn mcp_config() -> String {
+    let server = serde_json::json!({
+        "command": format!("{}/xtask", crate::api_sandbox::BIN),
+        "args": ["api-mcp-inner", "--port", crate::api_sandbox::RELAY_PORT.to_string()],
+    });
+    serde_json::json!({"mcpServers": {"harness": server}}).to_string()
+}
 
 /// How the session ended.
 #[derive(Debug, PartialEq, Eq)]
@@ -49,6 +68,11 @@ pub fn arguments(model: &str, budget: f64) -> Vec<String> {
         .map(str::to_owned),
     );
     args.extend(TOOLS.map(str::to_owned));
+    args.extend([
+        "--strict-mcp-config".into(),
+        "--mcp-config".into(),
+        mcp_config(),
+    ]);
     args
 }
 
