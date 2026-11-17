@@ -38,6 +38,9 @@ pub(super) struct TextGpu {
     /// The frame's entry in the transform table the bytes name: bytes
     /// naming another are built again.
     frame: u32,
+    /// The rows its bytes name: its range must hold this many
+    /// (`rows_fit`).
+    rows_needed: usize,
     pub(super) drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -66,6 +69,7 @@ impl KeptGpu {
         let generation = atlas.generation();
         match self.texts.get(&key) {
             Some(gpu) if gpu.current(run, painted, (generation, frame)) => {
+                crate::painter::kept::rows_fit(key, gpu.rows_needed, range);
                 #[cfg(debug_assertions)]
                 crate::painter::kept::rows_in_range(key, rows, range);
                 gpu.check(atlas, painted, ((run, frame, rows), at));
@@ -100,7 +104,8 @@ impl KeptGpu {
             return Ok(());
         };
         let built = (bytes, frame, self.frame);
-        let gpu = TextGpu::new((range.range(), pins), (run, painted), built);
+        let mut gpu = TextGpu::new((range.range(), pins), (run, painted), built);
+        gpu.rows_needed = crate::painter::kept::rows_needed(rows);
         self.texts.insert(key, gpu);
         self.written += 1;
         Ok(())
@@ -148,6 +153,7 @@ impl TextGpu {
             resolved: Resolved::of(run, painted),
             len: bytes.len() as u64,
             frame,
+            rows_needed: 0,
             drawn,
             #[cfg(debug_assertions)]
             bytes,

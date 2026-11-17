@@ -33,7 +33,7 @@ mod gpu;
 pub(super) use gpu::KeptGpu;
 #[path = "painter_kept_bytes.rs"]
 mod bytes;
-pub(super) use bytes::{Kind, RunBytes, rows_in_range, run_bytes};
+pub(super) use bytes::{Kind, RunBytes, rows_fit, rows_in_range, rows_needed, run_bytes};
 
 /// The painter's [`Pipelines`], each borrowed from its own field, so the
 /// painter's other fields stay free to borrow beside them.

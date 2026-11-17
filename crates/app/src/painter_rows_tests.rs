@@ -127,3 +127,21 @@ fn an_item_row_at_the_end_of_its_batchs_range_is_refused() {
 fn an_item_row_in_a_batch_with_no_range_is_refused() {
     super::super::kept::rows_in_range(a_key(), &[0], 0);
 }
+
+#[test]
+fn kept_bytes_need_their_highest_row_and_one() {
+    assert_eq!(super::super::kept::rows_needed(&[0, 4, 2]), 5);
+    assert_eq!(super::super::kept::rows_needed(&[]), 0);
+}
+
+#[test]
+fn kept_bytes_fit_a_range_holding_the_rows_they_name() {
+    super::super::kept::rows_fit(a_key(), 5, 5);
+    super::super::kept::rows_fit(a_key(), 0, 0);
+}
+
+#[test]
+#[should_panic(expected = "kept bytes name 5 rows, and its range holds 4")]
+fn kept_bytes_drawn_with_a_range_that_shrank_are_refused() {
+    super::super::kept::rows_fit(a_key(), 5, 4);
+}

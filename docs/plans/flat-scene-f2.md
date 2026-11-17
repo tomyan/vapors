@@ -270,4 +270,13 @@ kept as a second path).
 - **Left for F2.3:** the mesh pipeline (still on `Shift`), the shape
   batch cut, and the renderer's `Shift` and `RowOffsets` types
   (`RowOffsets::CAPACITY` still caps a batch's range at 128 rows).
+- **Kept bytes and a range that changes.** A batch keeps its key, and
+  so its kept bytes, while its rows' offsets change: vapors-elements
+  matches keys on the items' rows, not on the rows' offsets
+  (`kept_batches_keys.rs` `same`). The range a batch's bytes are drawn
+  with can therefore shrink after the bytes were built, which the
+  build-time check (`rows_in_range`) does not see. Each kept batch
+  records the rows its bytes name (the highest row and one), and every
+  draw from kept bytes, in every build, refuses a range that holds
+  fewer (`rows_fit`, O(1)).
 
