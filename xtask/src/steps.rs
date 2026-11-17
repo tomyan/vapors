@@ -25,15 +25,40 @@ fn tools() -> Step {
 /// the check is never skipped. A cold fetch and check took 1.2 to 1.4 s
 /// here (2026-10-23); 60 s leaves room for a slow network before the
 /// fetch is declared hung.
+/// The variable that turns off cargo deny's fetching: set to `1` by the
+/// API builder's sandbox, which has no network and binds the advisory
+/// database its host fetched, read-only (`docs/plans/api-builder.md`,
+/// slice 4; the lead, L43). Every check still runs, on that database.
+pub const DENY_OFFLINE: &str = "VAPORS_DENY_OFFLINE";
+
 fn deny() -> Step {
+    deny_with(std::env::var(DENY_OFFLINE).ok().as_deref())
+}
+
+/// The deny step for [`DENY_OFFLINE`]'s value: unset fetches, `1` does
+/// not, and any other value is refused by a step that fails naming it.
+fn deny_with(offline: Option<&str>) -> Step {
+    let args: &[&str] = match offline {
+        None => &["deny", "check"],
+        Some("1") => &["deny", "--offline", "check"],
+        Some(other) => return refused_deny(other),
+    };
     let mut step = Step::new(
         "deny",
         "cargo",
-        &["deny", "check"],
+        args,
         "fix the dependency, or record a reasoned exception in deny.toml; if the advisory database could not be fetched (offline), connect and rerun `cargo xtask deny`: it is never skipped",
     );
     step.deadline = Some(std::time::Duration::from_secs(60));
     step
+}
+
+/// A step that fails, its fix naming the value refused.
+fn refused_deny(value: &str) -> Step {
+    let fix = format!(
+        "{DENY_OFFLINE}={value:?} is neither unset nor 1: unset it, or set it to 1 where the advisory database is bound"
+    );
+    Step::new("deny", "false", &[], &fix)
 }
 
 fn fmt() -> Step {

@@ -83,7 +83,7 @@ fn the_wasm_release_step_lints_the_package_as_trunk_builds_it() {
 #[test]
 fn the_deny_step_checks_every_section_within_its_deadline() {
     // When
-    let step = deny();
+    let step = super::deny_with(None);
 
     // Then
     assert_eq!(step.reproduce(), "cargo deny check");
@@ -112,5 +112,28 @@ fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
             "nightly issues",
             "clippy"
         ]
+    );
+}
+
+#[test]
+fn the_deny_step_runs_every_check_offline_when_the_sandbox_says_so() {
+    // When
+    let step = super::deny_with(Some("1"));
+
+    // Then
+    assert_eq!(step.reproduce(), "cargo deny --offline check");
+}
+
+#[test]
+fn the_deny_step_refuses_a_value_of_its_variable_it_does_not_know() {
+    // When
+    let step = super::deny_with(Some("yes"));
+
+    // Then: a step that fails, naming the value
+    assert_eq!(step.program, "false");
+    assert!(
+        step.fix.contains("VAPORS_DENY_OFFLINE=\"yes\""),
+        "{}",
+        step.fix
     );
 }
