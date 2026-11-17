@@ -27,9 +27,11 @@ mod scrollbar;
 mod share;
 mod sheet_hashes;
 pub use sheet_hashes::SheetHash;
+pub(crate) use sheet_hashes::SheetKind;
 mod sibling_deps;
 mod sides;
 pub(crate) use sibling_deps::SiblingDeps;
+mod compiled_add;
 mod compiled_rules;
 mod compiled_shareable;
 mod sizes;
@@ -78,15 +80,17 @@ pub(crate) struct Sheets {
     pub(crate) features: features::Features,
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
-    scopes: std::collections::HashMap<String, String>,
+    scopes: std::collections::HashMap<String, compiled_add::Registered>,
     /// Each global component sheet added, by name, with its text.
-    globals: std::collections::HashMap<String, String>,
+    globals: std::collections::HashMap<String, compiled_add::Registered>,
     /// Rust-added sheets against analysed elements (`rust_sheets`).
     rust: rust_sheets::RustSheets,
     /// Each component sheet in the cascade, by kind and name: its place
     /// and its text's hash (`sheet_hashes`).
     components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
     refused: Vec<ElementError>,
+    /// Compiled sheets' texts hashed to check their claims.
+    pub(crate) hashes_taken: usize,
 }
 
 impl Sheets {
@@ -102,6 +106,7 @@ impl Sheets {
             rust: rust_sheets::RustSheets::default(),
             components: std::collections::HashMap::new(),
             refused: Vec::new(),
+            hashes_taken: 0,
         }
     }
 
@@ -124,7 +129,11 @@ impl Sheets {
     /// nothing, as the generated code's other calls do. False when the
     /// scope was already added with this style and nothing changed.
     pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) -> bool {
-        if self.scopes.get(scope).is_some_and(|added| added == text) {
+        if self
+            .scopes
+            .get(scope)
+            .is_some_and(|added| added.text == text)
+        {
             return false;
         }
         self.add_new_scoped(scope, text);
@@ -143,7 +152,10 @@ impl Sheets {
                     format!("scope `{scope}` was already added with another style: two components share a scope; give their files different paths"),
                 )));
             }
-            None => drop(self.scopes.insert(scope.to_owned(), text.to_owned())),
+            None => drop(
+                self.scopes
+                    .insert(scope.to_owned(), compiled_add::Registered::new(text)),
+            ),
         }
         let sheet = match vapors_css::parse(text) {
             Ok(sheet) => sheet,

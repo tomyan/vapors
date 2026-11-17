@@ -6,6 +6,7 @@
 
 mod compiled_mount_order;
 mod compiled_sharing;
+mod compiled_sheet_once;
 mod compiled_winners;
 mod honoured_compiled;
 mod honoured_declared;

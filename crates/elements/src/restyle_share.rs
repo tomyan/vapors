@@ -47,11 +47,6 @@ impl Document {
         else {
             return Ok((self.compute_own(node, viewport)?, Path::Unkeyed));
         };
-        // check 1 first: a sheet registered with other text is that, not a
-        // disagreement of the sharing answers (review of #437, M2)
-        if let Some(winners) = key.winners.compiled() {
-            self.compiled_key(key, winners)?;
-        }
         if !self.shareable(key)? {
             return Ok((self.compute_keyed(node, key, viewport)?, Path::Unshareable));
         }
@@ -112,6 +107,14 @@ impl Document {
         let kept = self.kept.as_ref().expect("restyle sets it");
         if let Some(decided) = kept.shared.shareable.get(&address) {
             return Ok(*decided);
+        }
+        // check 1 first, once per key: a sheet registered with other text
+        // is that, not a disagreement of the sharing answers (review of
+        // #437, M2). A refused key is not decided (`refuse_key` drops a
+        // decision), so each of its elements comes here and is refused
+        // again.
+        if let Some(winners) = key.winners.compiled() {
+            self.compiled_key(key, winners)?;
         }
         let runtime = self.sheets.runtime_shareable(key);
         let decided = match key.winners.compiled() {

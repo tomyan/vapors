@@ -7,6 +7,7 @@ use vapors_dom::{CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
+use crate::style::SheetKind;
 
 impl Dom for Document {
     fn create_element(&mut self, tag: &str) -> NodeId {
@@ -50,12 +51,10 @@ impl Dom for Document {
     /// Every mount calls it; a sheet already added changes nothing. A
     /// new one restyles every element: which elements its rules reach
     /// is not worked out. One whose text does not hash as the compiler
-    /// said is refused (`Sheets::compiled_text`).
+    /// said is refused (`Sheets::compiled_text`), checked once per sheet
+    /// (`Sheets::add_compiled`).
     fn add_style(&mut self, sheet: CompiledSheet<'_>) {
-        if !self.sheets.compiled_text(sheet) {
-            return;
-        }
-        if self.sheets.add_scoped(sheet.name(), sheet.text()) {
+        if self.sheets.add_compiled(SheetKind::Scope, sheet) {
             self.note_change();
             self.dirty.everything();
         }
@@ -63,10 +62,7 @@ impl Dom for Document {
 
     /// As [`Dom::add_style`], unscoped.
     fn add_global_style(&mut self, sheet: CompiledSheet<'_>) {
-        if !self.sheets.compiled_text(sheet) {
-            return;
-        }
-        if self.sheets.add_global(sheet.name(), sheet.text()) {
+        if self.sheets.add_compiled(SheetKind::Global, sheet) {
             self.note_change();
             self.dirty.everything();
         }

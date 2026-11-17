@@ -20,9 +20,12 @@ impl Sheets {
     /// layout corpus alone, which mounts one fixture per document.
     pub(crate) fn add_global(&mut self, sheet: &str, text: &str) -> bool {
         match self.globals.get(sheet) {
-            Some(added) if added == text => return false,
+            Some(added) if added.text == text => return false,
             Some(_) => return self.refuse_other_text(sheet),
-            None => drop(self.globals.insert(sheet.to_owned(), text.to_owned())),
+            None => drop(
+                self.globals
+                    .insert(sheet.to_owned(), super::compiled_add::Registered::new(text)),
+            ),
         }
         match self.add_author(sheet, text) {
             Ok(()) => self.note_sheet(super::sheet_hashes::SheetKind::Global, sheet, text),
@@ -67,6 +70,7 @@ impl Sheets {
         let Some(claimed) = sheet.hash() else {
             return true;
         };
+        self.hashes_taken += 1;
         if claimed == vapors_css::sheet_hash::sheet_hash(sheet.text()) {
             return true;
         }
