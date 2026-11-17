@@ -13,6 +13,9 @@ fn host() -> Host {
         claude: PathBuf::from("/home/u/.local/share/claude/versions/2"),
         objects: PathBuf::from("/home/u/projects/vapors/.git/objects"),
         render_nodes: vec![PathBuf::from("/dev/dri/renderD128")],
+        advisories: vec![PathBuf::from(
+            "/home/u/.cargo/advisory-dbs/advisory-db-3157",
+        )],
     }
 }
 
@@ -90,6 +93,26 @@ fn the_session_is_given_the_relay_and_a_dummy_key_never_a_key_file() {
 }
 
 #[test]
+fn cargo_deny_runs_offline_on_the_hosts_advisory_database_bound_read_only() {
+    // When
+    let args = arguments(&builder(), &host(), 4000);
+
+    // Then
+    let bound = args.windows(3).any(|w| {
+        w == [
+            "--ro-bind",
+            "/home/u/.cargo/advisory-dbs/advisory-db-3157",
+            "/home/u/.cache/api-build/b1/cargo-home/advisory-dbs/advisory-db-3157",
+        ]
+    });
+    assert!(bound, "{args:?}");
+    assert!(
+        args.join(" ").contains("--setenv VAPORS_DENY_OFFLINE 1"),
+        "{args:?}"
+    );
+}
+
+#[test]
 fn the_hosts_shared_sccache_directory_is_never_bound() {
     // When
     let args = arguments(&builder(), &host(), 4000);
@@ -125,6 +148,7 @@ fn only_these_paths_are_bound_read_only() {
             "/home/u/.local/share/factory",
             "/home/u/projects/vapors/.git/objects",
             "/home/u/.cache/api-build/b1/socket",
+            "/home/u/.cache/api-build/b1/cargo-home/advisory-dbs/advisory-db-3157",
             "/home/u/.cache/api-build/b1/cargo-home/registry",
             "/opt/api-build/xtask",
             "/opt/api-build/claude",

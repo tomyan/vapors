@@ -29,3 +29,18 @@ fn a_name_that_could_leave_its_directory_is_refused() {
         assert!(refused.is_err(), "{name:?} was accepted");
     }
 }
+
+#[test]
+fn a_ci_builder_shares_nothing_writable_with_its_session() {
+    // Given
+    let session = Builder::new("b", Path::new("/home/u")).expect("a plain name");
+
+    // When
+    let ci = session.ci(3);
+
+    // Then
+    assert_eq!(ci.name, "b-ci-3");
+    assert_ne!(ci.sandbox_sccache(), session.sandbox_sccache());
+    assert_ne!(ci.target(), session.target());
+    assert_ne!(ci.root(), session.root());
+}
