@@ -164,7 +164,7 @@ ever drawn approximately: every row not marked support is refused.
 | CSS `d: path(..)` and its interpolation | run | no `d` property | `d={expr}` as known-variable geometry (S6) | refuse: `d` stays an attribute, bound through `d={expr}` |
 | `pointer-events` on shapes: `visiblePainted` (initial), `visibleFill`, `visibleStroke`, `visible`, `painted`, `fill`, `stroke`, `all`, `none`; `bounding-box` | hit by the painted shape per the keyword | `auto | none`, hit by the box | the same | support (V18) |
 | Accessibility of shapes and groups: `role`, `aria-*`, `<title>` naming, `<text>` as static text, the svg root's role | as the `ax_oracle` records it | `aria-hidden` and `role="img"` + `aria-label` on the root only | the same | support (V19), each form recorded by the oracle |
-| `shape-rendering` | `crispEdges` and `optimizeSpeed` draw without antialiasing; `auto` and `geometricPrecision` antialiased | refused | not planned | support (V24): `crispEdges` and `optimizeSpeed` snap to device pixels under a `WholeTranslate` frame (3.14) |
+| `shape-rendering` | `crispEdges` and `optimizeSpeed` draw without antialiasing; `auto` and `geometricPrecision` antialiased | refused | not planned | support (V24): `crispEdges` and `optimizeSpeed` snap to device pixels and draw without antialiasing under a `WholeTranslate` frame, as Chromium (3.14) |
 | `text-rendering`, `image-rendering` hints | hints | refused | not planned | out: coverage is the renderer's policy |
 | `color-interpolation` | ignored by Chromium | refused | not planned | out |
 | Namespaced attributes (`xlink:href`, `xml:space`) | `xlink:href` as a deprecated alias of `href` | refused by the compiler (`codegen/attribute_refusals.rs`, `NAMESPACES`) | the same | out: write `href` |
@@ -668,23 +668,24 @@ counted.
   leave it clear, which is how every shape draws today. The property
   is inherited, initial `auto`, so a value on an `<svg>`, a `<g>` or an
   HTML ancestor reaches the shapes under it.
-- **Technique:** a crisp shape snaps its geometry to device pixels
-  when its frame's class is `WholeTranslate` (`flat-scene.md` F1's
-  rule, as box edges snap at paint today), and draws unsnapped under
-  any other class (`Affine`, `Projective`). The snap applies to the
-  item's device-space vertices after the transform, the same rounding
-  (`half_up`) box edges take. A 1px horizontal or vertical line then
-  covers whole device pixels instead of two half-covered rows. The
-  flag is a constant for a literal value; a toggled class that sets it
-  rewrites the item's bytes, counted, and tessellates nothing.
-- **Chromium:** it draws these two values with antialiasing off.
-  Snapping gives the same pixels for edges along the pixel grid, which
-  is what crisp lines are for. On a diagonal edge, Chromium's is
-  aliased and a snapped one stays antialiased: D11.
-- **Oracle:** a Chromium corpus case of 1px lines (horizontal,
-  vertical, and the outline of a rect), with and without `crispEdges`,
-  at scales 1, 1.5 and 2, passing the paint rules.
-- **Cost:** one bit per item; the snap is in the vertex shader.
+- **Technique:** a crisp shape, when its frame's class is
+  `WholeTranslate` (`flat-scene.md` F1's rule), snaps its geometry to
+  device pixels, the same rounding (`half_up`) box edges take at paint
+  today, applied to the item's device-space vertices after the
+  transform, and draws with its coverage antialiasing off: a pixel is
+  covered or not, so a diagonal edge stair-steps as Chromium's does
+  (D11, decided). A 1px horizontal or vertical line covers whole device
+  pixels instead of two half-covered rows. Under any other class
+  (`Affine`, `Projective`) the shape draws as without the property:
+  unsnapped and antialiased. The flag is a constant for a literal
+  value; a toggled class that sets it rewrites the item's bytes,
+  counted, and tessellates nothing.
+- **Oracle:** Chromium corpus cases of 1px lines (horizontal,
+  vertical, and the outline of a rect) and of a diagonal line, each
+  with and without `crispEdges`, at scales 1, 1.5 and 2, passing the
+  paint rules.
+- **Cost:** one bit per item, read by the vertex shader (the snap) and
+  the fragment shader (coverage on or off).
 - **Verdict:** support (V24).
 
 ## 4. Left out, and why
@@ -744,7 +745,7 @@ rarer). The S rows of `one-scene.md` come first; V1 starts after S6.
 | V21 | CSS transitions and animations on `fill`, `stroke`, `opacity`, `stroke-dashoffset`, `transform` of SVG elements | A transition writes paint or transform bytes per frame and tessellates nothing except a dash offset (counted); the CSS animation slice's own oracle | 300 | the CSS animation slice ("a slice after F2c"), V5 |
 | V22 | `vector-effect: non-scaling-stroke` through run-time tessellation keyed by the transform | A 1-px stroke stays 1 px under a 4x scale, compared with Chromium; counted per transform change | 300 | V5, `runtime-shapes` |
 | V23 | `<pattern>`: a tile rendered at the pattern's device scale, rebuilt on change, counted | A fixture passes while the transform is unchanged; a scale change rebuilds once | 400 | V12 |
-| V24 | `shape-rendering` in `vapors-css` (inherited, initial `auto`) and `honoured.rs`; `crispEdges` and `optimizeSpeed` snap a shape's geometry to device pixels under a `WholeTranslate` frame and leave it unsnapped under any other class (3.14) | A Chromium corpus case of 1px lines at scales 1, 1.5 and 2 passes the paint rules; a test sets each of the four values on each shape element, `<g>`, `<svg>` and an HTML ancestor and finds none refused; a shape under an `Affine` frame draws as without the property | 200 | flat-scene F1, V1 |
+| V24 | `shape-rendering` in `vapors-css` (inherited, initial `auto`) and `honoured.rs`; `crispEdges` and `optimizeSpeed` snap a shape's geometry to device pixels and turn its antialiasing off under a `WholeTranslate` frame, and draw it as without the property under any other class (3.14) | Chromium corpus cases of 1px lines and of a diagonal line at scales 1, 1.5 and 2 pass the paint rules; a test sets each of the four values on each shape element, `<g>`, `<svg>` and an HTML ancestor and finds none refused; a shape under an `Affine` frame draws as without the property | 200 | flat-scene F1, V1 |
 
 Critical path for icon sets and logos: V1 to V7 (seven PRs). V18 and
 V19 close the "element in the tree" promise. V8 to V12 are the paint
@@ -828,18 +829,15 @@ says wait for the properties only. Recommendation: (a), since the
 benchmark and the site need no SVG beyond icons; Tom decides the
 order against the website's needs.
 
-**D11. `shape-rendering: crispEdges` on a diagonal edge** (open,
-2026-11-17). V24 snaps a crisp shape's geometry under a
-`WholeTranslate` frame, as Tom specified. Chromium draws the value with
-antialiasing off: for edges along the pixel grid the two give the same
-pixels, which the V24 corpus case compares; for a diagonal edge
-Chromium's is stair-stepped and a snapped one stays antialiased.
-(a) Snap only, as specified; the corpus compares grid-aligned lines,
-and a diagonal crisp edge differs from Chromium's. (b) Snap, and turn
-the shape's coverage antialiasing off under a `WholeTranslate` frame,
-which matches Chromium's diagonal edges too; one more bit read in the
-fragment shader. No recommendation is recorded: the choice is about
-what crisp edges should look like, and (a) is what was asked for.
+**D11. `shape-rendering: crispEdges` on a diagonal edge.** **Decided
+2026-11-17 (Tom): match Chromium.** Chromium draws `crispEdges` and
+`optimizeSpeed` with antialiasing off. Under a `WholeTranslate` frame,
+V24 snaps a crisp shape's geometry and turns its coverage antialiasing
+off, so a diagonal edge stair-steps as Chromium's does; V24's corpus
+compares a diagonal line beside the grid-aligned ones. Under any other
+class the shape draws as without the property. The alternative, snap
+only, would have left a diagonal crisp edge antialiased, unlike
+Chromium's.
 
 ## 7. Risks
 
