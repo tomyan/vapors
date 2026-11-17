@@ -1,7 +1,7 @@
 //! `SceneRenderer`: the scene on a `gpu-surface`.
 
 use crate::camera::{CameraUniform, view_projection};
-use crate::draw::{MeshNode, Pass, mesh_nodes, record};
+use crate::draw::{MeshNode, Pass, materials_built, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::log::Tracked;
 use crate::pipeline::Pipeline;
@@ -10,7 +10,7 @@ use crate::{FrameError, RendererLog, Resource, depth};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
-use vapors_scene3d::{Meshes, NodeId, Scene};
+use vapors_scene3d::{MaterialId, Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
 /// given to its [`Meshes`]. Each render borrows the `Meshes` mutably to
@@ -85,6 +85,7 @@ impl SurfaceRenderer for SceneRenderer {
         let mut scene = self.scene.borrow_mut();
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
+        materials_built(&nodes, &meshes, mounted.pipeline.materials.len())?;
         mounted.geometry.upload_missing(&frame, &nodes);
         mounted
             .camera
@@ -132,16 +133,16 @@ impl Mounted {
         depth: &wgpu::TextureView,
         nodes: &[MeshNode],
     ) -> Result<(), FrameError> {
-        let mut draws = nodes
+        // in tree order: of two fragments at one depth the first drawn wins
+        // (depth `Less`), so the material does not reorder them
+        let draws = nodes
             .iter()
             .filter(|mesh| mesh.visible)
             .map(|mesh| {
-                let material = self.material_of(mesh)?;
+                let material = mesh.material.map(MaterialId::index);
                 Ok((material, self.offset(mesh.node), self.geometry.get(mesh)?))
             })
             .collect::<Result<Vec<_>, FrameError>>()?;
-        // opaque, depth-tested: order changes no pixel; grouped by pipeline
-        draws.sort_by_key(|(material, ..)| *material);
         let pass = Pass {
             pipelines: (&self.pipeline.render, &self.pipeline.materials),
             camera: self.camera.bind_group(),
@@ -152,23 +153,6 @@ impl Mounted {
         };
         record(frame.encoder, &pass, &draws);
         Ok(())
-    }
-
-    /// The place of `mesh`'s material among the pipelines built at
-    /// mount; none for its colour.
-    fn material_of(&self, mesh: &MeshNode) -> Result<Option<usize>, FrameError> {
-        let Some(material) = mesh.material else {
-            return Ok(None);
-        };
-        let built = self.pipeline.materials.len();
-        if material.index() >= built {
-            return Err(FrameError::MaterialMissing {
-                node: mesh.node,
-                material,
-                built,
-            });
-        }
-        Ok(Some(material.index()))
     }
 
     fn offset(&self, node: NodeId) -> u32 {

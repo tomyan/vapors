@@ -1,10 +1,8 @@
 //! `<Mesh material={..}>` (one-scene R2): the mesh a page mounts is drawn
 //! with the material the page passes, and with its colour without one.
 
-mod support;
-
-use support::material_page::{MaterialPage, MaterialPageProps};
-use support::{Stage, square};
+use super::support::material_page::{MaterialPage, MaterialPageProps};
+use super::support::{Stage, square};
 use vapors_scene3d::{Material, MaterialId, Scene};
 
 /// The material of the page's one mesh, after mounting it with `material`.
@@ -33,7 +31,7 @@ fn a_mesh_given_a_material_is_drawn_with_it() {
             label: "plain".into(),
             wgsl: "fn material(at: MaterialInput) -> vec4<f32> { return at.colour; }".into(),
         };
-        Some(stage.meshes.borrow_mut().material(material))
+        Some(stage.meshes.borrow_mut().material(material).expect("held"))
     });
     assert!(given.is_some());
     assert_eq!(held, given);

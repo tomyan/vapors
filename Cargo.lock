@@ -3264,6 +3264,7 @@ name = "vapors-scene3d"
 version = "0.0.0"
 dependencies = [
  "glam",
+ "naga",
 ]
 
 [[package]]
@@ -3289,6 +3290,7 @@ dependencies = [
 name = "vapors-scene3d-gpu"
 version = "0.0.0"
 dependencies = [
+ "naga",
  "vapors-app",
  "vapors-gpu-harness",
  "vapors-renderer",

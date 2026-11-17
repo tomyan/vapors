@@ -16,7 +16,10 @@ fn materials_are_held_in_the_order_given_each_id_its_place() {
     let mut meshes = Meshes::new();
 
     // When
-    let (first, second) = (meshes.material(checker()), meshes.material(checker()));
+    let (first, second) = (
+        meshes.material(checker()).unwrap(),
+        meshes.material(checker()).unwrap(),
+    );
 
     // Then
     assert_eq!((first.index(), second.index()), (0, 1));
@@ -27,7 +30,7 @@ fn materials_are_held_in_the_order_given_each_id_its_place() {
 #[test]
 fn another_meshes_material_is_not_issued_by_this_one() {
     let mut other = Meshes::new();
-    let foreign = other.material(checker());
+    let foreign = other.material(checker()).unwrap();
     assert!(!Meshes::new().issued_material(foreign));
 }
 
@@ -35,7 +38,7 @@ fn another_meshes_material_is_not_issued_by_this_one() {
 fn a_mesh_takes_a_material_and_gives_it_back_to_its_colour() {
     // Given
     let (mut meshes, mut scene) = (Meshes::new(), Scene::new());
-    let material = meshes.material(checker());
+    let material = meshes.material(checker()).unwrap();
     let root = scene.root();
     let node = scene.add(root, mesh(), Transform::IDENTITY).expect("adds");
 
@@ -54,7 +57,7 @@ fn a_mesh_takes_a_material_and_gives_it_back_to_its_colour() {
 #[test]
 fn a_material_on_a_group_is_refused_naming_the_setter() {
     let (mut meshes, mut scene) = (Meshes::new(), Scene::new());
-    let material = meshes.material(checker());
+    let material = meshes.material(checker()).unwrap();
     let root = scene.root();
     let group = scene
         .add(root, NodeKind::Group, Transform::IDENTITY)
