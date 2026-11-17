@@ -237,3 +237,68 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
         .collect();
     assert_eq!(shape, [('v', 2), ('i', 1), ('v', 1), ('t', 1)]);
 }
+
+#[test]
+fn quads_shadows_shapes_text_and_icons_join_across_clips_and_every_other_kind_splits() {
+    // Given: each kind, two items under two clips
+    let (a, b) = (
+        Some(Rect::new(0.0, 0.0, 4.0, 4.0)),
+        Some(Rect::new(4.0, 0.0, 8.0, 4.0)),
+    );
+    let kinds: [(Item, bool); 8] = [
+        (quad(0.0), true),
+        (Item::Shadow(a_shadow()), true),
+        (a_shape(ShapeKind::ClosedForm), true),
+        (text(0), true),
+        (
+            Item::Icon {
+                icon: IconId(0),
+                rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+                colour: Color::from_rgba8(0, 0, 0, 255),
+            },
+            true,
+        ),
+        (picture(0), false),
+        (
+            Item::Surface {
+                surface: SurfaceId(0),
+                rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+            },
+            false,
+        ),
+        (a_shape(ShapeKind::Mesh), false),
+    ];
+    for (item, joins) in kinds {
+        // When
+        let batched = batched([(item, a), (item, b)], Rect::new(0.0, 0.0, 100.0, 100.0));
+
+        // Then: one batch under two clips, or two batches under one each
+        let expected = if joins { 1 } else { 2 };
+        assert_eq!(batched.batches.len(), expected, "{item:?}");
+        assert_eq!(batched.batches[0].run.clipped_by_table(), joins, "{item:?}");
+    }
+}
+
+/// A shadow in view.
+fn a_shadow() -> Shadow {
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    Shadow {
+        rect,
+        radii: [0.0; 4],
+        blur: 0.0,
+        color: Color::from_rgba8(0, 0, 0, 255),
+        caster: rect,
+        caster_radii: [0.0; 4],
+    }
+}
+
+/// A shape of `kind` in view.
+fn a_shape(kind: ShapeKind) -> Item {
+    Item::Shape(crate::Shape {
+        shape: crate::ShapeRef::Table(0),
+        kind,
+        transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        colour: Color::from_rgba8(1, 2, 3, 255),
+        bounds: Rect::new(0.0, 0.0, 4.0, 4.0),
+    })
+}

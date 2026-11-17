@@ -29,6 +29,14 @@ fn each_item_reads_the_clip_of_its_run() {
 }
 
 #[test]
+#[should_panic(expected = "given item 1: items are pushed in order")]
+fn an_item_pushed_out_of_order_is_refused() {
+    let mut clips = Clips::one(rect(0.0));
+    clips.push(2, rect(20.0));
+    clips.push(1, rect(0.0));
+}
+
+#[test]
 fn the_union_holds_every_clip_and_is_unclipped_when_an_item_is() {
     let mut clips = Clips::one(rect(0.0));
     clips.push(1, rect(20.0));

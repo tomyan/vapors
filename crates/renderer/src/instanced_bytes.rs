@@ -84,8 +84,8 @@ pub(crate) fn rowed_instances<T>(
 pub type ClipRuns<'a> = &'a [(u32, u32)];
 
 /// Item `at`'s clip entry in `clips`, runs of items under one clip as
-/// `(first item, entry)` in item order: the entry of the last run that
-/// starts at or before `at`; 0, no clip, before the first or with none.
+/// `(first item, entry)` in item order, the first at item 0: the entry
+/// of the last run that starts at or before `at`; 0, no clip, with none.
 /// A batch joined across clips names several (flat-scene F3.1 step 2).
 #[must_use]
 pub fn clip_of(clips: &[(u32, u32)], at: usize) -> u32 {
@@ -93,21 +93,25 @@ pub fn clip_of(clips: &[(u32, u32)], at: usize) -> u32 {
     after.checked_sub(1).map_or(0, |run| clips[run].1)
 }
 
-/// Refuses, naming `label`, clip runs whose first items do not rise or
-/// run past `items`: out of order, an item would read another's clip.
+/// Refuses, naming `label`, clip runs that do not start at item 0, whose
+/// first items do not rise, or that run past `items`: an item before the
+/// first run would be drawn unclipped, and out of order an item would
+/// read another's clip. No runs at all is the one spelling of no clip.
 ///
 /// # Panics
 ///
 /// As said.
 fn assert_clip_runs(label: &str, items: usize, clips: &[(u32, u32)]) {
     let rising = clips.windows(2).all(|pair| pair[0].0 < pair[1].0);
+    let from_zero = clips.first().is_none_or(|&(first, _)| first == 0);
     let inside = clips
         .last()
         .is_none_or(|&(first, _)| (first as usize) < items.max(1));
     assert!(
-        rising && inside,
-        "{label}: clip runs {clips:?} for {items} items: each run's first item must rise and \
-         fall inside the batch (instanced_bytes.rs clip_of); reproduce with `cargo xtask test`"
+        from_zero && rising && inside,
+        "{label}: clip runs {clips:?} for {items} items: the first run must start at item 0 and \
+         each run's first item must rise and fall inside the batch (instanced_bytes.rs \
+         clip_of); reproduce with `cargo xtask test`"
     );
 }
 

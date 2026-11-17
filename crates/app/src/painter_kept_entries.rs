@@ -10,7 +10,8 @@ use crate::painter::rows::Moved;
 use crate::painter::runs::table_clip;
 
 /// A run's frame entry, its items' clip entries as runs `(first item,
-/// entry)`, and its rows' first entry.
+/// entry)` (the painter's scratch, `Clips::runs`, to give back), and its
+/// rows' first entry.
 pub(super) type TableEntries = (u32, Vec<(u32, u32)>, u32);
 
 impl ScenePainter {
@@ -29,7 +30,9 @@ impl ScenePainter {
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
-        let mut clips = Vec::with_capacity(moved.clips.runs().len());
+        // the scratch, reused batch after batch: no allocation a batch
+        let mut clips = std::mem::take(&mut self.clips.runs);
+        clips.clear();
         for &(first, clip) in moved.clips.runs() {
             let entry = match table_clip(run, clip) {
                 Some(clip) => self.clip_entry(target, (frame, clip), moved)?,
