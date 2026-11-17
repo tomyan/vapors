@@ -50,7 +50,7 @@ impl Sampler<'_> {
         let start = self.begin(workload, texture.format())?;
         let start_phases = (self.clock.take(), self.clock.take_instructions()?);
         let frame = self.frame(workload, &texture, 0, None)?;
-        let (frame_instructions, frame_counts) = frame.instructions.unzip();
+        let (frame_instructions, frame_counts) = frame.counted.into_instructions().unzip();
         Ok(FirstFrame {
             start,
             start_phases,

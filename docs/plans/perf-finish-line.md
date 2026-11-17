@@ -115,6 +115,8 @@ a height too, and Taffy's caches are not keyed by the requested axis.
 Follow-up: pass the axis through the measure path so an intrinsic
 width costs no break; measure what that removes from an edit's layout.
 
+Hardware counters (`vapors-perf --counters`, Tom 2026-11-13): for each phase, the run reports median cycles, instructions per cycle, branch misses, L1d misses (the kernel's L1-dcache-load-misses; on Intel cores from Skylake on, every line filled into L1d) and last-level cache demand read misses (the kernel's LLC-load-misses). It also estimates the bytes those last-level misses bring in, as misses times the LLC's line size read from sysfs, and refuses when the size cannot be read. The five are read as one perf event group on the calling thread. On opening, work that must raise each event (a loop, branches on random bits, a random chase over 64 MiB) is run, and an event that does not rise enough is refused, naming it; so is a multiplexed reading, and a reading without its enabled and running times. Run it like the timed run, in a quiet window: the counts move with whatever else uses the core and its caches. They are diagnostics, and no property is judged on them. When perf events are not allowed, the run refuses and names `sudo sysctl kernel.perf_event_paranoid=1`. Its test needs the same events, so it is in its own tier, `cargo xtask test --tier pmu`, which neither `cargo xtask ci` nor ci.yml runs. Run that tier in the same quiet window, before the counters. Example: `vapors-perf 20 5 --counters --only "1000 rows, Text"`.
+
 ## Order of work
 
 1. IU3 3c-3f: kept batches (property 2).

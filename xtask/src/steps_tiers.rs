@@ -1,4 +1,5 @@
-//! The two test tiers, split on the test function's name.
+//! The test tiers, split on the test function's name: unit, gpu, and
+//! pmu, which `ci` never runs.
 
 use super::Step;
 
@@ -20,6 +21,12 @@ pub(super) const UNIT_TIER: (&str, &str) = ("VAPORS_TEST_TIER", "unit");
 /// binary, `scripts/one-test-binary.sh`, has ids `<file>::<function>`).
 pub(super) const GPU_TESTS: &str = "test(/^gpu_/) | test(/::gpu_[^:]*$/)";
 
+/// Tests that read hardware performance counters (cycles, cache misses),
+/// named `pmu_` as the GPU tests are `gpu_`. A machine or VM without
+/// those events cannot run them, so they are in no tier `ci` or ci.yml
+/// runs: `cargo xtask test --tier pmu` runs them, in a quiet window.
+pub(super) const PMU_TESTS: &str = "test(/^pmu_/) | test(/::pmu_[^:]*$/)";
+
 pub(super) fn unit() -> Step {
     let mut step = Step::new(
         "unit",
@@ -29,7 +36,7 @@ pub(super) fn unit() -> Step {
             "run",
             "--workspace",
             "-E",
-            &format!("not ({GPU_TESTS})"),
+            &format!("not ({GPU_TESTS}) and not ({PMU_TESTS})"),
         ],
         "run the failing test alone with `cargo nextest run <name>`",
     );
@@ -44,6 +51,16 @@ pub(super) fn gpu() -> Step {
         "cargo",
         &["nextest", "run", "--workspace", "-E", GPU_TESTS],
         "needs a Vulkan adapter; the failure names what was found and how to select one",
+    )
+}
+
+pub(super) fn pmu() -> Step {
+    Step::new(
+        "pmu",
+        "cargo",
+        &["nextest", "run", "--workspace", "-E", PMU_TESTS],
+        "needs Linux perf events for cycles and cache misses (`sudo sysctl \
+         kernel.perf_event_paranoid=1`) and a Vulkan adapter; run in a quiet window",
     )
 }
 

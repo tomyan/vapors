@@ -77,16 +77,18 @@ pub fn checked_counter() -> Result<InstructionCounter, String> {
 pub fn samples_counted(name: &str, samples: &Samples) -> Result<(), String> {
     let counted = samples.instructions.as_ref().map(|kept| &kept.phases);
     let empty = BTreeMap::new();
-    phases_counted(&samples.phases, counted.unwrap_or(&empty)).map_err(|e| format!("{name}: {e}"))
+    phases_counted(&samples.phases, (counted.unwrap_or(&empty), "instructions"))
+        .map_err(|e| format!("{name}: {e}"))
 }
 
-/// Refuses timed phases that have no instruction count.
+/// Refuses timed phases that have no count; `counts` names what was
+/// counted (instructions, hardware counts).
 ///
 /// # Errors
 /// Names the phases of `timed` that `counted` lacks.
 pub fn phases_counted<T, U>(
     timed: &BTreeMap<String, T>,
-    counted: &BTreeMap<String, U>,
+    (counted, counts): (&BTreeMap<String, U>, &str),
 ) -> Result<(), String> {
     let missing: Vec<&str> = timed
         .keys()
@@ -97,7 +99,7 @@ pub fn phases_counted<T, U>(
         return Ok(());
     }
     Err(format!(
-        "phases timed but not counted in instructions: {}",
+        "phases timed but not counted in {counts}: {}",
         missing.join(", ")
     ))
 }

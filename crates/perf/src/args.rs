@@ -1,7 +1,10 @@
 //! The harness's command line: `[runs] [warmup]`, 200 and 20 by default,
-//! with `--only <substring>`, `--instructions`, `--off-path` and
-//! `--scaling <change>`, or one of the modes that replace the full run.
+//! with `--only <substring>`, `--instructions` or `--counters`,
+//! `--off-path` and `--scaling <change>`, or one of the modes that
+//! replace the full run.
 
+pub use crate::args_measure::Measure;
+use crate::args_measure::refuse_scaling_with_others;
 pub use crate::args_off_path::WorkloadSet;
 use crate::args_off_path::refuse_off_path_with_modes;
 use crate::rows::RowChange;
@@ -13,7 +16,7 @@ use crate::scene_kind::SceneKind;
 pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
-                     [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
+                     [runs] [warmup] [--only <substring> (once)] [--instructions|--counters] [--off-path] \
                      [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] [--first-frame <rows>] \
                      [--scene-run [racer|one-scene]]; --scaling needs `--profile judged` in place of `--release`";
 
@@ -24,8 +27,8 @@ pub struct Options {
     pub settings: Settings,
     /// Run only workloads whose name contains this.
     pub only: Option<String>,
-    /// Report instructions retired per phase instead of times.
-    pub instructions: bool,
+    /// What to report per phase: times, instructions or hardware counts.
+    pub measure: Measure,
     /// Which workloads the full run runs.
     pub set: WorkloadSet,
     /// Run these changes at each size of `scaling::SIZES` and judge their
@@ -61,7 +64,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
     let Flags {
         counts,
         only,
-        instructions,
+        measure,
         set,
         scaling,
         mount,
@@ -69,7 +72,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         first_frame,
         scene_run,
     } = flags;
-    refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
+    refuse_scaling_with_others(scaling.is_some(), only.is_some(), measure)?;
     refuse_off_path_with_modes(
         set,
         [
@@ -81,7 +84,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
     )?;
     refuse_mount_with_others([
         ("--only", only.is_some()),
-        ("--instructions", instructions),
+        measure.given(),
         ("--scaling", scaling.is_some()),
         ("--mount", mount),
         ("--mount-memory", mount_memory.is_some()),
@@ -92,7 +95,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
-        instructions,
+        measure,
         set,
         scaling,
         mount,
@@ -106,7 +109,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
 struct Flags {
     counts: Vec<String>,
     only: Option<String>,
-    instructions: bool,
+    measure: Measure,
     set: WorkloadSet,
     scaling: Option<Vec<RowChange>>,
     mount: bool,
@@ -121,7 +124,8 @@ impl Flags {
         match arg.as_str() {
             "--only" if self.only.is_some() => return Err(format!("--only given twice: {USAGE}")),
             "--only" => self.only = Some(only_value(rest.next())?),
-            "--instructions" => self.instructions = true,
+            "--instructions" => self.measure = self.measure.and(Measure::Instructions)?,
+            "--counters" => self.measure = self.measure.and(Measure::Counters)?,
             "--off-path" => self.set = WorkloadSet::OffPath,
             "--mount" => self.mount = true,
             "--scene-run" => return self.scene_run(rest),
@@ -161,20 +165,6 @@ impl Flags {
             "--scene-run {next}: no scene is called `{next}`; the scenes are racer and one-scene: {USAGE}"
         ))
     }
-}
-
-/// `--scaling` always counts instructions, over a fixed set of sizes and
-/// workloads, so `--only` and `--instructions` have nothing to select or add.
-fn refuse_scaling_with_others(scaling: bool, only: bool, instructions: bool) -> Result<(), String> {
-    if scaling && only {
-        return Err(format!("--scaling and --only cannot be combined: {USAGE}"));
-    }
-    if scaling && instructions {
-        return Err(format!(
-            "--scaling and --instructions cannot be combined (--scaling always counts instructions): {USAGE}"
-        ));
-    }
-    Ok(())
 }
 
 /// `--mount`, `--mount-memory` and `--scene-run` each replace the full
