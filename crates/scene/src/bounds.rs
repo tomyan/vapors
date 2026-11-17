@@ -62,6 +62,17 @@ impl Rect {
         )
     }
 
+    /// The smallest rectangle holding both.
+    #[must_use]
+    pub fn union(self, other: Rect) -> Rect {
+        Rect::new(
+            self.left.min(other.left),
+            self.top.min(other.top),
+            self.right.max(other.right),
+            self.bottom.max(other.bottom),
+        )
+    }
+
     /// Where both rectangles overlap: edges crossed when they do not.
     #[must_use]
     pub fn intersection(self, other: Rect) -> Rect {

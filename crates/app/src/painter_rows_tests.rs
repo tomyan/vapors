@@ -62,6 +62,10 @@ fn lane_rows(rows: &RowsOfBatches) -> BatchRows<'_> {
     lane.expect("a batch over the rows")
 }
 
+/// A batch's clips: every item unclipped.
+static UNCLIPPED: std::sync::LazyLock<vapors_scene::Clips> =
+    std::sync::LazyLock::new(|| vapors_scene::Clips::one(None));
+
 /// A batch at a shift of 3, 5 with `rows` at `offsets`.
 fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
     Moved {
@@ -70,7 +74,7 @@ fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
         offsets,
         rows_key: a_key(),
         rows,
-        clip: None,
+        clips: &UNCLIPPED,
         draw: vapors_elements::FrameDraw {
             shift: [3.0, 5.0],
             clip: None,

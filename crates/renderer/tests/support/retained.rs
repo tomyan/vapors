@@ -65,7 +65,7 @@ impl Frame {
             .get_or_insert_with(|| self.table.take(encoder, 1).expect("room"));
         let at = target(&self.gpu, encoder, &self.view, SIDE);
         self.pipeline
-            .keep(&at, &QuadPipeline::bytes_in(&quads, (frame, 0), &[]))
+            .keep(&at, &QuadPipeline::bytes_in(&quads, (frame, &[]), &[]))
     }
 
     pub fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {

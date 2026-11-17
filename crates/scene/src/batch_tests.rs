@@ -80,7 +80,33 @@ fn a_batch_keeps_its_items_in_order() {
 }
 
 #[test]
-fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
+fn a_change_of_clip_starts_a_batch_of_a_kind_the_scissor_clips() {
+    // Given: a text, two texts under a clip, a text with the clip lifted
+    let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let mut scene = Scene::new();
+    scene.push(text(0));
+    scene.set_clip(Some(clip));
+    scene.push(text(1));
+    scene.push(text(2));
+    scene.set_clip(None);
+    scene.push(text(3));
+
+    // When
+    let batches = batches(&scene);
+
+    // Then: three batches, each under one clip
+    let shape: Vec<(Option<Option<Rect>>, usize)> = batches
+        .iter()
+        .map(|batch| (batch.clips.uniform(), batch.run.len()))
+        .collect();
+    assert_eq!(
+        shape,
+        [(Some(None), 1), (Some(Some(clip)), 2), (Some(None), 1)]
+    );
+}
+
+#[test]
+fn quads_join_across_clip_changes_each_keeping_its_clip() {
     // Given: a quad, two quads under a clip, a quad with the clip lifted
     let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
     let mut scene = Scene::new();
@@ -94,15 +120,13 @@ fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
     // When
     let batches = batches(&scene);
 
-    // Then
-    let shape: Vec<(Option<Rect>, usize)> = batches
-        .iter()
-        .map(|batch| match &batch.run {
-            Run::Quads(quads) => (batch.clip, quads.len()),
-            other => panic!("expected quads, got {other:?}"),
-        })
-        .collect();
-    assert_eq!(shape, [(None, 1), (Some(clip), 2), (None, 1)]);
+    // Then: one batch, its clips in runs
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].run.len(), 4);
+    assert_eq!(
+        batches[0].clips.runs(),
+        [(0, None), (1, Some(clip)), (3, None)]
+    );
 }
 
 #[test]
@@ -211,4 +235,69 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
         })
         .collect();
     assert_eq!(shape, [('v', 2), ('i', 1), ('v', 1), ('t', 1)]);
+}
+
+#[test]
+fn quads_shadows_and_shapes_join_across_clips_and_every_other_kind_splits() {
+    // Given: each kind, two items under two clips
+    let (a, b) = (
+        Some(Rect::new(0.0, 0.0, 4.0, 4.0)),
+        Some(Rect::new(4.0, 0.0, 8.0, 4.0)),
+    );
+    let kinds: [(Item, bool); 8] = [
+        (quad(0.0), true),
+        (Item::Shadow(a_shadow()), true),
+        (a_shape(ShapeKind::ClosedForm), true),
+        (text(0), false),
+        (
+            Item::Icon {
+                icon: IconId(0),
+                rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+                colour: Color::from_rgba8(0, 0, 0, 255),
+            },
+            false,
+        ),
+        (picture(0), false),
+        (
+            Item::Surface {
+                surface: SurfaceId(0),
+                rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+            },
+            false,
+        ),
+        (a_shape(ShapeKind::Mesh), false),
+    ];
+    for (item, joins) in kinds {
+        // When
+        let batched = batched([(item, a), (item, b)], Rect::new(0.0, 0.0, 100.0, 100.0));
+
+        // Then: one batch under two clips, or two batches under one each
+        let expected = if joins { 1 } else { 2 };
+        assert_eq!(batched.batches.len(), expected, "{item:?}");
+        assert_eq!(batched.batches[0].run.clipped_by_table(), joins, "{item:?}");
+    }
+}
+
+/// A shadow in view.
+fn a_shadow() -> Shadow {
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    Shadow {
+        rect,
+        radii: [0.0; 4],
+        blur: 0.0,
+        color: Color::from_rgba8(0, 0, 0, 255),
+        caster: rect,
+        caster_radii: [0.0; 4],
+    }
+}
+
+/// A shape of `kind` in view.
+fn a_shape(kind: ShapeKind) -> Item {
+    Item::Shape(crate::Shape {
+        shape: crate::ShapeRef::Table(0),
+        kind,
+        transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        colour: Color::from_rgba8(1, 2, 3, 255),
+        bounds: Rect::new(0.0, 0.0, 4.0, 4.0),
+    })
 }

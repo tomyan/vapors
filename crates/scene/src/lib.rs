@@ -3,6 +3,7 @@
 //! can be asserted on in tests without a device.
 
 mod batch;
+mod batch_clips;
 mod bounds;
 mod clip_chain;
 mod color;
@@ -14,7 +15,7 @@ mod shape;
 mod transform;
 mod transform_class;
 
-pub use batch::{Batch, Batched, ROWS_PER_BATCH, Run, batched, culled};
+pub use batch::{Batch, Batched, Clips, ROWS_PER_BATCH, Run, batched, culled};
 pub use clip_chain::MAX_CLIP_CHAIN;
 pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};

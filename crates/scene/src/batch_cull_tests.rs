@@ -155,7 +155,7 @@ fn a_culled_surface_keeps_its_place_in_a_batch_marked_culled() {
     // Then
     assert_eq!(kinds(&batched), [('q', 1), ('g', 1), ('q', 1)]);
     assert!(batched.batches[1].culled);
-    assert_eq!(batched.batches[1].clip, None);
+    assert_eq!(batched.batches[1].clips.uniform(), Some(None));
     assert_eq!(batched.culled, 1);
 }
 

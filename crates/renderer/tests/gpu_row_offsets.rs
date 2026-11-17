@@ -50,7 +50,7 @@ fn gpu_kept_quads_in_two_rows_land_each_at_its_rows_offset() {
         let mut pipeline = QuadPipeline::new(device, format);
         let mut table = table(target, [3.0, 2.0], &[[0.0, 0.0], [0.0, 10.0]]);
         let items = [at(2.0, 1.0), at(2.0, 1.0)];
-        let bytes = QuadPipeline::bytes_in(&items, (table.frame, 0), &[0, 1]);
+        let bytes = QuadPipeline::bytes_in(&items, (table.frame, &[]), &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
         pipeline.draw_kept(
             target,
@@ -93,7 +93,7 @@ fn gpu_kept_shadows_in_two_rows_land_each_at_its_rows_offset() {
         let mut pipeline = ShadowPipeline::new(device, format);
         let mut table = table(target, [4.0, 0.0], &[[0.0, 2.0], [0.0, 14.0]]);
         let items = [shadow(0.0, 0.0), shadow(0.0, 0.0)];
-        let bytes = ShadowPipeline::bytes_in(&items, (table.frame, 0), &[0, 1]);
+        let bytes = ShadowPipeline::bytes_in(&items, (table.frame, &[]), &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
         pipeline.draw_kept(
             target,
@@ -136,7 +136,7 @@ fn gpu_a_kept_quad_drawn_after_the_table_grows_lands_at_its_rows_offset() {
     let early = pipeline
         .keep(
             &at,
-            &QuadPipeline::bytes_in(&[red(0.0, 0.0)], (frame, 0), &[]),
+            &QuadPipeline::bytes_in(&[red(0.0, 0.0)], (frame, &[]), &[]),
         )
         .expect("room");
     pipeline.draw_kept(&at, &early, (&mut table, &mut clips, 0));
@@ -154,7 +154,7 @@ fn gpu_a_kept_quad_drawn_after_the_table_grows_lands_at_its_rows_offset() {
     let late = pipeline
         .keep(
             &at,
-            &QuadPipeline::bytes_in(&[red(2.0, 1.0)], (frame, 0), &[69]),
+            &QuadPipeline::bytes_in(&[red(2.0, 1.0)], (frame, &[]), &[69]),
         )
         .expect("room");
     pipeline.draw_kept(&at, &late, (&mut table, &mut clips, base));

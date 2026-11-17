@@ -40,12 +40,13 @@ impl QuadPipeline {
     /// The instance bytes of `quads`, as a draw writes them.
     #[must_use]
     pub fn bytes(quads: &[Quad]) -> Vec<u8> {
-        Self::bytes_in(quads, (0, 0), &[])
+        Self::bytes_in(quads, (0, &[]), &[])
     }
 
     /// The instance bytes of `quads`, each in frame `frame` (its entry
-    /// in the transform table) under clip `clip` (its entry in the clip
-    /// table, 0 for none), item `i` in row `rows[i]` of its batch's
+    /// in the transform table), each under its clip's entry in the clip
+    /// table from `clips` (runs `(first item, entry)`,
+    /// [`clip_of`](crate::clip_of); empty for none), item `i` in row `rows[i]` of its batch's
     /// range, or every item in row 0 for an empty `rows`.
     ///
     /// # Panics
@@ -53,10 +54,14 @@ impl QuadPipeline {
     /// When `rows` is neither empty nor one index an item, or names a row
     /// past a batch's range ([`ROWS_PER_BATCH`](vapors_scene::ROWS_PER_BATCH)).
     #[must_use]
-    pub fn bytes_in(quads: &[Quad], (frame, clip): (u32, u32), rows: &[u32]) -> Vec<u8> {
+    pub fn bytes_in(
+        quads: &[Quad],
+        (frame, clips): (u32, crate::ClipRuns<'_>),
+        rows: &[u32],
+    ) -> Vec<u8> {
         rowed_instances(
             ("quads", Self::VEC4S as usize),
-            (quads, (frame, clip), rows),
+            (quads, (frame, clips), rows),
             instance,
         )
     }

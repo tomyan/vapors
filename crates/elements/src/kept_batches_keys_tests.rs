@@ -1,4 +1,4 @@
-use vapors_scene::{Batched, Color, Item, Quad, Rect, batched};
+use vapors_scene::{Batched, Item, Rect, TextId, batched};
 
 use super::KeptBatched;
 use crate::frames::PAGE;
@@ -11,9 +11,24 @@ const VIEW: Rect = Rect {
     bottom: 100.0,
 };
 
-pub(super) fn quad(top: f32, red: u8) -> Item {
+/// A text run `id` at `top`. Text, as its batches split at each clip
+/// change, which these tests use to make batches; quads join across
+/// clips (vapors-scene `Run::clipped_by_table`).
+pub(super) fn split_item(top: f32, id: u8) -> Item {
+    Item::Text {
+        text: TextId(u32::from(id)),
+        origin: [10.0, top],
+        ink: Rect::new(10.0, top, 20.0, top + 10.0),
+    }
+}
+
+/// A quad at `top`.
+fn filled(top: f32) -> Item {
     let rect = Rect::new(10.0, top, 20.0, top + 10.0);
-    Item::Quad(Quad::fill(rect, Color::from_rgba8(red, 2, 3, 255)))
+    Item::Quad(vapors_scene::Quad::fill(
+        rect,
+        vapors_scene::Color::from_rgba8(1, 2, 3, 255),
+    ))
 }
 
 /// The batches of `items`, each under its clip.
@@ -37,16 +52,20 @@ pub(super) fn keyed(batched: Batched, was: Option<&KeptBatched>) -> KeptBatched 
 /// Three batches: a quad unclipped, one clipped, one unclipped again.
 fn three(middle: Item) -> Batched {
     let clip = Some(Rect::new(0.0, 0.0, 50.0, 50.0));
-    batches(&[(quad(0.0, 1), None), (middle, clip), (quad(20.0, 1), None)])
+    batches(&[
+        (split_item(0.0, 1), None),
+        (middle, clip),
+        (split_item(20.0, 1), None),
+    ])
 }
 
 #[test]
 fn batches_made_again_with_equal_runs_keep_their_keys() {
     // Given
-    let was = keyed(three(quad(10.0, 1)), None);
+    let was = keyed(three(split_item(10.0, 1)), None);
 
     // When
-    let again = keyed(three(quad(10.0, 1)), Some(&was));
+    let again = keyed(three(split_item(10.0, 1)), Some(&was));
 
     // Then
     assert_eq!(again.keys, was.keys);
@@ -55,10 +74,10 @@ fn batches_made_again_with_equal_runs_keep_their_keys() {
 #[test]
 fn a_batch_whose_run_changed_gets_a_new_key_and_the_others_keep_theirs() {
     // Given
-    let was = keyed(three(quad(10.0, 1)), None);
+    let was = keyed(three(split_item(10.0, 1)), None);
 
     // When: the middle quad's colour changed
-    let again = keyed(three(quad(10.0, 9)), Some(&was));
+    let again = keyed(three(split_item(10.0, 9)), Some(&was));
 
     // Then
     assert_eq!((again.keys[0], again.keys[2]), (was.keys[0], was.keys[2]));
@@ -68,8 +87,8 @@ fn a_batch_whose_run_changed_gets_a_new_key_and_the_others_keep_theirs() {
 #[test]
 fn batches_made_without_earlier_ones_each_get_a_key_of_their_own() {
     // When
-    let first = keyed(three(quad(10.0, 1)), None);
-    let second = keyed(three(quad(10.0, 1)), None);
+    let first = keyed(three(split_item(10.0, 1)), None);
+    let second = keyed(three(split_item(10.0, 1)), None);
 
     // Then
     let mut keys = [first.keys, second.keys].concat();
@@ -81,11 +100,11 @@ fn batches_made_without_earlier_ones_each_get_a_key_of_their_own() {
 #[test]
 fn a_batch_at_a_place_the_earlier_batches_did_not_reach_gets_a_new_key() {
     // Given: one batch
-    let was = keyed(batches(&[(quad(0.0, 1), None)]), None);
+    let was = keyed(batches(&[(split_item(0.0, 1), None)]), None);
 
     // When: the same batch, then one more
     let clip = Some(Rect::new(0.0, 0.0, 50.0, 50.0));
-    let more = batches(&[(quad(0.0, 1), None), (quad(10.0, 1), clip)]);
+    let more = batches(&[(split_item(0.0, 1), None), (split_item(10.0, 1), clip)]);
     let again = keyed(more, Some(&was));
 
     // Then
@@ -99,13 +118,17 @@ fn a_batch_put_in_leaves_the_batches_after_it_their_keys() {
     // Given: two batches
     let clip = Some(Rect::new(0.0, 0.0, 50.0, 50.0));
     let was = keyed(
-        batches(&[(quad(0.0, 1), None), (quad(20.0, 1), clip)]),
+        batches(&[(split_item(0.0, 1), None), (split_item(20.0, 1), clip)]),
         None,
     );
 
     // When: a batch put in between
-    let between = (quad(10.0, 1), Some(Rect::new(0.0, 0.0, 60.0, 60.0)));
-    let now = batches(&[(quad(0.0, 1), None), between, (quad(20.0, 1), clip)]);
+    let between = (split_item(10.0, 1), Some(Rect::new(0.0, 0.0, 60.0, 60.0)));
+    let now = batches(&[
+        (split_item(0.0, 1), None),
+        between,
+        (split_item(20.0, 1), clip),
+    ]);
     let again = keyed(now, Some(&was));
 
     // Then
@@ -116,11 +139,11 @@ fn a_batch_put_in_leaves_the_batches_after_it_their_keys() {
 #[test]
 fn a_batch_taken_out_leaves_the_batches_after_it_their_keys() {
     // Given: three batches
-    let was = keyed(three(quad(10.0, 1)), None);
+    let was = keyed(three(split_item(10.0, 1)), None);
 
     // When: the middle one taken out
     let again = keyed(
-        batches(&[(quad(0.0, 1), None), (quad(20.0, 1), None)]),
+        batches(&[(split_item(0.0, 1), None), (split_item(20.0, 1), None)]),
         Some(&was),
     );
 
@@ -132,12 +155,12 @@ fn a_batch_taken_out_leaves_the_batches_after_it_their_keys() {
 #[test]
 fn a_run_equal_to_one_matched_from_the_start_is_not_matched_again_from_the_end() {
     // Given: one batch
-    let was = keyed(batches(&[(quad(0.0, 1), None)]), None);
+    let was = keyed(batches(&[(split_item(0.0, 1), None)]), None);
 
     // When: the same batch twice, under two clips
     let clip = Some(Rect::new(0.0, 0.0, 50.0, 50.0));
     let again = keyed(
-        batches(&[(quad(0.0, 1), None), (quad(0.0, 1), clip)]),
+        batches(&[(split_item(0.0, 1), None), (split_item(0.0, 1), clip)]),
         Some(&was),
     );
 
@@ -148,11 +171,11 @@ fn a_run_equal_to_one_matched_from_the_start_is_not_matched_again_from_the_end()
 
 #[test]
 fn a_batch_whose_edge_went_from_minus_zero_to_zero_gets_a_new_key() {
-    // Given: the middle quad's top at -0.0
-    let was = keyed(three(quad(-0.0, 1)), None);
+    // Given: the middle batch a quad, its top at -0.0
+    let was = keyed(three(filled(-0.0)), None);
 
     // When: at 0.0, a run equal under == with other bytes
-    let again = keyed(three(quad(0.0, 1)), Some(&was));
+    let again = keyed(three(filled(0.0)), Some(&was));
 
     // Then
     assert_eq!((again.keys[0], again.keys[2]), (was.keys[0], was.keys[2]));
@@ -171,7 +194,7 @@ fn in_row_frames(
     row_frames: [usize; 2],
     was: Option<&KeptBatched>,
 ) -> KeptBatched {
-    let batched = batches(&[(quad(0.0, 1), None), (quad(20.0, 1), None)]);
+    let batched = batches(&[(split_item(0.0, 1), None), (split_item(20.0, 1), None)]);
     let rows = crate::framed_batches::RowsOfBatches::one(&row_frames, &items);
     let framed = crate::framed_batches::FramedBatched {
         frames: vec![BatchFrame::lane(3)],

@@ -30,8 +30,8 @@ pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched
 type Placed = ((Item, Option<vapors_scene::Rect>), bool);
 
 /// `kept`'s items put on the page as the painter draws them: each
-/// batch's clip moved by its frame's (or lane template's) shift and cut
-/// to its clip, the scissor; each item moved by that shift and its row's
+/// item's clip moved by its frame's (or lane template's) shift and cut
+/// to its clip; each item moved by that shift and its row's
 /// offset, what the shader adds (`vapors-app`'s `painter_runs.rs`).
 fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
     let batches = kept
@@ -45,7 +45,10 @@ fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
         let items = run_items(&batch.run).into_iter().enumerate();
         let put = move |(at, item): (usize, Item)| {
             let offset = item_offset(&offsets, rows, at);
-            (as_painted(&item, batch.clip, (draw, offset)), batch.culled)
+            (
+                as_painted(&item, batch.clips.at(at), (draw, offset)),
+                batch.culled,
+            )
         };
         items.map(put).collect::<Vec<_>>()
     });
@@ -101,11 +104,11 @@ fn as_painted(
     (item, draw.on_page(clip))
 }
 
-/// `page`'s items, each with its batch's clip.
+/// `page`'s items, each with its clip.
 fn page_items(page: &Batched) -> Vec<Placed> {
     let items = page.batches.iter().flat_map(|batch| {
-        let item = move |item| ((item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(item)
+        let item = move |(at, item)| ((item, batch.clips.at(at)), batch.culled);
+        run_items(&batch.run).into_iter().enumerate().map(item)
     });
     items.collect()
 }
