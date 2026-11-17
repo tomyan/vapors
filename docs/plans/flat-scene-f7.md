@@ -87,11 +87,18 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
      pass loading it for another view is refused: its resolve would put
      that view's frame on this one. `FrameCounts::multisampled_made`
      counts the textures made each frame.
-   - **Lifetime.** A texture is made on the first draw at its size,
-     kept while each frame draws at that size, and dropped after a frame
-     that does not, the rule kept bytes and table entries already
-     follow. A resize is a new size: the old texture goes after the
-     first frame at the new size.
+   - **Lifetime.** A texture is made on the first draw at its size and
+     goes once it has gone unused for as many painter frames as the
+     painter holds textures. Each `draw` is a painter frame, so a
+     painter drawing a fixed set of targets each app frame, two sizes
+     among them, keeps them all; a size given up (a resize) goes a frame
+     or two later. Dropping a texture at the first frame that did not
+     draw at it made two textures every app frame for a painter drawing
+     two sizes (#480's review, M2).
+   - **One encoder.** A tooltip on another view's 4x texture recorded
+     into an earlier encoder cannot happen: the pipelines refuse a draw
+     in a second encoder while the first is open (`encoder_turn.rs`), so
+     the view each texture was cleared for is the whole record.
    - **Where.** `Target` gains the 4x view beside the target's view
      (`None` at 1x). `FrameEncoder::begin` passes both to
      `OpenPass::begin`, which attaches the 4x view with the target's

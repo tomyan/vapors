@@ -86,12 +86,12 @@ fn gpu_a_4_sample_painter_keeps_one_texture_for_frames_into_new_views_of_one_siz
 }
 
 #[test]
-fn gpu_a_frame_at_a_new_size_makes_a_texture_and_drops_the_old() {
+fn gpu_a_size_given_up_goes_after_as_many_frames_as_textures_are_held() {
     // Given
     let gpu = gpu();
     let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
 
-    // When
+    // When: a frame at 32, then two at 16
     draw_into(
         (&gpu, &mut painter, &mut doc),
         (&view_of(&gpu, 32), 32),
@@ -102,11 +102,43 @@ fn gpu_a_frame_at_a_new_size_makes_a_texture_and_drops_the_old() {
         (&view_of(&gpu, 16), 16),
         None,
     );
+    let after_one = painter.multisampled.held();
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 16), 16),
+        None,
+    );
 
-    // Then
+    // Then: both held after one frame at 16 (two held, the 32 unused for
+    // one), the 32 gone after two
+    assert_eq!(after_one, 2);
     assert!(painter.multisampled.held_at((32, 32)).is_none());
-    assert!(painter.multisampled.held_at((16, 16)).is_some());
     assert_eq!(painter.multisampled.held(), 1);
+}
+
+#[test]
+fn gpu_a_painter_drawing_two_sizes_each_app_frame_makes_no_texture_after_the_first() {
+    // Given
+    let gpu = gpu();
+    let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
+
+    // When: three app frames, each a 32 and a 16 target
+    let made: Vec<u64> = (0..3)
+        .map(|_| {
+            let sizes = [32, 16].map(|side| {
+                draw_into(
+                    (&gpu, &mut painter, &mut doc),
+                    (&view_of(&gpu, side), side),
+                    None,
+                );
+                painter.frame_counts().multisampled_made
+            });
+            sizes.iter().sum()
+        })
+        .collect();
+
+    // Then: two on the first app frame, none after
+    assert_eq!(made, [2, 0, 0]);
 }
 
 #[test]

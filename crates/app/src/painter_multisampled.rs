@@ -1,16 +1,28 @@
 //! The painter's 4x colour textures (`docs/plans/flat-scene-f7.md`, plan
 //! item 3): at 4 samples its passes draw into one of these and resolve
-//! into the target's view. One for each viewport size it draws to (a
+//! into the target's view. One for each viewport size it draws at (a
 //! view of a smaller mip level is that level's size), made on the first
-//! draw at that size, kept while each frame draws at it, and dropped
-//! after a frame that does not, the rule kept bytes and table entries
-//! follow. Keyed by size, not by view: an app makes a new view of its
-//! surface's texture every frame, and a texture keyed by view was made
-//! again every frame (41.5 MB a frame at 1080 x 2400, the Pixel 9 Pro's
-//! crash, 2026-11-17). Two views of one size share the texture, so each
-//! records the view its frame was cleared for, and a pass loading it
-//! for another view (a tooltip on A after B's draw) is refused: its
-//! resolve would put B's frame on A. At 1 sample there are none.
+//! draw at that size. Keyed by size, not by view: an app makes a new
+//! view of its surface's texture every frame, and a texture keyed by
+//! view was made again every frame (41.5 MB a frame at 1080 x 2400, the
+//! Pixel 9 Pro's crash, 2026-11-17).
+//!
+//! Kept while used: a texture goes once it has gone unused for as many
+//! painter frames as the painter holds textures. Each `draw` is a
+//! painter frame, so a painter drawing a fixed set of targets each app
+//! frame, two sizes among them, draws at every size it holds within that
+//! many of its frames and keeps them all; a size given up for good (a
+//! resize) goes a frame or two later. Dropping each texture at the first
+//! frame that did not draw at it made two textures every app frame for
+//! a painter drawing two sizes (#480's review, M2).
+//!
+//! Two views of one size share the texture, so each records the view its
+//! frame was cleared for, and a pass loading it for another (a tooltip
+//! on A after B's draw) is refused: its resolve would put the other
+//! frame here. One encoder records all of it: the pipelines refuse a
+//! draw in a second encoder while the first is open (`encoder_turn.rs`),
+//! so a tooltip cannot be recorded into an earlier encoder after another
+//! view's draw. At 1 sample there are none.
 
 use vapors_renderer::{PassFormat, Samples, Target};
 
@@ -88,7 +100,7 @@ impl Multisampled {
         held.drawn = self.frame;
         match uses {
             Use::Clear => held.cleared_for = Some(target.view.clone()),
-            Use::Load => assert_cleared_for(held, target.view),
+            Use::Load => assert_cleared_for(held, target),
         }
         Some(held.view.clone())
     }
@@ -105,10 +117,11 @@ impl Multisampled {
         self.held.len() - 1
     }
 
-    /// Drops the textures this frame did not draw at.
+    /// Drops the textures unused for as many frames as are held
+    /// (the module's rule).
     pub(super) fn release_undrawn(&mut self) {
-        let frame = self.frame;
-        self.held.retain(|held| held.drawn == frame);
+        let (frame, kept) = (self.frame, self.held.len() as u64);
+        self.held.retain(|held| frame - held.drawn < kept);
     }
 
     /// The 4x textures made since the last take; the count restarts.
@@ -130,18 +143,20 @@ impl Multisampled {
     }
 }
 
-/// Refuses a load of `held` for `view` when its frame was cleared for
+/// Refuses a load of `held` for `target` when its frame was cleared for
 /// another view.
 ///
 /// # Panics
 ///
 /// As said, naming the fix.
-fn assert_cleared_for(held: &Held, view: &wgpu::TextureView) {
+fn assert_cleared_for(held: &Held, target: &Target<'_>) {
+    let view = target.view;
     assert!(
         held.cleared_for.as_ref() == Some(view),
         "a 4-sample pass loads the {}x{} 4x texture for target view {view:?}, but its frame was \
-         cleared for {:?}: its resolve would put that view's frame on this one; draw this target \
-         before drawing over it (painter_multisampled.rs); reproduce with `cargo xtask test`",
+         cleared for {:?}: its resolve would put that frame on this one; draw this target first, \
+         and pass the same TextureView value (or a clone of it) that draw was given, not another \
+         view of its texture (painter_multisampled.rs); reproduce with `cargo xtask test`",
         held.size.0,
         held.size.1,
         held.cleared_for
