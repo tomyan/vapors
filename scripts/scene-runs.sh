@@ -8,7 +8,9 @@
 # /proc/loadavg, and the binary's sha256; scripts/scene-run-table.sh
 # makes the tables from them.
 #
-# Usage: scripts/scene-runs.sh <new or empty dir> [racer|one-scene]
+# Usage: scripts/scene-runs.sh <new or empty dir> [racer|one-scene] [1|4]
+# The third argument is the samples the scene's pages draw at
+# (`--samples`, flat-scene F7); vapors-perf's default, 1, without it.
 # On a clean tree only: the harness prints the revision it was built
 # from, and a dirty one could not be traced. Needs a quiet machine
 # (each run refuses a 1-minute load of 1.5 or more): run it under
@@ -19,14 +21,16 @@
 # A run that never reached its first frame (a refusal: the load, the
 # adapter, the shader cache) fails the script, naming its output.
 set -eu
-out=${1:?usage: scripts/scene-runs.sh <new or empty dir> [racer|one-scene]}
+out=${1:?usage: scripts/scene-runs.sh <new or empty dir> [racer|one-scene] [1|4]}
 scene=${2:-racer}
+samples=${3:-1}
+case $samples in 1|4) ;; *) echo "samples=$samples: give 1 or 4" >&2; exit 2 ;; esac
 # The scenes are vapors-perf's SceneKind (crates/perf/src/scene_kind.rs);
 # a scene added there is added here too.
 case $scene in racer|one-scene) ;; *) echo "no scene is called $scene; give racer or one-scene" >&2; exit 2 ;; esac
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 if [ -n "$(git status --porcelain)" ]; then
-  echo "the tree is dirty; commit, then: scripts/scene-runs.sh $out $scene" >&2; exit 1
+  echo "the tree is dirty; commit, then: scripts/scene-runs.sh $out $scene $samples" >&2; exit 1
 fi
 if [ -e "$out" ] && [ -n "$(ls -A "$out")" ]; then echo "$out: not empty" >&2; exit 1; fi
 mkdir -p "$out"
@@ -37,7 +41,7 @@ cp target/release/vapors-perf "$out/vapors-perf"
 run() { # run <name> <cache dir>
   echo "$1 start $(date +%T) load $(load)" >> "$out/log.txt"
   code=0
-  MESA_SHADER_CACHE_DIR=$2 "$out/vapors-perf" --scene-run "$scene" > "$out/$1.txt" 2>&1 || code=$?
+  MESA_SHADER_CACHE_DIR=$2 "$out/vapors-perf" --scene-run "$scene" --samples "$samples" > "$out/$1.txt" 2>&1 || code=$?
   echo "$1 end $(date +%T) exit $code load $(load)" >> "$out/log.txt"
 }
 settle
