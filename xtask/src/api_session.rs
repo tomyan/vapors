@@ -22,7 +22,7 @@ const POLL: Duration = Duration::from_secs(1);
 /// The tools the session may use without asking: everything a builder
 /// needs, as the sandbox, not the tool list, is the fence; and the
 /// harness's, from the MCP server below.
-const TOOLS: [&str; 7] = [
+const TOOLS: [&str; 8] = [
     "Bash",
     "Read",
     "Edit",
@@ -30,6 +30,7 @@ const TOOLS: [&str; 7] = [
     "Glob",
     "Grep",
     "mcp__harness__ask_lead",
+    "mcp__harness__request_push",
 ];
 
 /// The harness's MCP server, the trusted xtask inside, posting through
