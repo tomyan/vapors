@@ -3,16 +3,28 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+// Relaxed guard, declared: the proxy's parts below are read by the
+// harness server's API route and `cargo xtask api-build` in the next PR
+// (the #469 split); until then only their tests use them. Retired by
+// that PR, which removes these allows.
+#[allow(dead_code, reason = "used by the API route, the next PR")]
+mod api_budget;
 mod api_clone;
 mod api_fds;
 mod api_fences;
 mod api_fences_run;
 mod api_fences_works;
 mod api_host;
+#[allow(dead_code, reason = "used by the API route, the next PR")]
+mod api_http;
 mod api_inner;
 mod api_paths;
+#[allow(dead_code, reason = "used by the API route, the next PR")]
+mod api_prices;
 mod api_sandbox;
 mod api_server;
+#[allow(dead_code, reason = "used by the API route, the next PR")]
+mod api_usage;
 mod builds;
 mod builds_config;
 mod builds_tree;

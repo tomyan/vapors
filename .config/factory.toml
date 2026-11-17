@@ -173,3 +173,17 @@ repo = "tomyan/vapors"
 merge_on = "checks"
 run = "~/.cache/w-queue/vapors-run/vapors"
 log = "~/.cache/queue/vapors.log"
+
+# The API builder's prices (cargo xtask api-build, docs/plans/api-builder.md):
+# dollars per million tokens, "input output cache_write cache_read", the
+# cache write at the five-minute rate (1.25x input). Input, output and cache
+# write from the Anthropic model table as cached 2026-10-06 by the claude-api
+# skill. Sonnet 5.5's cache read is the CLI's: the skill's table says $0.20,
+# and the CLI's own cost (claude 2.1.323, costBasis "list") prices it at
+# $0.10, which api-build's proxy-versus-CLI check caught on 2026-11-17.
+# Opus 5.5's cache read is the skill's $0.20, not yet checked against a run.
+# A model with no row is refused, so a budget is never counted with another
+# model's prices.
+[api_build.prices]
+claude-sonnet-5-5 = "2.00 10.00 2.50 0.10"
+claude-opus-5-5 = "4.00 20.00 5.00 0.20"
