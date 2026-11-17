@@ -2,6 +2,8 @@
 //! 10,000-row page takes seconds to mount, and `--only` should not pay
 //! for the pages it skips.
 
+use vapors_renderer::Samples;
+
 use crate::racer::RacerFrames;
 use crate::rows::{RowChange, Rows};
 use crate::run::{Settings, Workload};
@@ -37,13 +39,27 @@ pub fn settings_for(rows: Option<usize>, settings: Settings) -> Settings {
 /// build it.
 #[must_use]
 pub fn workloads() -> Vec<(String, (Option<usize>, Make))> {
+    workloads_at(Samples::One)
+}
+
+/// As [`workloads`], each painter drawing at `samples` (`--samples`).
+#[must_use]
+pub fn workloads_at(samples: Samples) -> Vec<(String, (Option<usize>, Make))> {
     let mut all = Vec::new();
     for (count, change) in row_workloads() {
-        let make: Make = Box::new(move || Box::new(Rows::new(count, change)));
+        let make: Make = Box::new(move || {
+            let mut rows = Rows::new(count, change);
+            rows.set_samples(samples);
+            Box::new(rows)
+        });
         all.push((format!("{count} rows, {change:?}"), (Some(count), make)));
     }
     for (name, racing) in [("racer, paused", false), ("racer, racing", true)] {
-        let make: Make = Box::new(move || Box::new(RacerFrames::new(racing)));
+        let make: Make = Box::new(move || {
+            let mut racer = RacerFrames::new(racing);
+            racer.set_samples(samples);
+            Box::new(racer)
+        });
         all.push((name.into(), (None, make)));
     }
     all

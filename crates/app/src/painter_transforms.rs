@@ -108,12 +108,12 @@ impl Transforms {
     }
 
     /// Gives back the entries of the frames and batches this frame did
-    /// not draw.
-    pub(super) fn release_undrawn(&mut self) {
+    /// not draw; the frames' entries given back.
+    pub(super) fn release_undrawn(&mut self) -> Vec<u32> {
         let frame = self.frame;
-        for held in [&mut self.frames as &mut dyn Release, &mut self.rows] {
-            held.release(frame, &mut self.table);
-        }
+        let frames = self.frames.release(frame, &mut self.table);
+        self.rows.release(frame, &mut self.table);
+        frames
     }
 }
 
@@ -146,14 +146,20 @@ fn held<K: std::hash::Hash + Eq>(
 
 /// Entries by key that a frame not drawing them gives back.
 trait Release {
-    fn release(&mut self, frame: u64, table: &mut TransformTable);
+    /// Gives them back; the first entry of each.
+    fn release(&mut self, frame: u64, table: &mut TransformTable) -> Vec<u32>;
 }
 
 impl<K: std::hash::Hash + Eq> Release for HashMap<K, Entry> {
-    fn release(&mut self, frame: u64, table: &mut TransformTable) {
-        for (_, entry) in self.extract_if(|_, entry| entry.drawn != frame) {
+    fn release(&mut self, frame: u64, table: &mut TransformTable) -> Vec<u32> {
+        let undrawn: Vec<Entry> = self
+            .extract_if(|_, entry| entry.drawn != frame)
+            .map(|(_, entry)| entry)
+            .collect();
+        for entry in &undrawn {
             table.give(entry.at, entry.count);
         }
+        undrawn.iter().map(|entry| entry.at).collect()
     }
 }
 

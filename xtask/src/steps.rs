@@ -8,7 +8,7 @@ use crate::steps_checks::{builds, files, imports, layers, nightly, nightly_issue
 
 #[path = "steps_tiers.rs"]
 mod tiers;
-use tiers::{gpu, pmu, unit};
+use tiers::{gpu, host, pmu, unit};
 
 fn tools() -> Step {
     Step::new(
@@ -19,21 +19,78 @@ fn tools() -> Step {
     )
 }
 
-/// cargo-deny's advisories, bans, licences and sources, by deny.toml.
-/// It fetches the advisory database every run and fails when it cannot,
-/// with a database cached or not; xtask never passes --disable-fetch, so
-/// the check is never skipped. A cold fetch and check took 1.2 to 1.4 s
-/// here (2026-10-23); 60 s leaves room for a slow network before the
-/// fetch is declared hung.
+/// The variable that turns off cargo deny's fetching: set to `1` by the
+/// API builder's sandbox, which has no network and binds the advisory
+/// database its host fetched, read-only (`docs/plans/api-builder.md`,
+/// slice 4; the lead, L43). Every check still runs, on that database.
+/// The gate refuses to run while it is set (`refuse_deny_offline`), so a
+/// merge always checks a database fetched that run. Relaxed guard,
+/// declared: inside the sandbox the database is as fresh as the host's
+/// fetch just before (`request_push`); retired when the sandbox can reach
+/// the advisory database itself.
+pub const DENY_OFFLINE: &str = "VAPORS_DENY_OFFLINE";
+
+/// Refuses [`DENY_OFFLINE`] set at all, naming it: for the gate.
+///
+/// # Errors
+///
+/// The variable set, with its value.
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Debug quotes the value and escapes its control and non-UTF-8 bytes"
+)]
+pub fn refuse_deny_offline(value: Option<&std::ffi::OsStr>) -> Result<(), String> {
+    match value {
+        None => Ok(()),
+        Some(value) => Err(format!(
+            "{DENY_OFFLINE}={value:?} is set: the gate's deny step must fetch the advisory database; fix: unset {DENY_OFFLINE}"
+        )),
+    }
+}
+
 fn deny() -> Step {
+    deny_with(std::env::var_os(DENY_OFFLINE).as_deref())
+}
+
+/// cargo-deny's advisories, bans, licences and sources, by deny.toml,
+/// for [`DENY_OFFLINE`]'s value: unset fetches the advisory database
+/// every run and fails when it cannot, with a database cached or not;
+/// `1` reads the one on disk (`--offline`); any other value, a non-UTF-8
+/// one included, is refused by a step that fails naming it. A cold fetch
+/// and check took 1.2 to 1.4 s here (2026-10-23), and `--offline` 1.5 s
+/// (2026-11-17, mostly cargo's start); 60 s leaves room for a slow
+/// network before the fetch is declared hung.
+fn deny_with(offline: Option<&std::ffi::OsStr>) -> Step {
+    let args: &[&str] = match offline.map(|value| value.to_str()) {
+        None => &["deny", "check"],
+        Some(Some("1")) => &["deny", "--offline", "check"],
+        Some(_) => return refused_deny(offline.unwrap_or_default()),
+    };
     let mut step = Step::new(
         "deny",
         "cargo",
-        &["deny", "check"],
+        args,
         "fix the dependency, or record a reasoned exception in deny.toml; if the advisory database could not be fetched (offline), connect and rerun `cargo xtask deny`: it is never skipped",
     );
     step.deadline = Some(std::time::Duration::from_secs(60));
     step
+}
+
+/// A step that prints why it refuses and exits 1, its fix naming the
+/// value refused.
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Debug quotes the value and escapes its control and non-UTF-8 bytes"
+)]
+fn refused_deny(value: &std::ffi::OsStr) -> Step {
+    let said = format!("{DENY_OFFLINE}={value:?} is neither unset nor 1");
+    let fix = format!("{said}: unset it, or set it to 1 where the advisory database is bound");
+    Step::new(
+        "deny",
+        "sh",
+        &["-c", "printf '%s\\n' \"$1\" >&2; exit 1", "deny", &said],
+        &fix,
+    )
 }
 
 fn fmt() -> Step {
@@ -158,6 +215,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         wasm(web_package),
         wasm_release(web_package),
         unit(),
+        host(),
         gpu(),
     ]
 }
@@ -194,6 +252,11 @@ pub fn unit_tests() -> Vec<Step> {
 /// The GPU tier.
 pub fn gpu_tests() -> Vec<Step> {
     vec![gpu()]
+}
+
+/// The host tier: what only the host has (`steps_tiers.rs` `HOST_TESTS`).
+pub fn host_tests() -> Vec<Step> {
+    vec![host()]
 }
 
 /// The hardware-counter tier: never part of `ci`.

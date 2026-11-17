@@ -103,12 +103,14 @@ fn this_repositorys_workflow_is_one_the_gate_can_run() {
 }
 
 #[test]
-fn the_ci_job_runs_lint_wasm_and_unit_as_three_steps_so_the_log_times_each() {
-    // Given
+fn the_ci_job_runs_lint_wasm_unit_and_host_as_four_steps_so_the_log_times_each() {
+    // Given: the host tier among them, so the gate and GitHub run the
+    // host_ tests (steps_tiers.rs HOST_TESTS)
     let wanted = [
         "cargo xtask lint",
         "cargo xtask wasm",
         "cargo xtask test --tier unit",
+        "cargo xtask test --tier host",
     ];
 
     // When
@@ -123,6 +125,7 @@ fn the_ci_job_runs_lint_wasm_and_unit_as_three_steps_so_the_log_times_each() {
             run.contains("cargo xtask lint")
                 || run.contains("cargo xtask wasm")
                 || run.contains("--tier unit")
+                || run.contains("--tier host")
         })
         .collect();
     assert_eq!(
@@ -132,7 +135,7 @@ fn the_ci_job_runs_lint_wasm_and_unit_as_three_steps_so_the_log_times_each() {
 }
 
 #[test]
-fn the_lint_wasm_and_unit_steps_have_no_if_so_a_failure_stops_the_rest_as_and_did() {
+fn the_lint_wasm_unit_and_host_steps_are_there_with_no_if_so_a_failure_stops_the_rest_as_and_did() {
     // Given (`continue-on-error` is refused by the gate's step keys)
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let text = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
@@ -141,18 +144,23 @@ fn the_lint_wasm_and_unit_steps_have_no_if_so_a_failure_stops_the_rest_as_and_di
         "cargo xtask lint",
         "cargo xtask wasm",
         "cargo xtask test --tier unit",
+        "cargo xtask test --tier host",
     ];
 
     // When
-    let conditional: Vec<&serde_json::Value> = workflow["jobs"]["ci"]["steps"]
+    let steps: Vec<&serde_json::Value> = workflow["jobs"]["ci"]["steps"]
         .as_array()
         .expect("the ci job's steps")
         .iter()
         .filter(|step| commands.contains(&step["run"].as_str().unwrap_or_default().trim()))
-        .filter(|step| step.get("if").is_some())
         .collect();
 
-    // Then
+    // Then: each there, and none conditional
+    assert_eq!(steps.len(), commands.len(), "{WORKFLOW}: {steps:?}");
+    let conditional: Vec<_> = steps
+        .iter()
+        .filter(|step| step.get("if").is_some())
+        .collect();
     assert!(conditional.is_empty(), "{WORKFLOW}: {conditional:?}");
 }
 

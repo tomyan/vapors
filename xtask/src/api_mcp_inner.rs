@@ -30,10 +30,11 @@ pub const TOOLS: [Tool; 1] = [Tool {
     route: "/api-build/ask",
 }];
 
-/// How long a tool call waits for the harness: `ask_lead` waits 30
-/// minutes for the lead (`api_ask.rs`), and a minute more lets that wait
-/// end first and say so.
-pub const CALL_DEADLINE: Duration = Duration::from_mins(31);
+/// How long a tool call waits for the harness: `ask_lead` waits
+/// `api_ask::ANSWER_DEADLINE` for the lead, and a minute more lets that
+/// wait end first and say so.
+pub const CALL_DEADLINE: Duration =
+    Duration::from_secs(crate::api_ask::ANSWER_DEADLINE.as_secs() + 60);
 
 /// Serves MCP on stdio, posting tool calls to loopback `port`.
 pub fn run(port: u16) -> ExitCode {

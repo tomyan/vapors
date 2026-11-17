@@ -78,9 +78,11 @@ static NEXT_MESHES: AtomicU64 = AtomicU64::new(0);
 /// that sweep, so holding a borrow of it across a frame panics there.
 #[derive(Debug)]
 pub struct Meshes {
-    id: u64,
+    pub(crate) id: u64,
     issued: u64,
     held: HashMap<u64, Held>,
+    /// The application materials given (`material.rs`), in order.
+    pub(crate) materials: Vec<crate::Material>,
 }
 
 /// A held piece, shared with its handles.
@@ -104,6 +106,7 @@ impl Meshes {
             id: NEXT_MESHES.fetch_add(1, Ordering::Relaxed),
             issued: 0,
             held: HashMap::new(),
+            materials: Vec::new(),
         }
     }
 

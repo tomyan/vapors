@@ -1,13 +1,15 @@
 //! `<Mesh geometry={..} transform={..}>`: geometry drawn in one colour,
 //! its anchor's computed `color`, and shown while its `visibility` is
-//! `visible` (docs/plans/css-for-3d.md C3).
+//! `visible` (docs/plans/css-for-3d.md C3); or, given `material={..}`,
+//! drawn by an application material that sees that colour
+//! (vapors-scene3d `material.rs`).
 
 use crate::component::node_component;
 use crate::node::{Mounted, mount_node};
 use crate::own_keys;
 use crate::placement::Placement;
 use vapors_dom::{Appearance, DynDom, NodeId as ElementId, Snippet, StyleKey};
-use vapors_scene3d::{Colour, GeometryHandle, NodeKind, Transform};
+use vapors_scene3d::{Colour, GeometryHandle, MaterialId, NodeKind, Transform};
 use vapors_signals::Signal;
 
 /// What a parent passes to [`Mesh::mount`].
@@ -17,6 +19,9 @@ pub struct MeshProps {
     /// Where the mesh sits in its parent; a change writes its uniform
     /// alone.
     pub transform: Signal<Transform>,
+    /// The application material it is drawn with, from the renderer's
+    /// `Meshes`; `None` for its colour. Fixed when it mounts.
+    pub material: Option<MaterialId>,
     /// The anchor's key, which the compiler passes for a tag carrying
     /// `class`, `class:` or `style`; `None` takes the component's own.
     pub anchor: Option<&'static StyleKey>,
@@ -32,6 +37,7 @@ impl Default for MeshProps {
         Self {
             geometry: None,
             transform: Signal::new(Transform::IDENTITY),
+            material: None,
             anchor: None,
         }
     }
@@ -75,6 +81,12 @@ impl Mesh {
             props.transform,
             &Snippet::empty(),
         );
+        let placed = &mounted.placement;
+        let set = placed
+            .scene
+            .borrow_mut()
+            .set_material(placed.node, props.material);
+        set.expect("a node mount_node just added as a mesh takes a material");
         let sink = appearance_sink(mounted.placement.clone());
         dom.borrow_mut().watch_appearance(mounted.anchor, sink);
         let (placement, anchor) = (&mounted.placement, mounted.anchor);

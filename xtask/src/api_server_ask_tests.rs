@@ -24,14 +24,16 @@ fn asked(body: &str, routes: &Routes) -> String {
 #[test]
 fn an_ask_with_no_question_is_refused_and_writes_nothing() {
     let dir = tempfile::tempdir().expect("a scratch directory");
+    let asks = Asks::for_run(dir.path(), "run-1").expect("a run directory");
+    let run = asks.dir.clone();
     let routes = Routes {
-        asks: Some(Asks::new(dir.path().to_path_buf())),
+        asks: Some(asks),
         ..Routes::default()
     };
     let answer = asked(r#"{"question":"  "}"#, &routes);
     assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
     assert!(answer.contains("no question"), "{answer}");
-    assert_eq!(std::fs::read_dir(dir.path()).expect("read").count(), 0);
+    assert_eq!(std::fs::read_dir(run).expect("read").count(), 0);
 }
 
 #[test]

@@ -36,7 +36,15 @@ impl DrivenScene {
     /// # Errors
     /// It cannot be mounted.
     pub fn new() -> Result<Self, String> {
-        let mut scene = OneScene::new(None)?;
+        Self::at(vapors_renderer::Samples::One)
+    }
+
+    /// As [`DrivenScene::new`], the page and the scene drawn at `samples`.
+    ///
+    /// # Errors
+    /// As [`DrivenScene::new`].
+    pub fn at(samples: vapors_renderer::Samples) -> Result<Self, String> {
+        let mut scene = OneScene::at(None, samples)?;
         scene.time_frames(true);
         Ok(Self {
             scene,

@@ -74,15 +74,28 @@ fn the_deadline_is_what_is_left_of_the_job_or_the_steps_own_if_sooner() {
 
 #[test]
 fn a_step_past_its_deadline_is_killed_with_what_it_started() {
+    // The step run as it is, as the gate runs steps where it hides no
+    // device; its twin under the real bwrap is
+    // host_a_bwrapped_step_past_its_deadline_is_killed_with_what_it_started
+    killed_at_its_deadline_with_its_child(Wrap::SwitchedOff, "gate-deadline");
+}
+
+#[test]
+fn host_a_bwrapped_step_past_its_deadline_is_killed_with_what_it_started() {
+    // As the gate runs it here: hidden where this machine has a /dev/dri,
+    // so the real bwrap, and the host tier (steps_tiers.rs HOST_TESTS)
+    killed_at_its_deadline_with_its_child(wrap_for_this_machine(), "gate-deadline-host");
+}
+
+/// A step that starts a child and waits on it, run under `wrap` with a
+/// one-second deadline: it must be killed with its child.
+fn killed_at_its_deadline_with_its_child(wrap: Wrap, name: &str) {
     // Given: a step that starts a child and waits on it
-    let dir = crate::scratch::dir("gate-deadline");
+    let dir = crate::scratch::dir(name);
     let pid_file = dir.join("child.pid");
     let script = format!("sleep 300 & echo $! > {}; wait", pid_file.display());
-    // As the gate runs it here: hidden where this machine has a /dev/dri
-    let wrap = wrap_for_this_machine();
     let mut step = step_for(&planned(&script), &dir.join("out"), wrap);
-    let (_target, env) =
-        crate::scratch::target("a_step_past_its_deadline_is_killed_with_what_it_started");
+    let (_target, env) = crate::scratch::target(name);
     step.env.push(env);
     step.deadline = Some(Duration::from_secs(1));
 

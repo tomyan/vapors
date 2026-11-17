@@ -1,7 +1,7 @@
 //! The bytes of the instanced pipelines (`instanced.rs`): an instance's
-//! floats, then its row's index in its batch's range and its frame's
-//! entry in the transform table (`transform_table.rs`), padded to 16
-//! bytes; and the view uniform's bytes.
+//! floats, then its row's index in its batch's range, its frame's entry
+//! in the transform table and its clip's in the clip table (`table.rs`,
+//! `clip_table.rs`), padded to 16 bytes; and the view uniform's bytes.
 
 use vapors_scene::{ROWS_PER_BATCH, Size};
 
@@ -35,8 +35,9 @@ pub(crate) fn view_bytes(viewport: Size, rows_base: u32) -> [u8; VIEW_SIZE] {
 
 /// The instance bytes of `items` for the pipeline `label`: each item's
 /// `vec4s` four-float attributes (`floats`), then its row's index in
-/// `rows` (in its batch's range of the transform table) and `frame`, its
-/// frame's entry in the table, padded to 16 bytes. An empty `rows` puts
+/// `rows` (in its batch's range of the transform table), `frame`, its
+/// frame's entry in the table, and `clip`, its clip's entry in the clip
+/// table (0 for none), padded to 16 bytes. An empty `rows` puts
 /// every item in row 0 (a batch in one frame).
 ///
 /// # Panics
@@ -48,7 +49,7 @@ pub(crate) fn view_bytes(viewport: Size, rows_base: u32) -> [u8; VIEW_SIZE] {
 /// reads them at.
 pub(crate) fn rowed_instances<T>(
     (label, vec4s): (&str, usize),
-    (items, frame, rows): (&[T], u32, &[u32]),
+    (items, (frame, clip), rows): (&[T], (u32, u32), &[u32]),
     floats: impl Fn(&T) -> Vec<f32>,
 ) -> Vec<u8> {
     assert_rows(label, items.len(), rows);
@@ -63,7 +64,8 @@ pub(crate) fn rowed_instances<T>(
         bytes.extend(floats.into_iter().flat_map(f32::to_le_bytes));
         bytes.extend(rows.get(at).copied().unwrap_or(0).to_le_bytes());
         bytes.extend(frame.to_le_bytes());
-        bytes.extend([0; 8]);
+        bytes.extend(clip.to_le_bytes());
+        bytes.extend([0; 4]);
     }
     #[allow(clippy::cast_possible_truncation)] // a handful of vec4s
     let instance = instance_bytes(vec4s as u32);

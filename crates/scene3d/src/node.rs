@@ -38,6 +38,9 @@ pub(crate) struct Node {
     pub(crate) world_version: u64,
     /// Drawn; set by `Scene::set_appearance`.
     pub(crate) visible: bool,
+    /// The application material a mesh is drawn with, or none for its
+    /// colour (`material.rs`).
+    pub(crate) material: Option<crate::MaterialId>,
     pub(crate) dirty: bool,
 }
 

@@ -4,6 +4,7 @@
 
 mod batch;
 mod bounds;
+mod clip_chain;
 mod color;
 mod display;
 mod finite;
@@ -14,6 +15,7 @@ mod transform;
 mod transform_class;
 
 pub use batch::{Batch, Batched, ROWS_PER_BATCH, Run, batched, culled};
+pub use clip_chain::MAX_CLIP_CHAIN;
 pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use finite::NonFinite;

@@ -1,6 +1,6 @@
 //! Track resources built once: uniform layout and bind group, solid meshes, world pass.
 use super::{mesh, pipeline};
-use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
+use crate::model::{Camera, Race};
 use wgpu::util::DeviceExt;
 use wgpu::{CommandEncoder, Extent3d, RenderPass, TextureView};
 
@@ -95,11 +95,16 @@ pub(super) fn pipelines(
     format: wgpu::TextureFormat,
     layout: &wgpu::BindGroupLayout,
 ) -> (wgpu::RenderPipeline, wgpu::RenderPipeline) {
+    let source = [
+        crate::ground_material::ground_wgsl(),
+        include_str!("../track.wgsl").into(),
+    ]
+    .concat();
     let shader = vapors_renderer::pipelines::shader_module(
         device,
         wgpu::ShaderModuleDescriptor {
             label: Some("racer track"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../track.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
         },
     );
     let ground = pipeline::create(device, format, layout, &shader, false);
@@ -153,9 +158,10 @@ fn track_values(camera: Camera) -> [f32; 9] {
     let (sin, cos) = (camera.rotation.sin(), camera.rotation.cos());
     [
         400.0,
-        STRAIGHT,
-        RADIUS,
-        ROAD,
+        // unread: ground.wgsl's constants hold the track (ground_wgsl)
+        0.0,
+        0.0,
+        0.0,
         camera.tilt,
         cos,
         sin,
