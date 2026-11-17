@@ -5,7 +5,7 @@
 //! (`painter_rows.rs`).
 
 use vapors_elements::{BatchKey, KeptBatched, Painted};
-use vapors_renderer::{Shift, Target};
+use vapors_renderer::Target;
 use vapors_scene::Run;
 
 use super::ScenePainter;
@@ -66,7 +66,7 @@ impl ScenePainter {
         let (offsets, rows_key) = places.rows(at, (painted, kept));
         let moved = Moved {
             frame: kept.frames[at],
-            shift: Shift::whole(frame.shift),
+            shift: frame.shift,
             offsets,
             rows_key,
             rows: kept.rows.get(at).unwrap_or_default(),

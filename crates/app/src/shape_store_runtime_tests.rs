@@ -48,7 +48,7 @@ fn a_documents_shapes_are_drawn_by_their_runtime_refs() {
     // Then
     let mesh = item(&cache, triangle, ShapeKind::Mesh);
     let closed = item(&cache, rect, ShapeKind::ClosedForm);
-    assert!(store.mesh_instances(&[mesh]).is_ok());
+    assert!(store.mesh_instances(&[mesh], &[]).is_ok());
     assert_eq!(
         store.closed_forms(&[closed]).map(|drawn| drawn.len()),
         Ok(1)
@@ -72,10 +72,10 @@ fn a_freed_entrys_ref_is_refused_and_its_slots_new_entry_drawn() {
     // Then
     assert_eq!(new.index, old.index);
     assert!(matches!(
-        store.mesh_instances(&[stale]),
+        store.mesh_instances(&[stale], &[]),
         Err(ShapeError::Unregistered { .. })
     ));
-    assert!(store.mesh_instances(&[fresh]).is_ok());
+    assert!(store.mesh_instances(&[fresh], &[]).is_ok());
 }
 
 #[test]

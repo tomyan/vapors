@@ -5,7 +5,7 @@
 //! coverage.
 
 use crate::projective::{Bound, ProjectiveLayouts, ScenePassFormats, ScenePipeline};
-use crate::{MeshPipeline, MeshShape, WorkCounter};
+use crate::{MeshShape, WorkCounter};
 use vapors_shapes::MeshTriangle;
 
 /// A pipeline that draws mesh items in a scene pass. Create once per
@@ -34,11 +34,12 @@ impl ProjectiveMeshes {
         Self(shader.build(device, layouts, formats))
     }
 
-    /// An item's bytes, as [`ProjectiveMeshes::record`] reads them: the
-    /// page's.
+    /// An item's bytes, as [`ProjectiveMeshes::record`] reads them: its
+    /// 48 bytes of floats, without the row and frame the page's item
+    /// carries.
     #[must_use]
     pub fn item_bytes(item: &MeshShape) -> Vec<u8> {
-        MeshPipeline::bytes(&[*item])
+        crate::instanced::float_bytes(item.instance())
     }
 
     /// An entry's triangle bytes, as the page's entry buffer holds them.

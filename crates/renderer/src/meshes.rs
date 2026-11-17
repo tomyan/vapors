@@ -7,48 +7,30 @@
 //! wedges in device pixels. Instance bytes are kept between frames as a
 //! quad run's are; the entries' triangles are the store's.
 
-use crate::instanced::{float_bytes, viewport_bytes};
-use crate::kept_bind_group::KeptBindGroup;
 use crate::mesh_entries::{MeshEntries, MeshEntry};
-use crate::uniform_slots::UniformSlots;
-use crate::{GpuWork, KeptRange, MeshShape, Retained, Shift, Target, WorkCounter};
-
-/// Bytes per item: [`MeshShape::instance`]'s floats, each draw's slice
-/// of the kept buffer, which `meshes_setup.rs` reads at stride 0.
-pub(crate) const INSTANCE_BYTES: u64 = MeshPipeline::INSTANCE_BYTES as u64;
+use crate::meshes_bytes::INSTANCE_BYTES;
+use crate::table_binding::TableBinding;
+use crate::{GpuWork, KeptRange, MeshShape, Retained, Target, TransformTable, WorkCounter};
 
 /// A pipeline that draws mesh items. Create once per target format.
 pub struct MeshPipeline {
     pipeline: wgpu::RenderPipeline,
-    layout: wgpu::BindGroupLayout,
-    viewports: UniformSlots,
-    bind_group: KeptBindGroup,
+    binding: TableBinding,
     kept: Retained,
     work: WorkCounter,
 }
 
 impl MeshPipeline {
-    /// Bytes per item in the kept buffer: [`MeshShape::instance`]'s floats.
-    pub const INSTANCE_BYTES: usize = crate::mesh_shape::INSTANCE_FLOATS * 4;
-
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let layout = crate::quads_setup::bind_group_layout(device);
+        let binding = TableBinding::new(device, "meshes");
         Self {
-            pipeline: crate::meshes_setup::render_pipeline(device, &layout, format),
-            layout,
-            viewports: UniformSlots::new(device, "meshes"),
-            bind_group: KeptBindGroup::NONE,
+            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), format),
+            binding,
             kept: Retained::new(device, "meshes", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),
         }
-    }
-
-    /// The instance bytes of `shapes`, as a draw keeps them.
-    #[must_use]
-    pub fn bytes(shapes: &[MeshShape]) -> Vec<u8> {
-        float_bytes(shapes.iter().flat_map(MeshShape::instance))
     }
 
     /// Draws `shapes`, each of the entry beside it in `drawn`, without
@@ -67,7 +49,8 @@ impl MeshPipeline {
             return;
         };
         let drawn: Vec<&MeshEntry> = items.iter().map(|(_, entry)| *entry).collect();
-        self.draw_kept(target, &kept, Shift::NONE, (entries, &drawn));
+        self.binding.prepare_identity(target.queue, &self.work);
+        self.draw_from(target, &kept, (None, 0), (entries, &drawn));
         self.release(kept);
     }
 
@@ -78,48 +61,47 @@ impl MeshPipeline {
             .keep(target.encoder, target.queue, &self.work, bytes)
     }
 
-    /// Draws the items `kept` holds, the `i`th of `drawn[i]`'s entry,
-    /// moved by `shift`, one draw each.
+    /// Draws the items `kept` holds, each of the entry beside it in
+    /// `drawn`, one draw an item, each at its frame's entry in `table`
+    /// and its row's in its batch's range from `rows_base`.
     ///
     /// # Panics
-    /// If `drawn` does not give one entry per kept instance, or `kept`
-    /// or an entry is another buffer's.
+    ///
+    /// If `kept` holds other than one item for each of `drawn`, was kept
+    /// by another pipeline, or `table` is not the table this pipeline's
+    /// kept draws bind (one table a pipeline).
     pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        shift: Shift,
+        (table, rows_base): (&mut TransformTable, u32),
         (entries, drawn): (&mut MeshEntries, &[&MeshEntry]),
     ) {
-        let count = self.kept.len(kept) / INSTANCE_BYTES;
-        assert_eq!(
-            count,
-            drawn.len() as u64,
-            "meshes: {count} kept instances and {} entries; give each instance its entry",
-            drawn.len()
-        );
-        let Some(viewport) = self.viewport_slot(target, shift) else {
+        self.binding.adopt(table, target.queue);
+        self.draw_from(target, kept, (Some(table), rows_base), (entries, drawn));
+    }
+
+    /// Records the draws of `kept`'s items through the bind group over
+    /// the slots and `table` (the identity table for `None`).
+    fn draw_from(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        (table, rows_base): (Option<&TransformTable>, u32),
+        (entries, drawn): (&mut MeshEntries, &[&MeshEntry]),
+    ) {
+        assert_entries(self.kept.len(kept) / INSTANCE_BYTES, drawn.len());
+        let Some(viewport) = self.binding.slot(target, rows_base, &self.work) else {
             return;
         };
-        let Self {
-            pipeline,
-            layout,
-            viewports,
-            bind_group,
-            kept: instances_buffer,
-            work,
-        } = self;
-        let bind_group = bind_group.of((viewports.generation(), 0), || {
-            made_bind_group(target, layout, work, viewports)
-        });
         let run = Draws {
-            pipeline,
-            bind_group,
+            pipeline: &self.pipeline,
+            bind_group: self.binding.group(target, table, &self.work),
             viewport,
-            items: instances_buffer.slice(target.encoder, kept),
+            items: self.kept.slice(target.encoder, kept),
             triangles: entries.slices(target, drawn),
         };
-        run.record(target, work, drawn);
+        run.record(target, &self.work, drawn);
     }
 
     /// Gives `kept`'s bytes back.
@@ -133,41 +115,29 @@ impl MeshPipeline {
         self.kept.live_bytes()
     }
 
-    /// The bind groups kept: one once this pipeline has drawn.
+    /// The bind groups kept: for the identity table and a painter's,
+    /// each once drawn through.
     #[must_use]
     pub fn bind_groups_kept(&self) -> u64 {
-        self.bind_group.kept()
+        self.binding.kept()
     }
 
     /// The work its draws issued since the last take; the count restarts.
     pub fn take_work(&self) -> GpuWork {
         self.work.take()
     }
-
-    fn viewport_slot(&mut self, target: &Target<'_>, shift: Shift) -> Option<u32> {
-        let viewport = viewport_bytes(target.viewport, shift);
-        self.viewports
-            .slot(target.encoder, target.queue, &self.work, viewport)
-    }
 }
 
-fn made_bind_group(
-    target: &Target<'_>,
-    layout: &wgpu::BindGroupLayout,
-    work: &WorkCounter,
-    viewports: &UniformSlots,
-) -> wgpu::BindGroup {
-    work.create_bind_group(
-        target.device,
-        &wgpu::BindGroupDescriptor {
-            label: Some("meshes"),
-            layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: viewports.binding(),
-            }],
-        },
-    )
+/// Refuses `count` kept items drawn with `entries` entries.
+///
+/// # Panics
+///
+/// When they differ: each item is drawn over its own entry.
+fn assert_entries(count: u64, entries: usize) {
+    assert_eq!(
+        count, entries as u64,
+        "meshes: {count} kept instances and {entries} entries; give each instance its entry"
+    );
 }
 
 /// One run's draws: the pipeline, its bind group at `viewport`, the

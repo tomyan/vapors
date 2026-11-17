@@ -66,7 +66,7 @@ fn lane_rows(rows: &RowsOfBatches) -> BatchRows<'_> {
 fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
     Moved {
         frame: a_frame(),
-        shift: Shift::whole([3.0, 5.0]),
+        shift: [3.0, 5.0],
         offsets,
         rows_key: a_key(),
         rows,

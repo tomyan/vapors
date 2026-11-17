@@ -1,14 +1,5 @@
 //! The quad pipeline's fixed wgpu objects: its layout and pipeline.
 
-/// The layout of a pipeline that reads one uniform at a dynamic offset:
-/// the viewport (and, for meshes, a shift).
-pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("instanced"),
-        entries: &[uniform_entry()],
-    })
-}
-
 /// The instanced pipelines' layout (`instanced.rs`): the view uniform,
 /// and the transform table read in the vertex stage
 /// (`transform_table.rs`).

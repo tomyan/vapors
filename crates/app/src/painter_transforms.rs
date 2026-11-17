@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use vapors_elements::{BatchFrame, BatchKey};
-use vapors_renderer::{Shift, Target, TransformTable, translation};
+use vapors_renderer::{Target, TransformTable, translation};
 
 /// The table, and what each frame and lane batch holds in it.
 pub(super) struct Transforms {
@@ -59,21 +59,26 @@ impl Transforms {
         self.frame += 1;
     }
 
-    /// The entry of `frame`, set to `shift`; `None` when the table could
-    /// not grow (the refusal is on the target's encoder).
+    /// The entry of `frame`, set to `shift`, `[dx, dy]` device pixels;
+    /// `None` when the table could not grow (the refusal is on the
+    /// target's encoder).
+    ///
+    /// # Panics
+    ///
+    /// As [`whole`]: before the table is touched.
     pub(super) fn frame_entry(
         &mut self,
         target: &Target<'_>,
         frame: BatchFrame,
-        shift: Shift,
+        shift: [f32; 2],
     ) -> Option<u32> {
+        let value = translation(whole(shift));
         let at = held(
             &mut self.table,
             target,
             (&mut self.frames, frame, 1),
             self.frame,
         )?;
-        let value = translation(shift.pixels());
         self.table.set(target.encoder, target.queue, at, &[value]);
         Some(at)
     }
@@ -151,3 +156,27 @@ impl<K: std::hash::Hash + Eq> Release for HashMap<K, Entry> {
         }
     }
 }
+
+/// `shift`, a frame's shift in device pixels (IU4 4c,
+/// `docs/plans/iu4.md` section 3): kept items are snapped at offset
+/// zero and moved by it, which lands them on the edges a snap of the
+/// moved item gives (`half_up(v) + n == half_up(v + n)`) only for a
+/// whole `n`.
+///
+/// # Panics
+///
+/// When either is not a whole, finite number.
+fn whole(shift: [f32; 2]) -> [f32; 2] {
+    assert!(
+        shift.iter().all(|v| v.is_finite() && v.fract() == 0.0),
+        "a shift of {shift:?} device pixels is not whole: kept items are snapped at offset \
+         zero and moved by the shift, which keeps their edges on the pixel grid only for whole \
+         pixels (docs/plans/iu4.md section 3); round the scroll offset in device pixels \
+         (scroll::frame_shift) before drawing; reproduce with `cargo xtask test`"
+    );
+    shift
+}
+
+#[cfg(test)]
+#[path = "painter_transforms_tests.rs"]
+mod tests;

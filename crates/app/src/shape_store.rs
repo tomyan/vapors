@@ -97,11 +97,21 @@ impl ShapeStore {
     /// pipeline refuses, [`ShapeError::OutsideBounds`] for bounds that
     /// do not hold what the item draws.
     pub fn closed_forms(&self, shapes: &[Shape]) -> Result<Vec<ClosedFormShape>, ShapeError> {
-        let mut drawn = Vec::with_capacity(shapes.len());
-        for shape in shapes {
-            drawn.extend(self.closed_form(shape)?);
-        }
-        Ok(drawn)
+        Ok(self.closed_forms_in(shapes, &[])?.0)
+    }
+
+    /// As [`ShapeStore::closed_forms`], for items in a lane's rows: item
+    /// `i` in row `rows[i]`, or none for an empty `rows`. The rows of the
+    /// items drawn come back beside them.
+    ///
+    /// # Errors
+    /// As [`ShapeStore::closed_forms`].
+    pub(crate) fn closed_forms_in(
+        &self,
+        shapes: &[Shape],
+        rows: &[u32],
+    ) -> Result<(Vec<ClosedFormShape>, Vec<u32>), ShapeError> {
+        drawn_in(shapes, rows, |shape| self.closed_form(shape))
     }
 
     fn closed_form(&self, item: &Shape) -> Result<Option<ClosedFormShape>, ShapeError> {
@@ -191,6 +201,27 @@ fn registered(entry: &'static ShapeEntry, shape: ShapeRef) -> Registered {
         stroke: stroke_of(paint),
         uploaded: None,
     }
+}
+
+/// What `draw` draws of `shapes`, and the rows of the items it draws:
+/// item `i` is in row `rows[i]`, or `rows` is empty. An item that draws
+/// nothing (no area) takes its row with it, so each drawn item keeps its
+/// own.
+///
+/// # Errors
+/// The first error `draw` returns.
+pub(crate) fn drawn_in<T>(
+    shapes: &[Shape],
+    rows: &[u32],
+    mut draw: impl FnMut(&Shape) -> Result<Option<T>, ShapeError>,
+) -> Result<(Vec<T>, Vec<u32>), ShapeError> {
+    let (mut drawn, mut kept) = (Vec::with_capacity(shapes.len()), Vec::new());
+    for (at, shape) in shapes.iter().enumerate() {
+        let Some(one) = draw(shape)? else { continue };
+        drawn.push(one);
+        kept.extend(rows.get(at));
+    }
+    Ok((drawn, kept))
 }
 
 #[cfg(test)]
