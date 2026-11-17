@@ -18,6 +18,7 @@ use vapors_scene::{Item, Run};
 
 use super::errors::{MountError, PaintError};
 use super::rows::Moved;
+use super::transforms::ItemPlace;
 use super::{ScenePainter, SurfaceState};
 use crate::surface::SurfaceRenderer;
 
@@ -138,21 +139,27 @@ impl Surfaces {
     }
 
     /// Renders, as needed, and composites each surface item of `items`
-    /// over the quad at its place in `kept`, moved by `shift`.
+    /// over the quad at its place in `kept`, at its frame's and row's
+    /// entries of `at`'s table.
     pub(super) fn draw_kept(
         &mut self,
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, moved): (&[Item], &KeptRange, &Moved<'_>),
+        (items, kept, moved, at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
     ) -> Result<(), PaintError> {
         for (place, (name, size, _)) in (0..).zip(surfaces(painted, items)) {
-            let shift = moved.item_shift(place as usize);
+            let row = at.row_entry(moved.item_row(place as usize));
             let mounted = unmounted_refused(&mut self.mounted, name)?;
             let turn = turn(&self.waker);
             let bound = mounted.prepare(target, pipeline, size, turn, &self.work);
             let bound = bound.map_err(|r| r.named(name))?;
-            pipeline.draw_kept(target, bound, (kept, place), shift);
+            pipeline.draw_kept(
+                target,
+                bound,
+                (kept, place),
+                (&mut *at.table, at.frame, row),
+            );
         }
         Ok(())
     }

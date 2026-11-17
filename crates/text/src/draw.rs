@@ -4,10 +4,10 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed, RowOffsets, Shift};
+use vapors_renderer::{KeptRange, Placed, TransformTable};
 use vapors_scene::Size;
 
-use crate::pipeline::{self, BlendParams, PARAMS_HEAD, TextPipeline};
+use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -74,16 +74,16 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let Some(params) = self.prepare(target, atlas, (params, (Shift::NONE, &RowOffsets::NONE)))
-        else {
+        let Some(params) = self.prepare(target, atlas, (params, 0)) else {
             return;
         };
         self.draw_quads(target, quads, params);
     }
 
     /// Uploads what changed in the atlas page; the dynamic offset of the
-    /// slot holding `params`, the target's viewport and `shift`, `None`
-    /// when refused (the refusal is on the encoder).
+    /// slot holding `params`, the target's viewport and the draw's first
+    /// row entry `rows_base`, `None` when refused (the refusal is on the
+    /// encoder).
     ///
     /// # Panics
     ///
@@ -92,17 +92,16 @@ impl TextPipeline {
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        (params, moved): (BlendParams, (Shift, &RowOffsets)),
+        (params, rows_base): (BlendParams, u32),
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
-        let (shift, rows) = moved;
-        let head = params_head(params, target.viewport, shift);
+        let value = params_bytes(params, target.viewport, rows_base);
         self.params
-            .slot_with_rows(target.encoder, (target.queue, &self.work), (head, rows))
+            .slot(target.encoder, target.queue, &self.work, value)
     }
 
-    /// Draws `quads` with the params slot at `params`.
+    /// Draws `quads`, each on the page, with the params slot at `params`.
     fn draw_quads(&mut self, target: &RenderTarget<'_>, quads: &[f32], params: u32) {
         if quads.is_empty() {
             return;
@@ -114,16 +113,18 @@ impl TextPipeline {
         else {
             return;
         };
-        self.record_draw(target, Vertices::Placed(&vertices), params);
+        self.identity.prepare_counted(target.queue, &self.work);
+        self.record_draw(target, Vertices::Placed(&vertices), (None, params));
     }
 
     /// Records a draw of the vertices `from` holds with the params slot
-    /// at `params`, through the kept bind group.
+    /// at `params`, through the kept bind group over `table` (the
+    /// pipeline's identity table for `None`).
     pub(crate) fn record_draw(
         &mut self,
         target: &RenderTarget<'_>,
         from: Vertices<'_>,
-        params: u32,
+        (table, params): (Option<&TransformTable>, u32),
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let Self {
@@ -134,6 +135,7 @@ impl TextPipeline {
             atlas_texture,
             work,
             kept,
+            identity,
             ..
         } = self;
         let (vertices, count) = match from {
@@ -143,8 +145,11 @@ impl TextPipeline {
                 (kept.slice(target.encoder, range), count)
             }
         };
-        let bind_group = atlas_texture.bind_group(slots.generation(), |view| {
-            pipeline::bind_group(target.device, work, layout, view, sampler, slots)
+        let own = table.is_none();
+        let table = table.unwrap_or(identity);
+        let generation = (slots.generation() << 32) | table.generation();
+        let bind_group = atlas_texture.bind_group((own, generation), |view| {
+            pipeline::bind_group(target.device, work, layout, view, sampler, (slots, table))
         });
         target.draw_pass(|pass| {
             pass.set_pipeline(pipeline);
@@ -162,24 +167,22 @@ pub(crate) enum Vertices<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The params uniform's first 32 bytes, before the rows' offsets: gamma,
-/// contrast, the viewport's width and height and `shift`, in device
-/// pixels.
+/// The params uniform's bytes: gamma, contrast, the viewport's width and
+/// height in device pixels, then the draw's first row entry, padded to
+/// [`PARAMS_SIZE`].
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_head(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_HEAD] {
-    let [dx, dy] = shift.pixels();
+fn params_bytes(params: BlendParams, viewport: Size, rows_base: u32) -> [u8; PARAMS_SIZE] {
     let floats = [
         params.gamma,
         params.contrast,
         viewport.width as f32,
         viewport.height as f32,
-        dx,
-        dy,
     ];
-    let mut bytes = [0; PARAMS_HEAD];
+    let mut bytes = [0; PARAMS_SIZE];
     for (at, float) in floats.into_iter().enumerate() {
         bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
     }
+    bytes[16..20].copy_from_slice(&rows_base.to_le_bytes());
     bytes
 }
 

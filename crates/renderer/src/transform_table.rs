@@ -96,7 +96,7 @@ impl TransformTable {
     /// As [`TransformTable::prepare`], the write counted in `work` as
     /// well: for a pipeline's own identity table, whose writes no painter
     /// takes (`instanced.rs`).
-    pub(crate) fn prepare_counted(&mut self, queue: &wgpu::Queue, work: &WorkCounter) {
+    pub fn prepare_counted(&mut self, queue: &wgpu::Queue, work: &WorkCounter) {
         if self.fresh {
             self.prepare(queue);
             let (_, bytes) = self.take_written();

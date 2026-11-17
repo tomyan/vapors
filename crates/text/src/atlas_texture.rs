@@ -11,7 +11,10 @@ use crate::pipeline_gpu::coverage_texture;
 pub(crate) struct AtlasTexture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    bind_group: KeptBindGroup,
+    /// Over the pipeline's own identity table, for immediate draws.
+    own_group: KeptBindGroup,
+    /// Over a painter's transform table, for kept draws.
+    table_group: KeptBindGroup,
 }
 
 impl AtlasTexture {
@@ -21,7 +24,8 @@ impl AtlasTexture {
         Self {
             view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
             texture,
-            bind_group: KeptBindGroup::NONE,
+            own_group: KeptBindGroup::NONE,
+            table_group: KeptBindGroup::NONE,
         }
     }
 
@@ -35,21 +39,26 @@ impl AtlasTexture {
         &self.texture
     }
 
-    /// The bind group for the uniform buffer of `generation`: the kept
-    /// one, or one `make` makes over the view.
+    /// The bind group over the uniform buffer and transform table of
+    /// `generation`, for the pipeline's own table (`own`) or a
+    /// painter's: the kept one, or one `make` makes over the view.
     pub(crate) fn bind_group(
         &mut self,
-        generation: u64,
+        (own, generation): (bool, u64),
         make: impl FnOnce(&wgpu::TextureView) -> wgpu::BindGroup,
     ) -> &wgpu::BindGroup {
         let Self {
-            view, bind_group, ..
+            view,
+            own_group,
+            table_group,
+            ..
         } = self;
-        bind_group.of(generation, || make(view))
+        let kept = if own { own_group } else { table_group };
+        kept.of(generation, || make(view))
     }
 
-    /// How many bind groups are kept: 0 or 1.
+    /// How many bind groups are kept: 0, 1 or 2.
     pub(crate) fn bind_groups_kept(&self) -> u64 {
-        self.bind_group.kept()
+        self.own_group.kept() + self.table_group.kept()
     }
 }

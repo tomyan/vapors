@@ -8,10 +8,10 @@ use vapors_scene::{Rect, Size, Transform};
 
 use crate::frame_arena::FrameArena;
 use crate::image_binding::{Sampling, TextureBinding};
-use crate::image_setup::{bind_group_layout, render_pipeline, samplers, view_layout};
+use crate::image_setup::{bind_group_layout, render_pipeline, samplers};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::uniform_slots::UniformSlots;
-use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Shift, Target, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Target, TransformTable, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 
@@ -29,7 +29,14 @@ pub struct ImagePipeline {
     /// The viewport and scroll frame shift each quad is drawn at.
     views: UniformSlots,
     view_layout: wgpu::BindGroupLayout,
-    view_group: KeptBindGroup,
+    /// The identity alone, for draws of this frame's quads, which are on
+    /// the page (`transform_table.rs`).
+    identity: TransformTable,
+    own_group: KeptBindGroup,
+    table_group: KeptBindGroup,
+    /// The id of the table kept draws bind: one table a pipeline, as
+    /// `instanced.rs` holds.
+    table_id: Option<u64>,
     work: WorkCounter,
 }
 
@@ -44,7 +51,8 @@ impl ImagePipeline {
                 source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
             },
         );
-        let (layout, view_layout) = (bind_group_layout(device), view_layout(device));
+        let layout = bind_group_layout(device);
+        let view_layout = crate::quads_setup::table_layout(device);
         let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, format);
         let (nearest, smooth) = samplers(device);
         let vertices = FrameArena::new(
@@ -62,7 +70,10 @@ impl ImagePipeline {
             kept: Retained::new(device, "image quads", wgpu::BufferUsages::VERTEX),
             views: UniformSlots::new(device, "image views"),
             view_layout,
-            view_group: KeptBindGroup::NONE,
+            identity: TransformTable::new(device, "image identity"),
+            own_group: KeptBindGroup::NONE,
+            table_group: KeptBindGroup::NONE,
+            table_id: None,
             work: WorkCounter::default(),
         }
     }
@@ -142,11 +153,12 @@ impl ImagePipeline {
         else {
             return;
         };
-        let Some(view) = self.view_slot(target, Shift::NONE) else {
+        let Some(view) = self.view_slot(target, (0, 0)) else {
             return;
         };
+        self.identity.prepare_counted(target.queue, &self.work);
         let from = (Quads::Placed(&vertices), 0..VERTEX_COUNT);
-        self.record(target, bound, from, view);
+        self.record(target, bound, from, (None, view));
     }
 
     fn bind_group(

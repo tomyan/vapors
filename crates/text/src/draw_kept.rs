@@ -6,7 +6,7 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::{KeptRange, RowOffsets, Shift};
+use vapors_renderer::{KeptRange, TransformTable};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
@@ -38,12 +38,12 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         texts: &[TextDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
-        Self::text_bytes_in_rows(atlas, texts, &[])
+        Self::text_bytes_in(atlas, texts, (0, &[]))
     }
 
-    /// As [`TextPipeline::text_bytes`], text `i`'s vertices in row
-    /// `rows[i]` of the batch's row offsets (`vapors_renderer::RowOffsets`),
-    /// or every text in row 0 for an empty `rows`.
+    /// As [`TextPipeline::text_bytes`], every vertex in the transform
+    /// table's entry `frame`, text `i`'s in row `rows[i]` of the batch's
+    /// range, or every text in row 0 for an empty `rows`.
     ///
     /// # Errors
     ///
@@ -52,15 +52,15 @@ impl TextPipeline {
     /// # Panics
     ///
     /// When `rows` is neither empty nor one row a text inside the table.
-    pub fn text_bytes_in_rows(
+    pub fn text_bytes_in(
         atlas: &mut GlyphAtlas,
         texts: &[TextDraw<'_>],
-        rows: &[u32],
+        (frame, rows): (u32, &[u32]),
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
         let counted = quads_counted(atlas, texts, Some(&mut pins));
         let (floats, vertices) = built(atlas, counted, &mut pins)?;
-        Ok((rowed_vertex_bytes(&floats, (&vertices, rows)), pins))
+        Ok((rowed_vertex_bytes(&floats, (&vertices, frame, rows)), pins))
     }
 
     /// The vertex bytes of `icons` as [`TextPipeline::draw_icons`] draws
@@ -73,11 +73,12 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
-        Self::icon_bytes_in_rows(atlas, icons, &[])
+        Self::icon_bytes_in(atlas, icons, (0, &[]))
     }
 
-    /// As [`TextPipeline::icon_bytes`], icon `i`'s vertices in row
-    /// `rows[i]`, or every icon in row 0 for an empty `rows`.
+    /// As [`TextPipeline::icon_bytes`], every vertex in the transform
+    /// table's entry `frame`, icon `i`'s in row `rows[i]`, or every icon
+    /// in row 0 for an empty `rows`.
     ///
     /// # Errors
     ///
@@ -86,15 +87,15 @@ impl TextPipeline {
     /// # Panics
     ///
     /// When `rows` is neither empty nor one row an icon inside the table.
-    pub fn icon_bytes_in_rows(
+    pub fn icon_bytes_in(
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
-        rows: &[u32],
+        (frame, rows): (u32, &[u32]),
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
         let counted = icon_quads_counted(atlas, icons, Some(&mut pins));
         let (floats, vertices) = built(atlas, counted, &mut pins)?;
-        Ok((rowed_vertex_bytes(&floats, (&vertices, rows)), pins))
+        Ok((rowed_vertex_bytes(&floats, (&vertices, frame, rows)), pins))
     }
 
     /// Writes `bytes` ([`TextPipeline::text_bytes`] or
@@ -117,45 +118,24 @@ impl TextPipeline {
     }
 
     /// Uploads what changed in `atlas`'s page and draws the vertices
-    /// `kept` holds, built with `pins`, into `target` with `params`,
-    /// moved by `shift` (device pixels: a scroll frame's), in one draw
-    /// call; not when the params slot is refused (the refusal is on the
-    /// encoder).
+    /// `kept` holds, built with `pins`, into `target` with `params`, each
+    /// at its frame's entry in `table` and its row's in the batch's range
+    /// from `rows_base`, in one draw call; not when the params slot is
+    /// refused (the refusal is on the encoder).
     ///
     /// # Panics
     ///
     /// If the atlas's generation moved on since the bytes were built
     /// (their glyphs may have moved: build them again), if `kept` was
-    /// kept by another pipeline, or as [`TextPipeline::draw`] for the
-    /// atlas.
+    /// kept by another pipeline, if `table` is not the table this
+    /// pipeline's kept draws bind (one table a pipeline), or as
+    /// [`TextPipeline::draw`] for the atlas.
     pub fn draw_kept(
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
         (kept, pins): (&KeptRange, &AtlasPins),
-        params: BlendParams,
-        shift: Shift,
-    ) {
-        self.draw_kept_in_rows(
-            target,
-            atlas,
-            (kept, pins),
-            (params, (shift, &RowOffsets::NONE)),
-        );
-    }
-
-    /// As [`TextPipeline::draw_kept`], each vertex moved by its row's
-    /// offset in `rows` as well.
-    ///
-    /// # Panics
-    ///
-    /// As [`TextPipeline::draw_kept`].
-    pub fn draw_kept_in_rows(
-        &mut self,
-        target: &RenderTarget<'_>,
-        atlas: &mut GlyphAtlas,
-        (kept, pins): (&KeptRange, &AtlasPins),
-        (params, moved): (BlendParams, (Shift, &RowOffsets)),
+        (params, table, rows_base): (BlendParams, &mut TransformTable, u32),
     ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(
@@ -163,10 +143,20 @@ impl TextPipeline {
             "text: kept bytes built at atlas generation {built} drawn at {now}; build them again \
              when the generation moves on (draw_kept.rs); reproduce with `cargo xtask test`"
         );
-        let Some(params) = self.prepare(target, atlas, (params, moved)) else {
+        let id = *self.table_id.get_or_insert(table.id());
+        assert_eq!(
+            id,
+            table.id(),
+            "text: a kept draw binds transform table {}, after table {id}: a pipeline draws from \
+             one table (draw_kept.rs); give each painter its own pipelines; reproduce with \
+             `cargo xtask test`",
+            table.id()
+        );
+        let Some(params) = self.prepare(target, atlas, (params, rows_base)) else {
             return;
         };
-        self.record_draw(target, Vertices::Kept(kept), params);
+        table.prepare(target.queue);
+        self.record_draw(target, Vertices::Kept(kept), (Some(table), params));
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

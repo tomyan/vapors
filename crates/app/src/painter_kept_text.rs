@@ -35,6 +35,9 @@ pub(super) struct TextGpu {
     /// What each item resolved to when the bytes were built.
     resolved: Resolved,
     len: u64,
+    /// The frame's entry in the transform table the bytes name: bytes
+    /// naming another are built again.
+    frame: u32,
     pub(super) drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -58,15 +61,20 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, rows, key, at): (&Run, &[u32], BatchKey, usize),
+        (run, (frame, rows, range), key, at): (&Run, (u32, &[u32], usize), BatchKey, usize),
     ) -> Result<Option<(&KeptRange, &AtlasPins)>, AtlasError> {
         let generation = atlas.generation();
         match self.texts.get(&key) {
-            Some(gpu) if gpu.current(run, painted, generation) => {
-                gpu.check(atlas, painted, ((run, rows), at));
+            Some(gpu) if gpu.current(run, painted, (generation, frame)) => {
+                #[cfg(debug_assertions)]
+                crate::painter::kept::rows_in_range(key, rows, range);
+                gpu.check(atlas, painted, ((run, frame, rows), at));
                 self.kept += 1;
             }
-            _ => self.write_text((text, atlas), (target, painted), (run, rows, key))?,
+            _ => {
+                crate::painter::kept::rows_in_range(key, rows, range);
+                self.write_text((text, atlas), (target, painted), (run, frame, rows, key))?;
+            }
         }
         let Some(gpu) = self.texts.get_mut(&key) else {
             return Ok(None);
@@ -81,17 +89,18 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, rows, key): (&Run, &[u32], BatchKey),
+        (run, frame, rows, key): (&Run, u32, &[u32], BatchKey),
     ) -> Result<(), AtlasError> {
         if let Some(stale) = self.texts.remove(&key) {
             stale.release((text, atlas));
         }
-        let (bytes, pins) = run_bytes(atlas, painted, (run, rows))?;
+        let (bytes, pins) = run_bytes(atlas, painted, (run, frame, rows))?;
         let Some(range) = kept_range(text, target, &bytes) else {
             atlas.unpin(pins);
             return Ok(());
         };
-        let gpu = TextGpu::new((range.range(), pins), (run, painted), (bytes, self.frame));
+        let built = (bytes, frame, self.frame);
+        let gpu = TextGpu::new((range.range(), pins), (run, painted), built);
         self.texts.insert(key, gpu);
         self.written += 1;
         Ok(())
@@ -126,27 +135,32 @@ fn kept_range(text: &mut TextPipeline, target: &Target<'_>, bytes: &[u8]) -> Opt
 
 impl TextGpu {
     /// The bytes built for `run` as `painted` resolves it, kept at
-    /// `range` with `pins`, drawn in `frame`.
+    /// `range` with `pins`, naming the transform table's entry `frame`,
+    /// drawn in painter frame `drawn`.
     fn new(
         (range, pins): (Option<KeptRange>, AtlasPins),
         (run, painted): (&Run, &Painted),
-        (bytes, frame): (Vec<u8>, u64),
+        (bytes, frame, drawn): (Vec<u8>, u32, u64),
     ) -> Self {
         Self {
             range,
             pins,
             resolved: Resolved::of(run, painted),
             len: bytes.len() as u64,
-            drawn: frame,
+            frame,
+            drawn,
             #[cfg(debug_assertions)]
             bytes,
         }
     }
 
     /// True when these bytes are `run`'s as `painted` resolves it, with
-    /// the atlas at `generation`.
-    fn current(&self, run: &Run, painted: &Painted, generation: u64) -> bool {
-        self.pins.generation() == generation && self.resolved.matches(run, painted)
+    /// the atlas at `generation`, naming the transform table's entry
+    /// `frame`.
+    fn current(&self, run: &Run, painted: &Painted, (generation, frame): (u64, u32)) -> bool {
+        self.pins.generation() == generation
+            && self.frame == frame
+            && self.resolved.matches(run, painted)
     }
 
     /// The bytes held in the kept buffer.
@@ -170,11 +184,11 @@ impl TextGpu {
         &self,
         atlas: &GlyphAtlas,
         painted: &Painted,
-        ((run, rows), at): ((&Run, &[u32]), usize),
+        ((run, frame, rows), at): ((&Run, u32, &[u32]), usize),
     ) {
         #[cfg(debug_assertions)]
         {
-            let fresh = run_placed_bytes(atlas, painted, (run, rows)).unwrap_or_else(|| {
+            let fresh = run_placed_bytes(atlas, painted, (run, frame, rows)).unwrap_or_else(|| {
                 panic!(
                     "batch {at} ({run:?}) drew kept text bytes that name a glyph the atlas no \
                      longer holds: a pinned glyph was evicted (atlas_pins.rs), or bytes built \
@@ -185,6 +199,6 @@ impl TextGpu {
             crate::painter::kept_check::assert_kept(&self.bytes, &fresh, (run, at));
         }
         #[cfg(not(debug_assertions))]
-        let _ = (atlas, painted, run, rows, at); // only the debug build's compare uses them
+        let _ = (atlas, painted, run, frame, rows, at); // only the debug build's compare uses them
     }
 }
