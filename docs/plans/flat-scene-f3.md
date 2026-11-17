@@ -2,11 +2,14 @@
 
 A design note for F3 (`flat-scene.md` section 8, the F3 row; the clip
 table is section 2.3), written against main and against F2.1 as built
-in #459 (`flat-scene-f2.md`, "As built: F2.1"), whose conventions the
-clip table follows: one table per 2D pipeline group, `Retained` free
-ranges, entries keyed by a stable slot so kept instance bytes keep
-naming the same entry, writes counted in `FrameCounts`, and a device
-that lacks what the table needs refused naming the limit. It says what
+in #459 (`flat-scene-f2.md`, "As built: F2.1"; the conventions lane3
+listed on #459, issuecomment-6937542558), which the clip table follows:
+a storage buffer beside the transform table, written only when an entry
+changes and refusing an entry changed twice for one encoder, growing by
+doubling under the buffer limits and refusing beyond them
+(`ArenaFull`), counting its writes through its own `WorkCounter`, its
+entries given back after a frame that does not draw them as kept bytes
+are, and a device that lacks what it needs refused naming the limit. It says what
 clips are today, what F3 changes, and the questions for the lead before
 building.
 
@@ -55,9 +58,11 @@ building.
 
 ## What F3 changes
 
-1. **The clip table.** Each 2D pipeline group shares one storage buffer
-   of clip entries beside the transform table, with the same free
-   ranges (`retained.rs`). An entry is a rectangle (`vec4<f32>`, device
+1. **The clip table.** `ClipTable` in `vapors-renderer`, built as
+   `TransformTable` is (`transform_table.rs`, `transform_entries.rs`):
+   one storage buffer of clip entries at binding 2, beside the view
+   uniform (0) and the transform table (1), with the same growth,
+   write and refusal rules. An entry is a rectangle (`vec4<f32>`, device
    pixels in its frame's space, snapped under a whole translation as
    today's clip is), four corner radii (`vec4<f32>`, circular, as
    `Quad::radii` are), its frame's transform entry (`u32`), and its
@@ -66,9 +71,13 @@ building.
    no clip.
 2. **Entries.** One per box that clips: `overflow` other than
    `visible`, and a replaced element with a radius clipping its own
-   content (an image, an icon, a `gpu-surface`). An entry is keyed by
-   the box's slot, kept as long as the box, and written when the clip's
-   rectangle, radii or frame change (a layout or style change). A
+   content (an image, an icon, a `gpu-surface`). The painter keeps an
+   entry per clipping box's slot, as `painter_transforms.rs` keeps one
+   per `BatchFrame`, and gives it back after a frame that draws nothing
+   under it, the rule `KeptGpu` uses for kept bytes; `KeptGpu` builds a
+   batch's bytes again when an index it names changes. An entry is
+   written when the clip's rectangle, radii or frame change (a layout
+   or style change). A
    scroll does not write it: the rectangle is in its frame's space,
    which the frame's transform entry moves. A rounded clip's radii are
    its padding box's: the border radius less the border width, as CSS
@@ -90,8 +99,9 @@ building.
    - text vertices: 4 bytes each, after F2.2's index;
    - mesh instances: 4 bytes each, after F2.3's two indices;
    - images: nothing, as the index goes in the draw's uniform.
-5. **`clip.wgsl`.** One function, shared by every 2D pipeline and by
-   `svg-support.md` V10: the coverage of a device-space position under
+5. **`clip.wgsl`.** Concatenated ahead of each 2D pipeline's shader, as
+   `transform_table.wgsl` is, and shared with `svg-support.md` V10. One
+   function: the coverage of a device-space position under
    clip `index`, the product of each link's coverage. Each link moves
    the position into its frame's space by that frame's transform entry
    (a translation by whole pixels for every frame before F4a; a debug
@@ -115,10 +125,12 @@ building.
 9. **Hit testing.** Hits stay on the CPU, cut by the box's clip chain
    in CSS px; a rounded clip cuts them by its rounded shape, as
    Chromium does (to be confirmed by the events oracle, F3.2).
-10. **The device.** The vertex and fragment stages read two storage
-    buffers where F2 reads one: `vapors_gpu::raised_limits` refuses
-    `max_storage_buffers_per_shader_stage` below 2, naming it, with
-    the unit test on faked limits extended.
+10. **The device.** The fragment stage now reads storage buffers (the
+    clip table, and the transform table for each link's frame), so
+    `vapors_gpu::raised_limits` adds that stage's limit to F2's vertex
+    check, refusing it by name below what F3 reads, with the unit test
+    on faked limits extended. There is no fallback, as for F2 (Tom's
+    decision).
 
 ## Acceptance (the F3 row, with this design)
 
