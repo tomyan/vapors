@@ -70,6 +70,7 @@ fn gpu_a_timed_frame_reads_back_one_pair_per_render_pass_once_the_gpu_finishes()
         frame: 5,
         pairs: 2,
         time: Ok(time),
+        surfaces: Duration::ZERO,
         resolution,
     }) = after
     else {

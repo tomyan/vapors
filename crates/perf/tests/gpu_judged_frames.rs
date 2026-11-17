@@ -3,12 +3,13 @@
 //! frame-to-idle time no shorter than its GPU time; and no frame that
 //! builds a pipeline (one-scene F0).
 
-use vapors_app::FrameTiming;
+use vapors_app::{FrameTiming, SURFACE_PHASE};
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::racer_driven::DrivenRacer;
 use vapors_perf::run::{Counts, Workload};
 use vapors_perf::sampler::Sampler;
+use vapors_perf::scene_size::Resized;
 use vapors_platform::{App, Next};
 use vapors_renderer::SolidPipeline;
 
@@ -41,7 +42,33 @@ fn gpu_every_judged_frame_from_the_first_has_a_gpu_time_and_its_time_to_idle() {
             "frame {}",
             frame.index
         );
+        // the racing track renders its gpu-surface every frame: its own
+        // GPU pair and its CPU phase (13b)
+        assert!(
+            !frame.surfaces.is_zero() && frame.surfaces < frame.gpu,
+            "frame {}: {frame:?}",
+            frame.index
+        );
+        let surface = frame.phases.get(SURFACE_PHASE).copied().unwrap_or_default();
+        assert!(!surface.is_zero(), "frame {}: {frame:?}", frame.index);
     }
+}
+
+#[test]
+fn gpu_a_resized_scene_runs_at_the_size_it_is_given() {
+    // Given
+    let gpu = gpu_with(FEATURES);
+    let mut resized = Resized::new(Box::new(DrivenRacer::new()), (320, 200));
+
+    // When
+    let frames = Sampler::new(&gpu)
+        .judged(&mut resized, 2)
+        .expect("both frames ran")
+        .frames;
+
+    // Then
+    assert_eq!(resized.size(), (320, 200));
+    assert_eq!(frames.len(), 2);
 }
 
 #[test]

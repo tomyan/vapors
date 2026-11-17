@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::{GpuMissing, GpuResolution, sum_pairs};
+use super::{GpuMissing, GpuResolution, section_ticks, sum_pairs};
 
 #[test]
 fn the_gpu_time_is_the_sum_of_each_pairs_span_in_nanoseconds() {
@@ -48,4 +48,17 @@ fn a_native_resolution_is_one_tick_of_the_period_truncated_to_the_nanosecond() {
         resolution.to_string(),
         "83ns (the device's timestamp period)"
     );
+}
+
+#[test]
+fn a_frames_surface_time_sums_only_its_section_pairs() {
+    // Given: three pairs of 10, 20 and 30 ticks; the second and third
+    // time sections (gpu-surface renders)
+    let ticks = [0, 10, 100, 120, 200, 230];
+
+    // When
+    let surfaces = sum_pairs(&section_ticks(&ticks, &[1, 2]), 1.0);
+
+    // Then
+    assert_eq!(surfaces, Ok(Duration::from_nanos(50)));
 }

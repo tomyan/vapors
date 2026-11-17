@@ -8,6 +8,8 @@ use crate::args_measure::refuse_scaling_with_others;
 pub use crate::args_off_path::WorkloadSet;
 use crate::args_off_path::refuse_off_path_with_modes;
 use crate::args_samples::{refuse_samples_with_modes, samples_of};
+pub use crate::args_scene_profile::SceneProfile;
+use crate::args_scene_profile::{refuse_without_scene_run, size_of};
 use crate::rows::RowChange;
 use crate::run::Settings;
 use crate::scene_kind::SceneKind;
@@ -19,7 +21,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions|--counters] [--off-path] \
                      [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] [--first-frame <rows>] \
-                     [--scene-run [racer|one-scene]] [--samples 1|4]; --scaling needs `--profile judged` in place of `--release`";
+                     [--scene-run [racer|one-scene] [--size <width>x<height>] [--profile-only]] [--samples 1|4]; --scaling needs `--profile judged` in place of `--release`";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -49,6 +51,9 @@ pub struct Options {
     /// the racer, or the scene named after the flag; no counts, no other
     /// flag.
     pub scene_run: Option<SceneKind>,
+    /// The scene run's size and whether it is judged (`--size`,
+    /// `--profile-only`).
+    pub scene: SceneProfile,
     /// The samples the full run's painters draw at (`--samples`).
     pub samples: vapors_renderer::Samples,
 }
@@ -65,6 +70,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         flags.take(arg, &mut args)?;
     }
     let samples = flags.samples()?;
+    flags.refuse()?;
     let Flags {
         counts,
         only,
@@ -75,28 +81,9 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         mount_memory,
         first_frame,
         scene_run,
+        scene,
         samples: _,
     } = flags;
-    refuse_scaling_with_others(scaling.is_some(), only.is_some(), measure)?;
-    refuse_off_path_with_modes(
-        set,
-        [
-            ("--scaling", scaling.is_some()),
-            ("--mount", mount),
-            ("--mount-memory", mount_memory.is_some()),
-            ("--scene-run", scene_run.is_some()),
-        ],
-    )?;
-    refuse_mount_with_others([
-        ("--only", only.is_some()),
-        measure.given(),
-        ("--scaling", scaling.is_some()),
-        ("--mount", mount),
-        ("--mount-memory", mount_memory.is_some()),
-        ("--first-frame", first_frame.is_some()),
-        ("--scene-run", scene_run.is_some()),
-    ])?;
-    refuse_counts_with_scene_run(scene_run.is_some() || first_frame.is_some(), &counts)?;
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
@@ -107,6 +94,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         mount_memory,
         first_frame,
         scene_run,
+        scene,
         samples,
     })
 }
@@ -122,7 +110,36 @@ struct Flags {
     mount_memory: Option<usize>,
     first_frame: Option<usize>,
     scene_run: Option<SceneKind>,
+    scene: SceneProfile,
     samples: Option<vapors_renderer::Samples>,
+}
+
+impl Flags {
+    /// The flags that cannot be given together, refused naming them.
+    fn refuse(&self) -> Result<(), String> {
+        let scene_run = self.scene_run.is_some();
+        refuse_without_scene_run(self.scene, scene_run)?;
+        refuse_scaling_with_others(self.scaling.is_some(), self.only.is_some(), self.measure)?;
+        refuse_off_path_with_modes(
+            self.set,
+            [
+                ("--scaling", self.scaling.is_some()),
+                ("--mount", self.mount),
+                ("--mount-memory", self.mount_memory.is_some()),
+                ("--scene-run", scene_run),
+            ],
+        )?;
+        refuse_mount_with_others([
+            ("--only", self.only.is_some()),
+            self.measure.given(),
+            ("--scaling", self.scaling.is_some()),
+            ("--mount", self.mount),
+            ("--mount-memory", self.mount_memory.is_some()),
+            ("--first-frame", self.first_frame.is_some()),
+            ("--scene-run", scene_run),
+        ])?;
+        refuse_counts_with_scene_run(scene_run || self.first_frame.is_some(), &self.counts)
+    }
 }
 
 impl Flags {
@@ -154,6 +171,11 @@ impl Flags {
             }
             "--samples" => self.samples = Some(samples_of(rest.next().as_deref())?),
             "--scene-run" => return self.scene_run(rest),
+            "--size" if self.scene.size.is_some() => {
+                return Err(format!("--size given twice: {USAGE}"));
+            }
+            "--size" => self.scene.size = Some(size_of(rest.next().as_deref())?),
+            "--profile-only" => self.scene.profile_only = true,
             "--mount-memory" => self.mount_memory = Some(rows_of("--mount-memory", rest.next())?),
             "--first-frame" => self.first_frame = Some(rows_of("--first-frame", rest.next())?),
             "--scaling" if self.scaling.is_some() => {

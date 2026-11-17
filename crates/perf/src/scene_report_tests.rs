@@ -15,6 +15,7 @@ fn frames() -> Vec<JudgedFrame> {
             index: usize::try_from(n - 1).expect("small"),
             cpu: Duration::from_micros(n),
             gpu: Duration::from_micros(2 * n),
+            surfaces: Duration::from_micros(n / 2),
             idle: Duration::from_micros(3 * n),
             ..JudgedFrame::default()
         })
@@ -32,6 +33,14 @@ fn the_report_gives_median_p99_and_max_of_each_time_and_the_over_budget_count() 
     );
     assert!(
         report.contains("| GPU time | 100.0 | 198.0 | 200.0 |"),
+        "{report}"
+    );
+    assert!(
+        report.contains("| GPU, in gpu-surface renders | 25.0 | 49.0 | 50.0 |"),
+        "{report}"
+    );
+    assert!(
+        report.contains("| GPU, in the page's passes | 75.0 | 149.0 | 150.0 |"),
         "{report}"
     );
     assert!(

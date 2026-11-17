@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use vapors_platform::{Frame, Next};
-use vapors_renderer::WRITE_PHASE;
 
 use super::start::BuiltSince;
 use super::{FRAME_DEADLINE, INTERVAL, Measured, Sampler};
@@ -65,14 +64,14 @@ impl Sampler<'_> {
         Ok(since)
     }
 
-    /// The frame's phase times and counts, `write` recorded as 0 when
-    /// the frame entered none.
+    /// The frame's phase times and counts, `write` and `surface`
+    /// recorded as 0 when the frame entered none (a page without a
+    /// `gpu-surface` has no surface phase).
     fn taken_phases(
         &mut self,
         rise: Rise,
     ) -> Result<(BTreeMap<String, Duration>, Counted), String> {
-        let mut phases = self.clock.take();
-        phases.entry(WRITE_PHASE.into()).or_default();
+        let phases = frame_counts::with_maybe_entered(self.clock.take());
         Ok((phases, rise.with_phases(frame_counts::take(&self.clock)?)))
     }
 

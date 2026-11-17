@@ -64,6 +64,10 @@ pub(super) fn render_into(
     target
         .encoder
         .time_section(&mut encoder, &backing.view, |encoder| {
+            // the scene's prepare and record on the CPU (13b): its uploads,
+            // uniform writes and draws, within `draw`
+            let _surface =
+                tracing::trace_span!("draw step", phase = crate::SURFACE_PHASE).entered();
             renderer.render(SurfaceFrame {
                 device: target.device,
                 queue: target.queue,

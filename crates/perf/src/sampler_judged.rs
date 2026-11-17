@@ -18,6 +18,8 @@ pub struct JudgedFrame {
     pub cpu: Duration,
     /// The GPU's time in the frame's render passes and surface renders.
     pub gpu: Duration,
+    /// The part of `gpu` in `gpu-surface` renders (`GpuReading::surfaces`).
+    pub surfaces: Duration,
     /// From the start of `App::frame` to the return of the GPU wait.
     pub idle: Duration,
     /// Each phase's time; a phase the frame did not enter is absent.
@@ -90,21 +92,33 @@ impl Sampler<'_> {
 
 /// Frame `index`, kept once its GPU reading `gpu` has come back: a
 /// frame is never kept without one.
-fn judged(measured: Measured, counts: &Counts, gpu: Duration, index: usize) -> JudgedFrame {
+fn judged(
+    measured: Measured,
+    counts: &Counts,
+    (gpu, surfaces): (Duration, Duration),
+    index: usize,
+) -> JudgedFrame {
     JudgedFrame {
         index,
         cpu: measured.took,
         gpu,
+        surfaces,
         idle: measured.idle,
         phases: measured.phases,
         counts: *counts,
     }
 }
 
-/// Frame `frame`'s GPU time, read back by the frame after it.
-fn gpu_reading(workload: &dyn Workload, frame: usize) -> Result<Duration, String> {
-    frame_gpu_time(workload.timing().gpu, frame)?
-        .map(|(time, _)| time)
+/// Frame `frame`'s GPU time and the part of it in surface renders,
+/// read back by the frame after it.
+fn gpu_reading(workload: &dyn Workload, frame: usize) -> Result<(Duration, Duration), String> {
+    let time = workload.timing().gpu;
+    let surfaces = match &time {
+        vapors_app::GpuTime::Read(reading) => reading.surfaces,
+        _ => Duration::ZERO,
+    };
+    frame_gpu_time(time, frame)?
+        .map(|(time, _)| (time, surfaces))
         .ok_or_else(|| {
             format!("frame {frame} has no GPU time: the device has no timestamp queries")
         })

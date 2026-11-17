@@ -119,10 +119,11 @@ fn gpu_a_frame_is_read_back_by_the_next_with_a_pair_per_render_pass() {
         time > Duration::ZERO && time < Duration::from_secs(1),
         "{time:?}"
     );
+    assert_eq!(reading.surfaces, Duration::ZERO, "no gpu-surface rendered");
 }
 
 #[test]
-fn gpu_a_surface_render_adds_a_pair_of_its_own() {
+fn gpu_a_surface_render_adds_a_pair_of_its_own_and_its_time_is_the_readings_surfaces() {
     // Given
     let mut app = app_of(TRACK, &[(None, "gpu-surface", "track")]);
     let gpu = timed_gpu();
@@ -137,7 +138,11 @@ fn gpu_a_surface_render_adds_a_pair_of_its_own() {
     // Then
     let reading = read(app.frame_timing().gpu);
     assert_eq!((reading.frame, u64::from(reading.pairs)), (0, passes + 1));
-    assert!(reading.time.is_ok(), "{reading:?}");
+    let time = reading.time.clone().expect("a measured time");
+    assert!(
+        reading.surfaces > Duration::ZERO && reading.surfaces < time,
+        "the surface's own pair is part of the frame's time: {reading:?}"
+    );
 }
 
 #[test]

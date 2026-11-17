@@ -1,0 +1,72 @@
+settled after 0 s, load 1.10 1.71 7.24; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:52:28 claude
+21.2       00:00 xtask
+ 2.2  5-13:45:32 tailscaled
+ 1.3 13-09:52:33 kcompactd0
+ 1.1  8-22:57:23 sccache
+llvmpipe-racer-1x-own start 20:46:03 load 1.10 1.71 7.24
+llvmpipe-racer-1x-own end 20:46:32 exit 1 load 5.63 2.72 7.40
+settled after 160 s, load 1.40 2.23 6.48; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:55:36 claude
+16.0       00:00 gh
+ 8.1       00:00 gh
+ 2.2  5-13:48:40 tailscaled
+ 1.3 13-09:55:42 kcompactd0
+llvmpipe-racer-1x-1920x1080 start 20:49:12 load 1.40 2.23 6.48
+llvmpipe-racer-1x-1920x1080 end 20:50:09 exit 1 load 8.62 4.08 6.87
+settled after 160 s, load 1.45 2.78 5.92; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:59:13 claude
+ 5.4       00:00 gh
+ 2.2  5-13:52:17 tailscaled
+ 1.3 13-09:59:19 kcompactd0
+ 1.1  8-23:04:09 sccache
+llvmpipe-racer-4x-own start 20:52:49 load 1.45 2.78 5.92
+llvmpipe-racer-4x-own end 20:53:46 exit 1 load 9.15 4.64 6.36
+settled after 391 s, load 1.42 3.65 5.40; busiest:
+%CPU     ELAPSED COMMAND
+29.7 13-10:06:41 claude
+ 2.2  5-13:59:45 tailscaled
+ 1.3 13-10:06:47 kcompactd0
+ 1.1  8-23:11:37 sccache
+ 0.8 13-10:06:46 kswapd0
+llvmpipe-racer-4x-1920x1080 start 21:00:17 load 1.42 3.65 5.40
+llvmpipe-racer-4x-1920x1080 end 21:02:22 exit 1 load 12.53 7.22 6.50
+settled after 201 s, load 1.47 4.24 5.45; busiest:
+%CPU     ELAPSED COMMAND
+29.7 13-10:12:07 claude
+ 2.2  5-14:05:11 tailscaled
+ 1.3 13-10:12:13 kcompactd0
+ 1.1  8-23:17:02 sccache
+ 0.8 13-10:12:12 kswapd0
+llvmpipe-one-scene-1x-own start 21:05:43 load 1.47 4.24 5.45
+llvmpipe-one-scene-1x-own end 21:05:54 exit 1 load 2.28 4.32 5.46
+settled after 40 s, load 1.32 3.82 5.25; busiest:
+%CPU     ELAPSED COMMAND
+29.7 13-10:12:59 claude
+ 2.2  5-14:06:03 tailscaled
+ 1.3 13-10:13:04 kcompactd0
+ 1.1  8-23:17:54 sccache
+ 0.8 13-10:13:04 kswapd0
+llvmpipe-one-scene-1x-1920x1080 start 21:06:35 load 1.32 3.82 5.25
+llvmpipe-one-scene-1x-1920x1080 end 21:07:02 exit 1 load 4.96 4.49 5.42
+settled after 130 s, load 1.37 3.38 4.90; busiest:
+%CPU     ELAPSED COMMAND
+29.7 13-10:15:37 claude
+ 2.2  5-14:08:41 tailscaled
+ 1.3 13-10:15:42 kcompactd0
+ 1.1  8-23:20:32 sccache
+ 0.8 13-10:15:42 kswapd0
+llvmpipe-one-scene-4x-own start 21:09:12 load 1.37 3.38 4.90
+llvmpipe-one-scene-4x-own end 21:09:53 exit 1 load 6.02 4.31 5.15
+settled after 160 s, load 1.28 2.89 4.47; busiest:
+%CPU     ELAPSED COMMAND
+29.7 13-10:18:57 claude
+ 5.5       00:01 gh
+ 2.2  5-14:12:01 tailscaled
+ 1.3 13-10:19:03 kcompactd0
+ 1.1  8-23:23:53 sccache
+llvmpipe-one-scene-4x-1920x1080 start 21:12:33 load 1.28 2.89 4.47
+llvmpipe-one-scene-4x-1920x1080 end 21:14:08 exit 1 load 12.62 6.36 5.56

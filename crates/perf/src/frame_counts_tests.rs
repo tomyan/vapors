@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use vapors_app::SURFACE_PHASE;
 use vapors_renderer::WRITE_PHASE;
 
 use super::*;
@@ -12,7 +13,7 @@ fn style_only<T>(value: T) -> BTreeMap<String, T> {
 }
 
 #[test]
-fn a_frame_that_entered_no_write_phase_has_one_of_zero_for_each_counter() {
+fn a_frame_that_entered_no_write_or_surface_phase_has_them_at_zero_for_each_counter() {
     // Given
     let rise = Rise {
         instructions: Some(100),
@@ -24,9 +25,12 @@ fn a_frame_that_entered_no_write_phase_has_one_of_zero_for_each_counter() {
 
     // Then
     let (frame, phases) = counted.instructions.expect("instructions");
-    assert_eq!((frame, phases.get(WRITE_PHASE)), (100, Some(&0)));
+    assert_eq!(frame, 100);
     let (_, counters) = counted.counters.expect("counters");
-    assert_eq!(counters.get(WRITE_PHASE), Some(&Reading::default()));
+    for phase in [WRITE_PHASE, SURFACE_PHASE] {
+        assert_eq!(phases.get(phase), Some(&0), "{phase}");
+        assert_eq!(counters.get(phase), Some(&Reading::default()), "{phase}");
+    }
 }
 
 #[test]
