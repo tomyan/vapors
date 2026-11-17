@@ -28,6 +28,14 @@ pub(crate) struct NotPlaced {
     pub(crate) part: PartKind,
 }
 
+/// What paint refused, for the update to report after paint.
+pub(crate) struct Refused {
+    /// The boxes it could not place.
+    pub(crate) unplaced: Vec<NotPlaced>,
+    /// The boxes whose clip chain is past `MAX_CLIP_CHAIN`, with its links.
+    pub(crate) long_chains: Vec<(usize, usize)>,
+}
+
 impl Document {
     /// One refusal for `unplaced`, at `scale`, naming its cause.
     ///

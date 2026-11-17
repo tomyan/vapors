@@ -96,7 +96,18 @@ pub(crate) fn paint_all(
 fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let cache = input.cache.clone();
     let partial = std::mem::take(&mut input.unresolvable);
+    let partial_chains = std::mem::take(&mut input.long_chains);
     let painted = paint(boxes, rects, input);
+    let mut chains = std::mem::replace(&mut input.long_chains, partial_chains);
+    chains.sort_unstable();
+    let mut kept_chains = input.long_chains.clone();
+    kept_chains.sort_unstable();
+    assert_eq!(
+        chains, kept_chains,
+        "the boxes whose clip chain a fresh paint finds past MAX_CLIP_CHAIN differ from the \
+         update's (fresh first): a kept box's chain changed unseen (clip_chain.rs, \
+         kept_paint.rs); reproduce with `cargo xtask test`"
+    );
     let slots = |list: &[crate::paint_refusals::NotPlaced]| {
         let mut slots: Vec<usize> = list.iter().map(|n| n.slot).collect();
         slots.sort_unstable();

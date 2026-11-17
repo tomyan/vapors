@@ -85,7 +85,7 @@ fn drew(part: PartKind) -> (String, &'static str) {
 }
 
 /// Every box's slot, root first, children in order.
-fn tree_order(placed: &Placed) -> Vec<usize> {
+pub(crate) fn tree_order(placed: &Placed) -> Vec<usize> {
     let mut order = Vec::new();
     let mut stack = vec![0];
     while let Some(slot) = stack.pop() {
