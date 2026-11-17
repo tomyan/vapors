@@ -18,11 +18,14 @@ use crate::api_push_fetch::git;
 use crate::api_sandbox::Host;
 use crate::deadline::{Finished, run_with_deadline};
 
-/// `cargo xtask ci` in the fresh sandbox: provisional and unmeasured
-/// (review of slice 4, M4). The lead (L43) has it measured from a full
-/// sandboxed run with gpu once slices 1 and 2 are on main, then set to
-/// three times that.
-pub const CI_DEADLINE: Duration = Duration::from_mins(40);
+/// `cargo xtask ci` in the fresh sandbox: three times the measured run
+/// (the lead, L43). Measured 2026-11-17 on main plus slice 4, through
+/// `sandboxed` with [`CI`], in a new ci builder (cold target): 331 s,
+/// every step passing, the ci sccache warm, load 6 to 21. A run with the
+/// ci sccache cold took 585 s to its first failure, 83% of the way
+/// through the unit tier (the failure since fixed); a whole cold run is
+/// about 700 s, inside this with room for load. 3 x 331 s is 993 s.
+pub const CI_DEADLINE: Duration = Duration::from_mins(17);
 
 /// The advisory database's fetch on the host: the deny step's own
 /// deadline for the same fetch (`steps.rs`).
