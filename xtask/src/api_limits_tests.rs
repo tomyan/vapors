@@ -20,21 +20,23 @@ fn the_scope_carries_the_memory_and_task_limits_without_swap() {
     );
 }
 
-/// A cgroup directory holding `memory.max` and `pids.max` as given.
-fn cgroup(memory: Option<&str>, pids: &str) -> tempfile::TempDir {
+/// A cgroup directory holding `memory.max`, `memory.swap.max` and
+/// `pids.max` as given.
+fn cgroup(memory: Option<&str>, swap: &str, pids: &str) -> tempfile::TempDir {
     let root = tempfile::tempdir().expect("a scratch directory");
     let dir = root.path().join("user.slice/run-1.scope");
     std::fs::create_dir_all(&dir).expect("made");
     if let Some(memory) = memory {
         std::fs::write(dir.join("memory.max"), format!("{memory}\n")).expect("written");
     }
+    std::fs::write(dir.join("memory.swap.max"), format!("{swap}\n")).expect("written");
     std::fs::write(dir.join("pids.max"), format!("{pids}\n")).expect("written");
     root
 }
 
 #[test]
 fn a_scope_with_its_limits_in_force_passes() {
-    let root = cgroup(Some("34359738368"), "4096");
+    let root = cgroup(Some("34359738368"), "0", "4096");
     assert_eq!(
         in_force("0::/user.slice/run-1.scope\n", root.path()),
         Ok(())
@@ -43,16 +45,26 @@ fn a_scope_with_its_limits_in_force_passes() {
 
 #[test]
 fn a_scope_whose_controller_is_not_delegated_is_refused() {
-    let root = cgroup(None, "4096");
+    let root = cgroup(None, "0", "4096");
     let refused = in_force("0::/user.slice/run-1.scope\n", root.path()).expect_err("refused");
     assert!(refused.contains("memory.max is not there"), "{refused}");
 }
 
 #[test]
 fn a_scope_whose_limit_is_another_is_refused() {
-    let root = cgroup(Some("max"), "4096");
+    let root = cgroup(Some("max"), "0", "4096");
     let refused = in_force("0::/user.slice/run-1.scope\n", root.path()).expect_err("refused");
     assert!(refused.contains("is max, not 34359738368"), "{refused}");
+}
+
+#[test]
+fn a_scope_that_may_swap_is_refused() {
+    let root = cgroup(Some("34359738368"), "max", "4096");
+    let refused = in_force("0::/user.slice/run-1.scope\n", root.path()).expect_err("refused");
+    assert!(
+        refused.contains("memory.swap.max is max, not 0"),
+        "{refused}"
+    );
 }
 
 #[test]
