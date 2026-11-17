@@ -136,6 +136,25 @@ fn gpu_unmounting_drops_the_renderer_and_the_surface_is_then_refused() {
 }
 
 #[test]
+fn gpu_unmounting_then_removing_the_element_leaves_a_page_that_draws_and_waits() {
+    // Given
+    let (solid, log) = Solid::new(RED);
+    let (mut rig, mut doc) = drawn_once(solid);
+
+    // When: the renderer goes first, then its element
+    rig.painter.unmount("track").expect("mounted");
+    let surface = doc.children(doc.body())[0];
+    doc.remove(surface);
+    update(&mut doc, 1.0);
+    let drawn = rig.draw(&doc);
+
+    // Then: the page draws without it and wants no frame
+    assert!(log.borrow().dropped);
+    assert!(drawn.is_ok(), "{:?}", drawn.err());
+    assert!(!rig.painter.wants_frame());
+}
+
+#[test]
 fn gpu_a_renderer_remounted_on_a_name_while_idle_wants_a_frame_and_renders_in_it() {
     // Given
     let (mut rig, doc) = drawn_once(Solid::new(RED).0);

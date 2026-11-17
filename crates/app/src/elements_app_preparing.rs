@@ -3,8 +3,9 @@
 //! loop. An app that writes its scene's signals before calling
 //! `ElementsApp::frame` (the racer, one-scene R3a2) holds one around
 //! those writes, so the frame that draws them is not followed by a woken
-//! frame that draws nothing. The caller draws a frame right after: a
-//! surface marked in it and not drawn waits for the next wake.
+//! frame that draws nothing. The caller drops it and draws a frame right
+//! after: `frame` and `event` refuse while one lives, since an
+//! invalidation made under a guard kept longer would wake nothing.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -26,6 +27,20 @@ impl ElementsApp {
         let shared = Rc::clone(&self.surfaces.shared);
         shared.borrow_mut().preparing += 1;
         Preparing { shared }
+    }
+}
+
+impl ElementsApp {
+    /// Refused while a [`Preparing`] lives: entering `frame` or `event`
+    /// with one held means it outlives the preparation it was for.
+    pub(super) fn not_preparing(&self, entered: &str) -> Result<(), String> {
+        let held = self.surfaces.shared.borrow().preparing;
+        if held == 0 {
+            return Ok(());
+        }
+        Err(format!(
+            "ElementsApp::{entered} was called while {held} Preparing guard(s) live: an invalidation under one wakes no loop, so a guard kept past its frame's preparation leaves a surface waiting; drop the guard before calling ElementsApp::{entered}"
+        ))
     }
 }
 

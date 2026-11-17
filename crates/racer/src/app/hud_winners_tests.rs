@@ -8,7 +8,11 @@
 use super::Racer;
 use vapors_elements::Viewport;
 
-/// The world's anchors styled at run time: those with no class.
+/// The world's anchors styled at run time: those with no class. No rule
+/// of the world's sheet can match them, so the cascade only computes
+/// defaults, and a racing frame restyles nothing (`gpu_hud_iu5_tests.rs`).
+/// Retired when the compiler analyses scene components' keys
+/// (one-scene.md section 7, Open items), when this becomes 0.
 const WORLD_OWN_KEYED: usize = 5;
 
 #[test]

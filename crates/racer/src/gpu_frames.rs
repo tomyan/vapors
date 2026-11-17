@@ -8,6 +8,11 @@ use vapors_platform::{App, Event, Frame, Instant, Modifiers, Next, Platform};
 use vapors_renderer::clear;
 use vapors_scene::Color;
 
+/// The world's draws when it renders: the ground and the nine parts
+/// (`world_geometry.rs`'s `Part::ALL`), the one answer the racer's GPU
+/// tests count from.
+pub(crate) const WORLD_DRAWS: u64 = 1 + crate::world_geometry::Part::ALL.len() as u64;
+
 pub(crate) const WIDTH: u32 = 1100;
 pub(crate) const HEIGHT: u32 = 720;
 /// What the frame's texture holds before the app draws.
@@ -77,7 +82,16 @@ pub(crate) fn looped(
 /// An idle racer whose app keeps `platform`'s waker, as after the
 /// loop's first frame: a handle call wakes `platform` from then on.
 pub(crate) fn idle_in_loop(gpu: &Gpu, platform: &Platform) -> Racer {
-    let mut racer = idle(gpu);
+    idle_in_loop_at(gpu, platform, vapors_renderer::Samples::Four)
+}
+
+/// As [`idle_in_loop`], the racer drawn at `samples`.
+pub(crate) fn idle_in_loop_at(
+    gpu: &Gpu,
+    platform: &Platform,
+    samples: vapors_renderer::Samples,
+) -> Racer {
+    let mut racer = idle_at(gpu, samples);
     racer.drawn(platform);
     assert!(
         !platform.take_redraw_request(),
@@ -103,7 +117,15 @@ pub(crate) fn settle(racer: &mut Racer, gpu: &Gpu) {
 
 /// A racer drawn, then paused and idle: its frames ask for none.
 pub(crate) fn idle(gpu: &Gpu) -> Racer {
-    let mut racer = Racer::new();
+    idle_at(gpu, vapors_renderer::Samples::Four)
+}
+
+/// As [`idle`], the racer drawn at `samples`: 1 for a test of when frames
+/// come and render, which the sample count does not change, that draws
+/// tens of frames (a camera transition, about 70): at 4 samples one took
+/// 13.5 s on llvmpipe (2026-11-17).
+pub(crate) fn idle_at(gpu: &Gpu, samples: vapors_renderer::Samples) -> Racer {
+    let mut racer = Racer::with_samples(samples);
     settle(&mut racer, gpu);
     racer
 }

@@ -50,14 +50,14 @@ pub struct Rig {
 }
 
 impl Rig {
-    /// The world at `size` (`LANDSCAPE` or `PORTRAIT`), at 1 sample as the
-    /// golden pictures were drawn, showing `race` through `camera`.
-    pub fn new(race: &Race, camera: &Camera, size: SurfaceSize) -> Self {
+    /// The world at `size` (`LANDSCAPE` or `PORTRAIT`) and `samples`,
+    /// showing `race` through `camera`.
+    pub fn new(race: &Race, camera: &Camera, size: SurfaceSize, samples: Samples) -> Self {
         let props = RacerTargetProps {
             portrait: size == PORTRAIT,
             window: false,
         };
-        Self::mount(props, (Samples::One, race, camera), size)
+        Self::mount(props, (samples, race, camera), size)
     }
 
     /// The world filling a window of `size` at `samples`: what the racer

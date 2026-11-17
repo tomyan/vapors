@@ -3,13 +3,17 @@
 //! alone at that size; the HUD lays out for the new size; at 2x it
 //! renders on each frame with one composition draw, and the world shows
 //! the same colours (`gpu_track_scale_tests.rs`; docs/gpu-surface.md,
-//! 3D slice 1c PR 6). The scene renderer's own resize (its depth and 4x
-//! textures per size) is pinned in `vapors-scene3d-gpu`.
+//! 3D slice 1c PR 6). Each size or scale change makes the scene
+//! renderer's attachments (its depth and 4x textures) once and frees the
+//! old ones once.
 use crate::app::Racer;
-use crate::gpu_frames::{WINDOW, drive, frame_in, hold_button, idle, pixel_in, world_alone_in};
+use crate::gpu_frames::{
+    WINDOW, WORLD_DRAWS, drive, frame_in, hold_button, idle, pixel_in, world_alone_in,
+};
 use vapors_app::SurfaceSize;
 use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{Instant, Next};
+use vapors_scene3d_gpu::Resource;
 
 /// Narrower than the HUD's compact breakpoint (760 CSS pixels).
 const NARROW: SurfaceSize = SurfaceSize {
@@ -54,6 +58,11 @@ fn gpu_a_window_resized_mid_race_renders_the_world_once_at_the_new_size() {
     let gpu = gpu();
     let (mut racer, now) = racing(&gpu);
     let before = racer.track.renders();
+    let log = racer.track.log();
+    let made = (
+        log.made(Resource::Attachments),
+        log.freed(Resource::Attachments),
+    );
 
     // When: three frames at the new size, the clock held, so only the
     // size changes
@@ -66,6 +75,15 @@ fn gpu_a_window_resized_mid_race_renders_the_world_once_at_the_new_size() {
     // as the world alone renders at that size where no control covers it
     // (a pass at the wrong size is refused by wgpu, failing the frame)
     assert_eq!(racer.track.renders() - before, 1);
+    let now_made = (
+        log.made(Resource::Attachments),
+        log.freed(Resource::Attachments),
+    );
+    assert_eq!(
+        (now_made.0 - made.0, now_made.1 - made.1),
+        (1, 1),
+        "attachments made, freed"
+    );
     let centre = [350.0, 300.0];
     let alone = world_alone_in(&racer, &gpu, NARROW);
     assert_ne!(pixel_in(&alone, NARROW.width, centre), [255, 0, 255, 255]);
@@ -98,17 +116,31 @@ fn gpu_a_device_scale_change_mid_race_renders_on_each_frame_with_one_composition
     let gpu = gpu();
     let (mut racer, now) = racing(&gpu);
     let before = racer.track.renders();
+    let log = racer.track.log();
+    let made = (
+        log.made(Resource::Attachments),
+        log.freed(Resource::Attachments),
+    );
 
     // When: 2x, then 1x again
     drawn_in(&mut racer, &gpu, DOUBLE, now);
     let surfaces_doubled = racer.app.frame_counts().surfaces.draw_calls;
     drawn_in(&mut racer, &gpu, WINDOW, now);
 
-    // Then: the world rendered at each; the page composed it once at each
+    // Then: the world rendered at each, its attachments made and freed
+    // once per change; the page composed it once at each, beside the
+    // world's own draws
     assert_eq!(racer.track.renders() - before, 2);
-    assert_eq!(DOUBLE.logical(), WINDOW.logical());
-    assert_eq!(
-        surfaces_doubled,
-        racer.app.frame_counts().surfaces.draw_calls
+    let now_made = (
+        log.made(Resource::Attachments),
+        log.freed(Resource::Attachments),
     );
+    assert_eq!(
+        (now_made.0 - made.0, now_made.1 - made.1),
+        (2, 2),
+        "attachments made, freed"
+    );
+    let drawn = WORLD_DRAWS + 1;
+    assert_eq!(surfaces_doubled, drawn, "at 2x");
+    assert_eq!(racer.app.frame_counts().surfaces.draw_calls, drawn, "at 1x");
 }

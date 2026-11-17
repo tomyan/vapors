@@ -3,11 +3,12 @@
 //! waits; a render that fails ends the racer with its failure; dropping
 //! the racer drops its world's renderer and frees what it made.
 use crate::app::Racer;
-use crate::gpu_frames::{drive, frame_at, frames, idle, settle};
+use crate::gpu_frames::{drive, frame_at, frames, idle, idle_at, settle};
 use std::time::Duration;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_gpu_harness::gpu;
 use vapors_platform::{Instant, Next};
+use vapors_renderer::Samples;
 use vapors_scene3d_gpu::Resource;
 
 /// Mounts and resizes, then refuses every render.
@@ -48,7 +49,7 @@ fn gpu_restarting_while_paused_renders_the_track_once_and_waits() {
 fn gpu_the_end_of_a_paused_camera_transition_renders_once_and_waits() {
     // Given: idle; a camera toggle moves the camera while paused
     let gpu = gpu();
-    let mut racer = idle(&gpu);
+    let mut racer = idle_at(&gpu, Samples::One);
     let before = racer.track.renders();
     racer.command("camera").expect("toggles the camera");
 

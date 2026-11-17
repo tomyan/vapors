@@ -10,7 +10,7 @@
 //! calls. What a changed text costs (text layouts, boxes, atlas bytes)
 //! does not hold yet: IU3/IU4 targets in docs/plans/3d-1c.md.
 use crate::app::Racer;
-use crate::gpu_frames::{drive, frame_at, idle};
+use crate::gpu_frames::{WORLD_DRAWS, drive, frame_at, idle};
 use std::time::Duration;
 use vapors_app::FrameCounts;
 use vapors_gpu_harness::{Gpu, gpu};
@@ -80,10 +80,6 @@ fn work(racer: &Racer, renders: u64) -> Work {
         draws: draws(&counts),
     }
 }
-
-/// The world's draws when it renders: the ground and the nine parts
-/// (`gpu_world_tests.rs` pins them with the composition).
-const WORLD_DRAWS: u64 = 10;
 
 /// `idle`'s draws with the world rendered: the HUD's the same, the
 /// surfaces' its composition and the world's.

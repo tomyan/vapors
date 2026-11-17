@@ -213,3 +213,35 @@ fn an_invalidation_while_the_next_frame_is_prepared_wakes_no_loop() {
     assert_eq!(after, Ok(Invalidated::Woke));
     assert!(platform.take_redraw_request());
 }
+
+#[test]
+fn an_event_while_a_preparing_guard_lives_is_refused_naming_the_fix() {
+    // Given: a guard kept past its preparation
+    let mut app = app();
+    let _kept = app.preparing();
+
+    // When
+    app.event(Event::PointerLeft, &Platform::detached());
+
+    // Then
+    let failure = app.failure().get().unwrap_or_default();
+    assert!(
+        failure.contains("drop the guard before calling ElementsApp::event"),
+        "{failure:?}"
+    );
+}
+
+#[test]
+fn a_refusal_for_an_unmounted_surface_names_the_fix() {
+    // When
+    let refused = InvalidateError::NotMounted("track".into()).to_string();
+
+    // Then
+    assert!(
+        refused.contains("\"track\" has no renderer mounted")
+            && refused.contains(
+                "mount one with ElementsApp::mount and call through the handle it returns"
+            ),
+        "{refused}"
+    );
+}

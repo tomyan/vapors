@@ -125,3 +125,23 @@ fn gpu_a_started_app_says_it_was_started() {
     // Then
     assert_eq!(app.start_state(), StartState::Started);
 }
+
+#[test]
+fn gpu_a_frame_while_a_preparing_guard_lives_is_refused_naming_the_fix() {
+    // Given: a guard kept past its preparation
+    let (mut app, _, gpu) = rig();
+    start(&mut app, &gpu).expect("starts");
+    let kept = app.preparing();
+
+    // When
+    let (next, _) = app_frame(&mut app, &gpu);
+    drop(kept);
+
+    // Then
+    assert_eq!(next, vapors_platform::Next::Exit);
+    let failure = app.failure().get().unwrap_or_default();
+    assert!(
+        failure.contains("drop the guard before calling ElementsApp::frame"),
+        "{failure:?}"
+    );
+}
