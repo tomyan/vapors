@@ -73,26 +73,16 @@ pub(crate) struct Resolved {
 /// Each of `steps` resolved, a frame's group looked up again only when
 /// the frame changes from the step before. A row's steps mostly run
 /// together; a positioned descendant's paint later, and the lookup is
-/// then made again. A step in a lane row that paints a shape is batched
-/// in the row's own frame: the shape and mesh pipelines take no table
-/// of row offsets (option (b) of the fold). It cuts the lane's run
-/// there, so a lane whose rows paint shapes draws a batch or more a row;
-/// the flat scene's transform table (F2) retires that.
+/// then made again.
 fn resolved(steps: impl Iterator<Item = Step>, (boxes, frames): Sources<'_>) -> Vec<Resolved> {
     let mut last = LastSeen::default();
     let resolve = |step| {
-        let (frame, mut items) = frame_items(boxes, step);
+        let (frame, _) = frame_items(boxes, step);
         let group = last.get(frame, || {
             frames
                 .lane_container_of(frame)
                 .map_or_else(|| BatchFrame::frame(frame), BatchFrame::lane)
         });
-        let in_lane = matches!(group.0, Framing::Lane(_));
-        let group = if in_lane && items.any(|(item, _)| matches!(item, Item::Shape(_))) {
-            BatchFrame::frame(frame)
-        } else {
-            group
-        };
         Resolved { step, frame, group }
     };
     steps.map(resolve).collect()

@@ -362,3 +362,22 @@ the shape cut (F2.3b); the 128-row cap stays; `Shift` becomes
   id for the instanced and mesh pipelines, so the refusal has one
   implementation and one message.
 - `meshes_bytes.rs` holds the mesh item layout, beside its tests.
+
+## As built: F2.3b
+
+- **The cut is gone.** `framed_batches.rs` `resolved` no longer puts a
+  lane row's shape step in the row's own frame: shape and mesh items
+  name their rows and are placed by their row's entry, as every other
+  item is.
+- **What it buys.** Rows that each hold one kind of item are one batch
+  over the rows: a rect in each row is one shape batch (one draw), a
+  path in each row one mesh batch. Before, each row's shapes were a
+  batch of their own.
+- **What it does not.** Batches keep paint order: `Batched::push` joins
+  an item only to the last batch. Rows that each paint a background, a
+  rect and a path still give a quad, a shape and a mesh batch a row,
+  now each naming its row. Joining them across rows means reordering
+  items, which is only sound where rows do not overlap; that is F13's
+  question, not F2's. L4 asked for one batch per pipeline "on a
+  shape-per-row lane page", which this meets; the mixed page is pinned
+  at its paint-order count.
