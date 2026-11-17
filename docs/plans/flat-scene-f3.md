@@ -94,8 +94,14 @@ The six recommendations of the first draft are taken:
    back and taken again. The painter keeps, per frame entry, the clip
    entries that name it, and rewrites them when that frame entry's
    index changes, in the same pass that rebuilds the kept bytes naming
-   the frame. Test:
-   `clip_entry_follows_its_frame_entry_after_the_frame_leaves_and_returns`.
+   the frame. The release order: after a frame, clip entries are given
+   back first, and a frame entry is then held while any held clip
+   entry names it, even when the frame draws nothing itself (an outer
+   frame whose content is all in inner frames, say), so a held clip
+   never names a released frame entry. Tests:
+   `a_frame_drawing_nothing_under_a_held_clip_keeps_its_entry` and
+   `clip_entry_follows_its_frame_entry_after_the_frame_leaves_and_returns`
+   (released, taken again at another index, the clip entry rewritten).
 5. **Rectangles fold, and what that costs.** A chain of rectangular
    clips in one frame folds into one rectangle on the CPU, as today's
    intersection does; an entry's parent names the next clip that cannot
@@ -244,8 +250,8 @@ The six recommendations of the first draft are taken:
   committed from the scissor path before F3.1 removes it.
 - `clip_writes` 0 on a scroll and on Idle; 1 at mount for a lane of
   equal rows; the W1 resize bound of item 5.
-- Batch counts on W1 and W4 before and after F3.1, with the prediction
-  recorded first: within a frame, one batch per pipeline run where
+- Batch counts on W1 and W4 before and after F3.1, measured in F3.1,
+  with the prediction recorded first: within a frame, one batch per pipeline run where
   today clip changes split runs; across frames, unchanged until F3.3.
 - The tests named in items 2, 4, 5, 6, 11 and 13; the kept-bytes
   compare covering the clip index.
