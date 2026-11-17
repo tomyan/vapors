@@ -29,6 +29,7 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: 640,
             height: 400,

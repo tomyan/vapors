@@ -6,9 +6,6 @@
 use vapors_app::SURFACE_FORMAT;
 use vapors_scene3d::{MATERIAL_WGSL, Material, VERTEX_BYTES};
 
-/// The depth buffer's format.
-pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-
 pub(crate) use vapors_renderer::projective::{CAMERA_BYTES, NODE_BYTES as MESH_BYTES};
 use vapors_renderer::projective::{PROJECTIVE_WGSL, ProjectiveLayouts};
 
@@ -130,7 +127,7 @@ fn fragment<'a>(shader: &'a wgpu::ShaderModule, entry: &'a str) -> wgpu::Fragmen
 /// Nearer fragments win: depth runs 0 at near to 1 at far.
 fn depth_test() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {
-        format: DEPTH_FORMAT,
+        format: vapors_renderer::DEPTH_FORMAT,
         depth_write_enabled: Some(true),
         depth_compare: Some(wgpu::CompareFunction::Less),
         stencil: wgpu::StencilState::default(),

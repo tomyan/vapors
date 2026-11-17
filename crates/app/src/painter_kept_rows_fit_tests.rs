@@ -70,6 +70,7 @@ fn on_target(draw: impl FnOnce(&mut ScenePainter, &Target<'_>)) {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

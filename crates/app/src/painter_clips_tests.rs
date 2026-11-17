@@ -57,6 +57,7 @@ fn with_target(
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: 8,
             height: 8,

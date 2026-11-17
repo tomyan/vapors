@@ -46,6 +46,7 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: size,
         scissor: None,
     };

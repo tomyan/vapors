@@ -32,6 +32,7 @@ pub fn drawn_on(
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport,
         scissor: None,
     });

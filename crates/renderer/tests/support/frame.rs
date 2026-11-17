@@ -30,6 +30,7 @@ pub fn target<'a>(
         encoder,
         view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: side,
             height: side,

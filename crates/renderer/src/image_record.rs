@@ -59,7 +59,7 @@ impl ImagePipeline {
             (target, &self.work),
         );
         target.draw_pass(("images", self.samples), |pass| {
-            pass.set_pipeline(&self.pipeline);
+            pass.set_pipeline(self.pipeline.for_target(target));
             pass.set_bind_group(0, bound.bind_group(), &[]);
             pass.set_bind_group(1, view_group, &[view]);
             pass.set_vertex_buffer(0, slice);

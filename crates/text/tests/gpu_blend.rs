@@ -55,6 +55,7 @@ fn render(text: &str, ink: Color, background: Color, params: BlendParams) -> Vec
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: WIDTH,
             height: HEIGHT,

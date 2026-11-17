@@ -60,6 +60,7 @@ pub(crate) fn render_pipeline(
     shader: &wgpu::ShaderModule,
     pass: crate::PassFormat,
     instance: wgpu::VertexBufferLayout<'_>,
+    depth: crate::Depth,
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("instanced"),
@@ -88,7 +89,7 @@ pub(crate) fn render_pipeline(
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: crate::depth_variants::depth_2d(depth),
             multisample: pass.samples.state(),
             multiview_mask: None,
             cache: None,

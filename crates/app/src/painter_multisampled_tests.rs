@@ -45,6 +45,7 @@ fn draw_into(
         encoder: &encoder,
         view,
         multisampled,
+        depth: None,
         viewport: Size {
             width: side,
             height: side,

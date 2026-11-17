@@ -159,6 +159,7 @@ fn tooltip_after_two_draws(encoders: (usize, usize, usize), tooltip_on: usize) {
         encoder: &both[encoder],
         view: &views[view],
         multisampled: None,
+        depth: None,
         viewport: vapors_scene::Size {
             width: SIZE,
             height: SIZE,

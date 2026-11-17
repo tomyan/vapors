@@ -44,7 +44,7 @@ pub(crate) const PARAMS_SIZE: usize = 32;
 
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {
-    pub(crate) pipeline: wgpu::RenderPipeline,
+    pub(crate) pipeline: vapors_renderer::DepthVariants,
     /// The samples it was made for.
     pub(crate) samples: vapors_renderer::Samples,
     pub(crate) layout: wgpu::BindGroupLayout,
@@ -92,7 +92,9 @@ impl TextPipeline {
             immediate_size: 0,
         });
         Self {
-            pipeline: render_pipeline(device, &pipeline_layout, &shader, pass),
+            pipeline: vapors_renderer::DepthVariants::new(|depth| {
+                render_pipeline(device, &pipeline_layout, &shader, (pass, depth))
+            }),
             samples: pass.samples,
             layout,
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {

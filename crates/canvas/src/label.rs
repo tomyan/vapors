@@ -100,6 +100,7 @@ impl LabelDraw {
             encoder: &encoder,
             view: &view,
             multisampled: None,
+            depth: None,
             viewport,
             scissor: None,
         };

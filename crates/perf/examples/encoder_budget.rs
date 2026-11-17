@@ -94,6 +94,7 @@ fn target<'a>(gpu: &'a Gpu, encoder: &'a FrameEncoder, view: &'a wgpu::TextureVi
         encoder,
         view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

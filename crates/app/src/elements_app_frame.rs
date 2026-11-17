@@ -129,6 +129,7 @@ impl ElementsApp {
             encoder,
             view: &view,
             multisampled: None,
+            depth: None,
             viewport: size_of(frame),
             scissor: None,
         };

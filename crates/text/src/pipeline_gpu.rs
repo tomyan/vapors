@@ -78,7 +78,7 @@ pub(crate) fn render_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
     shader: &wgpu::ShaderModule,
-    pass: vapors_renderer::PassFormat,
+    (pass, depth): (vapors_renderer::PassFormat, vapors_renderer::Depth),
 ) -> wgpu::RenderPipeline {
     let targets = [Some(color_target(pass.format))];
     vapors_renderer::pipelines::render_pipeline(
@@ -94,7 +94,7 @@ pub(crate) fn render_pipeline(
                 targets: &targets,
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: vapors_renderer::depth_2d(depth),
             multisample: pass.samples.state(),
             multiview_mask: None,
             cache: None,
