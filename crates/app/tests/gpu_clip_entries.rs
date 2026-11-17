@@ -137,9 +137,8 @@ fn gpu_a_clip_resized_under_kept_bytes_draws_as_a_fresh_painter_does() {
 #[test]
 fn gpu_text_and_a_quad_under_one_clip_in_a_scrolled_frame_draw_as_afresh() {
     // Given: each row's clipped box holds text as well as its quad, so a
-    // text batch (still under the scissor until F3.1b) and a quad batch
-    // (on the clip table) share a clip in the scroll frame; every build
-    // holds the two answers together (painter_clips.rs `assert_agrees`)
+    // text batch and a quad batch, both on the clip table (F3.1b), share
+    // a clip in the scroll frame
     let mut doc = list();
     let list_node = doc.children(doc.body())[0];
     for row in doc.children(list_node) {

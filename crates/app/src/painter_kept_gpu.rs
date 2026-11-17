@@ -18,7 +18,7 @@ use text::TextGpu;
 
 /// The transform entry a run's items name, and their clip entries as
 /// runs `(first item, entry)` (`vapors_renderer::clip_of`).
-type Named<'a> = (u32, &'a [(u32, u32)]);
+pub(super) type Named<'a> = (u32, &'a [(u32, u32)]);
 
 /// A batch's rows' indices, and how many rows its range holds.
 type RowsIn<'a> = (&'a [u32], usize);
@@ -188,10 +188,16 @@ impl KeptGpu {
     /// written with (flat-scene-f3.md item 11). Undrawn batches are
     /// released first, and a drawn one holds its entries, so none does.
     pub(super) fn assert_none_names_clip(&self, freed: &[u32]) {
-        let named = self.entries.iter().find_map(|(key, gpu)| {
+        let instanced = self.entries.iter().find_map(|(key, gpu)| {
             let entry = gpu.clips.iter().find(|(_, entry)| freed.contains(entry))?;
             Some((key, entry.1))
         });
+        let texts = || {
+            self.texts
+                .iter()
+                .find_map(|(key, gpu)| Some((key, gpu.names_clip(freed)?)))
+        };
+        let named = instanced.or_else(texts);
         if let Some((key, entry)) = named {
             panic!(
                 "kept batch {key:?} names clip entry {entry}, given back: its bytes would read \

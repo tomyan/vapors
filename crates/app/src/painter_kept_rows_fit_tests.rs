@@ -108,7 +108,7 @@ fn gpu_kept_text_drawn_with_a_range_short_of_its_rows_is_refused() {
         on_target(|painter, target| {
             for range in [3, 2] {
                 let parts = (&mut painter.text, &mut painter.atlas);
-                let drawn = (run, (0, &[2][..], range), key, at);
+                let drawn = (run, ((0, &[][..]), &[2][..], range), key, at);
                 let _ = painter
                     .kept
                     .text_range(parts, (target, painted), drawn)

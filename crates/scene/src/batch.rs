@@ -149,13 +149,17 @@ impl Batched {
 
 impl Run {
     /// Whether the run's items take their clip from the clip table as
-    /// coverage (flat-scene F3.1): quads, shadows and closed-form shapes.
+    /// coverage (flat-scene F3.1): quads, shadows and closed-form shapes,
+    /// and text and icons (F3.1b).
     /// Such a run joins items across clip changes; every other is cut by
     /// the scissor, one clip a batch. The one answer the batching and the
     /// painter read.
     #[must_use]
     pub fn clipped_by_table(&self) -> bool {
-        matches!(self, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
+        matches!(
+            self,
+            Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_) | Run::Texts(_) | Run::Icons(_)
+        )
     }
 
     /// How many items the run holds.

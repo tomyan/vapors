@@ -110,6 +110,6 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
         coverage = blurred(in.pixel, in.shape, in.radii, in.sigma);
     }
     let outside_caster = clamp(0.5 + rounded_distance(in.pixel, in.caster, in.caster_radii), 0.0, 1.0);
-    let clipped = clip_coverage(in.position.xy, in.clip, in.row);
+    let clipped = clip_coverage(in.position.xy, in.clip, in.row, view.rows_base);
     return vec4(in.color.rgb, in.color.a * coverage * outside_caster * clipped);
 }

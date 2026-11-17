@@ -81,15 +81,16 @@ fn a_batch_keeps_its_items_in_order() {
 
 #[test]
 fn a_change_of_clip_starts_a_batch_of_a_kind_the_scissor_clips() {
-    // Given: a text, two texts under a clip, a text with the clip lifted
+    // Given: an image, two images under a clip, an image with the clip
+    // lifted
     let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
     let mut scene = Scene::new();
-    scene.push(text(0));
+    scene.push(picture(0));
     scene.set_clip(Some(clip));
-    scene.push(text(1));
-    scene.push(text(2));
+    scene.push(picture(1));
+    scene.push(picture(2));
     scene.set_clip(None);
-    scene.push(text(3));
+    scene.push(picture(3));
 
     // When
     let batches = batches(&scene);

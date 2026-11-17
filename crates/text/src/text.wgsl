@@ -1,7 +1,10 @@
 // Glyph quads from the coverage atlas. Positions arrive in device
 // pixels (origin top-left, y down) in their frame and row, are placed by
 // their entries in the transform table (vapors-renderer
-// transform_table.rs) and go to clip space by the viewport.
+// transform_table.rs) and go to clip space by the viewport. Each
+// vertex names its clip's entry in the clip table, whose coverage the
+// fragment takes (vapors-renderer clip.wgsl, concatenated after this:
+// flat-scene F3.1b).
 // The fragment turns coverage into an alpha the way Skia's mask gamma
 // does: blend text and an assumed background in linear light, with a
 // contrast boost that fades as the text gets lighter, then find the
@@ -23,12 +26,15 @@ struct VertexIn {
     @location(2) color: vec4<f32>,
     @location(3) row: u32,                 // the row's index in its draw's range
     @location(4) frame: u32,               // the frame's entry in the transform table
+    @location(5) clip: u32,                // the innermost clip's entry in the clip table
 }
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) color: vec4<f32>,
+    @location(2) @interpolate(flat) clip: u32,
+    @location(3) @interpolate(flat) row: u32,
 }
 
 @group(0) @binding(0) var atlas: texture_2d<f32>;
@@ -48,6 +54,8 @@ fn vs_main(in: VertexIn) -> VertexOut {
     out.position = vec4<f32>(clip, 0.0, 1.0);
     out.uv = in.uv;
     out.color = in.color;
+    out.clip = in.clip;
+    out.row = in.row;
     return out;
 }
 
@@ -80,6 +88,7 @@ fn adjust(coverage: f32, src: f32) -> f32 {
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     let coverage = textureSample(atlas, atlas_sampler, in.uv).r;
-    let alpha = adjust(coverage, luminance(in.color.rgb)) * in.color.a;
+    let clipped = clip_coverage(in.position.xy, in.clip, in.row, params.rows_base);
+    let alpha = adjust(coverage, luminance(in.color.rgb)) * in.color.a * clipped;
     return vec4<f32>(in.color.rgb * alpha, alpha);
 }

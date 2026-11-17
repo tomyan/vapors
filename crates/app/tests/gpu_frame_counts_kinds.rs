@@ -61,10 +61,11 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
     // 2496 before IU4 PR 3: the text batch's 13 glyphs' 2496 bytes are kept;
     // since 4f a quad is 144 bytes; since flat-scene F2.2 a text vertex is
     // 40 (its row's index and its frame's entry in the transform table),
-    // a text run padded to 16: 2 * 144 and 13 * 6 * 40 = 3120
+    // and since F3.1b 44 (its clip's entry in the clip table), a text run
+    // padded to 16: 2 * 144 and 13 * 6 * 44 = 3432, padded to 3440
     assert_eq!(idle.buffer_bytes, 0);
     assert_eq!((counts.batches_written, counts.batches_kept), (0, 3));
-    assert_eq!(counts.retained_bytes, 2 * 144 + 3120);
+    assert_eq!(counts.retained_bytes, 2 * 144 + 3440);
     assert_eq!(counts.atlas_lookups, 0);
     assert_eq!(idle.texture_bytes, 0);
 }

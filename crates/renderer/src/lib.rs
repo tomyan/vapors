@@ -60,7 +60,7 @@ mod work;
 
 pub use arena_full::{ArenaFull, Holding};
 pub use clear::{clear, clear_target, clear_view};
-pub use clip_table::{ClipEntry, ClipTable, clip_prelude};
+pub use clip_table::{ClipEntry, ClipTable, clip_prelude, clip_source};
 pub use closed_form_shape::{ClosedFormError, ClosedFormShape};
 pub use closed_forms::ClosedFormPipeline;
 pub use closed_forms_3d::{CLOSED_FORM_STRIDE, CLOSED_FORMS_3D_WGSL, ProjectiveClosedForms};

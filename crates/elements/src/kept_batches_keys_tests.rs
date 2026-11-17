@@ -1,4 +1,4 @@
-use vapors_scene::{Batched, Item, Rect, TextId, batched};
+use vapors_scene::{Batched, ImageId, Item, Rect, batched};
 
 use super::KeptBatched;
 use crate::frames::PAGE;
@@ -11,14 +11,13 @@ const VIEW: Rect = Rect {
     bottom: 100.0,
 };
 
-/// A text run `id` at `top`. Text, as its batches split at each clip
-/// change, which these tests use to make batches; quads join across
-/// clips (vapors-scene `Run::clipped_by_table`).
+/// An image `id` at `top`. An image, as its batches split at each clip
+/// change, which these tests use to make batches; quads and text join
+/// across clips (vapors-scene `Run::clipped_by_table`).
 pub(super) fn quad(top: f32, id: u8) -> Item {
-    Item::Text {
-        text: TextId(u32::from(id)),
-        origin: [10.0, top],
-        ink: Rect::new(10.0, top, 20.0, top + 10.0),
+    Item::Image {
+        image: ImageId(u32::from(id)),
+        rect: Rect::new(10.0, top, 20.0, top + 10.0),
     }
 }
 

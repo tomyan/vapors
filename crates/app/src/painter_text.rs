@@ -4,6 +4,7 @@
 //! path.
 
 use vapors_elements::Painted;
+use vapors_renderer::ClipRuns;
 use vapors_scene::{Item, Rect, Run};
 use vapors_text::{AtlasError, AtlasPins, GlyphAtlas, IconDraw, TextDraw, TextPipeline};
 
@@ -16,14 +17,14 @@ use vapors_text::{AtlasError, AtlasPins, GlyphAtlas, IconDraw, TextDraw, TextPip
 pub(super) fn run_bytes(
     atlas: &mut GlyphAtlas,
     painted: &Painted,
-    (run, frame, rows): (&Run, u32, &[u32]),
+    (run, (frame, clips), rows): (&Run, (u32, ClipRuns<'_>), &[u32]),
 ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
     match run {
         Run::Texts(items) => {
-            TextPipeline::text_bytes_in(atlas, &text_draws(painted, items), (frame, rows))
+            TextPipeline::text_bytes_in(atlas, &text_draws(painted, items), (frame, clips, rows))
         }
         Run::Icons(items) => {
-            TextPipeline::icon_bytes_in(atlas, &icon_draws(painted, items), (frame, rows))
+            TextPipeline::icon_bytes_in(atlas, &icon_draws(painted, items), (frame, clips, rows))
         }
         other => unreachable!("{other:?} is not a text or icon run"),
     }
@@ -35,15 +36,19 @@ pub(super) fn run_bytes(
 pub(super) fn run_placed_bytes(
     atlas: &GlyphAtlas,
     painted: &Painted,
-    (run, frame, rows): (&Run, u32, &[u32]),
+    (run, (frame, clips), rows): (&Run, (u32, ClipRuns<'_>), &[u32]),
 ) -> Option<Vec<u8>> {
     match run {
-        Run::Texts(items) => {
-            TextPipeline::placed_text_bytes_in(atlas, &text_draws(painted, items), (frame, rows))
-        }
-        Run::Icons(items) => {
-            TextPipeline::placed_icon_bytes_in(atlas, &icon_draws(painted, items), (frame, rows))
-        }
+        Run::Texts(items) => TextPipeline::placed_text_bytes_in(
+            atlas,
+            &text_draws(painted, items),
+            (frame, clips, rows),
+        ),
+        Run::Icons(items) => TextPipeline::placed_icon_bytes_in(
+            atlas,
+            &icon_draws(painted, items),
+            (frame, clips, rows),
+        ),
         other => unreachable!("{other:?} is not a text or icon run"),
     }
 }

@@ -98,5 +98,5 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
     // no dark fringe.
     let a = mix(in.background.a, edge.a, m);
     let rgb = mix(in.background.rgb * in.background.a, edge.rgb * edge.a, m) / max(a, 0.0001);
-    return vec4(rgb, a * outer * clip_coverage(in.position.xy, in.clip, in.row));
+    return vec4(rgb, a * outer * clip_coverage(in.position.xy, in.clip, in.row, view.rows_base));
 }

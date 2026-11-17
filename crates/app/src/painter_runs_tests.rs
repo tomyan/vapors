@@ -10,17 +10,18 @@ fn each_run_is_cut_by_its_clip_entry_or_its_scissor_never_both_nor_neither() {
         Run::Quads(Vec::new()),
         Run::Shadows(Vec::new()),
         Run::Shapes(Vec::new()),
-    ];
-    let scissored = [
         Run::Texts(Vec::new()),
         Run::Icons(Vec::new()),
+    ];
+    let scissored = [
         Run::Images(Vec::new()),
         Run::Surfaces(Vec::new()),
         Run::Meshes(Vec::new()),
     ];
 
-    // Then: quads, shadows and shapes take a clip entry and the frame's
-    // scissor only; the rest take entry 0 and the batch's scissor
+    // Then: quads, shadows, shapes, text and icons take a clip entry and
+    // the frame's scissor only; the rest take entry 0 and the batch's
+    // scissor
     for run in &on_the_table {
         assert_eq!(
             (table_clip(run, clip), scissor_clip(run, clip)),

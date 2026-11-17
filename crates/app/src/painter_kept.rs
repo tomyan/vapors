@@ -147,16 +147,21 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let Some((frame, _no_clips, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
         let parts = (&mut self.text, &mut self.atlas);
-        let rows = (frame, moved.rows.items(), moved.offsets.len());
+        let rows = (
+            (frame, clips.as_slice()),
+            moved.rows.items(),
+            moved.offsets.len(),
+        );
         let kept = self
             .kept
             .text_range(parts, (target, painted), (run, rows, key, at))?;
         if let Some(kept) = kept {
-            let params = (blend(run), &mut self.transforms.table, rows_base);
+            let tables = (&mut self.transforms.table, &mut self.clips.table);
+            let params = (blend(run), tables, rows_base);
             self.text.draw_kept(target, &mut self.atlas, kept, params);
         }
         Ok(())

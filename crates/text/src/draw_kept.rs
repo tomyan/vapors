@@ -6,7 +6,9 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::{KeptRange, TransformTable};
+use vapors_renderer::{ClipTable, KeptRange, TransformTable};
+
+use vapors_renderer::ClipRuns;
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
@@ -38,7 +40,7 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         texts: &[TextDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
-        Self::text_bytes_in(atlas, texts, (0, &[]))
+        Self::text_bytes_in(atlas, texts, (0, &[], &[]))
     }
 
     /// As [`TextPipeline::text_bytes`], every vertex in the transform
@@ -55,12 +57,15 @@ impl TextPipeline {
     pub fn text_bytes_in(
         atlas: &mut GlyphAtlas,
         texts: &[TextDraw<'_>],
-        (frame, rows): (u32, &[u32]),
+        (frame, clips, rows): (u32, ClipRuns<'_>, &[u32]),
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
         let counted = quads_counted(atlas, texts, Some(&mut pins));
         let (floats, vertices) = built(atlas, counted, &mut pins)?;
-        Ok((rowed_vertex_bytes(&floats, (&vertices, frame, rows)), pins))
+        Ok((
+            rowed_vertex_bytes(&floats, (&vertices, (frame, clips), rows)),
+            pins,
+        ))
     }
 
     /// The vertex bytes of `icons` as [`TextPipeline::draw_icons`] draws
@@ -73,7 +78,7 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
-        Self::icon_bytes_in(atlas, icons, (0, &[]))
+        Self::icon_bytes_in(atlas, icons, (0, &[], &[]))
     }
 
     /// As [`TextPipeline::icon_bytes`], every vertex in the transform
@@ -90,12 +95,15 @@ impl TextPipeline {
     pub fn icon_bytes_in(
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
-        (frame, rows): (u32, &[u32]),
+        (frame, clips, rows): (u32, ClipRuns<'_>, &[u32]),
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
         let counted = icon_quads_counted(atlas, icons, Some(&mut pins));
         let (floats, vertices) = built(atlas, counted, &mut pins)?;
-        Ok((rowed_vertex_bytes(&floats, (&vertices, frame, rows)), pins))
+        Ok((
+            rowed_vertex_bytes(&floats, (&vertices, (frame, clips), rows)),
+            pins,
+        ))
     }
 
     /// Writes `bytes` ([`TextPipeline::text_bytes`] or
@@ -120,22 +128,28 @@ impl TextPipeline {
     /// Uploads what changed in `atlas`'s page and draws the vertices
     /// `kept` holds, built with `pins`, into `target` with `params`, each
     /// at its frame's entry in `table` and its row's in the batch's range
-    /// from `rows_base`, in one draw call; not when the params slot is
-    /// refused (the refusal is on the encoder).
+    /// from `rows_base`, under its clip's entry in `clips`, in one draw
+    /// call; not when the params slot is refused (the refusal is on the
+    /// encoder).
     ///
     /// # Panics
     ///
     /// If the atlas's generation moved on since the bytes were built
     /// (their glyphs may have moved: build them again), if `kept` was
     /// kept by another pipeline, if `table` is not the table this
-    /// pipeline's kept draws bind (one table a pipeline), or as
+    /// pipeline's kept draws bind (one table a pipeline), likewise
+    /// `clips`, or as
     /// [`TextPipeline::draw`] for the atlas.
     pub fn draw_kept(
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
         (kept, pins): (&KeptRange, &AtlasPins),
-        (params, table, rows_base): (BlendParams, &mut TransformTable, u32),
+        (params, (table, clips), rows_base): (
+            BlendParams,
+            (&mut TransformTable, &mut ClipTable),
+            u32,
+        ),
     ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(
@@ -152,11 +166,27 @@ impl TextPipeline {
              `cargo xtask test`",
             table.id()
         );
+        self.adopt_clips(clips);
         let Some(params) = self.prepare(target, atlas, (params, rows_base)) else {
             return;
         };
         table.prepare(target.queue);
-        self.record_draw(target, Vertices::Kept(kept), (Some(table), params));
+        clips.prepare(target.queue);
+        self.record_draw(target, Vertices::Kept(kept), (Some((table, clips)), params));
+    }
+
+    /// Panics unless `clips` is the clip table this pipeline's kept draws
+    /// bind: one a pipeline, as with the transform table.
+    fn adopt_clips(&mut self, clips: &ClipTable) {
+        let id = *self.clips_id.get_or_insert(clips.id());
+        assert_eq!(
+            id,
+            clips.id(),
+            "text: a kept draw binds clip table {}, after table {id}: a pipeline draws from one \
+             clip table (draw_kept.rs); give each painter its own pipelines; reproduce with \
+             `cargo xtask test`",
+            clips.id()
+        );
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

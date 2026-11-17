@@ -1,9 +1,9 @@
 // The clip table (clip_table.rs, docs/plans/flat-scene-f3.md): each
 // instance names the innermost clip it is drawn under, each clip its
 // frame's entry in the transform table and the next clip outward.
-// Concatenated after transform_table.wgsl and the prelude that sets
-// MAX_CLIP_CHAIN (clip_table.rs `clip_prelude`), ahead of each instanced
-// pipeline's shader.
+// Concatenated, with the prelude that sets MAX_CLIP_CHAIN and the
+// table's binding (clip_table.rs `clip_source`), into each 2D pipeline's
+// shader, which declares `transforms`, the transform table.
 //
 // A clip's coverage takes the one-pixel ramp a box's edge takes
 // (quads.wgsl), not fwidth: before F4a every frame is a whole
@@ -21,8 +21,6 @@ struct Clip {
                       // bit 1: given back, covering nothing
     pad: u32,
 }
-
-@group(0) @binding(2) var<storage, read> clips: array<Clip>;
 
 // The distance past one corner's arc, for a point in that corner's
 // square (the r x r square at the corner); otherwise none.
@@ -49,7 +47,8 @@ fn rounded_distance(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>) -> f32 {
 
 // How much of the device pixel at `on_target` is inside clip `first`
 // and the clips outward from it; 1 for clip 0, which reads no entry.
-fn clip_coverage(on_target: vec2<f32>, first: u32, row: u32) -> f32 {
+// `row` and `rows_base` place a clip relative to the instance's row.
+fn clip_coverage(on_target: vec2<f32>, first: u32, row: u32, rows_base: u32) -> f32 {
     var coverage = 1.0;
     var index = first;
     for (var link = 0u; link < MAX_CLIP_CHAIN; link++) {
@@ -62,7 +61,7 @@ fn clip_coverage(on_target: vec2<f32>, first: u32, row: u32) -> f32 {
         }
         var m = transforms[clip.frame];
         if ((clip.flags & 1u) != 0u) {
-            m = m * transforms[view.rows_base + row];
+            m = m * transforms[rows_base + row];
         }
         // a whole translation: its inverse is the subtraction
         let p = on_target - m[3].xy;

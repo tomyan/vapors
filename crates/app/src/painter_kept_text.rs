@@ -16,7 +16,7 @@ use vapors_renderer::{KeptRange, Target};
 use vapors_scene::Run;
 use vapors_text::{AtlasError, AtlasPins, GlyphAtlas, TextPipeline};
 
-use super::KeptGpu;
+use super::{KeptGpu, Named};
 use resolved::Resolved;
 
 #[path = "painter_kept_resolved.rs"]
@@ -35,9 +35,10 @@ pub(super) struct TextGpu {
     /// What each item resolved to when the bytes were built.
     resolved: Resolved,
     len: u64,
-    /// The frame's entry in the transform table the bytes name: bytes
-    /// naming another are built again.
+    /// The frame's entry in the transform table and the clip entries
+    /// the bytes name: bytes naming others are built again.
     frame: u32,
+    clips: Vec<(u32, u32)>,
     /// The rows its bytes name: its range must hold this many
     /// (`rows_fit`).
     rows_needed: usize,
@@ -64,7 +65,7 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, (frame, rows, range), key, at): (&Run, (u32, &[u32], usize), BatchKey, usize),
+        (run, (frame, rows, range), key, at): (&Run, (Named<'_>, &[u32], usize), BatchKey, usize),
     ) -> Result<Option<(&KeptRange, &AtlasPins)>, AtlasError> {
         let generation = atlas.generation();
         match self.texts.get(&key) {
@@ -93,7 +94,7 @@ impl KeptGpu {
         &mut self,
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
-        (run, frame, rows, key): (&Run, u32, &[u32], BatchKey),
+        (run, frame, rows, key): (&Run, Named<'_>, &[u32], BatchKey),
     ) -> Result<(), AtlasError> {
         if let Some(stale) = self.texts.remove(&key) {
             stale.release((text, atlas));
@@ -145,7 +146,7 @@ impl TextGpu {
     fn new(
         (range, pins, rows_needed): (Option<KeptRange>, AtlasPins, usize),
         (run, painted): (&Run, &Painted),
-        (bytes, frame, drawn): (Vec<u8>, u32, u64),
+        (bytes, (frame, clips), drawn): (Vec<u8>, Named<'_>, u64),
     ) -> Self {
         Self {
             range,
@@ -153,6 +154,7 @@ impl TextGpu {
             resolved: Resolved::of(run, painted),
             len: bytes.len() as u64,
             frame,
+            clips: clips.to_vec(),
             rows_needed,
             drawn,
             #[cfg(debug_assertions)]
@@ -161,12 +163,20 @@ impl TextGpu {
     }
 
     /// True when these bytes are `run`'s as `painted` resolves it, with
-    /// the atlas at `generation`, naming the transform table's entry
-    /// `frame`.
-    fn current(&self, run: &Run, painted: &Painted, (generation, frame): (u64, u32)) -> bool {
+    /// the atlas at `generation`, naming the transform table's entry and
+    /// the clip entries `frame`.
+    fn current(&self, run: &Run, painted: &Painted, (generation, frame): (u64, Named<'_>)) -> bool {
         self.pins.generation() == generation
-            && self.frame == frame
+            && (self.frame, self.clips.as_slice()) == frame
             && self.resolved.matches(run, painted)
+    }
+
+    /// The clip entry the bytes name that is in `freed`, if any.
+    pub(super) fn names_clip(&self, freed: &[u32]) -> Option<u32> {
+        self.clips
+            .iter()
+            .map(|&(_, entry)| entry)
+            .find(|entry| freed.contains(entry))
     }
 
     /// The bytes held in the kept buffer.
@@ -190,7 +200,7 @@ impl TextGpu {
         &self,
         atlas: &GlyphAtlas,
         painted: &Painted,
-        ((run, frame, rows), at): ((&Run, u32, &[u32]), usize),
+        ((run, frame, rows), at): ((&Run, Named<'_>, &[u32]), usize),
     ) {
         #[cfg(debug_assertions)]
         {
