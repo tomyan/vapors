@@ -37,14 +37,23 @@ pub fn run(name: &str) -> ExitCode {
 fn made_and_proven(builder: &Builder) -> Result<Vec<String>, String> {
     let (main, objects) = crate::api_clone::main_repository()?;
     crate::api_clone::make(builder, (&main, &objects), &branch(builder))?;
-    let proven = crate::api_host::host(objects).and_then(|host| proven(builder, &host));
+    let routes = std::sync::Arc::new(crate::api_server::Routes::default());
+    let proven = crate::api_server::serve(&builder.socket(), routes)
+        .and_then(|()| crate::api_host::host(objects))
+        .and_then(|host| proven(builder, &host));
     let removed = removed(builder);
     let lines = proven?;
     removed.map(|()| lines)
 }
 
-fn proven(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
-    crate::api_server::serve(&builder.socket())?;
+/// Builder's fences proven and what must work inside checked, the
+/// harness server already on its socket; a line for each.
+///
+/// # Errors
+///
+/// A fence broken, a probe that cannot show its escape, or a check that
+/// fails inside.
+pub fn proven(builder: &Builder, host: &Host) -> Result<Vec<String>, String> {
     let inside = |script: &str| inside(builder, host, script);
     let key_file = builder.home.join(KEY_FILE);
     let escapes = Escapes {
