@@ -75,34 +75,35 @@ fn an_aspect_the_projection_refuses_is_refused() {
     );
 }
 
-/// A stage whose camera, 5 back, is scaled by `scale` on every axis.
-fn scaled_camera(scale: f32) -> Stage {
-    let eye = Transform::new(Vec3::new(0.0, 0.0, 5.0), Quat::IDENTITY, Vec3::splat(scale));
-    let mut stage = Stage::with_eye(ortho(4.0), [100.0, 100.0], eye.unwrap());
+/// A stage whose rigid camera stands `along` world units along +X and 5
+/// back, through an orthographic lens `height` tall.
+fn camera_at(along: f32, height: f32) -> Stage {
+    let eye = Transform::from_translation(Vec3::new(along, 0.0, 5.0)).unwrap();
+    let mut stage = Stage::with_eye(ortho(height), [100.0, 100.0], eye);
     stage.square_at(at_z(0.0));
     stage
 }
 
 #[test]
 fn a_camera_whose_view_projection_is_not_finite_is_refused_naming_it() {
-    for scale in [1e-13, 1e13] {
-        // Given: the camera's world matrix has no finite inverse
-        let mut stage = scaled_camera(scale);
+    // Given: a camera 3e38 along X through a lens 1e-3 tall, whose
+    // view-projection's translation overflows (2000 * 3e38); a camera's
+    // scale, which reached this before, is refused as not rigid
+    let mut stage = camera_at(3e38, 1e-3);
 
-        // When
-        let refused = stage.try_pick([50.0, 50.0]);
+    // When
+    let refused = stage.try_pick([50.0, 50.0]);
 
-        // Then
-        let expected = PickError::Camera(CameraError::NotFinite(stage.camera));
-        assert_eq!(refused, Err(expected), "scale {scale}");
-    }
+    // Then
+    let expected = PickError::Camera(CameraError::NotFinite(stage.camera));
+    assert_eq!(refused, Err(expected));
 }
 
 #[test]
 fn a_camera_whose_view_projection_has_no_finite_inverse_is_refused_naming_it() {
-    // Given: a finite view-projection scaled by 1e-12, whose inverse is
-    // not finite (measured: 1e13 already fails the forward matrix)
-    let mut stage = scaled_camera(1e12);
+    // Given: a lens 1e30 tall, a finite view-projection whose determinant
+    // underflows f32, so its inverse is not finite
+    let mut stage = camera_at(0.0, 1e30);
 
     // When
     let refused = stage.try_pick([50.0, 50.0]);

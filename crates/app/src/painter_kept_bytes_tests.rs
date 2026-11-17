@@ -30,7 +30,7 @@ fn a_closed_form_with_no_area_in_a_rowed_run_takes_its_row_with_it() {
     let items = vec![item(0, IDENTITY), item(0, [0.0; 6]), item(0, IDENTITY)];
 
     // When
-    let built = run_bytes((&Run::Shapes(items), 1, &[0, 1, 2]), &store).expect("builds");
+    let built = run_bytes((&Run::Shapes(items), (1, 0), &[0, 1, 2]), &store).expect("builds");
 
     // Then
     let one = ClosedFormPipeline::INSTANCE_BYTES;
@@ -46,7 +46,7 @@ fn a_mesh_with_no_area_in_a_rowed_run_takes_its_row_with_it() {
     let items = vec![mesh(IDENTITY), mesh([0.0; 6]), mesh(IDENTITY)];
 
     // When
-    let built = run_bytes((&Run::Meshes(items), 1, &[0, 1, 2]), &store).expect("builds");
+    let built = run_bytes((&Run::Meshes(items), (1, 0), &[0, 1, 2]), &store).expect("builds");
 
     // Then
     assert_eq!(

@@ -92,7 +92,13 @@ fn cloned(builder: &Builder, (main, objects): (&Path, &Path), branch: &str) -> R
     Ok(())
 }
 
-fn directories(builder: &Builder) -> Result<(), String> {
+/// `builder`'s target, sccache, cargo home and socket directories made,
+/// and its target linked into its clone.
+///
+/// # Errors
+///
+/// The filesystem failing, naming the path.
+pub fn directories(builder: &Builder) -> Result<(), String> {
     let made = |path: &Path| {
         fs::create_dir_all(path).map_err(|e| format!("making {}: {e}", path.display()))
     };

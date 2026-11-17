@@ -18,6 +18,7 @@ pub struct Projection {
 enum Kind {
     Perspective { vertical_fov: f32 },
     Orthographic { height: f32 },
+    OrthographicShorter { extent: f32 },
 }
 
 impl Projection {
@@ -59,6 +60,23 @@ impl Projection {
         }
         finite_scalar("Projection::orthographic near", near)?;
         Self::with_depth(Kind::Orthographic { height }, near, far)
+    }
+
+    /// An orthographic projection `extent` world units across the
+    /// viewport's shorter side, its height on a landscape viewport and
+    /// its width on a portrait one; the longer side follows the aspect.
+    /// `near` may be zero or negative.
+    ///
+    /// # Errors
+    ///
+    /// As [`Projection::orthographic`], `extent` refused as the height is.
+    pub fn orthographic_shorter(extent: f32, near: f32, far: f32) -> Result<Self, SceneError> {
+        finite_scalar("Projection::orthographic_shorter extent", extent)?;
+        if extent <= 0.0 {
+            return Err(SceneError::HeightNotPositive { height: extent });
+        }
+        finite_scalar("Projection::orthographic_shorter near", near)?;
+        Self::with_depth(Kind::OrthographicShorter { extent }, near, far)
     }
 
     fn with_depth(kind: Kind, near: f32, far: f32) -> Result<Self, SceneError> {
@@ -104,11 +122,17 @@ impl Projection {
             Kind::Perspective { vertical_fov } => {
                 directx::perspective(vertical_fov, aspect, self.near, self.far)
             }
-            Kind::Orthographic { height } => {
-                let (half_h, half_w) = (height / 2.0, height / 2.0 * aspect);
-                directx::orthographic(-half_w, half_w, -half_h, half_h, self.near, self.far)
+            Kind::Orthographic { height } => self.orthographic_matrix(height, aspect),
+            Kind::OrthographicShorter { extent } if aspect < 1.0 => {
+                self.orthographic_matrix(extent / aspect, aspect)
             }
+            Kind::OrthographicShorter { extent } => self.orthographic_matrix(extent, aspect),
         }
+    }
+
+    fn orthographic_matrix(&self, height: f32, aspect: f32) -> Mat4 {
+        let (half_h, half_w) = (height / 2.0, height / 2.0 * aspect);
+        directx::orthographic(-half_w, half_w, -half_h, half_h, self.near, self.far)
     }
 }
 

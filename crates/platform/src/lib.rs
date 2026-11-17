@@ -112,7 +112,7 @@ pub use gestures::{Gestures, TAP_SLOP};
 pub use navigate::{Followed, NewContext};
 pub use paste_key::paste_shortcut;
 pub use platform::Platform;
-pub use report::{report_error, report_startup, report_status};
+pub use report::{report_error, report_readout, report_startup, report_status};
 pub use shortcut_modifier::shortcut_is_command;
 pub use start::Start;
 pub use surface::pick_format;
@@ -141,6 +141,20 @@ pub fn app_draws_open() {
 pub fn hide_status_line() {
     #[cfg(target_family = "wasm")]
     web::hide_status_line();
+}
+
+/// Every value of `name` in the page URL's query string, in order, so a
+/// caller can refuse it given twice. Natively there is no URL, so it is
+/// always empty.
+#[must_use]
+pub fn query_parameters(name: &str) -> Vec<String> {
+    #[cfg(target_family = "wasm")]
+    return page::query_values(&web::search(), name);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let _ = name;
+        Vec::new()
+    }
 }
 
 /// The value of `name` in the page URL's query string (`?demo=hello`).

@@ -210,10 +210,8 @@ fn environment(builder: &Builder, port: u16) -> Vec<String> {
         ("SCCACHE_DIR", text(&builder.sandbox_sccache())),
         ("ANTHROPIC_BASE_URL", format!("http://127.0.0.1:{port}")),
         ("ANTHROPIC_API_KEY", DUMMY_KEY.into()),
-        // steps.rs's DENY_OFFLINE (#486, on #481's stack): the ci inside
-        // runs main's xtask, which reads it; this names it literally until
-        // both stacks are on main, when it becomes that constant
-        ("VAPORS_DENY_OFFLINE", "1".into()),
+        // cargo deny runs offline on the bound databases (steps.rs)
+        (crate::steps::DENY_OFFLINE, "1".into()),
         // the CLI's MCP tool timeout outlasts the longest tool call's
         // wait (api_mcp_inner.rs) by five minutes
         (

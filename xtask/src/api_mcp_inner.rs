@@ -31,8 +31,8 @@ pub const TOOLS: [Tool; 2] = [
                       what blocks you in BLOCKED.md and stop.",
         arguments: &["question"],
         route: "/api-build/ask",
-        // the 30-minute wait (api_ask.rs), and a minute for it to end first
-        deadline: Duration::from_mins(31),
+        // the lead's wait (api_ask.rs), and a minute for it to end first
+        deadline: Duration::from_secs(crate::api_ask::ANSWER_DEADLINE.as_secs() + 60),
     },
     Tool {
         name: "request_push",
@@ -43,9 +43,9 @@ pub const TOOLS: [Tool; 2] = [
                       URL or why it refused. Uncommitted work is not pushed.",
         arguments: &["title", "body"],
         route: "/api-build/push",
-        // the sandboxed ci's deadline (api_push.rs), and five minutes for
-        // the fetch, the push and the PR
-        deadline: Duration::from_secs(crate::api_push::CI_DEADLINE.as_secs() + 5 * 60),
+        // the whole call's deadline (api_push.rs), and a minute for it to
+        // end first
+        deadline: Duration::from_secs(crate::api_push::PUSH_CALL_DEADLINE.as_secs() + 60),
     },
 ];
 

@@ -17,12 +17,16 @@ fn a_line_without_a_process_reads_as_none() {
 
 #[test]
 fn a_port_held_by_another_process_is_refused_naming_it() {
-    // Given: this test's own listener, which no unit owns
+    // Given: this test's own listener, which no unit owns, and systemd's
+    // answer for a unit that is not running, as `systemctl --user show -p
+    // MainPID` gives it (given here, not asked: there may be no user bus)
     let held = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = held.local_addr().expect("addr").port();
+    let not_running = "0\n";
 
     // When
-    let refusal = owned_by("xtask-serve-no-such-unit.service", port).expect_err("refused");
+    let refusal =
+        owned_by_main("xtask-serve-no-such-unit.service", not_running, port).expect_err("refused");
 
     // Then
     assert!(

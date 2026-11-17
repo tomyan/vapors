@@ -83,6 +83,28 @@ impl ElementsApp {
         self.timer.made()
     }
 
+    /// Times its frames and writes a status line once a second: the
+    /// median GPU time and its painter's samples, or that the device has
+    /// no timestamp-query (`elements_app_readout.rs`). For a run by hand
+    /// on a device with no profiler, such as a phone.
+    pub fn show_gpu_time(&mut self) {
+        self.time_frames(true);
+        self.readout = Some(super::readout::GpuReadout::new(self.samples));
+    }
+
+    /// Writes the readout's line, when one is due after a frame at `now`.
+    pub(super) fn read_out(&mut self, now: vapors_platform::Instant) {
+        let gpu = self.timer.gpu();
+        let Some(line) = self
+            .readout
+            .as_mut()
+            .and_then(|readout| readout.take(&gpu, now))
+        else {
+            return;
+        };
+        vapors_platform::report_readout(&line);
+    }
+
     /// Turns timing the app's frames on the GPU on or off; off by
     /// default, as each timed frame resolves, copies and maps its
     /// timestamps. Off drops the timer and what it read.

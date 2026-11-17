@@ -9,6 +9,9 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+# A material's WGSL is checked against the contract alone when it is
+# given (material_check.rs), not when a renderer builds it.
+naga.workspace = true
 glam.workspace = true
 
 [lints]

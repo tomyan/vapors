@@ -41,18 +41,25 @@ pub fn named(name: &str) -> Option<AppDemo> {
         .map(|(_, app)| *app)
 }
 
-/// Runs `app` in a window made from `options`.
+/// Runs `app` in a window made from `options`, at the page's `samples`
+/// (`samples.rs`) where it takes them.
 ///
 /// # Errors
-/// The app's own start or run failing, or a bad `ticks=`.
-pub fn run_app(app: AppDemo, options: WindowOptions) -> Result<(), String> {
+/// The app's own start or run failing, a bad `ticks=`, or `samples`
+/// given to the image app.
+pub fn run_app(
+    app: AppDemo,
+    options: WindowOptions,
+    samples: Option<vapors_renderer::Samples>,
+) -> Result<(), String> {
     match app {
-        AppDemo::Racer => vapors_racer::run(),
+        AppDemo::Racer => vapors_racer::run_with(samples),
         AppDemo::OneScene => {
             let ticks = vapors_demos::frame_limit(query_parameter("ticks").as_deref())?;
-            vapors_one_scene::run(ticks.map(|frames| frames as u64))
+            vapors_one_scene::run(ticks.map(|frames| frames as u64), samples)
         }
         AppDemo::Image => {
+            crate::samples::none_for("image", samples)?;
             let image =
                 decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
             let app = ImageApp::showing("gradient.png", image, BACKGROUND);

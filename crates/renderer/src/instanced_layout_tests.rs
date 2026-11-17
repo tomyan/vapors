@@ -3,6 +3,7 @@
 //! size at 0, the rows' first entry at 8, within `VIEW_SIZE` bytes; and
 //! the table is the storage buffer at binding 1.
 
+use super::instanced_source;
 use crate::instanced_bytes::VIEW_SIZE;
 
 /// The view's members as (name, offset), its span, and the table's
@@ -32,20 +33,15 @@ fn layout(source: &str) -> (Vec<(String, u32)>, u32, Option<u32>) {
 
 #[test]
 fn each_instanced_shader_reads_the_view_and_the_table_as_written() {
-    let table = include_str!("transform_table.wgsl");
     for (name, source) in [
-        ("quads", format!("{table}{}", include_str!("quads.wgsl"))),
-        (
-            "shadows",
-            format!("{table}{}", include_str!("shadows.wgsl")),
-        ),
+        ("quads", instanced_source(include_str!("quads.wgsl"))),
+        ("shadows", instanced_source(include_str!("shadows.wgsl"))),
         (
             "closed forms",
-            format!(
-                "{table}{}{}",
+            instanced_source(concat!(
                 include_str!("closed_forms_2d.wgsl"),
                 include_str!("closed_forms_shared.wgsl")
-            ),
+            )),
         ),
     ] {
         let (members, span, binding) = layout(&source);

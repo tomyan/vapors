@@ -1,202 +1,139 @@
 //! `request_push`, outside (`docs/plans/api-builder.md`, the lead's answer
-//! 8): the builder's branch fetched into a bare repository
-//! (`api_push_fetch.rs`), its diff checked there (`api_push_checks.rs`),
-//! `cargo xtask ci` run on it in a fresh sandbox with the same fences,
-//! then pushed from the bare repository and a PR opened. No git runs in
-//! the builder's clone outside the sandbox.
+//! 8): the builder's branch fetched into a bare repository of this
+//! call's own (`api_push_fetch.rs`), its history and diff checked there
+//! (`api_push_history.rs`, `api_push_checks.rs`), `cargo xtask ci` run on
+//! it in a fresh sandbox (`api_push_ci.rs`), then the checked commit
+//! pushed and a PR opened (`api_push_remote.rs`). No git runs in the
+//! builder's clone outside the sandbox. One push runs at a time, and the
+//! commit pushed is the one checked (review of slice 4, H1).
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use crate::api_clone::ORIGIN_MAIN;
 use crate::api_paths::Builder;
 use crate::api_push_fetch::git as bare_git;
 use crate::api_sandbox::Host;
-use crate::deadline::{Finished, run_with_deadline};
-use crate::queue_git::git;
 
-/// `cargo xtask ci` in the fresh sandbox. Measured 2026-11-17: see the
-/// commit that set it; three times the measured run.
-pub const CI_DEADLINE: Duration = Duration::from_mins(40);
+/// How long a `request_push` call may take, all of it: the sandboxed ci
+/// (`api_push_ci::CI_DEADLINE`) and 15 minutes for the rest, whose own
+/// deadlines are each a minute or two. The push itself starts only if
+/// it can end within this (`time_left_to_push`), so the session is never
+/// told a call failed that then pushed (review of slice 4, M3).
+pub const PUSH_CALL_DEADLINE: Duration =
+    Duration::from_secs(crate::api_push_ci::CI_DEADLINE.as_secs() + 15 * 60);
 
-/// The advisory database's fetch on the host: the deny step's own
-/// deadline for the same fetch (`steps.rs`).
-const ADVISORY_DEADLINE: Duration = Duration::from_secs(60);
-
-/// The sandboxed ci's command. Declared skip (the lead, L42): the host
-/// tier (`host_` tests) runs bwrap and systemd, which the sandbox refuses
-/// (`--disable-userns`, no user bus), so it cannot run inside; the
-/// pre-push hook is skipped too (`pushed`). Retired when ci can run in a
-/// sandbox the host tier works in.
-pub const CI: [&str; 5] = ["cargo", "xtask", "ci", "--except", "host"];
-
-/// What a push needs.
+/// What a push needs, and the lock and count of its calls.
 pub struct Pusher {
     pub main: PathBuf,
     pub builder: Builder,
     pub host: Host,
     /// The paths the branch may change (`api_push_checks::allowed`).
     pub allowed: Vec<String>,
+    /// The calls so far; held for the whole of a call.
+    calls: Mutex<u64>,
+}
+
+/// Refuses a session builder's name that a ci builder could take
+/// (`Builder::ci`, review of slice 4, L6).
+///
+/// # Errors
+///
+/// A name holding `-ci-`, naming it.
+pub fn session_name(name: &str) -> Result<(), String> {
+    if name.contains("-ci-") {
+        return Err(format!(
+            "builder name {name:?}: `-ci-` names request_push's ci builders; choose another"
+        ));
+    }
+    Ok(())
 }
 
 impl Pusher {
+    /// The pusher for `builder`'s branch.
+    pub fn new(main: PathBuf, builder: Builder, host: Host, allowed: Vec<String>) -> Self {
+        Self {
+            main,
+            builder,
+            host,
+            allowed,
+            calls: Mutex::new(0),
+        }
+    }
+
     /// The branch checked, built, pushed, and its PR opened with `title`
-    /// and `body`; what was done and the PR's URL.
+    /// and `body`; what was done and the PR's URL. One call at a time.
     ///
     /// # Errors
     ///
     /// Any step refusing, its reason and output: the text the session reads.
     pub fn push(&self, title: &str, body: &str) -> Result<String, String> {
+        let started = Instant::now();
+        let mut calls = self
+            .calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        *calls += 1;
+        crate::api_push_remote::pr_text(title, body)?;
         let branch = crate::api_fences_run::branch(&self.builder);
-        let bare = crate::api_push_fetch::fetched(&self.builder, &self.host.objects, &branch)?;
-        let lines = self.checked(&bare, &branch)?;
-        self.built(&bare, &branch)?;
-        self.pushed(&bare, &branch)?;
-        let url = self.opened(&branch, (title, body))?;
-        Ok(format!("pushed {branch} ({lines} lines) and opened {url}"))
+        let objects = &self.host.objects;
+        let bare = crate::api_push_fetch::fetched(&self.builder, objects, (&branch, *calls))?;
+        let pushed = self.checked_built_pushed(&bare, (&branch, *calls), started, (title, body));
+        let _ = std::fs::remove_dir_all(&bare); // this call's; the outcome is the result
+        pushed
     }
 
-    /// The branch's diff from where it left `origin/main`, checked; the
-    /// lines it changes.
-    fn checked(&self, bare: &Path, branch: &str) -> Result<u64, String> {
-        let origin_main = git(&self.main, &["rev-parse", ORIGIN_MAIN])?;
-        let fork = bare_git(bare, &["merge-base", &origin_main, branch])
-            .map_err(|why| format!("{branch} shares no history with origin/main: {why}"))?;
-        let numstat = bare_git(bare, &["diff", "--no-renames", "--numstat", &fork, branch])?;
-        crate::api_push_checks::checked(&numstat, &self.allowed)
+    fn checked_built_pushed(
+        &self,
+        bare: &Path,
+        (branch, call): (&str, u64),
+        started: Instant,
+        (title, body): (&str, &str),
+    ) -> Result<String, String> {
+        let tip = bare_git(bare, &["rev-parse", &format!("refs/heads/{branch}")])?;
+        let lines = self.checked(bare, &tip)?;
+        crate::api_push_ci::built(self, (bare, &tip), call)?;
+        time_left_to_push(started.elapsed())?;
+        crate::api_push_remote::pushed(&self.main, bare, (&tip, branch))?;
+        let url = crate::api_push_remote::opened(&self.main, branch, (title, body))?;
+        Ok(format!(
+            "pushed {tip} to {branch} ({lines} lines) and opened {url}"
+        ))
     }
 
-    /// [`CI`] on the branch, in a fresh clone in a fresh sandbox, on
-    /// the advisory database fetched just before.
-    fn built(&self, bare: &Path, branch: &str) -> Result<(), String> {
-        let host = self.advised()?;
-        let ci = Builder::new(&format!("{}-ci", self.builder.name), &self.builder.home)?;
-        let _ = std::fs::remove_dir_all(ci.root()); // the last request_push's; its target is kept
-        let finished = self.ci_clone(&ci, (bare, branch)).and_then(|()| {
-            let command = crate::api_fences_run::sandboxed(&ci, &host, &CI)?;
-            run_with_deadline(command, CI_DEADLINE)
-        });
-        let _ = std::fs::remove_dir_all(ci.root());
-        ci_passed(finished?)
-    }
-
-    /// `ci`'s clone, made from the main repository and moved to the
-    /// branch's tip from the bare repository: host git runs in it only
-    /// before its sandbox does.
-    fn ci_clone(&self, ci: &Builder, (bare, branch): (&Path, &str)) -> Result<(), String> {
-        crate::api_clone::make(ci, (&self.main, &self.host.objects), branch)?;
-        let clone = ci.clone_dir();
-        git(
-            &clone,
-            &["fetch", "--quiet", &bare.display().to_string(), branch],
-        )?;
-        git(&clone, &["checkout", "--quiet", "-B", branch, "FETCH_HEAD"]).map(|_| ())
-    }
-
-    /// The host with the advisory database cargo deny has just fetched
-    /// in the main repository, which the sandbox, with no network, binds
-    /// (`api_sandbox.rs` `Host::advisories`).
-    fn advised(&self) -> Result<Host, String> {
-        let mut fetch = std::process::Command::new("cargo");
-        fetch.args(["deny", "fetch", "db"]).current_dir(&self.main);
-        match run_with_deadline(fetch, ADVISORY_DEADLINE)? {
-            Finished::Exited { success: true, .. } => {}
-            Finished::Exited { output, .. } | Finished::TimedOut { output } => {
-                return Err(format!(
-                    "cargo deny fetch db failed on the host:\n{}",
-                    tail(&output)
-                ));
-            }
-        }
-        let advisories = crate::api_host::advisories()?;
-        if advisories.is_empty() {
-            return Err(
-                "cargo deny fetch db left no advisory database in ~/.cargo/advisory-dbs".into(),
-            );
-        }
-        Ok(Host {
-            advisories,
-            ..self.host.clone()
-        })
-    }
-
-    /// The branch pushed from the bare repository to the main
-    /// repository's remote.
-    fn pushed(&self, bare: &Path, branch: &str) -> Result<(), String> {
-        let remote = git(&self.main, &["remote", "get-url", "origin"])?;
-        let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
-        // Relaxed guard, declared (the lead, answer 8): the pre-push hook
-        // would run this branch's code (build scripts, tests, its xtask)
-        // outside the sandbox, so it is skipped; the same checks ran as
-        // [`CI`] in a fresh sandbox just before. Retired when the hook
-        // can run its checks in a sandbox.
-        let push = [
-            "-c",
-            "core.hooksPath=/dev/null",
-            "push",
-            "--no-verify",
-            "--quiet",
-            &remote,
-            &refspec,
-        ];
-        git(bare, &push)
-            .map(|_| ())
-            .map_err(|why| format!("pushing {branch}: {why}"))
-    }
-
-    /// The PR for `branch`: the one already open, or a new one.
-    fn opened(&self, branch: &str, (title, body): (&str, &str)) -> Result<String, String> {
-        if let Ok(url) = gh(
-            &self.main,
-            &["pr", "view", branch, "--json", "url", "-q", ".url"],
-        ) {
-            return Ok(url);
-        }
-        let create = [
-            "pr", "create", "--base", "main", "--head", branch, "--title", title, "--body", body,
-        ];
-        gh(&self.main, &create)
+    /// The commits from where `tip` left `origin/main` checked to be a
+    /// line, and their diff checked; the lines it changes.
+    fn checked(&self, bare: &Path, tip: &str) -> Result<u64, String> {
+        let origin_main = crate::queue_git::git(&self.main, &["rev-parse", ORIGIN_MAIN])?;
+        let fork = bare_git(bare, &["merge-base", &origin_main, tip])
+            .map_err(|why| format!("{tip} shares no history with origin/main: {why}"))?;
+        let range = format!("{fork}..{tip}");
+        let rev_list = bare_git(bare, &["rev-list", "--parents", &range])?;
+        crate::api_push_history::linear(&rev_list, &fork)?;
+        let diff =
+            |format: &str| bare_git(bare, &["diff", "--no-renames", format, "-z", &fork, tip]);
+        crate::api_push_checks::checked(&diff("--numstat")?, &diff("--raw")?, &self.allowed)
     }
 }
 
-/// How the sandboxed ci ended, as the session reads it.
-fn ci_passed(finished: Finished) -> Result<(), String> {
-    match finished {
-        Finished::Exited { success: true, .. } => Ok(()),
-        Finished::Exited { output, .. } => Err(format!(
-            "{} failed in the sandbox:\n{}",
-            CI.join(" "),
-            tail(&output)
-        )),
-        Finished::TimedOut { output } => Err(format!(
-            "{} passed its deadline of {CI_DEADLINE:?} in the sandbox:\n{}",
-            CI.join(" "),
-            tail(&output)
-        )),
+/// Refuses to start the push when, `spent` into the call, the push and
+/// the PR's deadlines could run past [`PUSH_CALL_DEADLINE`].
+///
+/// # Errors
+///
+/// Too little time left, saying nothing was pushed.
+pub fn time_left_to_push(spent: Duration) -> Result<(), String> {
+    let needed = crate::api_push_remote::PUSH_DEADLINE + 2 * crate::api_push_remote::GH_DEADLINE;
+    if spent + needed > PUSH_CALL_DEADLINE {
+        return Err(format!(
+            "{spent:?} into the call, too little of its {PUSH_CALL_DEADLINE:?} is left to push and \
+             open the PR ({needed:?}): nothing was pushed; call request_push again"
+        ));
     }
+    Ok(())
 }
 
-fn gh(dir: &Path, args: &[&str]) -> Result<String, String> {
-    let output = std::process::Command::new("gh")
-        .args(args)
-        .current_dir(dir)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .output()
-        .map_err(|e| format!("gh: {e}"))?;
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned());
-    }
-    Err(format!(
-        "gh {}: {}",
-        args[..2].join(" "),
-        String::from_utf8_lossy(&output.stderr).trim()
-    ))
-}
-
-/// The last 60 lines of `output`: where ci names its failure.
-fn tail(output: &str) -> String {
-    let lines: Vec<&str> = output.lines().collect();
-    lines[lines.len().saturating_sub(60)..].join("\n")
-}
+#[cfg(test)]
+#[path = "api_push_tests.rs"]
+mod tests;

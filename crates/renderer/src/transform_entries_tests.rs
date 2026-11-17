@@ -1,4 +1,6 @@
-use super::{Entries, IDENTITY, translation};
+use super::{IDENTITY, Matrix, translation};
+
+type Entries = crate::table_entries::Entries<Matrix>;
 
 #[test]
 fn entry_0_is_the_identity_and_never_handed_out() {

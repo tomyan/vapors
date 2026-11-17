@@ -24,7 +24,7 @@ impl Scene {
     ) -> Result<bool, StoreError> {
         let node = self.node_mut(id)?;
         let NodeKind::Mesh { colour: held, .. } = &mut node.kind else {
-            return Err(StoreError::NotMesh(id));
+            return Err(StoreError::NotMesh(id, "set_appearance"));
         };
         let recoloured = *held != colour;
         let changed = recoloured || node.visible != visible;

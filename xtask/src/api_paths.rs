@@ -14,6 +14,9 @@ pub const KEY_FILE: &str = ".csvg-tok";
 pub struct Builder {
     pub name: String,
     pub home: PathBuf,
+    /// A `request_push` ci run's builder (`Builder::ci`), whose sccache
+    /// is not the sessions'.
+    ci: bool,
 }
 
 impl Builder {
@@ -34,7 +37,21 @@ impl Builder {
         Ok(Self {
             name: name.to_owned(),
             home: home.to_owned(),
+            ci: false,
         })
+    }
+
+    /// The builder `request_push` call number `call` runs ci in:
+    /// `<name>-ci-<call>`, its own clone, cargo home and target, and the
+    /// ci runs' sccache, never the sessions' (review of slice 4, M2), so
+    /// a session cannot plant what ci links. A session's name may not
+    /// hold `-ci-` (`api_push::session_name`), so the two never meet.
+    pub fn ci(&self, call: u64) -> Self {
+        Self {
+            name: format!("{}-ci-{call}", self.name),
+            home: self.home.clone(),
+            ci: true,
+        }
     }
 
     /// Everything of this builder's but its target directory.
@@ -55,10 +72,15 @@ impl Builder {
             .join(format!("api-{}", self.name))
     }
 
-    /// The sccache directory the sandboxes share, which the host never
-    /// reads (`api_sandbox.rs`).
+    /// The sccache directory the sessions' sandboxes share, or the one
+    /// the ci runs share; the host never reads either (`api_sandbox.rs`).
     pub fn sandbox_sccache(&self) -> PathBuf {
-        self.home.join(".cache/sccache-sandbox")
+        let shared = if self.ci {
+            "sccache-sandbox-ci"
+        } else {
+            "sccache-sandbox"
+        };
+        self.home.join(".cache").join(shared)
     }
 
     /// The cargo home it writes, the registry bound read-only inside.

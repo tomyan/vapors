@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use crate::api_paths::Builder;
 
@@ -19,17 +20,35 @@ const GIT_ENV: [(&str, &str); 3] = [
     ("GIT_CONFIG_GLOBAL", "/dev/null"),
 ];
 
-/// A fresh bare repository at `builder`'s `push.git`, its objects the
-/// main repository's (`objects`) through alternates, and `branch` of the
-/// builder's clone fetched into it; its path.
+/// The most a local git call here may take: on this host the tests'
+/// init, fetch from a clone, merge-base and diff each take under 0.1 s
+/// (2026-11-17); 60 s covers a loaded host and a slice's whole pack.
+pub const LOCAL_GIT_DEADLINE: Duration = Duration::from_secs(60);
+
+/// A new bare repository for push number `call`, its objects the main
+/// repository's (`objects`) through alternates, and `branch` of the
+/// builder's clone fetched into it, every object checked
+/// (`transfer.fsckObjects`); its path. Each call has its own, so one
+/// push's objects are never another's (review of slice 4, H1).
 ///
 /// # Errors
 ///
-/// git failing, naming the step; a branch not in the clone says to
-/// commit on it.
-pub fn fetched(builder: &Builder, objects: &Path, branch: &str) -> Result<PathBuf, String> {
-    let bare = builder.root().join("push.git");
-    let _ = std::fs::remove_dir_all(&bare); // the last request_push's, if any
+/// The clone's repository not as `api_clone` made it, the bare
+/// repository already there, or git failing, naming the step; a branch
+/// not in the clone says to commit on it.
+pub fn fetched(
+    builder: &Builder,
+    objects: &Path,
+    (branch, call): (&str, u64),
+) -> Result<PathBuf, String> {
+    clone_as_made(&builder.clone_dir(), objects)?;
+    let bare = builder.root().join(format!("push-{call}.git"));
+    if bare.exists() {
+        return Err(format!(
+            "{} is already there: each push starts in a new repository",
+            bare.display()
+        ));
+    }
     git(Path::new("/"), &["init", "--quiet", "--bare", &text(&bare)])?;
     let alternates = bare.join("objects/info/alternates");
     std::fs::write(&alternates, format!("{}\n", objects.display()))
@@ -37,6 +56,8 @@ pub fn fetched(builder: &Builder, objects: &Path, branch: &str) -> Result<PathBu
     let refspec = format!("+refs/heads/{branch}:refs/heads/{branch}");
     let clone = text(&builder.clone_dir());
     let fetch = [
+        "-c",
+        "transfer.fsckObjects=true",
         "fetch",
         "--quiet",
         "--no-tags",
@@ -50,12 +71,45 @@ pub fn fetched(builder: &Builder, objects: &Path, branch: &str) -> Result<PathBu
     Ok(bare)
 }
 
+/// Refuses a clone whose repository the session has re-pointed: the host's
+/// upload-pack follows `.git` as a gitfile, symlinked object directories
+/// and alternates, any of which could reach another repository's objects
+/// on the host (review of slice 4, M1). Checked without following links.
+fn clone_as_made(clone: &Path, objects: &Path) -> Result<(), String> {
+    let git_dir = clone.join(".git");
+    for (path, what) in [
+        (git_dir.clone(), "a directory"),
+        (git_dir.join("objects"), "a directory"),
+        (git_dir.join("objects/pack"), "a directory"),
+    ] {
+        let is_dir = std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_dir());
+        if !is_dir {
+            return Err(format!(
+                "{} is not {what} (a link or a file): the clone was changed; nothing is fetched",
+                path.display()
+            ));
+        }
+    }
+    let alternates = git_dir.join("objects/info/alternates");
+    let found = std::fs::read_to_string(&alternates)
+        .map_err(|e| format!("reading {}: {e}", alternates.display()))?;
+    if found != format!("{}\n", objects.display()) {
+        return Err(format!(
+            "{} names {found:?}, not the main repository's objects: nothing is fetched",
+            alternates.display()
+        ));
+    }
+    Ok(())
+}
+
 /// git in `dir` (never the clone), hooks off, `file://` allowed for the
-/// clone, its environment cleared to [`GIT_ENV`]; stdout trimmed.
+/// clone, its environment cleared to [`GIT_ENV`], within
+/// [`LOCAL_GIT_DEADLINE`]; stdout trimmed.
 ///
 /// # Errors
 ///
-/// git not starting or not exiting 0, with its stderr.
+/// git not starting, passing its deadline, or not exiting 0, with its
+/// stderr.
 pub fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = Command::new("git");
     command.env_clear().envs(GIT_ENV).current_dir(dir);
@@ -65,14 +119,16 @@ pub fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
         "-c",
         "protocol.file.allow=always",
     ]);
-    let output = command
-        .args(args)
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if !output.status.success() {
-        return Err(crate::queue_git::failure(args, &output));
+    command.args(args);
+    let ended = crate::api_timed::within(command, LOCAL_GIT_DEADLINE)?;
+    if !ended.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&ended.stderr).trim()
+        ));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    Ok(String::from_utf8_lossy(&ended.stdout).trim().to_owned())
 }
 
 fn text(path: &Path) -> String {

@@ -25,7 +25,10 @@ mod api_paths;
 mod api_prices;
 mod api_push;
 mod api_push_checks;
+mod api_push_ci;
 mod api_push_fetch;
+mod api_push_history;
+mod api_push_remote;
 mod api_refusals;
 mod api_request_content;
 mod api_request_policy;
@@ -34,6 +37,7 @@ mod api_server;
 mod api_server_ask;
 mod api_server_proxy;
 mod api_session;
+mod api_timed;
 mod api_tool_prompt;
 mod api_upstream;
 mod api_usage;
@@ -282,6 +286,7 @@ fn main() -> ExitCode {
             match tier {
                 Tier::Unit => steps::unit_tests(),
                 Tier::Gpu => steps::gpu_tests(),
+                Tier::Host => steps::host_tests(),
                 Tier::Pmu => steps::pmu_tests(),
             }
         }

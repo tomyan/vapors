@@ -56,7 +56,8 @@ fn scene_out(page: Out, instance: Instance) -> SceneOut {
 }
 
 fn page_out(in: SceneOut) -> Out {
-    return Out(in.position, in.local, in.params, in.form, in.colour, in.radii);
+    // no clip and row 0: a scene's shapes are not clipped by the page's clip table
+    return Out(in.position, in.local, in.params, in.form, in.colour, in.radii, 0u, 0u);
 }
 
 // The shape units per device pixel, right and down, from the analytic

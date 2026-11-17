@@ -31,7 +31,10 @@ pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
 /// timestamps or a busy machine, before the first frame; a frame refused
 /// or without a GPU reading, naming it; then every frame over budget and
 /// a busy machine at the end.
-pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
+pub fn run(
+    open: impl FnOnce() -> Gpu,
+    (kind, samples): (SceneKind, vapors_renderer::Samples),
+) -> Result<(), String> {
     let reproduce = reproducing(kind);
     let cache = shader_cache(|name| std::env::var(name).ok()).map_err(&reproduce)?;
     let gpu = open();
@@ -43,9 +46,10 @@ pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
         cache.describe()
     );
     println!(
-        "Frames: {RUN_FRAMES}, each held to the frame budget, no warmup; load average at the start {start:.2}\n"
+        "Frames: {RUN_FRAMES}, each held to the frame budget, no warmup; load average at the start {start:.2}; samples {}\n",
+        samples.count()
     );
-    let mut workload = kind.workload().map_err(&reproduce)?;
+    let mut workload = kind.workload(samples).map_err(&reproduce)?;
     let run = Sampler::new(&gpu)
         .judged(&mut *workload, RUN_FRAMES)
         .map_err(&reproduce)?;

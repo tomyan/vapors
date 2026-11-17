@@ -34,6 +34,13 @@ pub enum Holding {
         /// `max_buffer_size` or `max_storage_buffer_binding_size`.
         limit: &'static str,
     },
+    /// The clip table's entries (`clip_table.rs`): one per clip drawn
+    /// under, kept while drawn; `limit` names the device limit that
+    /// applied.
+    ClipEntries {
+        /// `max_buffer_size` or `max_storage_buffer_binding_size`.
+        limit: &'static str,
+    },
 }
 
 impl fmt::Display for ArenaFull {
@@ -54,6 +61,12 @@ impl fmt::Display for ArenaFull {
                 limit,
                 "draw fewer scroll frames and lane batches in view, each of which holds entries \
                  while it is drawn",
+            ),
+            Holding::ClipEntries { limit } => (
+                "the clip table's entries need",
+                limit,
+                "draw fewer clipped boxes in view, each clip of which holds an entry while it is \
+                 drawn",
             ),
         };
         write!(
