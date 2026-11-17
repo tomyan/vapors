@@ -50,13 +50,16 @@ fn phases<T: Default>(names: &[&str]) -> BTreeMap<String, T> {
 fn every_timed_phase_counted_is_accepted() {
     let timed = phases::<Duration>(&["layout", "style"]);
     let counted = phases::<u64>(&["layout", "paint", "style"]);
-    assert_eq!(phases_counted(&timed, &counted), Ok(()));
+    assert_eq!(phases_counted(&timed, (&counted, "instructions")), Ok(()));
 }
 
 #[test]
 fn a_timed_phase_without_a_count_is_refused_naming_it() {
     let timed = phases::<Duration>(&["layout", "paint", "style"]);
     let counted = phases::<u64>(&["layout"]);
-    let error = phases_counted(&timed, &counted).expect_err("uncounted");
-    assert!(error.ends_with("paint, style"), "{error}");
+    let error = phases_counted(&timed, (&counted, "hardware counts")).expect_err("uncounted");
+    assert_eq!(
+        error,
+        "phases timed but not counted in hardware counts: paint, style"
+    );
 }

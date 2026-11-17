@@ -27,6 +27,12 @@ impl Measure {
         }
     }
 
+    /// Its flag and whether it was given, for the modes that refuse it:
+    /// times, given by no flag, is never refused.
+    pub(crate) fn given(self) -> (&'static str, bool) {
+        self.flag().map_or(("", false), |flag| (flag, true))
+    }
+
     /// `self` with `asked` given as well.
     ///
     /// # Errors

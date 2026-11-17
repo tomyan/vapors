@@ -33,6 +33,7 @@ pub mod idle_run;
 pub mod instruction_samples;
 pub mod instructions;
 pub mod instructions_check;
+pub mod llc_line;
 pub mod mount;
 pub mod mount_memory;
 pub mod mount_run;

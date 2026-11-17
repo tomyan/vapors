@@ -28,9 +28,12 @@ pub(crate) struct Counted {
 impl Start {
     /// The counters now.
     pub(crate) fn now(clock: &PhaseClock) -> Result<Self, String> {
+        // the counters first and instructions last, so an instructions
+        // run's window holds no read of absent counters
+        let counters = clock.counters_now()?;
         Ok(Self {
             instructions: clock.instructions_now()?,
-            counters: clock.counters_now()?,
+            counters,
         })
     }
 

@@ -3,16 +3,21 @@
 
 use std::collections::BTreeMap;
 
-use super::{QUIET_WINDOW, counters_section};
+use super::{QUIET_WINDOW, counters_section_lined};
+
+fn counters_section(name: &str, samples: &Samples) -> Result<String, String> {
+    counters_section_lined(name, samples, 64)
+}
 use crate::counter_samples::CounterSamples;
 use crate::run::Samples;
 
 /// Three frames whose `update` phase ran 1000, 2000 and 3000 cycles at
-/// 2.5 instructions per cycle, with 10, 20 and 30 of each miss.
+/// 2.5 instructions per cycle, with distinct misses per event so a
+/// swapped column shows: branch 10 a frame, L1d 100, LLC 1000.
 fn three_frames() -> Samples {
     let mut kept = CounterSamples::default();
     for at in 1..=3 {
-        let reading = [1000 * at, 2500 * at, 10 * at, 10 * at, 10 * at];
+        let reading = [1000 * at, 2500 * at, 10 * at, 100 * at, 1000 * at];
         kept.push(reading, BTreeMap::from([("update".to_owned(), reading)]));
     }
     Samples {
@@ -25,7 +30,7 @@ fn three_frames() -> Samples {
 fn a_phase_row_has_its_medians_its_ipc_and_its_llc_miss_bytes() {
     let section = counters_section("10 units, Edit", &three_frames()).expect("counted");
     assert!(
-        section.contains("| update | 2000 | 2.50 | 20 | 20 | 20 | 1280 |"),
+        section.contains("| update | 2000 | 2.50 | 20 | 200 | 2000 | 128000 |"),
         "{section}"
     );
 }
@@ -44,4 +49,13 @@ fn a_phase_no_frame_entered_says_so_and_the_note_follows() {
 fn samples_without_hardware_counts_are_refused_naming_the_workload() {
     let error = counters_section("10 units, Edit", &Samples::default()).expect_err("none");
     assert_eq!(error, "10 units, Edit: no hardware counts were taken");
+}
+
+#[test]
+fn llc_miss_bytes_are_the_misses_times_the_line_size_given() {
+    let section = counters_section_lined("10 units, Edit", &three_frames(), 128).expect("counted");
+    assert!(
+        section.contains("| update | 2000 | 2.50 | 20 | 200 | 2000 | 256000 |"),
+        "{section}"
+    );
 }

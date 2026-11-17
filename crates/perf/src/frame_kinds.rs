@@ -135,8 +135,11 @@ fn one_section(name: &str, samples: &Samples, measure: Measure) -> Result<String
         }
         Measure::Counters => {
             let counted = samples.counters.as_ref().map(|kept| &kept.phases);
-            phases_counted(&samples.phases, counted.unwrap_or(&BTreeMap::new()))
-                .map_err(|e| format!("{name}: {e}"))?;
+            phases_counted(
+                &samples.phases,
+                (counted.unwrap_or(&BTreeMap::new()), "hardware counts"),
+            )
+            .map_err(|e| format!("{name}: {e}"))?;
             counters_section(name, samples)
         }
     }

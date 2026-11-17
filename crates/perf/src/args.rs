@@ -84,10 +84,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
     )?;
     refuse_mount_with_others([
         ("--only", only.is_some()),
-        (
-            measure.flag().unwrap_or("--instructions"),
-            measure != Measure::Times,
-        ),
+        measure.given(),
         ("--scaling", scaling.is_some()),
         ("--mount", mount),
         ("--mount-memory", mount_memory.is_some()),
