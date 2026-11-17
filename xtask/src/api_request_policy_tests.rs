@@ -1,4 +1,4 @@
-use super::{Demand, TOOL_PROMPT_TOKENS, betas, judged};
+use super::{Demand, betas, judged};
 
 fn body(extra: &str) -> Vec<u8> {
     format!(r#"{{"model":"claude-sonnet-5-5","max_tokens":1000,"messages":[]{extra}}}"#)
@@ -78,13 +78,13 @@ fn a_token_count_is_judged_but_not_billed() {
 }
 
 #[test]
-fn tools_add_the_largest_tool_use_system_prompt_to_the_input_bound() {
+fn tools_add_the_models_tool_use_system_prompt_to_the_input_bound() {
     let sent = body(r#","tools":[{"name":"Bash","input_schema":{}}]"#);
     let demand = judged("/v1/messages", &sent)
         .expect("judged")
         .demand
         .expect("demand");
-    assert_eq!(demand.input_bound, sent.len() as u64 + TOOL_PROMPT_TOKENS);
+    assert_eq!(demand.input_bound, sent.len() as u64 + 804);
 }
 
 #[test]

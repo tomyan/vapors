@@ -58,14 +58,6 @@ pub const BETAS: [&str; 7] = [
     "effort-2025-11-24",
 ];
 
-/// The most tokens of system prompt the API adds when `tools` is
-/// present: the largest figure in the "Tool use system prompt tokens"
-/// table (Claude Opus 4.7, `any`/`tool`), in the Pricing section of
-/// <https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview>
-/// (read 2026-11-17; Sonnet 5.5 and Opus 5.5 list 286). Not in the
-/// body's bytes, so added to the input bound (review of #476-#478, N1).
-pub const TOOL_PROMPT_TOKENS: u64 = 804;
-
 /// Refuses an `anthropic-beta` header naming a value not in [`BETAS`].
 ///
 /// # Errors
@@ -103,7 +95,8 @@ pub struct Demand {
     /// An upper bound on its input tokens: the forwarded body's bytes,
     /// as a token is at least one byte of the text it stands for (the
     /// blocks forwarded are text, `api_request_content.rs`), plus
-    /// [`TOOL_PROMPT_TOKENS`] when `tools` is present.
+    /// the tool-use system prompt when `tools` is present
+    /// (`api_tool_prompt.rs`).
     pub input_bound: u64,
 }
 
@@ -201,7 +194,11 @@ fn demand(value: &Value, bytes: usize) -> Result<Demand, String> {
     let tools = value["tools"]
         .as_array()
         .is_some_and(|tools| !tools.is_empty());
-    let prompt = if tools { TOOL_PROMPT_TOKENS } else { 0 };
+    let prompt = if tools {
+        crate::api_tool_prompt::tool_prompt_tokens(&model)
+    } else {
+        0
+    };
     let input_bound = u64::try_from(bytes).map_err(|_| "a body too long to count")? + prompt;
     Ok(Demand {
         model,

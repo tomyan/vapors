@@ -29,6 +29,7 @@ mod api_request_content;
 mod api_request_policy;
 mod api_sandbox;
 mod api_server;
+mod api_tool_prompt;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
 mod api_usage;
 mod builds;
