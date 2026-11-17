@@ -78,38 +78,34 @@ pub fn compile_str(path: &str, text: &str) -> Result<String, CompileError> {
     generate(&parse_str(path, text)?)
 }
 
-/// Reads, parses and generates: the Rust for a `.wisp` file.
-///
-/// # Errors
-/// A [`CompileError`] for an unreadable file (positioned at 1:1), or
-/// from parsing or code generation.
-pub fn compile_file(path: &Path) -> Result<String, CompileError> {
-    compile_str(&path.display().to_string(), &read_source(path)?)
-}
-
-/// Reads and parses a `.wisp` file.
+/// Reads and parses a `.wisp` file, its scope named by the path as
+/// given. Not public: generated code from it would name that path, which
+/// may be the build machine's; callers name a root (`parse_file_under`).
 ///
 /// # Errors
 /// A [`CompileError`] for an unreadable file (positioned at 1:1) or
 /// for the first thing the parser did not recognise.
-pub fn parse_file(path: &Path) -> Result<ast::Component, CompileError> {
+fn parse_file(path: &Path) -> Result<ast::Component, CompileError> {
     parse_str(&path.display().to_string(), &read_source(path)?)
 }
 
-/// [`compile_file`] with the component's scope named by its path under
-/// `root`, so it is the same on every machine.
+/// Reads, parses and generates: the Rust for a `.wisp` file, its scope
+/// named by its path under `root`, so it is the same on every machine.
 ///
 /// # Errors
-/// As [`compile_file`]; and a file not under `root`, naming both.
+/// A [`CompileError`] for an unreadable file (positioned at 1:1), from
+/// parsing or code generation, or a file not under `root`, naming both.
 pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileError> {
     generate(&parse_file_under(path, root)?)
 }
 
-/// [`parse_file`] with the component's scope named by its path under
-/// `root`.
+/// Reads and parses a `.wisp` file, its scope named by its path under
+/// `root`; refusals name the path as given, which an editor opens.
 ///
 /// # Errors
-/// As [`parse_file`]; and a file not under `root`, naming both.
+/// A [`CompileError`] for an unreadable file (positioned at 1:1), for
+/// the first thing the parser did not recognise, or a file not under
+/// `root`, naming both.
 pub fn parse_file_under(path: &Path, root: &Path) -> Result<ast::Component, CompileError> {
     let relative = relative_name(path, root)?;
     let mut component = parse_file(path)?;
@@ -117,10 +113,12 @@ pub fn parse_file_under(path: &Path, root: &Path) -> Result<ast::Component, Comp
     Ok(component)
 }
 
-/// [`parse_file_global`], its sheet named by its path under `root`.
+/// [`parse_file_under`] for a component whose `<style>` is a global
+/// sheet, which may hold no `:global()`: its sheet named by its path
+/// under `root`.
 ///
 /// # Errors
-/// As [`parse_file_global`]; and a file not under `root`, naming both.
+/// As [`parse_file_under`].
 pub fn parse_file_global_under(path: &Path, root: &Path) -> Result<ast::Component, CompileError> {
     let relative = relative_name(path, root)?;
     let mut component = parse_file_global(path)?;
@@ -145,11 +143,11 @@ fn relative_name(path: &Path, root: &Path) -> Result<String, CompileError> {
     Ok(parts.collect::<Vec<_>>().join("/"))
 }
 
-/// [`compile_file`] for a component whose `<style>` the app adds as a
-/// global sheet: nothing is scoped.
+/// [`compile_file_under`] for a component whose `<style>` the app adds
+/// as a global sheet: nothing is scoped.
 ///
 /// # Errors
-/// As [`compile_file`].
+/// As [`compile_file_under`].
 pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
     // its sheet named by its file under its own directory, the same on
     // every machine, as `compile_dir_global` names it under the root
@@ -158,11 +156,11 @@ pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
 }
 
 /// [`parse_file`] for a component whose `<style>` is a global sheet,
-/// which may hold no `:global()`.
+/// which may hold no `:global()`. Not public, as [`parse_file`].
 ///
 /// # Errors
 /// As [`parse_file`].
-pub fn parse_file_global(path: &Path) -> Result<ast::Component, CompileError> {
+fn parse_file_global(path: &Path) -> Result<ast::Component, CompileError> {
     let text = read_source(path)?;
     let mut component = parse_text(&path.display().to_string(), &text, Styles::Global)?;
     component.scope = None;

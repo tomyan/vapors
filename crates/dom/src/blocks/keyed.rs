@@ -117,7 +117,9 @@ fn refuse_duplicate_keys<K: Eq + Hash + Debug, V>(next: &[(K, V)], site: &str) {
     let mut seen = std::collections::HashSet::with_capacity(next.len());
     if let Some((key, _)) = next.iter().find(|(key, _)| !seen.insert(key)) {
         panic!(
-            "{site}: two rows of this {{for}} share the key {key:?}; give `key=` an expression that is unique per row"
+            "{site} (the .wisp's path under its crate's directory, after the crate's package \
+             name): two rows of this {{for}} share the key {key:?}; give `key=` an expression \
+             that is unique per row"
         );
     }
 }
@@ -137,3 +139,7 @@ fn stays(old_positions: &[Option<usize>]) -> Vec<bool> {
     }
     stays
 }
+
+#[cfg(test)]
+#[path = "keyed_tests.rs"]
+mod tests;

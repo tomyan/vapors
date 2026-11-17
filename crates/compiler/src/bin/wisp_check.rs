@@ -23,10 +23,19 @@ fn main() {
     }
     let global = flags.contains(&&"--global".to_owned());
     let path = std::path::Path::new(path);
+    // named under the file's own directory, as compile_file_global names
+    // it; refusals name the path as given
+    let root = path.parent().unwrap_or_else(|| std::path::Path::new(""));
     let (reading, parsed) = if global {
-        ("global style", vapors_compiler::parse_file_global(path))
+        (
+            "global style",
+            vapors_compiler::parse_file_global_under(path, root),
+        )
     } else {
-        ("scoped style", vapors_compiler::parse_file(path))
+        (
+            "scoped style",
+            vapors_compiler::parse_file_under(path, root),
+        )
     };
     let styles = flags.contains(&&"--styles".to_owned());
     let checked = parsed.and_then(|component| check(&component, styles));
