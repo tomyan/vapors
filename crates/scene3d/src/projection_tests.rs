@@ -204,3 +204,25 @@ fn invalid_projections_are_refused_naming_the_fix() {
         assert!(error.starts_with(message), "{error}");
     }
 }
+
+#[test]
+fn a_shorter_side_orthographic_projection_spans_its_extent_across_the_shorter_side() {
+    // Given: 4 units across the shorter side
+    let projection = Projection::orthographic_shorter(4.0, 0.0, 100.0).unwrap();
+
+    // When / Then: landscape, the height spans 4 and the width 8; portrait,
+    // the width spans 4 and the height 8
+    let edge = |aspect: f32, point: Vec3| ndc(projection, aspect, point);
+    assert!((edge(2.0, Vec3::new(0.0, 2.0, 0.0)).y - 1.0).abs() < 1e-5);
+    assert!((edge(2.0, Vec3::new(4.0, 0.0, 0.0)).x - 1.0).abs() < 1e-5);
+    assert!((edge(0.5, Vec3::new(2.0, 0.0, 0.0)).x - 1.0).abs() < 1e-5);
+    assert!((edge(0.5, Vec3::new(0.0, 4.0, 0.0)).y - 1.0).abs() < 1e-5);
+}
+
+#[test]
+fn a_shorter_side_extent_that_is_not_positive_is_refused() {
+    assert_eq!(
+        Projection::orthographic_shorter(0.0, 0.0, 1.0),
+        Err(SceneError::HeightNotPositive { height: 0.0 })
+    );
+}

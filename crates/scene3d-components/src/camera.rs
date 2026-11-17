@@ -1,19 +1,22 @@
 //! `<Camera handle={..} projection={..} transform={..}>`: a camera the
-//! `<Scene>` names by handle.
+//! `<Scene>` names by handle. Its lens is a signal, so a zoom is a lens
+//! change; its node stays rigid (`Scene::view_projection` refuses a
+//! camera that scales or mirrors).
 
 use crate::component::node_component;
-use crate::node::{Mounted, mount_node};
+use crate::node::{Mounted, mount_node, refuse};
 use crate::own_keys;
 use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{CameraHandle, NodeKind, Projection, Transform};
-use vapors_signals::Signal;
+use vapors_signals::{Effect, Signal};
 
 /// What a parent passes to [`Camera::mount`].
 pub struct CameraProps {
     /// The name the scene's `camera` prop points at; required.
     pub handle: Option<CameraHandle>,
-    /// How it projects; required.
-    pub projection: Option<Projection>,
+    /// How it projects; required. A change writes the camera's lens and
+    /// draws the surface again.
+    pub projection: Option<Signal<Projection>>,
     /// Where it sits in its parent, looking down its own -Z; a change
     /// writes the camera's uniform alone.
     pub transform: Signal<Transform>,
@@ -66,16 +69,39 @@ impl Camera {
             panic!("<Camera> needs handle={{Some(..)}} and projection={{Some(..)}}: pass both")
         };
         let key = own_keys::anchor_key("Camera", props.anchor, &own_keys::CAMERA);
-        let kind = ("Camera", key, NodeKind::Camera { handle, projection });
+        let lens = projection.get_untracked();
+        let kind = NodeKind::Camera {
+            handle,
+            projection: lens,
+        };
         let mounted = mount_node(
             dom,
             (parent, before),
-            kind,
+            ("Camera", key, kind),
             props.transform,
             &Snippet::empty(),
         );
+        let placement = mounted.placement.clone();
+        mounted
+            .owner
+            .with(|| follow_projection(placement, projection));
         Self { mounted }
     }
 }
 
 node_component!(Camera, CameraProps);
+
+/// Writes each later value of `projection` to the camera and draws its
+/// surface again.
+fn follow_projection(placement: crate::placement::Placement, projection: Signal<Projection>) {
+    Effect::new(move || {
+        let lens = projection.get();
+        let written = placement
+            .scene
+            .borrow_mut()
+            .set_projection(placement.node, lens);
+        if refuse("Camera", written) {
+            placement.invalidate("Camera");
+        }
+    });
+}

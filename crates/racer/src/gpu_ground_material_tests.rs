@@ -18,9 +18,7 @@ use vapors_scene3d_gpu::SceneRenderer;
 use crate::gpu::{Scene as TrackScene, Track, TrackLog};
 use crate::model::{Camera, RADIUS, Race};
 
-#[path = "gpu_ground_material_target.rs"]
-mod target;
-use target::{Samples, drawn, mount, sampled};
+use crate::gpu_ground_material_target::{Samples, drawn, mount, sampled};
 
 /// Device pixels a ground unit spans: the Track's `min(w, h) / 400 * zoom`.
 const ZOOM: f32 = 6.0;

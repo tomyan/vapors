@@ -1,7 +1,11 @@
 //! The active camera: the one camera node holding the handle the scene
 //! root names (`docs/plans/3d-2.md`, decision 2).
 
-use crate::{CameraError, CameraHandle, Mat4, NodeId, NodeKind, Scene, StoreError};
+use crate::{CameraError, CameraHandle, Mat4, NodeId, NodeKind, Projection, Scene, StoreError};
+
+/// How far a rigid camera's axis lengths and their dot products may be
+/// from 1 and 0: f32 composition of rotations stays within about 1e-6.
+const RIGID_TOLERANCE: f32 = 1e-4;
 
 impl Scene {
     /// Names the active camera by the handle its camera node holds;
@@ -50,13 +54,54 @@ impl Scene {
             return Err(CameraError::NotCamera(camera));
         };
         let matrix = projection.matrix(aspect).map_err(CameraError::Projection)?;
-        let view_projection = matrix * self.world(camera)?.inverse();
+        let world = self.world(camera)?;
+        rigid(camera, world)?;
+        let view_projection = matrix * world.inverse();
         if view_projection.is_finite() {
             Ok(view_projection)
         } else {
             Err(CameraError::NotFinite(camera))
         }
     }
+
+    /// Sets camera `id`'s lens; whether it changed. The renderer writes
+    /// the camera's uniform when the view-projection changes.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Stale`], or [`StoreError::NotCamera`] for a group or
+    /// mesh.
+    pub fn set_projection(&mut self, id: NodeId, lens: Projection) -> Result<bool, StoreError> {
+        let node = self.node_mut(id)?;
+        let NodeKind::Camera { projection, .. } = &mut node.kind else {
+            return Err(StoreError::NotCamera(id, "set_projection"));
+        };
+        let changed = *projection != lens;
+        *projection = lens;
+        Ok(changed)
+    }
+}
+
+/// `world`, a camera's, refused unless it is a rotation and a
+/// translation (`CameraError::NotRigid`).
+fn rigid(node: NodeId, world: Mat4) -> Result<(), CameraError> {
+    let axes = [world.x_axis, world.y_axis, world.z_axis].map(glam::Vec4::truncate);
+    let lengths = axes.map(glam::Vec3::length);
+    let unit = lengths
+        .iter()
+        .all(|length| (length - 1.0).abs() <= RIGID_TOLERANCE);
+    let square = [(0, 1), (1, 2), (0, 2)]
+        .iter()
+        .all(|&(a, b)| axes[a].dot(axes[b]).abs() <= RIGID_TOLERANCE);
+    let mirrored = world.determinant() < 0.0;
+    if unit && square && !mirrored {
+        return Ok(());
+    }
+    Err(CameraError::NotRigid {
+        node,
+        lengths,
+        mirrored,
+    })
 }
 
 #[cfg(test)]

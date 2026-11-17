@@ -1,6 +1,6 @@
 use super::*;
 use crate::test_support::mesh;
-use crate::{Projection, Transform};
+use crate::{Projection, Quat, Transform, Vec3};
 
 fn camera(handle: CameraHandle) -> NodeKind {
     let projection = Projection::perspective(1.0, 0.1, 100.0).unwrap();
@@ -108,5 +108,74 @@ fn a_group_or_mesh_never_answers_for_a_camera() {
     assert_eq!(
         scene.active_camera(),
         Err(StoreError::CameraUnresolved(handle))
+    );
+}
+
+/// A scene whose active camera sits under a group placed by `group`.
+fn camera_under(group: Transform) -> (Scene, NodeId) {
+    let mut scene = Scene::new();
+    let handle = CameraHandle::new();
+    let root = scene.root();
+    let parent = scene.add(root, NodeKind::Group, group).unwrap();
+    let node = scene
+        .add(parent, camera(handle), Transform::IDENTITY)
+        .unwrap();
+    scene.set_camera(Some(handle));
+    scene.update();
+    (scene, node)
+}
+
+#[test]
+fn a_camera_under_a_scaling_or_mirroring_group_is_refused_naming_it() {
+    for (scale, mirrored) in [(Vec3::splat(2.0), false), (Vec3::new(1.0, -1.0, 1.0), true)] {
+        // Given
+        let group = Transform::new(Vec3::ZERO, Quat::IDENTITY, scale).unwrap();
+        let (scene, node) = camera_under(group);
+
+        // When
+        let refused = scene.view_projection(1.0).expect_err("refused");
+
+        // Then
+        let CameraError::NotRigid {
+            node: named,
+            mirrored: found,
+            ..
+        } = refused
+        else {
+            panic!("{refused:?}");
+        };
+        assert_eq!((named, found), (node, mirrored));
+    }
+}
+
+#[test]
+fn a_camera_under_a_turned_and_moved_group_is_held() {
+    let turned = Quat::from_rotation_y(0.7) * Quat::from_rotation_x(-0.4);
+    let group = Transform::new(Vec3::new(3.0, -2.0, 9.0), turned, Vec3::ONE).unwrap();
+    assert!(camera_under(group).0.view_projection(1.5).is_ok());
+}
+
+#[test]
+fn a_cameras_lens_is_set_and_a_mesh_is_refused() {
+    // Given
+    let (mut scene, node) = camera_under(Transform::IDENTITY);
+    let wide = Projection::orthographic_shorter(8.0, 0.0, 10.0).unwrap();
+
+    // When
+    let changed = (
+        scene.set_projection(node, wide),
+        scene.set_projection(node, wide),
+    );
+
+    // Then
+    assert_eq!(changed, (Ok(true), Ok(false)));
+    let NodeKind::Camera { projection, .. } = scene.kind(node).unwrap() else {
+        panic!("a camera");
+    };
+    assert_eq!(*projection, wide);
+    let root = scene.root();
+    assert_eq!(
+        scene.set_projection(root, wide),
+        Err(StoreError::NotCamera(root, "set_projection"))
     );
 }

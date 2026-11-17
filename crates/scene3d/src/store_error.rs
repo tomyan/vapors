@@ -35,6 +35,8 @@ pub enum StoreError {
     WorldPending(NodeId),
     /// A mesh's setter, named, called on a group or camera.
     NotMesh(NodeId, &'static str),
+    /// A camera's setter, named, called on a group or mesh.
+    NotCamera(NodeId, &'static str),
 }
 
 impl fmt::Display for StoreError {
@@ -66,6 +68,10 @@ impl fmt::Display for StoreError {
             Self::NotMesh(id, setter) => write!(
                 f,
                 "{id} is not a mesh, so Scene::{setter} cannot apply to it: pass a mesh node's id"
+            ),
+            Self::NotCamera(id, setter) => write!(
+                f,
+                "{id} is not a camera, so Scene::{setter} cannot apply to it: pass a camera node's id"
             ),
         }
     }

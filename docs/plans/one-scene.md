@@ -355,7 +355,7 @@ releases geometry on unmount.
 | Racer today | One scene |
 |---|---|
 | `Track` renderer, its own pipelines (`gpu.rs`, `gpu/setup.rs`, `gpu/pipeline.rs`, `track.wgsl`) | `SceneRenderer` on the same `gpu-surface` named `track`; those files deleted |
-| Hand-written tilted orthographic projection in `vs_solid` | a `<Camera>` with `Projection::Orthographic { height, .. }` under a group carrying the tilt, yaw and look-ahead; `height` from the racer's zoom |
+| Hand-written tilted orthographic projection in `vs_solid` | a rigid `<Camera>` in the scene's root carrying the tilt, yaw and look-ahead, its lens `Projection::orthographic_shorter(400 / zoom, ..)`: the Track's `min(w, h) / 400 * zoom` pixels a unit on any target, the projection taking the target's shape at each render; zoom is a lens change through `<Camera projection>`'s signal (#483 review M1 (b)) |
 | Simulation X, Y ground, Z up | one root `<Group>` mirroring Y and then rotating -90 degrees about X (scale (1, -1, 1)), so simulation (x, y, z) is the scene's (x, z, y), the racer's geometry keeps its coordinates and the scene stays +Y up. The Track draws X right and Y down the screen from above, a reflection of a right-handed frame, which no rotation reproduces (#482 review H1, L54 (a)). The cameras sit outside this group: a camera's view inverts its whole world matrix, so one inside would take the mirror into its view and undo it. A node of determinant -1 draws today (no culling, shade baked per vertex, picking takes either face); F8 and F9 record what a renderer adding culling or lit normals must do |
 | Car flag in the vertex and heading in the shader | `<Group transform={car}>` holding the car's meshes; one uniform write per frame |
 | Face shading baked into vertex colours | a per-vertex shade factor times the node's CSS colour (D4) |
@@ -366,6 +366,37 @@ releases geometry on unmount.
 
 That is about 11 scene draws before decals: ground 1, scenery 4, car 6
 (wheels, body, cabin, roof, two brake lights). R3a1 pins the count.
+
+Built in R3a1 (2026-11-17): `world.rs` and `world_geometry.rs` in
+`vapors-racer`, and the test page `tests/pages/racer_world.wisp`. The
+Track and the scene draw from one geometry source: each triangle is
+tagged with its part, and the Track bakes the part's colour while the
+scene takes it from CSS. The scene draws 10: ground 1, scenery 4, and
+car 5 (wheels, body, cabin, roof, and the stripes as one mesh). With the
+composition that is 11 in `FrameCounts::surfaces`, pinned in both
+cameras.
+- **Stripes.** They stay a mesh because R4, which was to replace them,
+  waits on S8, which is not built; the decal comes as F9. R3b adds the
+  two brake lights.
+- **Camera.** It sits in the scene's root, rigid:
+  `Scene::view_projection` refuses a camera whose world matrix scales,
+  shears or mirrors (`CameraError::NotRigid`), so F8 may invert a
+  camera's world matrix as a rotation and a translation. Its lens is
+  `orthographic_shorter(400 / zoom)`, a `Signal` on `<Camera
+  projection>` written through `Scene::set_projection`, so a zoom is a
+  lens change and a resize needs nothing from the app.
+- **The Track's tilt is a rotation, not an oblique projection.** Screen
+  y = y cos - z sin and depth = y sin + z cos, so an orthographic camera
+  reproduces it exactly. The check therefore compares whole pictures:
+  wherever the Track's picture is flat (a pixel and its eight neighbours
+  within 2 a channel), the scene's pixel matches it within 6 (the
+  ground's noise, which hashes `floor(q)`, can take the next cell's value
+  at a cell's edge). It runs in the fixed and the following camera, on a
+  portrait target, and close on the car (6 pixels a unit, about 59,000
+  flat pixels). The car roof's centre also lands where
+  `Projection::project` puts it. Dropping the mirror, putting the camera
+  inside the group (now refused as not rigid), and turning the car by
+  0.1 rad each fail it.
 
 The ground and object check from 3D slice 2 (`3d-2.md`) is run on the
 racer: the car's base and the ground under it land on the same pixel,
@@ -568,7 +599,7 @@ is checked against what it found.
 | S6 | Known-variable geometry: `d={expr}` tessellated on change, counted | Changing the signal tessellates that element once; others 0 | S5b | everything after S5b; not on property 9's path |
 | R1 | The shade factor (D4): a per-vertex shade in `Meshes` geometry, multiplied by the node's colour in `shader.wgsl` | Pixel tests: a cube with shades 0.65 and 1.0 on two faces under one CSS colour; the ground and object check still passes | 3D PR 5 (shares `meshes.rs`) | IU4, S rows |
 | R2 | The ground material (D5): an application material on a mesh node (a WGSL fragment given by the app, reading world position from the scene's view-projection); the racer's ground shader ported to it | The racer's ground drawn through it matches `track.wgsl`'s colours at sample points on road, kerb, verge and grass, within 1 per channel | R1 | IU4, S rows |
-| R3a1 | The racer's world in `.wisp`: root group, camera, ground, merged scenery, car group, on a test page beside the racer | The ground and object check on the racer's geometry in both cameras, which covers the tilted and rotated views R2b does not (R2b compares straight down only) and the root group's mirror (2.2); scene draw calls pinned (about 11, 2.2) | R2, 3D PRs 4 and 5 | S rows |
+| R3a1 | Built (2026-11-17, see 2.2). The racer's world in `.wisp`: root group, camera, ground, merged scenery, car group, on a test page beside the racer | The ground and object check on the racer's geometry in both cameras, which covers the tilted and rotated views R2b does not (R2b compares straight down only) and the root group's mirror (2.2); scene draw calls pinned (about 11, 2.2) | R2, 3D PRs 4 and 5 | S rows |
 | R3a2 | The racer moves to it; `Track` and its files deleted; the tests in 2.2 moved | Every moved test passes; idle frames render nothing; browser scripts pass by hand | R3a1 | S rows |
 | R3b | CSS on the craft: `--craft-body`, the livery enum, brake-light meshes with `class:braking`, `:hover` (2.4) | Pixel tests per rule (the brake lights brighten while braking); each change counted: no geometry, one uniform per changed node | R3a2, 3D PR 4b | S rows |
 | S7 | Not built. Tom, 2026-11-16: property 9 is judged on the flat scene; S7 and the SceneRenderer decal route are not built; the decal comes as F9. | | | |
@@ -661,10 +692,9 @@ renderer and `ground_material()` both draw from, the material matching
 the Track's colours (within 1 a channel) at road, kerb, verge, grass
 and start-stripe points, at the centre and the middles of the left, top
 and bottom edges, the colours pinned as literals so R3a2 can delete the
-Track. Only the straight-down orthographic view is compared: the
-Track's tilt is an oblique affine projection and the scene's camera a
-perspective one, so R3a1's check in both cameras owns the tilted and
-rotated views.
+Track. Only the straight-down orthographic view is compared there;
+R3a1's check owns the tilted and rotated views (the Track's tilt is a
+rotation, which an orthographic camera reproduces, 2.2).
 
 **D6. What "no frame over 16.7 ms" measures.** (a) Frame-to-idle: from
 the start of `App::frame` to the GPU finishing that frame's work, frames
