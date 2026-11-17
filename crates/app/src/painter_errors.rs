@@ -41,6 +41,9 @@ pub enum NewPainterError {
     Format(UnsupportedFormat),
     /// The device cannot hold the glyph atlas's pages.
     Atlas(AtlasSizeError),
+    /// The format is not guaranteed to draw at the sample count asked
+    /// for (`flat-scene-f7.md`, L2 of its F7a1 review).
+    Samples(vapors_renderer::PassFormat),
 }
 
 impl From<UnsupportedFormat> for NewPainterError {
@@ -60,11 +63,46 @@ impl fmt::Display for NewPainterError {
         match self {
             Self::Format(error) => error.fmt(f),
             Self::Atlas(error) => write!(f, "ScenePainter's glyph atlas: {error}"),
+            Self::Samples(pass) => write!(
+                f,
+                "ScenePainter at {} samples on {:?}: the format is not guaranteed to draw at that count on this device; make the painter at 1 sample or on {}",
+                pass.samples.count(),
+                pass.format,
+                supported_names()
+            ),
         }
     }
 }
 
 impl std::error::Error for NewPainterError {}
+
+/// The formats a painter draws to ([`SUPPORTED`]), named for a fix.
+fn supported_names() -> String {
+    let names: Vec<String> = SUPPORTED
+        .iter()
+        .map(|format| format!("{format:?}"))
+        .collect();
+    names.join(" or ")
+}
+
+/// `pass`, when its format is guaranteed to draw at its sample count on
+/// a device with `features` (wgpu's guaranteed format features, which
+/// need no adapter); else the refusal.
+///
+/// # Errors
+///
+/// [`NewPainterError::Samples`] as said.
+pub(super) fn supported_samples(
+    pass: vapors_renderer::PassFormat,
+    features: wgpu::Features,
+) -> Result<vapors_renderer::PassFormat, NewPainterError> {
+    let flags = pass.format.guaranteed_format_features(features).flags;
+    if flags.sample_count_supported(pass.samples.count()) {
+        Ok(pass)
+    } else {
+        Err(NewPainterError::Samples(pass))
+    }
+}
 
 /// Why [`ScenePainter::draw_over`](super::ScenePainter::draw_over) drew
 /// nothing or an incomplete frame.
@@ -73,6 +111,10 @@ pub enum DrawOverError {
     /// `html` or `body` sets a background: it is the canvas's, which
     /// drawing over never paints.
     CanvasBackground(CanvasFrom),
+    /// A 4-sample painter draws into its own 4x texture, which holds
+    /// nothing of what the target holds (`docs/plans/flat-scene-f7.md`,
+    /// Q4).
+    Multisampled,
     /// As for `draw`.
     Paint(PaintError),
 }
@@ -84,6 +126,10 @@ impl fmt::Display for DrawOverError {
                 f,
                 "the document's {} sets a background, which becomes the canvas's, and drawing over paints no canvas; set the background on an element inside it",
                 from.tag()
+            ),
+            Self::Multisampled => write!(
+                f,
+                "draw_over at 4 samples: the painter draws into its own 4x texture, which holds nothing of what the target holds, so there is nothing to draw over; draw the page with draw, or make the painter at 1 sample"
             ),
             Self::Paint(error) => error.fmt(f),
         }
@@ -153,3 +199,7 @@ impl std::error::Error for PaintError {}
 mod surface_errors;
 pub use surface_errors::MountError;
 pub(crate) use surface_errors::Refusal;
+
+#[cfg(test)]
+#[path = "painter_errors_tests.rs"]
+mod tests;
