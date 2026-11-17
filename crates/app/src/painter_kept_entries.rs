@@ -5,7 +5,6 @@
 use vapors_renderer::Target;
 use vapors_scene::Run;
 
-use super::Kind;
 use crate::painter::ScenePainter;
 use crate::painter::rows::Moved;
 
@@ -24,10 +23,7 @@ impl ScenePainter {
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
-        let on_the_table = matches!(
-            Kind::of_run(run),
-            Some(Kind::Shadows | Kind::Quads | Kind::ClosedForms)
-        );
+        let on_the_table = crate::painter::runs::on_the_clip_table(run);
         let clip = match moved.clip.filter(|_| on_the_table) {
             Some(clip) => self.clip_entry(target, (frame, clip), moved)?,
             None => 0,

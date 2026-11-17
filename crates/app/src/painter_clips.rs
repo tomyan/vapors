@@ -73,8 +73,18 @@ impl Clips {
             None => self.table.take(target.encoder, 1)?,
         };
         let rect = [clip.left, clip.top, clip.right, clip.bottom];
-        let entry = ClipEntry::rect(rect, frame_entry);
-        self.table.set(target.encoder, target.queue, at, entry);
+        self.table.set(
+            target.encoder,
+            target.queue,
+            at,
+            ClipEntry::rect(rect, frame_entry),
+        );
+        self.hold(key, at, frame_entry);
+        Some(at)
+    }
+
+    /// `at` held for `key`, naming `frame_entry`, drawn this frame.
+    fn hold(&mut self, key: (BatchFrame, [u32; 4]), at: u32, frame_entry: u32) {
         let drawn = self.frame;
         self.held.insert(
             key,
@@ -84,7 +94,6 @@ impl Clips {
                 drawn,
             },
         );
-        Some(at)
     }
 
     /// Gives back the entries this frame did not draw, writing their
@@ -154,10 +163,7 @@ pub(super) fn assert_agrees(
     (clip, draw): (Rect, FrameDraw),
 ) {
     let entry = clips.entry(at);
-    let matrix = transforms.matrix(entry.frame);
-    let [left, top, right, bottom] = entry.rect;
-    let moved = Rect::new(left, top, right, bottom).offset([matrix[12], matrix[13]]);
-    let shader = draw.clip.map_or(moved, |outer| moved.intersection(outer));
+    let shader = on_the_page(transforms, &entry, draw.clip);
     assert_eq!(
         Some(shader),
         draw.on_page(Some(clip)),
@@ -168,6 +174,16 @@ pub(super) fn assert_agrees(
         entry.frame,
         draw.shift
     );
+}
+
+/// Where the clip shader puts `entry` on the page: its rectangle moved
+/// by the translation its frame entry holds, cut to the frame's clip
+/// `outer`.
+fn on_the_page(transforms: &TransformTable, entry: &ClipEntry, outer: Option<Rect>) -> Rect {
+    let matrix = transforms.matrix(entry.frame);
+    let [left, top, right, bottom] = entry.rect;
+    let moved = Rect::new(left, top, right, bottom).offset([matrix[12], matrix[13]]);
+    outer.map_or(moved, |outer| moved.intersection(outer))
 }
 
 #[cfg(test)]

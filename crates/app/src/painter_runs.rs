@@ -151,7 +151,8 @@ fn assert_parallel(kept: &KeptBatched) {
 
 /// Whether `run`'s items take their clip from the clip table (flat-scene
 /// F3.1): quads, shadows and closed-form shapes, the pipelines on F2.1's
-/// tables.
-fn on_the_clip_table(run: &Run) -> bool {
+/// tables. The one answer: the scissor here and the clip entry in
+/// `painter_kept_entries.rs` both read it (verify of #463, 1).
+pub(super) fn on_the_clip_table(run: &Run) -> bool {
     matches!(run, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
 }
