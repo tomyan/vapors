@@ -30,8 +30,10 @@ its environment, the network open and the whole home directory writable.
   key is a dummy.
 - **The harness server** (outside, on the socket): forwards
   `POST /v1/messages` and `/v1/messages/count_tokens` to the API with the
-  real key (curl, the key on its stdin), and refuses and logs anything
-  else; `HEAD /api/hello` waits on the lead's decision (F4). It sums the usage in each
+  real key (curl, the key on its stdin), at most 8 at once; answers
+  `HEAD /api/hello`, the CLI's connectivity check, itself with 200,
+  never forwarded and never keyed, and counts it (the lead, L13); and
+  refuses and logs anything else. It sums the usage in each
   response against the budget. The MCP tools `ask_lead` and
   `request_push` (served inside by `xtask api-relay-inner`'s MCP mode) post to it.
 
@@ -86,10 +88,11 @@ commit).
    (the relay and the session's parent) and the harness server, with its
    caps; (c) the fences and `cargo xtask api-fences <name>`, which proves
    them.
-2. **Proxy, key and budget**: the harness server's API route, the price
-   table in `.config/factory.toml` (a model with no price is refused),
-   `cargo xtask api-build` running the session; the key probe against the
-   live key file.
+2. **Proxy, key and budget**, in two PRs after #469 was split: (a) the
+   request reading, usage, prices and budget; (b) the forwarding, the
+   API route, the session and `cargo xtask api-build`. A model with no
+   price in `[api_build.prices]` is refused, and the run fails when the
+   proxy's count and the CLI's reported cost differ.
 3. **`ask_lead`**: the MCP server inside; `q<N>.md` written and its path
    logged, `a<N>.md` read, 30 minutes, then `BLOCKED.md` and stop.
 4. **`request_push`**: `cargo xtask ci` in a fresh sandbox, the path and

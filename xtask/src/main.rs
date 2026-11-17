@@ -3,12 +3,10 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
-// Relaxed guard, declared: the budget, prices and proxy are made only by
-// `cargo xtask api-build`, which lands in the next PR (the #469 split);
-// until then only their tests make them. Retired by that PR, which
-// removes these allows.
-#[allow(dead_code, reason = "constructed by api-build, the next PR")]
 mod api_budget;
+mod api_build_report;
+mod api_build_run;
+mod api_build_setup;
 mod api_clone;
 mod api_fds;
 mod api_fences;
@@ -18,12 +16,11 @@ mod api_host;
 mod api_http;
 mod api_inner;
 mod api_paths;
-#[allow(dead_code, reason = "constructed by api-build, the next PR")]
 mod api_prices;
 mod api_sandbox;
 mod api_server;
-#[allow(dead_code, reason = "constructed by api-build, the next PR")]
 mod api_server_proxy;
+mod api_session;
 mod api_upstream;
 mod api_usage;
 mod builds;
@@ -190,6 +187,20 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::ApiFences { name } => return api_fences_run::run(&name),
+        Command::ApiBuild {
+            name,
+            brief,
+            budget,
+            model,
+        } => {
+            let order = api_build_run::Order {
+                name: &name,
+                brief: &brief,
+                budget,
+                model: &model,
+            };
+            return api_build_run::run(&order);
+        }
         Command::ApiRelayInner {
             port,
             socket,
