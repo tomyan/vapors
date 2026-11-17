@@ -535,12 +535,15 @@ in the pass multisampled. Analytic 2D coverage is unchanged by that
 (the fragment shader runs once per pixel, writes an alpha, and the
 blend is the same across the pixel's samples), so a 2D-only page would
 pay MSAA's bandwidth for nothing; the pass is therefore multisampled
-only when `PaintUses::scenes` (or a mesh pipeline) is set. Second, the
+only when `PaintUses::scenes` is set (4.2). Second, the
 multisampled attachment resolves into the swapchain texture at the end
 of the pass (`resolve_target`), with the multisampled colour stored as
 `Discard`, which is the form that is near free on tile GPUs (Arm
 reports 4x MSAA at a 1 to 2% cost with resolve attachments and
-`DONT_CARE` store; section 11). On the UHD 630, which is not a tiler,
+`DONT_CARE` store; section 11). That is the one-pass form F8 reaches;
+until then a frame can open more than one pass on a view, so F7 stores
+the multisampled colour at the end of each pass and resolves each
+(`flat-scene-f7.md`, Q3). On the UHD 630, which is not a tiler,
 the cost is memory bandwidth: 4 samples of 4 bytes of colour and 4 of
 depth at 1100 x 720 is about 25 MB written per frame plus the resolve's
 reads; at the order of tens of GB/s that is under a millisecond, but
@@ -549,13 +552,16 @@ the number is to be measured (F7), not assumed.
 ### 4.2 The pass's sample count
 
 ```
-sample_count = if uses.scenes || uses.pipelines has a mesh pipeline { 4 } else { 1 }
+sample_count = if uses.scenes { 4 } else { 1 }
 ```
 
 Fixed per page from the merged table, so no pipeline is made twice and
-no frame switches. A 4x page draws its 2D content multisampled too;
-the quads, shadows and text pipelines exist in both sample counts in
-the pipeline registry, keyed by the page's count. WebGPU guarantees
+no frame switches. The rule first also turned 4x on for a mesh
+pipeline; F7's note (`flat-scene-f7.md`, plan item 1) drops that as
+our reading of D2, since 2D meshes have exact coverage without MSAA
+(S3a3). A 4x page draws its 2D content multisampled too; the painter
+is built for the page's count, its pipelines with it (F7's note: there
+is no registry, and a page of the other count gets its own painter). WebGPU guarantees
 sample count 4 for the formats in use (`rgba8unorm`, `bgra8unorm`,
 `depth32float`), so no device query is needed; a device that cannot
 would fail pipeline creation before frame 0, which is a loud failure
@@ -1000,7 +1006,7 @@ content enters the list.
 | F4b | Animating transforms | A bound custom property read by `transform` as the run-time source; the animating state (4.3): class held through the motion, `SETTLE_FRAMES` declared with its reason, `UpdateCounts::parts_reclassed` (added here, with the code that increments it) at start and settle only; the table entry rewritten per frame | W7 (boxes): `parts_reclassed` 2 per cycle, `batches_written` 0 while moving, table writes 1 per moving frame; the centroid rule against an exact-coverage reference; a snap mid-motion proven to fail it by breaking (class recomputed per frame); `crossing_the_whole_translation_boundary_reclasses_once`: a transform that crosses 4.3's tolerance repaints the frame's parts once, `parts_reclassed` 1 (the pop F4a's return to a whole translation and F11's panel show) | F4a |
 | F5 | Text under translation (regime B) | Atlas glyphs at fractional positions with bilinear sampling while the node animates; re-quantised at settle; the baseline not rounded while moving | W7 with text: `rasterisations` 0 while moving; the settle frame equals regime A's pixels for that transform (bytes compared); screenshots at the settle frame recorded; the Chromium comparison at rest before and after unchanged | F4b |
 | F6 | Text under rotation (regime C) | Glyph outlines tessellated into shape entries cached by (font, glyph, tolerance), behind `runtime-shapes`; drawn through the shapes pipeline with `adjust()`; `rotate()` and `skew()` accepted; the A/C weight difference measured at rest at 13, 16 and 28 px against Chromium at 0, 15, 45 and 90 degrees | The difference recorded with the paint rules' verdict per size; the switch rule's thresholds in `docs/text.md`; a rotated-text fixture passes or the question returns to Tom with the numbers | F5; one-scene S2, S3a2, S3b |
-| F7 | MSAA decision | The pass sample count from a page flag (the `PaintUses` field before F10 exists); every 2D pipeline in both counts in the registry; a resolve into the target; `GpuTimer` A/B on the rows page, W10 and the racer page at 1 and 4 samples on the UHD 630 and the Pixel 9 Pro; a mesh fixture (a tilted cube's edge) compared with an 8x reference at 1 and 4 | The numbers in `docs/perf/`; decision D2 answered with them; pixels unchanged at 1 sample | F3 |
+| F7 | MSAA decision | The pass sample count from a page flag (the `PaintUses` field before F10 exists; 4x for a page with a scene, our reading of D2, `flat-scene-f7.md`); the painter built for the page's count, its 2D pipelines with it; a resolve into the target; `GpuTimer` A/B on the rows page, W10 and the racer page at 1 and 4 samples on the UHD 630 and the Pixel 9 Pro; a mesh fixture (a tilted cube's edge) compared with an 8x reference at 1 and 4 | The numbers in `docs/perf/`; decision D2 answered with them; pixels unchanged at 1 sample | F3 |
 | F8 | The scene in the one pass | `Item::Scene` as a context: the scene's range drawn in the painter's pass with the depth attachment (present only when a scene is on the page), the viewport depth slice per scene, the slice-count refusal; meshes as instances of one in `Retained` with the world matrix in the transform table (E1 (a)); `slots.rs` retired; the scene's offscreen texture and composite gone; `Item::Surface` kept for application renderers | The ground and object check (`3d-2.md`) passes in the one pass; two scenes on one page do not depth-test each other (pixel test); HTML over the scene unchanged; the racer's 60 s run (one-scene P0's judge) before and after in `docs/perf/`; `passes` per frame pinned 1; `FrameCounts::surfaces` for the scene's work folded into the frame's counts with the pins moved, each proven by breaking | F2, F7; one-scene R3a2 (the racer on `SceneRenderer`) |
 | F9 | Primitives under a scene node | Shapes (decal paths) as primitives with a 4x4 transform in the scene's context, depth bias, drawn after opaque meshes; `<Decal>` from one-scene S8 on this route; S7's `SurfaceFrame::shapes` not built or retired | One-scene S7's acceptance on this route (a decal on a plane at 60 degrees against an 8x reference; no depth fighting at the racer's widest zoom); a livery toggle writes paint bytes, no geometry | F8; one-scene S5b |
 | F10 | `PaintUses` | The compiler emits the table per crate from B1's classification over `transform`, `overflow-*`, `border-radius`, scene tags and element kinds; the registry makes pipelines from the merged table at mount; the unsnapped path, outline regime and clip kinds are built only when named; `paint_uses_unknown` for hand-built pages; `wisp-check --paint` prints the table and each element that widens it with `file:line` | Snapshot per demo and the racer; a `<Mesh>` added from Rust on a page whose crates name no scene refused naming the site; `paint_uses_unknown` 0 pinned on Mount, the racer and one demo; the debug within-table assertion proven by breaking | F4a, F8; build-time-styles B3b |

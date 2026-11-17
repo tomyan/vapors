@@ -33,8 +33,12 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
   Consecutive draws on one view share the pass. A frame can open more
   than one pass, one per view: `gpu-surface` textures
   (`app/src/painter_surface_texture.rs`) and the frame clock's
-  (`frame_clock.rs`). Every vapors-perf workload opens one pass a frame
-  (`gpu_timer.rs`, `DEFAULT_PAIRS`).
+  (`frame_clock.rs`), and `FrameEncoder::flush` ends the open pass
+  mid-frame (at its pass budget, or for a repacked atlas page), so the
+  next draw on the view begins another. Every vapors-perf workload drew
+  one pass a frame when last counted (`docs/perf/baseline-2026-11-10.md`,
+  the harness at 03c4514); the racer's track renders in its
+  `gpu-surface`'s own encoder, which that count leaves out.
 - **No registry and no `PaintUses`.** `ScenePainter::new(device,
   format)` builds each pipeline once. `PaintUses` arrives with F10.
 - **3D is drawn outside the painter's pass until F8.** A scene renders
@@ -57,24 +61,45 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
 1. **The flag.** A page is 4x when it contains a `<Scene>`, and 1x
    otherwise. A page with only 2D meshes stays 1x (Q1). This is our
    reading of D2, not its wording: D2 (a) turns 4x on for "pages whose
-   table names a mesh pipeline" and keeps 2D coverage analytic. Since
-   S3a3, 2D meshes have exact coverage without MSAA, so we read the mesh
-   pipeline D2 means as the 3D one.
+   table names a mesh pipeline" and keeps 2D coverage analytic, and
+   4.2's rule is `uses.scenes || uses.pipelines has a mesh pipeline`.
+   Since S3a3, 2D meshes have exact coverage without MSAA, so we read
+   the mesh pipeline D2 means as the 3D one and drop 4.2's second
+   condition. `flat-scene.md` 4.2 and the F7 row now say so.
 2. **One count a painter.** `ScenePainter::new` takes the sample count,
    and passes it to every pipeline's constructor. A page needing the
    other count gets a new painter, as a format change already does.
    That replaces "both counts in the registry", since there is no
    registry (Q2).
-3. **The pass at 4x.** The painter keeps a 4x colour texture the size of
-   each view it draws into. Its pass draws into that texture and
-   resolves into the view. `draw` clears the 4x texture. A later pass on
-   the same view in the same frame loads it, so the texture is stored
-   at the end of every pass, and every pass resolves (Q3). `draw_over`
+3. **The pass at 4x.** The painter's pass draws into a 4x colour texture
+   and resolves into the target's view. `draw` clears the 4x texture. A
+   later pass on the same view in the same frame (another view's pass
+   between, or a flush) loads it, so the texture is stored at the end
+   of every pass, and every pass resolves (Q3).
+   - **Owner and key.** The painter owns its 4x textures, one for each
+     (viewport size, format) it draws to: the viewport, not the
+     texture's size, so a view of a smaller mip level gets a texture of
+     that level's size.
+   - **Lifetime.** A texture is made on the first draw to a target of
+     its key, kept while each frame draws to that key, and dropped
+     after a frame that does not, the rule kept bytes and table entries
+     already follow. A resize is a new key: the old texture goes after
+     the first frame at the new size.
+   - **Where.** `Target` gains the 4x view beside the target's view
+     (`None` at 1x). `FrameEncoder::begin` passes both to
+     `OpenPass::begin`, which attaches the 4x view with the target's
+     view as `resolve_target` (today `None`, `open_pass.rs`), and
+     `OpenPass::is_on` still compares the target's view.
+   - **Not multisampled:** `gpu-surface` textures, which application
+     renderers draw with their own pipelines, and the frame clock's
+     pass.
+   `draw_over`
    on a 4x painter is refused, naming `draw_over` and the sample count:
    the 4x texture holds nothing to draw over, and loading the view into
    it would need a copy pass (Q4).
 4. **Timing.** A script runs each page at 1 and 4 samples and reads
-   `GpuTimer`: the rows page, W10 (added in F3) and the racer page. For
+   `GpuTimer`: the rows page, W10 and the racer page. W10 is added by
+   F3, which F7 follows; F7b stops and reports if it is not on main. For
    the racer, the painter's pass is timed at 4x. The racer's own 3D
    pass is a different renderer and stays at 1x, so 3D at 4x is
    measured on the one-scene example instead (Q5). The UHD 630 is run
@@ -96,7 +121,9 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    difference as the bound, and the constant in the test cites the
    measurement (Q7).
 7. **Memory.** The 4x colour texture is 16 bytes a pixel: 12.7 MB at
-   1100 x 720, and 41.5 MB on the Pixel 9 Pro at 1080 x 2400. It is
+   1100 x 720, and 41.5 MB on the Pixel 9 Pro at 1080 x 2400. That is
+   colour alone; 4.1's estimate also counts a 4x depth buffer, which F8
+   adds. It is
    recorded beside the times. A memoryless attachment on tilers needs
    the texture discarded at the end of the pass, so it waits for F8,
    where the frame has one pass.
@@ -112,27 +139,30 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
   bound of 1x; a frame of two passes on one view at 4x matching the
   same frame at 1x within that bound; the `draw_over` refusal proven by
   breaking it.
-- **F7b, the numbers.** The timing script, the cube fixture against the
-  reference, the Pixel 9 Pro run by hand, a report in `docs/perf/`, and
-  D2 answered in `flat-scene.md`.
+- **F7b, the numbers.** The timing script; the debug-only sample-count
+  switch on the served page, for the Pixel 9 Pro run by hand; the cube
+  fixture against the reference; a report in `docs/perf/`; and D2
+  answered in `flat-scene.md`.
 
 ## Questions, answered
 
 The lead accepted all eight recommendations as written (L12,
-2026-11-17). Q1 is recorded in the plan as our reading of D2, so a
-reviewer can contest it. On Q4, touche does not call `draw_over`
+2026-11-17). Q1 is recorded in the plan (item 1 above, `flat-scene.md`
+4.2 and the F7 row) as our reading of D2, so a reviewer can contest
+it. On Q4, touche does not call `draw_over`
 either (the lead checked).
 
-1. **Flag: scenes only, not 2D meshes?** 4.2's rule turns 4x on for "a
-   mesh pipeline". Since S3a3, 2D meshes get exact coverage without
+1. **Flag: scenes only, not 2D meshes?** 4.2's rule turns 4x on for
+   scenes or a mesh pipeline. Since S3a3, 2D meshes get exact coverage without
    MSAA. I recommend `scenes` alone, so a page of SVG icons stays at 1x.
 2. **A painter per count, rather than a registry?** No registry exists.
    A painter built for one count matches "fixed per page" in 4.2 with no
    new structure. I recommend it.
 3. **Store and resolve at the end of every pass at 4x?** That is
    correct for frames with several passes on one view, and costs the
-   store and a resolve per pass. Every vapors-perf workload has one pass
-   a frame, so the measured cost is one store and one resolve. F8 pins
+   store and a resolve per pass. Every vapors-perf workload had one pass
+   a frame at the last count (`baseline-2026-11-10.md`), so the measured
+   cost is one store and one resolve. F8 pins
    one pass and can switch to discard. I recommend storing until F8.
 4. **Refuse `draw_over` at 4x?** The other option is a copy pass that
    loads the view into the 4x texture first. Nothing in vapors calls
