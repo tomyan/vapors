@@ -63,13 +63,16 @@ fn a_machine_without_bwrap_is_refused_naming_the_fix() {
 }
 
 /// A stand-in for bwrap at a path in a scratch directory: a script that
-/// prints `listed` and exits with `code`.
+/// writes its arguments to `bwrap.argv` beside it, prints `listed`, and
+/// exits with `code`.
 fn fake_bwrap(name: &str, listed: &str, code: i32) -> (crate::scratch::Scratch, String) {
     let dir = crate::scratch::dir(name);
     let program = dir.join("bwrap");
     std::fs::write(
         &program,
-        format!("#!/bin/sh\nprintf '%s' '{listed}'\nexit {code}\n"),
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$0.argv\"\nprintf '%s' '{listed}'\nexit {code}\n"
+        ),
     )
     .expect("written");
     let executable = std::os::unix::fs::PermissionsExt::from_mode(0o755);
@@ -86,8 +89,13 @@ fn a_bwrap_that_lists_nothing_hides_dev_dri_and_one_that_lists_or_fails_does_not
     let (_listed, shows) = fake_bwrap("bwrap-shows", "renderD128", 0);
     let (_failed, fails) = fake_bwrap("bwrap-fails", "", 1);
 
-    // Then
-    assert_eq!(check_with(&hides), Ok(()));
+    // When
+    let hidden = check_with(&hides);
+
+    // Then: it was asked to hide /dev/dri, and its answers are read
+    assert_eq!(hidden, Ok(()));
+    let argv = std::fs::read_to_string(format!("{hides}.argv")).expect("the stand-in's arguments");
+    assert!(argv.contains("--tmpfs\n/dev/dri\n"), "{argv}");
     assert!(
         check_with(&shows)
             .expect_err("listed")

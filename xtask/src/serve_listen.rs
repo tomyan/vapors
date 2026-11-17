@@ -60,7 +60,12 @@ fn owned_by(unit: &str, port: u16) -> Result<(), String> {
 /// gave as `main` ("0" for a unit not running). Split from [`owned_by`]
 /// so its test runs where there is no user bus to ask (an API builder's
 /// sandbox): the test gives systemd's answer; `cargo xtask serve` on the
-/// host asks systemd itself.
+/// host asks systemd itself. That real call, in [`owned_by`], has no test
+/// in any tier: a host_ test of it (a transient unit on a free port)
+/// passes under `cargo xtask ci` but fails under the gate, whose bwrap
+/// puts each step in a user namespace from which `ss -p` cannot name the
+/// unit's process (tried 2026-11-17); a mis-spelt argument there would be
+/// found by the next `cargo xtask serve`, which refuses loudly.
 fn owned_by_main(unit: &str, main: &str, port: u16) -> Result<(), String> {
     let listening = output("ss", &["-ltnpH", &format!("sport = :{port}")])?;
     let owner = listener(&listening);

@@ -73,7 +73,10 @@ fn the_unit_tier_leaves_out_the_gpu_pmu_and_host_tests() {
 
 #[test]
 fn the_host_tier_runs_the_host_tests_alone() {
+    // When
     let step = host();
+
+    // Then
     assert_eq!(step.args.last().map(String::as_str), Some(HOST_TESTS));
 }
 
