@@ -1008,11 +1008,13 @@ content enters the list.
 | F13 | Opaque reordering | Order-as-depth for opaque 2D primitives (Graphite's and WebRender's rule) if W12's profile shows pipeline switches over a stated share of draw; opaque front to back with depth write, blended back to front | Only on that measurement; `draw` on W12 down by the predicted share; pixels unchanged | F8, W12 |
 | W1 to W12 | Workloads | As section 6; one PR each, placed with the slice that lets the page mount | Each with first numbers in `docs/perf/` | per row |
 
-Critical path: F1, F2, F3 (useful alone: fewer binds, rounded clips;
-F2s, sticky, any time after F2.1 to F2.3, the split of F2),
-then F4a, F4b, F5 (transforms on HTML with crisp text at rest), then
-F7 and F8 (one pass with the scene), then F6, F9, F10, F11, F12. F13
-only on a number. Workloads W6 (its own pull request after F1), W1, W4, W10 (F3), W7 (F4a), W8
+Critical path (Tom, 2026-11-17, reordered for property 9): F1, F2
+(F2.1 to F2.3), F3 (useful alone: fewer binds, rounded clips; F2s,
+sticky, any time after F2.1 to F2.3); then F7, F8 and F9, and property
+9's run (W11 and the 60 s scene); then F4a, F4b, F5 (transforms on HTML
+with crisp text at rest), F6, F10, F11 and F12. F13 only on a number.
+The reason: property 9's test scene has untransformed HTML on top, so
+it does not need F4a to F5. Workloads W6 (its own pull request after F1), W1, W4, W10 (F3), W7 (F4a), W8
 (F5), W9 (one-scene S3a1), W11 (F8), W12 (after F2s, for its sticky
 header), W2, W3, W5 (any time after
 F1) carry the measurements.
