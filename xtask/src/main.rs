@@ -3,22 +3,15 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
-// Relaxed guard, declared: the API builder's sandbox
-// (docs/plans/api-builder.md) is read by `cargo xtask api-fences`, which
-// lands in the next PR (the #467 split); until then only its tests use it.
-// Retired by that PR, which removes these allows.
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_clone;
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_fds;
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
+mod api_fences;
+mod api_fences_run;
+mod api_fences_works;
 mod api_host;
 mod api_inner;
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_paths;
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_sandbox;
-#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_server;
 mod builds;
 mod builds_config;
@@ -183,6 +176,7 @@ fn main() -> ExitCode {
     let steps = match cli.command {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
+        Command::ApiFences { name } => return api_fences_run::run(&name),
         Command::ApiRelayInner {
             port,
             socket,
