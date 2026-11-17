@@ -1,7 +1,7 @@
 //! What a scene render refuses, each naming the fix.
 
 use std::fmt;
-use vapors_scene3d::{CameraError, GeometryId, NodeId, SceneError, StoreError};
+use vapors_scene3d::{CameraError, GeometryId, MaterialId, NodeId, SceneError, StoreError};
 
 /// A frame the scene renderer cannot draw.
 #[derive(Debug, Clone, PartialEq)]
@@ -29,6 +29,23 @@ pub enum FrameError {
         node: NodeId,
         /// The geometry it names.
         geometry: GeometryId,
+    },
+    /// A mesh node names a material another `Meshes` issued.
+    ForeignMaterial {
+        /// The mesh node.
+        node: NodeId,
+        /// The material it names.
+        material: MaterialId,
+    },
+    /// A mesh node names a material this renderer did not build at
+    /// mount: given to its `Meshes` after the mount.
+    MaterialMissing {
+        /// The mesh node.
+        node: NodeId,
+        /// The material it names.
+        material: MaterialId,
+        /// How many materials were built.
+        built: usize,
     },
     /// The active camera resolved to a node that is not a camera.
     ActiveCameraNotCamera(NodeId),
@@ -70,6 +87,18 @@ impl From<SceneError> for FrameError {
 impl fmt::Display for FrameError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::ForeignMaterial { node, material } => write!(
+                f,
+                "{node} names {material}, which another Meshes issued: give it a material from this renderer's Meshes"
+            ),
+            Self::MaterialMissing {
+                node,
+                material,
+                built,
+            } => write!(
+                f,
+                "{node} names {material}, and this renderer built {built} materials when it mounted: give every material to the Meshes before mounting the renderer"
+            ),
             Self::NotReady => write!(
                 f,
                 "SceneRenderer::render ran before mount and resize: mount it on a painter, which calls them first"

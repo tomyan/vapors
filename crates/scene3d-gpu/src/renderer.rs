@@ -60,7 +60,7 @@ impl Drop for SceneRenderer {
 impl SurfaceRenderer for SceneRenderer {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
         let log = &self.log;
-        let pipeline = Pipeline::new(device);
+        let pipeline = Pipeline::new(device, self.meshes.borrow().materials());
         self.mounted = Some(Mounted {
             camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
             slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
@@ -132,13 +132,18 @@ impl Mounted {
         depth: &wgpu::TextureView,
         nodes: &[MeshNode],
     ) -> Result<(), FrameError> {
-        let draws = nodes
+        let mut draws = nodes
             .iter()
             .filter(|mesh| mesh.visible)
-            .map(|mesh| Ok((self.offset(mesh.node), self.geometry.get(mesh)?)))
+            .map(|mesh| {
+                let material = self.material_of(mesh)?;
+                Ok((material, self.offset(mesh.node), self.geometry.get(mesh)?))
+            })
             .collect::<Result<Vec<_>, FrameError>>()?;
+        // opaque, depth-tested: order changes no pixel; grouped by pipeline
+        draws.sort_by_key(|(material, ..)| *material);
         let pass = Pass {
-            pipeline: &self.pipeline.render,
+            pipelines: (&self.pipeline.render, &self.pipeline.materials),
             camera: self.camera.bind_group(),
             slots: self.slots.bind_group(),
             colour: frame.view,
@@ -147,6 +152,23 @@ impl Mounted {
         };
         record(frame.encoder, &pass, &draws);
         Ok(())
+    }
+
+    /// The place of `mesh`'s material among the pipelines built at
+    /// mount; none for its colour.
+    fn material_of(&self, mesh: &MeshNode) -> Result<Option<usize>, FrameError> {
+        let Some(material) = mesh.material else {
+            return Ok(None);
+        };
+        let built = self.pipeline.materials.len();
+        if material.index() >= built {
+            return Err(FrameError::MaterialMissing {
+                node: mesh.node,
+                material,
+                built,
+            });
+        }
+        Ok(Some(material.index()))
     }
 
     fn offset(&self, node: NodeId) -> u32 {
