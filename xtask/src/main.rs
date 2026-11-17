@@ -3,6 +3,13 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+mod api_clone;
+mod api_fences;
+mod api_fences_run;
+mod api_inner;
+mod api_paths;
+mod api_sandbox;
+mod api_server;
 mod builds;
 mod builds_config;
 mod builds_tree;
@@ -166,6 +173,12 @@ fn main() -> ExitCode {
     let steps = match cli.command {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
+        Command::ApiFences { name } => return api_fences_run::run(&name),
+        Command::ApiRelayInner {
+            port,
+            socket,
+            command,
+        } => return api_inner::run(port, &socket, &command),
         Command::CheckFiles => return files::run(),
         Command::Quality {
             distributions,
