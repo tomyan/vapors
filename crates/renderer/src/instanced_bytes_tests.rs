@@ -18,7 +18,7 @@ fn two_quads() -> [Quad; 2] {
 #[test]
 fn an_item_in_the_last_row_a_batch_holds_is_written_with_its_frame() {
     // When: row 127, the last of 128
-    let bytes = QuadPipeline::bytes_in(&two_quads(), 9, &[0, 127]);
+    let bytes = QuadPipeline::bytes_in(&two_quads(), (9, 0), &[0, 127]);
 
     // Then: the second quad's row, then the frame's entry after it
     assert_eq!(bytes[144 + 128..144 + 132], 127u32.to_le_bytes());
@@ -30,7 +30,7 @@ fn an_item_in_the_last_row_a_batch_holds_is_written_with_its_frame() {
     expected = "quads: item 1 names row 128, past the 128 rows a batch's range holds; split the run into batches of at most that many rows (vapors-scene batch.rs)"
 )]
 fn an_item_past_the_rows_a_batch_holds_is_refused_naming_the_item_and_the_row() {
-    let _ = QuadPipeline::bytes_in(&two_quads(), 0, &[0, 128]);
+    let _ = QuadPipeline::bytes_in(&two_quads(), (0, 0), &[0, 128]);
 }
 
 #[test]
@@ -44,5 +44,5 @@ fn fewer_rows_than_items_are_refused() {
         caster: Rect::new(0.0, 0.0, 2.0, 2.0),
         caster_radii: [0.0; 4],
     };
-    let _ = ShadowPipeline::bytes_in(&[shadow, shadow], 0, &[0]);
+    let _ = ShadowPipeline::bytes_in(&[shadow, shadow], (0, 0), &[0]);
 }

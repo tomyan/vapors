@@ -19,8 +19,9 @@ pub enum Resource {
     Camera,
     /// The mesh uniform slots' buffer and bind group.
     Slots,
-    /// The depth texture's view.
-    Depth,
+    /// The pass's attachments: the depth texture, and at 4 samples the
+    /// multisampled colour texture.
+    Attachments,
     /// One uploaded piece of geometry: its vertex and index buffers.
     Geometry,
 }
@@ -31,7 +32,7 @@ impl Resource {
         Self::Pipeline,
         Self::Camera,
         Self::Slots,
-        Self::Depth,
+        Self::Attachments,
         Self::Geometry,
     ];
 }

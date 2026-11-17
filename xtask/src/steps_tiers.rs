@@ -1,5 +1,5 @@
-//! The test tiers, split on the test function's name: unit, gpu, and
-//! pmu, which `ci` never runs.
+//! The test tiers, split on the test function's name: unit, gpu, host,
+//! and pmu, which `ci` never runs.
 
 use super::Step;
 
@@ -27,6 +27,17 @@ pub(super) const GPU_TESTS: &str = "test(/^gpu_/) | test(/::gpu_[^:]*$/)";
 /// runs: `cargo xtask test --tier pmu` runs them, in a quiet window.
 pub(super) const PMU_TESTS: &str = "test(/^pmu_/) | test(/::pmu_[^:]*$/)";
 
+/// Tests that use what only the host has, named `host_`: bwrap making a
+/// user namespace, which an API builder's sandbox forbids
+/// (`--disable-userns`, `docs/plans/api-builder.md`), and the user's
+/// systemd. `ci` and ci.yml run them in their own tier, so the gate does
+/// (each gate step runs inside the gate's bwrap, the host tier
+/// included). An API builder's sandboxed ci will run every tier but this
+/// one, once `request_push` lands (the plan's slice 4); until then a
+/// sandboxed ci fails at this step, loudly. Each has a unit-tier twin
+/// that gives the host's answer instead of asking for it.
+pub(super) const HOST_TESTS: &str = "test(/^host_/) | test(/::host_[^:]*$/)";
+
 pub(super) fn unit() -> Step {
     let mut step = Step::new(
         "unit",
@@ -36,7 +47,7 @@ pub(super) fn unit() -> Step {
             "run",
             "--workspace",
             "-E",
-            &format!("not ({GPU_TESTS}) and not ({PMU_TESTS})"),
+            &format!("not ({GPU_TESTS}) and not ({PMU_TESTS}) and not ({HOST_TESTS})"),
         ],
         "run the failing test alone with `cargo nextest run <name>`",
     );
@@ -51,6 +62,15 @@ pub(super) fn gpu() -> Step {
         "cargo",
         &["nextest", "run", "--workspace", "-E", GPU_TESTS],
         "needs a Vulkan adapter; the failure names what was found and how to select one",
+    )
+}
+
+pub(super) fn host() -> Step {
+    Step::new(
+        "host",
+        "cargo",
+        &["nextest", "run", "--workspace", "-E", HOST_TESTS],
+        "needs bwrap able to make a user namespace; run the failing test alone with `cargo nextest run <name>`",
     )
 }
 

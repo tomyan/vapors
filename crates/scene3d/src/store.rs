@@ -160,6 +160,7 @@ impl Scene {
             world: Mat4::IDENTITY,
             world_version: 0,
             visible: true,
+            material: None,
             dirty: false,
         };
         let index = self.free.pop().unwrap_or_else(|| self.push_slot());

@@ -1,8 +1,8 @@
-//! GPU tier: the painter's 4x textures are one for each target view a
-//! frame draws to, the same texture while each frame draws to the view,
-//! a new one at a new size, dropped after a frame that does not draw to
-//! the view, and none at 1 sample; a target naming its own
-//! multisampled view is refused.
+//! GPU tier: the painter's 4x textures are one for each viewport size a
+//! frame draws at, the same texture while each frame draws at the size
+//! whatever view it is given, a new one at a new size, the old dropped,
+//! and none at 1 sample; a target naming its own multisampled view is
+//! refused.
 
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu};
@@ -61,36 +61,84 @@ fn page() -> Document {
 }
 
 #[test]
-fn gpu_a_4_sample_painter_keeps_a_views_texture_while_each_frame_draws_to_it() {
+fn gpu_a_4_sample_painter_keeps_one_texture_for_frames_into_new_views_of_one_size() {
     // Given
     let gpu = gpu();
-    let (mut painter, mut doc, view) = (painter(&gpu, Samples::Four), page(), view_of(&gpu, 32));
+    let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
 
-    // When: two frames into one view
-    draw_into((&gpu, &mut painter, &mut doc), (&view, 32), None);
-    let first = painter.multisampled.held_for(&view).expect("held");
-    draw_into((&gpu, &mut painter, &mut doc), (&view, 32), None);
+    // When: two frames, each into a new view of a 32 square, as an app's
+    // surface gives
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
+    let first = painter.multisampled.held_at((32, 32)).expect("held");
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
 
     // Then: the same texture, the only one
-    assert_eq!(painter.multisampled.held_for(&view), Some(first));
+    assert_eq!(painter.multisampled.held_at((32, 32)), Some(first));
     assert_eq!(painter.multisampled.held(), 1);
 }
 
 #[test]
-fn gpu_a_frame_into_another_view_drops_the_first_views_texture() {
+fn gpu_a_size_given_up_goes_after_as_many_frames_as_textures_are_held() {
     // Given
     let gpu = gpu();
     let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
-    let (first, second) = (view_of(&gpu, 32), view_of(&gpu, 32));
 
-    // When: a frame into each, the same size
-    draw_into((&gpu, &mut painter, &mut doc), (&first, 32), None);
-    draw_into((&gpu, &mut painter, &mut doc), (&second, 32), None);
+    // When: a frame at 32, then two at 16
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 32), 32),
+        None,
+    );
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 16), 16),
+        None,
+    );
+    let after_one = painter.multisampled.held();
+    draw_into(
+        (&gpu, &mut painter, &mut doc),
+        (&view_of(&gpu, 16), 16),
+        None,
+    );
 
-    // Then: the second's texture alone, not the first's shared
-    assert!(painter.multisampled.held_for(&first).is_none());
-    assert!(painter.multisampled.held_for(&second).is_some());
+    // Then: both held after one frame at 16 (two held, the 32 unused for
+    // one), the 32 gone after two
+    assert_eq!(after_one, 2);
+    assert!(painter.multisampled.held_at((32, 32)).is_none());
     assert_eq!(painter.multisampled.held(), 1);
+}
+
+#[test]
+fn gpu_a_painter_drawing_two_sizes_each_app_frame_makes_no_texture_after_the_first() {
+    // Given
+    let gpu = gpu();
+    let (mut painter, mut doc) = (painter(&gpu, Samples::Four), page());
+
+    // When: three app frames, each a 32 and a 16 target
+    let made: Vec<u64> = (0..3)
+        .map(|_| {
+            let sizes = [32, 16].map(|side| {
+                draw_into(
+                    (&gpu, &mut painter, &mut doc),
+                    (&view_of(&gpu, side), side),
+                    None,
+                );
+                painter.frame_counts().multisampled_made
+            });
+            sizes.iter().sum()
+        })
+        .collect();
+
+    // Then: two on the first app frame, none after
+    assert_eq!(made, [2, 0, 0]);
 }
 
 #[test]

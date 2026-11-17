@@ -9,17 +9,7 @@
 use crate::frames::{Frames, PAGE};
 use crate::kept_order::KeptOrder;
 
-/// The most links a box's clip chain may have. Measured 2026-11-17 at
-/// each page's first update at one viewport (the corpus at 800x600, the
-/// demos at 640x400): the longest chain in the corpus is
-/// [`MEASURED_CORPUS_CLIP_CHAIN`] links (`scrolling`) and in the demos
-/// [`MEASURED_DEMOS_CLIP_CHAIN`] (`scroll`), each pinned by its crate's
-/// `clip_chains.rs`. touche's own pages are not in either set; it meets
-/// this limit as a refusal at its next vapors pin bump. 8 leaves room for
-/// scroll containers nested a few deep and for F3.2's rounded clips,
-/// each a link of its own. The clip shader's loop bound is this number
-/// (F3.1's GPU side).
-pub const MAX_CLIP_CHAIN: usize = 8;
+pub use vapors_scene::MAX_CLIP_CHAIN;
 
 /// The longest clip chain in the corpus, measured (`MAX_CLIP_CHAIN`).
 #[doc(hidden)]

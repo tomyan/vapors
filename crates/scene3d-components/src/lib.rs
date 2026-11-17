@@ -7,6 +7,7 @@
 //! <gpu-surface name="view"></gpu-surface>
 //! <Scene scene={Some(scene)} surface={Some(surface)} camera={Some(eye)}>
 //!   <Camera handle={Some(eye)} projection={Some(lens)} transform={back} />
+//!   (`lens` a `Signal<Projection>`: a zoom is a lens change)
 //!   <Group transform={spin}>
 //!     <Mesh geometry={Some(cube)} class="hull" class:lit={lit} />
 //!   </Group>

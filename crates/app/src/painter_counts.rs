@@ -85,10 +85,28 @@ pub struct FrameCounts {
     pub transform_writes: u64,
     /// Bytes of those writes, 64 an entry.
     pub transform_bytes: u64,
+    /// Entries of the clip table written (`painter_clips.rs`): every
+    /// entry when the table's buffer is new, else a clip's when it is
+    /// first drawn, its rectangle changes or its frame's entry moved, and
+    /// a given-back entry's poison. A scroll writes those of the clips
+    /// entering the view and the poison of those leaving it, none of
+    /// those staying (a clip is in its frame's coordinates); an idle frame
+    /// writes none.
+    pub clip_writes: u64,
+    /// Bytes of those writes, 48 an entry.
+    pub clip_bytes: u64,
+    /// Clip entries whose value changed, a given-back entry's poison
+    /// included: unlike `clip_writes`, not the whole buffer a new table
+    /// writes.
+    pub clip_entries_changed: u64,
     /// Times the atlas cleared every pin to make room
     /// (`vapors_text::AtlasPins`): each makes every kept text and icon
     /// batch built again on its next draw.
     pub atlas_pin_clears: u64,
+    /// The painter's 4x colour textures made this frame
+    /// (`painter_multisampled.rs`): 1 on the first frame at a size at 4
+    /// samples, and 0 after while the size holds; always 0 at 1.
+    pub multisampled_made: u64,
 }
 
 impl FrameCounts {
@@ -185,8 +203,11 @@ impl ScenePainter {
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
         (self.counts.batches_written, self.counts.batches_kept) = self.kept.drawn();
+        self.counts.multisampled_made = self.multisampled.take_made();
         (self.counts.transform_writes, self.counts.transform_bytes) =
             self.transforms.table.take_written();
+        (self.counts.clip_writes, self.counts.clip_bytes) = self.clips.table.take_written();
+        self.counts.clip_entries_changed = self.clips.table.take_changed();
         self.counts.retained_bytes = self.retained_bytes() + self.mesh_entries.bytes();
         self.counts.atlas_lookups = self.atlas.lookups() - self.counts.atlas_lookups;
         self.counts.atlas_pin_clears = self.atlas.pin_clears() - self.counts.atlas_pin_clears;

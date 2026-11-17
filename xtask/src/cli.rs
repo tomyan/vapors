@@ -206,6 +206,9 @@ pub enum Tier {
     Unit,
     /// Needs a GPU adapter; `VAPORS_GPU_ADAPTER` names which. Fails, never skips, without one.
     Gpu,
+    /// Needs what only the host has (bwrap making a user namespace); run by ci and the gate,
+    /// never in an API builder's sandbox.
+    Host,
     /// Needs hardware performance counters and a GPU adapter; run in a quiet window, never by ci.
     Pmu,
 }

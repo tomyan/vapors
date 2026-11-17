@@ -17,6 +17,7 @@ struct Instance {
     @location(7) radii: vec4<f32>,         // top-left, top-right, bottom-right, bottom-left
     @location(8) row: u32,                 // the row's index in its batch's range
     @location(9) frame: u32,               // the frame's entry in the transform table
+    @location(10) clip: u32,               // the innermost clip's entry in the clip table
 }
 
 struct Out {
@@ -30,6 +31,8 @@ struct Out {
     @location(6) @interpolate(flat) bottom_color: vec4<f32>,
     @location(7) @interpolate(flat) left_color: vec4<f32>,
     @location(8) @interpolate(flat) radii: vec4<f32>,
+    @location(9) @interpolate(flat) clip: u32,
+    @location(10) @interpolate(flat) row: u32,
 }
 
 @vertex
@@ -50,31 +53,9 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     out.bottom_color = instance.bottom_color;
     out.left_color = instance.left_color;
     out.radii = instance.radii;
+    out.clip = instance.clip;
+    out.row = instance.row;
     return out;
-}
-
-// The radius of the corner whose quadrant `p` is in, about the centre.
-// The distance past one corner's arc, for a point in that corner's
-// square (the r x r square at the corner); otherwise none.
-fn corner_term(p: vec2<f32>, corner: vec2<f32>, inward: vec2<f32>, r: f32) -> f32 {
-    let centre = corner + inward * r;
-    let in_square = all((p - centre) * inward < vec2(0.0));
-    return select(-1e9, length(p - centre) - r, r > 0.0 && in_square);
-}
-
-// Signed distance from `p` to a rectangle with circular corners of the
-// given radii, negative inside. Radii arrive already fitted to the box
-// (CSS's single factor, applied on the CPU), so a corner may be larger
-// than half a side when its neighbours are small; each corner is cut
-// in its own square, so no radius is clamped here.
-fn rounded_distance(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>) -> f32 {
-    let q = max(rect.xy - p, p - rect.zw);
-    var d = max(q.x, q.y);
-    d = max(d, corner_term(p, rect.xy, vec2(1.0, 1.0), radii.x));
-    d = max(d, corner_term(p, vec2(rect.z, rect.y), vec2(-1.0, 1.0), radii.y));
-    d = max(d, corner_term(p, rect.zw, vec2(-1.0, -1.0), radii.z));
-    d = max(d, corner_term(p, vec2(rect.x, rect.w), vec2(1.0, -1.0), radii.w));
-    return d;
 }
 
 // The side whose border `p` is in: the edge it is nearest to, measured
@@ -117,5 +98,5 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
     // no dark fringe.
     let a = mix(in.background.a, edge.a, m);
     let rgb = mix(in.background.rgb * in.background.a, edge.rgb * edge.a, m) / max(a, 0.0001);
-    return vec4(rgb, a * outer);
+    return vec4(rgb, a * outer * clip_coverage(in.position.xy, in.clip, in.row));
 }

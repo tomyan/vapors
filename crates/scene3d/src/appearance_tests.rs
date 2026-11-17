@@ -71,7 +71,7 @@ fn setting_the_colour_of_a_node_that_is_not_a_mesh_is_refused() {
     let refused = tree.scene.set_appearance(tree.a, blue(), true);
 
     // Then
-    assert_eq!(refused, Err(StoreError::NotMesh(tree.a)));
+    assert_eq!(refused, Err(StoreError::NotMesh(tree.a, "set_appearance")));
     assert!(
         refused.unwrap_err().to_string().contains("set_appearance"),
         "names the call"
@@ -141,7 +141,7 @@ fn setting_the_appearance_of_a_group_or_a_removed_mesh_is_refused() {
     let removed = tree.scene.set_appearance(tree.b, blue(), true);
 
     // Then
-    assert_eq!(group, Err(StoreError::NotMesh(tree.a)));
+    assert_eq!(group, Err(StoreError::NotMesh(tree.a, "set_appearance")));
     assert_eq!(removed, Err(StoreError::Stale(tree.b)));
     assert_eq!(tree.scene.visible(tree.b), Err(StoreError::Stale(tree.b)));
 }

@@ -30,7 +30,14 @@ impl DrivenRacer {
     /// A racer timing its frames on the GPU, started with Space.
     #[must_use]
     pub fn new() -> Self {
+        Self::at(vapors_renderer::Samples::One)
+    }
+
+    /// As [`DrivenRacer::new`], the HUD drawn at `samples`.
+    #[must_use]
+    pub fn at(samples: vapors_renderer::Samples) -> Self {
         let mut racer = Racer::new();
+        racer.set_samples(samples);
         racer.time_frames(true);
         key(&mut racer, "Space", true);
         key(&mut racer, "Space", false);

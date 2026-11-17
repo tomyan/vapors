@@ -84,6 +84,16 @@ impl Racer {
     pub fn time_frames(&mut self, on: bool) {
         self.app.time_frames(on);
     }
+    /// Makes the HUD's painter draw at `samples`
+    /// ([`ElementsApp::set_samples`]), before the first frame.
+    pub fn set_samples(&mut self, samples: vapors_renderer::Samples) {
+        self.app.set_samples(samples);
+    }
+    /// Writes the HUD's GPU time to the status line once a second
+    /// ([`ElementsApp::show_gpu_time`]).
+    pub fn show_gpu_time(&mut self) {
+        self.app.show_gpu_time();
+    }
     /// Render passes the HUD's last frame began.
     #[must_use]
     pub fn render_passes(&self) -> u64 {

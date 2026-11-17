@@ -73,6 +73,10 @@ jobs:
         run: cargo xtask wasm
       - name: unit
         run: cargo xtask test --tier unit
+      # bwrap making a user namespace: run here and in the gate, never in
+      # an API builder's sandbox (xtask/src/steps_tiers.rs HOST_TESTS)
+      - name: host
+        run: cargo xtask test --tier host
       # Bins and examples only: the unit step's nextest built the test
       # targets in the test profile, and --all-targets built them again in
       # dev, 85 % of this step's CPU (docs/plans/factory-throughput.md C1).
