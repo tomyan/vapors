@@ -76,8 +76,11 @@ pub(crate) fn paint_all(
     let painted = paint_partial(boxes, rects, input, last, changed);
     if cfg!(debug_assertions) {
         let fresh = fresh(boxes, rects, input);
-        // a paint the update refuses is not shown, and its NaN
-        // coordinates equal nothing, themselves included
+        // Relaxed: a paint the update refuses is not shown, and its NaN
+        // coordinates equal nothing, themselves included, so it is not
+        // compared. Retired when paint stops drawing a box it cannot
+        // place, rather than recording it and painting on so the
+        // frames, entries and thumbs stay whole (paint_refusals.rs).
         if input.unresolvable.is_empty() {
             crate::kept_paint_check::assert_same(&painted, &fresh);
         }

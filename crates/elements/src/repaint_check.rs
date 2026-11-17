@@ -73,25 +73,35 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         "box slot {slot}'s outline ring is grown from {border_box:?}, not whole device pixels \
          (paint.rs `snapped`); reproduce with `cargo xtask test`"
     );
-    let [left, top] = [
-        border_box.left - ring.rect.left,
-        border_box.top - ring.rect.top,
-    ];
-    let [right, bottom] = [
-        ring.rect.right - border_box.right,
-        ring.rect.bottom - border_box.bottom,
-    ];
-    let reaches = [left, top, right, bottom];
     assert!(
-        reaches
-            .iter()
-            .all(|reach| (reach - left).abs() <= REACH_TOLERANCE),
+        ring_grown_evenly(ring.rect, border_box),
         "box slot {slot}'s outline ring {:?} is not grown evenly from its border box \
          {border_box:?} (paint_outline.rs `ring_quad`); reproduce with `cargo xtask test`",
         ring.rect
     );
 }
 
+/// Whether `ring` is `border_box` grown by one reach on every side, to
+/// [`REACH_TOLERANCE`]. Every reach must be finite, so a NaN or an
+/// infinite one fails: paint refuses a box whose border box or ring is
+/// not finite before this check (`repaint.rs`, issue #449).
+fn ring_grown_evenly(ring: Rect, border_box: Rect) -> bool {
+    let reaches = [
+        border_box.left - ring.left,
+        border_box.top - ring.top,
+        ring.right - border_box.right,
+        ring.bottom - border_box.bottom,
+    ];
+    let first = reaches[0];
+    reaches
+        .iter()
+        .all(|reach| reach.is_finite() && (reach - first).abs() <= REACH_TOLERANCE)
+}
+
 fn snaps(input: &PaintInput<'_>) -> bool {
     input.class.is_some_and(TransformClass::snaps)
 }
+
+#[cfg(test)]
+#[path = "repaint_check_tests.rs"]
+mod tests;

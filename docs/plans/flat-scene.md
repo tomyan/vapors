@@ -572,11 +572,13 @@ A transform node carries a class:
 
 ```rust
 pub enum TransformClass {
-    /// The composed transform is a translation by whole device pixels.
+    /// The frame's mapping is a translation by whole device pixels,
+    /// within the tolerance below.
     WholeTranslate,
-    /// Any other affine: a fractional translate, a scale, a rotation, a skew.
+    /// A 2D mapping that is not: a fractional translation, a scale other
+    /// than 1, a rotation, a skew.
     Affine,
-    /// A perspective or 3D rotation: w differs from 1.
+    /// A mapping with perspective (w differs from 1 over the frame).
     Projective,
 }
 ```
@@ -602,18 +604,43 @@ What the class decides:
 
 Where the class is decided:
 
+The rule, one for every transform a frame's mapping is made from (CSS
+`transform` from F4a; a scene node's plane from F11):
+
+- **The quantity.** Map the frame's extent (its bounds in its own
+  coordinates) to device pixels, and take `t`: the mapped origin's
+  offset from the origin, rounded to whole device pixels. The drift is
+  the largest distance, in device pixels, between a mapped corner of
+  the extent and that corner moved by `t`. For a 2D affine mapping the
+  four corners bound the drift over the whole extent. For a homography
+  (F11) F11 says which points bound it, with its test over a 2,000 px
+  panel.
+- **The decision.** A drift of at most `WHOLE_TOLERANCE`, 1/64 device
+  pixel (a constant declared in code with this reason when F4a adds
+  it), is `WholeTranslate`, painted snapped by `t`. Otherwise it is
+  `Affine` if w is 1 over the extent, and `Projective` if not.
+- **What it is not applied to.** Shifts made by scrolling and by lane
+  frames are not classified. They are made whole by construction
+  (`scroll::frame_shift`, `lane_child_at`), and F1's check asserts that
+  they are exactly whole (`frames.rs` `assert_whole_shift`). The
+  tolerance applies only to transforms an author or a scene gives.
+- **Scale factors.** The rule is in device pixels, so the class of a
+  translation depends on the scale factor: `translate(10px, 0)` is
+  whole at 1x, 1.5x and 2x (10, 15 and 20 device px), and
+  `translate(1px, 0)` is not at 1.5x (1.5 device px).
+
+Where it is decided:
+
 - **Compile time** for a node whose `transform` winner is a constant
-  value: `none` gives `WholeTranslate` (given its ancestors are);
-  anything else gives `Affine` or `Projective` by its functions. The
-  class is folded into the element's key (3.1 form 3) and the crate's
-  table (3.2). A keyed element with a constant `none` under constant
-  `none` ancestors never evaluates a class at run time.
+  that is the identity at every scale factor (`none`, `scale(1)`,
+  `translate(0, 0)`): `WholeTranslate`, given its ancestors are,
+  folded into the element's key (3.1 form 3) and the crate's table
+  (3.2). A keyed element like this under such ancestors never evaluates
+  a class at run time. Any other constant transform is classified at
+  run time once the scale factor is known, and again when it changes.
 - **Run time** for a known-variable transform (a toggled class whose
   rule sets `transform`, a bound custom property it reads, a
-  transition): the class is computed when the value changes, O(1) per
-  change, from the matrix: whole translation if the linear part is the
-  identity and the translation's device-pixel parts are whole
-  (`fract() == 0.0`, exactly, as `whole_rect` tests), else by `w`.
+  transition): by the rule, O(1) per change.
 - **While animating**, the class is held at `Affine` (or `Projective`)
   from the first animated frame to the settle frame, even on a frame
   where the sampled value happens to be whole (4.4). The runtime knows
@@ -624,6 +651,14 @@ Where the class is decided:
   and settles after `SETTLE_FRAMES` unchanged frames (a constant,
   declared in code with its reason; 2 is the starting value, measured by
   W7 for the smallest count that shows no mid-motion snap; decision D6).
+
+Open option, not planned (Tom, 2026-11-17, through the lead,
+paraphrased): a `ScaleTranslate` class, for a uniform scale with a
+translation, that snaps edges after the scale and rasterises text at
+the scaled size, as browser zoom does. Under the rule above, such a
+frame is `Affine` and painted unsnapped, for example an HTML panel
+square to a perspective camera at a distance other than the 1:1 one
+(F11's row).
 
 A class change re-paints the node's subtree once (the items' bytes
 change from snapped to unsnapped or back), counted as `parts_reclassed`;
@@ -958,15 +993,15 @@ content enters the list.
 | F1 | Transform class on frames | `TransformClass` in `vapors-scene`; each frame (`frames.rs`) carries `WholeTranslate`; paint takes `snap` from its frame's class (always true at this head; another class panics naming F4a); debug assertions that a `WholeTranslate` frame's shift is whole and that every snapped item under one is whole (`whole_item`). Design: `flat-scene-f1.md` | Pixels unchanged on every fixture; the assertions proven by breaking (a fractional shift panics naming the frame) | none |
 | F2 | The transform table | A `Retained` storage buffer of 4x4 entries; a `u32` index per instance in the quad, shadow, text and image layouts; the shaders read the table; `Shift` and the dynamic-offset slots retired for the painter (touche's immediate path untouched); a page-contract case that reads the table on SwiftShader; the Pixel 9 Pro checked by hand and recorded in `docs/web.md` | Scroll at 3,000 rows: writes equal to 4c's (one entry per scrolled frame); Idle 0; `kept_bytes` debug compare extended to the index; pixels unchanged; a device without vertex-stage storage buffers refused naming the limit (unit test with a faked limit) | F1 |
 | F3 | Clips as data | The clip table (rect and rounded rect, parent index); a `u32` clip index per instance; `clip.wgsl` shared by every pipeline; the scissor as the batch's bound; batches joined across frames and clips; `overflow: hidden` with `border-radius` and a rounded clip on a `gpu-surface` ancestor no longer refused | A Chromium fixture of a rounded scroller holding text, an image and a shadow at 1x and 2x passes the paint rules; W10 added; W1 and W4 added with before/after batch counts; the clip-depth refusal proven by breaking | F2 |
-| F4a | Boxes under an affine transform | CSS `transform: translate | scale` on elements accepted (the `Deferred` entry retired for those functions); a transformed element is a transform node with class from its matrix; items built unsnapped under `Affine`; `fwidth` scaling in `quads.wgsl` and `shadows.wgsl`; hit testing through the inverse; text under an `Affine` node refused naming F5; a static transform's class folded into the key (3.1 form 3) | Chromium fixtures at rest: a card at `translate(10.5px, 3.25px)` and at `scale(1.37)` pass the paint rules at 1x and 2x; `elementFromPoint` agrees on a click through the transform (events oracle); W7's page mounts (text replaced by boxes until F5) | F3; build-time-styles B1 for the key's class |
-| F4b | Animating transforms | A bound custom property read by `transform` as the run-time source; the animating state (4.3): class held through the motion, `SETTLE_FRAMES` declared with its reason, `UpdateCounts::parts_reclassed` (added here, with the code that increments it) at start and settle only; the table entry rewritten per frame | W7 (boxes): `parts_reclassed` 2 per cycle, `batches_written` 0 while moving, table writes 1 per moving frame; the centroid rule against an exact-coverage reference; a snap mid-motion proven to fail it by breaking (class recomputed per frame) | F4a |
+| F4a | Boxes under an affine transform | CSS `transform: translate | scale` on elements accepted (the `Deferred` entry retired for those functions); a transformed element is a transform node with class from its matrix; items built unsnapped under `Affine`; `fwidth` scaling in `quads.wgsl` and `shadows.wgsl`; hit testing through the inverse; text under an `Affine` node refused naming F5; a static transform's class folded into the key (3.1 form 3) | Chromium fixtures at rest: a card at `translate(10.5px, 3.25px)` and at `scale(1.37)` pass the paint rules at 1x and 2x; `elementFromPoint` agrees on a click through the transform (events oracle); W7's page mounts (text replaced by boxes until F5). Snapping is kept wherever the frame's mapping is a whole translation within section 4.3's tolerance (Tom, 2026-11-17, through the lead, paraphrased): (1) the class comes from the actual matrix by 4.3's rule, at 1x, 1.5x and 2x: `transform_none_is_whole_translate`, `scale_one_is_whole_translate`, `translate_ten_px_is_whole_translate_at_each_scale` (10, 15 and 20 device px), and `translate_one_px_at_one_and_a_half_is_affine` (1.5 device px, unsnapped); (2) `a_transform_back_to_a_whole_translation_snaps_again`. Each check is proven by breaking it. The class change on the way back is F4b's to count (`parts_reclassed`), and the perspective panel is F11's | F3; build-time-styles B1 for the key's class |
+| F4b | Animating transforms | A bound custom property read by `transform` as the run-time source; the animating state (4.3): class held through the motion, `SETTLE_FRAMES` declared with its reason, `UpdateCounts::parts_reclassed` (added here, with the code that increments it) at start and settle only; the table entry rewritten per frame | W7 (boxes): `parts_reclassed` 2 per cycle, `batches_written` 0 while moving, table writes 1 per moving frame; the centroid rule against an exact-coverage reference; a snap mid-motion proven to fail it by breaking (class recomputed per frame); `crossing_the_whole_translation_boundary_reclasses_once`: a transform that crosses 4.3's tolerance repaints the frame's parts once, `parts_reclassed` 1 (the pop F4a's return to a whole translation and F11's panel show) | F4a |
 | F5 | Text under translation (regime B) | Atlas glyphs at fractional positions with bilinear sampling while the node animates; re-quantised at settle; the baseline not rounded while moving | W7 with text: `rasterisations` 0 while moving; the settle frame equals regime A's pixels for that transform (bytes compared); screenshots at the settle frame recorded; the Chromium comparison at rest before and after unchanged | F4b |
 | F6 | Text under rotation (regime C) | Glyph outlines tessellated into shape entries cached by (font, glyph, tolerance), behind `runtime-shapes`; drawn through the shapes pipeline with `adjust()`; `rotate()` and `skew()` accepted; the A/C weight difference measured at rest at 13, 16 and 28 px against Chromium at 0, 15, 45 and 90 degrees | The difference recorded with the paint rules' verdict per size; the switch rule's thresholds in `docs/text.md`; a rotated-text fixture passes or the question returns to Tom with the numbers | F5; one-scene S2, S3a2, S3b |
 | F7 | MSAA decision | The pass sample count from a page flag (the `PaintUses` field before F10 exists); every 2D pipeline in both counts in the registry; a resolve into the target; `GpuTimer` A/B on the rows page, W10 and the racer page at 1 and 4 samples on the UHD 630 and the Pixel 9 Pro; a mesh fixture (a tilted cube's edge) compared with an 8x reference at 1 and 4 | The numbers in `docs/perf/`; decision D2 answered with them; pixels unchanged at 1 sample | F3 |
 | F8 | The scene in the one pass | `Item::Scene` as a context: the scene's range drawn in the painter's pass with the depth attachment (present only when a scene is on the page), the viewport depth slice per scene, the slice-count refusal; meshes as instances of one in `Retained` with the world matrix in the transform table (E1 (a)); `slots.rs` retired; the scene's offscreen texture and composite gone; `Item::Surface` kept for application renderers | The ground and object check (`3d-2.md`) passes in the one pass; two scenes on one page do not depth-test each other (pixel test); HTML over the scene unchanged; the racer's 60 s run (one-scene P0's judge) before and after in `docs/perf/`; `passes` per frame pinned 1; `FrameCounts::surfaces` for the scene's work folded into the frame's counts with the pins moved, each proven by breaking | F2, F7; one-scene R3a2 (the racer on `SceneRenderer`) |
 | F9 | Primitives under a scene node | Shapes (decal paths) as primitives with a 4x4 transform in the scene's context, depth bias, drawn after opaque meshes; `<Decal>` from one-scene S8 on this route; S7's `SurfaceFrame::shapes` not built or retired | One-scene S7's acceptance on this route (a decal on a plane at 60 degrees against an 8x reference; no depth fighting at the racer's widest zoom); a livery toggle writes paint bytes, no geometry | F8; one-scene S5b |
 | F10 | `PaintUses` | The compiler emits the table per crate from B1's classification over `transform`, `overflow-*`, `border-radius`, scene tags and element kinds; the registry makes pipelines from the merged table at mount; the unsnapped path, outline regime and clip kinds are built only when named; `paint_uses_unknown` for hand-built pages; `wisp-check --paint` prints the table and each element that widens it with `file:line` | Snapshot per demo and the racer; a `<Mesh>` added from Rust on a page whose crates name no scene refused naming the site; `paint_uses_unknown` 0 pinned on Mount, the racer and one demo; the debug within-table assertion proven by breaking | F4a, F8; build-time-styles B3b |
-| F11 | Projective transforms | `perspective`, `rotateX/Y/Z`, `rotate3d`, `matrix3d`, `transform-style: preserve-3d` (no plane splitting, as Chromium), `backface-visibility`, `transform-origin` with z: the `Projective` class; text in regime C; hit testing through the inverse with a singular matrix hitting nothing | WPT `css/css-transforms/` reftests named in design 09's oracle table run as pixel comparisons at rest; touche's layer-view card fixture passes; `getBoundingClientRect` agreement on the projected box | F6, F4b |
+| F11 | Projective transforms | `perspective`, `rotateX/Y/Z`, `rotate3d`, `matrix3d`, `transform-style: preserve-3d` (no plane splitting, as Chromium), `backface-visibility`, `transform-origin` with z: the `Projective` class; text in regime C; hit testing through the inverse with a singular matrix hitting nothing | WPT `css/css-transforms/` reftests named in design 09's oracle table run as pixel comparisons at rest; touche's layer-view card fixture passes; `getBoundingClientRect` agreement on the projected box; an HTML panel square to a perspective camera is classified by its plane's 2D mapping (the homography on the panel plane), not the 4x4 matrix, so constant depth reduces to a scale and a translation (Tom, 2026-11-17, through the lead, paraphrased). At the 1:1 distance, where one CSS pixel of the panel maps to one device pixel times the scale factor (the camera's distance equals its focal length in pixels, `viewport height / (2 tan(fov / 2))`), it is `WholeTranslate` and snaps (`panel_square_at_the_unit_distance_is_whole_translate`). Rotated by 0.5 degrees about its vertical axis, it is `Projective` (`panel_rotated_half_a_degree_is_projective`). The drift stays within 4.3's 1/64 device pixel over a 2,000 px panel, with the points F11 says bound a homography's drift (`tolerance_holds_over_a_2000_px_panel`). At any other distance it is a scale, so `Affine` and unsnapped (4.3's `ScaleTranslate` option would change that). Crossing the boundary is counted by F4b's `parts_reclassed`. Each check is proven by breaking it | F6, F4b |
 | F12 | HTML inside a scene | A scene node hosting an HTML subtree laid out in CSS px in a plane: its primitives in the scene's context with the node's matrix, regime C text, hit testing by the scene's ray then the plane's inverse | A label on the racer's craft follows it through a turn (pixel test); a click on the label reaches its listener; the 60 s run still passes | F9, F11 |
 | F13 | Opaque reordering | Order-as-depth for opaque 2D primitives (Graphite's and WebRender's rule) if W12's profile shows pipeline switches over a stated share of draw; opaque front to back with depth write, blended back to front | Only on that measurement; `draw` on W12 down by the predicted share; pixels unchanged | F8, W12 |
 | W1 to W12 | Workloads | As section 6; one PR each, placed with the slice that lets the page mount | Each with first numbers in `docs/perf/` | per row |
