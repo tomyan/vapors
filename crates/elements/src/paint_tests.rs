@@ -53,3 +53,15 @@ fn placing_a_box_under_an_affine_frame_panics_naming_f4a() {
     };
     super::snapped_in(Some(vapors_scene::TransformClass::Affine), rect, 1.0);
 }
+
+#[test]
+#[should_panic(expected = "flat-scene F4a")]
+fn placing_a_box_under_a_projective_frame_panics_naming_f4a() {
+    let rect = crate::layout::BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: 10.0,
+        height: 10.0,
+    };
+    super::snapped_in(Some(vapors_scene::TransformClass::Projective), rect, 1.0);
+}

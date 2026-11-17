@@ -73,6 +73,7 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         "box slot {slot}'s outline ring is grown from {border_box:?}, not whole device pixels \
          (paint.rs `snapped`); reproduce with `cargo xtask test`"
     );
+    // relaxed for infinite box edges until #449 (`ring_grown_evenly`)
     assert!(
         ring_grown_evenly(ring.rect, border_box),
         "box slot {slot}'s outline ring {:?} is not grown evenly from its border box \
@@ -82,20 +83,34 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
 }
 
 /// Whether `ring` is `border_box` grown by one reach on every side, to
-/// [`REACH_TOLERANCE`]. A side whose box edge is infinite has no reach
-/// and is left out (the relaxation of `whole_or_infinite`, issue #449);
-/// any other reach must be finite, so a NaN one fails.
+/// [`REACH_TOLERANCE`]. Every reach must be finite, so a NaN one fails.
+///
+/// Relaxed: a side whose box edge is infinite has no reach, and is
+/// asked only that the ring's edge is the same infinity. Paint does not
+/// yet refuse such a box (issue #449); that issue's fix, paint refusing
+/// the box, retires this, as it retires `whole_or_infinite`'s.
 fn ring_grown_evenly(ring: Rect, border_box: Rect) -> bool {
     let sides = [
-        (border_box.left, border_box.left - ring.left),
-        (border_box.top, border_box.top - ring.top),
-        (border_box.right, ring.right - border_box.right),
-        (border_box.bottom, ring.bottom - border_box.bottom),
+        (border_box.left, ring.left, border_box.left - ring.left),
+        (border_box.top, ring.top, border_box.top - ring.top),
+        (border_box.right, ring.right, ring.right - border_box.right),
+        (
+            border_box.bottom,
+            ring.bottom,
+            ring.bottom - border_box.bottom,
+        ),
     ];
+    // Exact: an infinity is compared with an infinity of the same sign.
+    #[allow(clippy::float_cmp)]
+    let infinite_matched =
+        |&(edge, ring_edge, _): &(f32, f32, f32)| !edge.is_infinite() || ring_edge == edge;
+    if !sides.iter().all(infinite_matched) {
+        return false;
+    }
     let mut reaches = sides
         .iter()
-        .filter(|(edge, _)| !edge.is_infinite())
-        .map(|&(_, reach)| reach);
+        .filter(|(edge, _, _)| !edge.is_infinite())
+        .map(|&(_, _, reach)| reach);
     let Some(first) = reaches.next() else {
         return true;
     };
