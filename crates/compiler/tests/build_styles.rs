@@ -132,7 +132,8 @@ fn wisp_check_refuses_a_style_that_does_not_parse() {
     );
 
     // When
-    let error = vapors_compiler::parse_file(&src.join("card.wisp")).expect_err("refused");
+    let error =
+        vapors_compiler::parse_file_under(&src.join("card.wisp"), &src).expect_err("refused");
 
     // Then
     assert_eq!((error.line, error.col), (2, 5), "{error}");

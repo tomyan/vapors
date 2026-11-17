@@ -147,7 +147,7 @@ impl Emitter<'_> {
     fn style_key(&self, keyed: &Keyed, winners: &str) -> Result<String, CompileError> {
         let (line, column) = self.source.position(keyed.offset);
         // the package, as `SCOPE` names it, so two crates' `src/card.wisp` differ
-        let place = format!("{}:{line}:{column}", self.source.path);
+        let place = format!("{}:{line}:{column}", self.site_name);
         let site = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {place:?})");
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
         let parts = key_parts(self.source, keyed)?;

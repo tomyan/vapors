@@ -181,6 +181,6 @@ fn a_keyed_for_passes_its_position_in_the_wisp() {
     // Then
     assert_has(
         &code,
-        "vapors_dom::blocks::keyed(dom, ul0, for_anchor1, \"counter.wisp:5:5\",",
+        "vapors_dom::blocks::keyed(dom, ul0, for_anchor1, concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:5:5\"),",
     );
 }

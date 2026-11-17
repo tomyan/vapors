@@ -19,7 +19,7 @@ pub(crate) fn assemble(
         .style
         .as_ref()
         .map_or("", |section| section.text.as_str());
-    let mut file = header(&component.path, style);
+    let mut file = header(component.site_name(), style);
     let scope = component.style.as_ref().and(component.scope.as_ref());
     if let Some(scope) = scope {
         file.push_str(&super::shell_sheet::scope_constant(scope));

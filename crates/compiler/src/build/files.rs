@@ -43,21 +43,17 @@ pub fn compile_dir_into_styled(
     styles: Styles,
 ) -> Result<Compiled, Vec<CompileError>> {
     let tree = scan_some(src)?;
-    let generated = out.join("wisp");
+    let generated = modules::generated_dir(out);
+    let root = src.parent().unwrap_or(src);
     let mut errors = Vec::new();
-    let parsed = parse_all(
-        &tree,
-        (src.parent().unwrap_or(src), styles),
-        &generated,
-        &mut errors,
-    );
+    let parsed = parse_all(&tree, (root, styles), &generated, &mut errors);
     let (index, indexed) = index_all(&parsed, &mut errors);
     let (mut outputs, unchecked) = generate_all(&indexed, &index, &mut errors);
     if !errors.is_empty() {
         errors.sort_by(|a, b| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         return Err(errors);
     }
-    outputs.push((out.join("wisp.rs"), modules::render(&tree, &generated)));
+    outputs.push((out.join("wisp.rs"), modules::render(&tree, root)));
     write_all(&outputs)?;
     Ok(Compiled {
         inputs: tree.inputs(),

@@ -38,11 +38,9 @@ fn each_module_is_documented_with_its_source_file() {
 
     // Then
     let modules = read(&compiled.modules);
-    let expected = format!(
-        "/// The component compiled from `{}`.",
-        src.join("counter.wisp").display()
-    );
-    assert!(modules.contains(&expected), "{modules}");
+    // named under the compiled directory's parent, as sites name it
+    let expected = "/// The component compiled from `src/counter.wisp`.";
+    assert!(modules.contains(expected), "{modules}");
 }
 
 #[test]

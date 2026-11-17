@@ -36,6 +36,16 @@ pub struct Component {
 }
 
 impl Component {
+    /// The file as generated code names it in sites, after the crate's
+    /// name: its scope or its global sheet's name, both under the
+    /// compiled directory's parent, so the generated code is the same on
+    /// every machine; else the path as named. Refusals at build time
+    /// name [`Component::path`], which an editor can open.
+    #[must_use]
+    pub fn site_name(&self) -> &str {
+        (self.scope.as_deref()).unwrap_or_else(|| self.global_sheet_name())
+    }
+
     /// The name a global sheet is held under after the crate's name:
     /// [`Component::global_sheet`], or the path as named. One answer for
     /// the generated `SHEET` and the analysis' `SheetId::Global`.
