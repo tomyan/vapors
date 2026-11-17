@@ -70,4 +70,4 @@ pub(crate) fn frame_chains(order: &KeptOrder, frames: &Frames) -> FrameChains {
 
 #[cfg(test)]
 #[path = "clip_chain_frames_tests.rs"]
-mod tests;
+pub(crate) mod tests;

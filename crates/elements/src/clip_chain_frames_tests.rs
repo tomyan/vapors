@@ -15,7 +15,7 @@ const VIEWPORT: Viewport = Viewport {
 
 /// Three scroll containers, each inside the last, and a leaf in the
 /// innermost, updated once: its paint, with its order taken out.
-fn nested_three() -> (Painted, KeptOrder) {
+pub(crate) fn nested_three() -> (Painted, KeptOrder) {
     let mut doc = Document::new(FontSystem::bundle_only());
     let css = ".scroller { overflow: auto; height: 50px; } .leaf { height: 100px; }";
     doc.add_stylesheet("t.css", css).expect("parses");

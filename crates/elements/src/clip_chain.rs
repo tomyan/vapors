@@ -104,3 +104,7 @@ impl crate::painted::Painted {
             .unwrap_or(0)
     }
 }
+
+#[cfg(test)]
+#[path = "clip_chain_tests.rs"]
+mod tests;

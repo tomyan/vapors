@@ -12,25 +12,15 @@ The counts are of the last frame of each case. Load average at the
 start was 10 to 12; counts do not depend on load, only times do.
 
 `crates/perf/tests/gpu_f3_baselines.rs` pins every count in the table
-at 1,000 units with the command's 5 warmup and 20 runs (the scroll
-changes' counts depend on how far they have scrolled, so other frame
-counts or page sizes give other numbers), one GPU-tier test per page
-and change. A change to the painter that moves a count fails there,
-and this table changes with it.
-
-| page | case | draw calls | batches written | batches kept |
-|---|---|---|---|---|
-| nested scrollers (1,000 to 10,000) | Edit | 35 | 0 | 35 |
-| | Scroll | 35 | 2 | 33 |
-| | ScrollInner | 35 | 1 | 34 |
-| | Insert | 35 | 0 | 35 |
-| code blocks (1,000 to 10,000) | Edit | 14 | 0 | 14 |
-| | Scroll | 17 | 3 | 14 |
-| | ScrollInner | 14 | 1 | 13 |
-| | Insert | 14 | 0 | 14 |
-
-Every count is the same at 1,000, 3,000 and 10,000: the draws are of
-what shows, not of the page.
+at 1,000 units, one GPU-tier test per page and change. The command
+counts frame 24 of a sampled run, after 25 changes; the tests reach the
+same frame counted alone (`crates/perf/src/counted_frames.rs`): 24
+changes with no frame between them, a priming frame, the 25th change
+and the measured frame, with no timing. Their counts equal the sampled
+run's (checked when they were switched). The scroll changes' counts
+depend on how far they have scrolled, so a different number of changes
+or page size gives other numbers. A change to the painter that moves a
+count fails there, and this table changes with it.
 
 ## A page where clip changes split runs
 
