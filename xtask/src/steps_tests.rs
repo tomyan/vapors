@@ -116,6 +116,34 @@ fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
 }
 
 #[test]
+fn ci_without_a_named_step_runs_every_other() {
+    // Given
+    let all = super::ci("web");
+
+    // When
+    let names: Vec<String> = super::without(all, &["gpu".to_owned()])
+        .expect("known")
+        .into_iter()
+        .map(|step| step.name)
+        .collect();
+
+    // Then
+    assert!(!names.contains(&"gpu".to_owned()), "{names:?}");
+    assert_eq!(names.len(), super::ci("web").len() - 1);
+}
+
+#[test]
+fn ci_without_a_step_it_does_not_have_is_refused_naming_its_steps() {
+    let refused = super::without(super::ci("web"), &["gpus".to_owned()])
+        .err()
+        .expect("refused");
+    assert!(
+        refused.starts_with("--except gpus: ci has no such step (tools, fmt"),
+        "{refused}"
+    );
+}
+
+#[test]
 fn the_deny_step_runs_every_check_offline_when_the_sandbox_says_so() {
     // When
     let step = super::deny_with(Some(std::ffi::OsStr::new("1")));

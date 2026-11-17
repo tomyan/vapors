@@ -47,6 +47,12 @@ pub struct Host {
     /// The GPU render nodes (`/dev/dri/renderD*`), bound for the GPU
     /// tier; the card nodes, which can drive displays, are not.
     pub render_nodes: Vec<PathBuf>,
+    /// The advisory databases cargo deny fetched on the host, each bound
+    /// read-only into the sandbox's cargo home, where `cargo deny
+    /// --offline` reads them (`VAPORS_DENY_OFFLINE`): the sandbox has no
+    /// network to fetch them. Only the databases are read-only; their
+    /// lock file is the cargo home's.
+    pub advisories: Vec<PathBuf>,
 }
 
 /// bwrap's arguments for `builder` on `host`, the relay on `port`,
@@ -105,6 +111,11 @@ fn home(builder: &Builder, host: &Host) -> Vec<String> {
     }
     for writable in writable(builder) {
         args.extend(bind("--bind", &writable, &writable));
+    }
+    for database in &host.advisories {
+        let name = database.file_name().unwrap_or_default();
+        let inside = builder.cargo_home().join("advisory-dbs").join(name);
+        args.extend(bind("--ro-bind", database, &inside));
     }
     let registry = builder.cargo_home().join("registry");
     args.extend(bind(
@@ -172,6 +183,17 @@ pub fn home_entries(builder: &Builder, host: &Host) -> Vec<String> {
     entries
 }
 
+/// The CLI's wait for an MCP tool call: five minutes past the longest
+/// tool's own deadline, so the tool's answer, or its saying it ran out,
+/// arrives first.
+fn mcp_tool_timeout() -> std::time::Duration {
+    let longest = crate::api_mcp_inner::TOOLS
+        .iter()
+        .map(|tool| tool.deadline)
+        .max();
+    longest.unwrap_or_default() + std::time::Duration::from_mins(5)
+}
+
 fn environment(builder: &Builder, port: u16) -> Vec<String> {
     let path = format!(
         "{BIN}:{}:/usr/bin:/bin",
@@ -188,6 +210,14 @@ fn environment(builder: &Builder, port: u16) -> Vec<String> {
         ("SCCACHE_DIR", text(&builder.sandbox_sccache())),
         ("ANTHROPIC_BASE_URL", format!("http://127.0.0.1:{port}")),
         ("ANTHROPIC_API_KEY", DUMMY_KEY.into()),
+        // cargo deny runs offline on the bound databases (steps.rs)
+        (crate::steps::DENY_OFFLINE, "1".into()),
+        // the CLI's MCP tool timeout outlasts the longest tool call's
+        // wait (api_mcp_inner.rs) by five minutes
+        (
+            "MCP_TOOL_TIMEOUT",
+            mcp_tool_timeout().as_millis().to_string(),
+        ),
     ];
     let mut args = Vec::new();
     for (name, value) in variables {

@@ -107,6 +107,7 @@ impl Rig {
             index: 0,
             scale_factor: f64::from(scale),
             now: Instant::now(),
+            resumed: false,
         });
         let pixels = read_rgba8(&gpu.device, &gpu.queue, &texture);
         (self.app.frame_counts().surfaces, pixels)

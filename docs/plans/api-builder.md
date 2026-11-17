@@ -93,8 +93,18 @@ commit).
    API route, the session and `cargo xtask api-build`. A model with no
    price in `[api_build.prices]` is refused, and the run fails when the
    proxy's count and the CLI's reported cost differ.
-3. **`ask_lead`**: the MCP server inside; `q<N>.md` written and its path
-   logged, `a<N>.md` read, 30 minutes, then `BLOCKED.md` and stop.
+3. **`ask_lead`** (built; live 2026-11-17: the session asked "What
+   colour?", the answer file said `blue`, and the session replied
+   `blue`): `xtask api-mcp-inner` is the session's MCP server inside.
+   Each question goes to `q<N>.md` in a new directory per run,
+   `~/.cache/api-build/<name>/questions/run-<secs>-<pid>`, and its path is
+   logged. The lead writes the answer to `a<N>.md.tmp` and renames it to
+   `a<N>.md`, so it is read whole. A question is at most 64 KiB, holds
+   no control byte but newline and tab, and a run asks at most 20. An
+   answer that cannot be read, or is empty, ends the wait at once. With
+   no answer in 30 minutes the session is told to write `BLOCKED.md` at
+   the clone's root and stop; the harness does not check that it did,
+   and the lead reads `BLOCKED.md` when the run ends.
 4. **`request_push`**: `cargo xtask ci` in a fresh sandbox, the path and
    400-line checks, the push from outside with the hook skipped (declared
    at the call), `gh pr create`; a branch whose `build.rs` writes outside

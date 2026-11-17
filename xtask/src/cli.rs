@@ -24,7 +24,13 @@ pub enum Command {
         ci: bool,
     },
     /// Run everything CI runs, in CI's order, stopping at the first failure.
-    Ci,
+    Ci {
+        /// A step not run, by name: for a caller that cannot run it and
+        /// declares why at its call (`api_push.rs`); repeatable. A name
+        /// ci has no step for is refused.
+        #[arg(long)]
+        except: Vec<String>,
+    },
     /// Make API builder `<name>`'s clone and prove its sandbox's fences
     /// (docs/plans/api-builder.md); the builder is removed afterwards.
     ApiFences {
@@ -43,6 +49,10 @@ pub enum Command {
         /// The model, which must have a price in `[api_build.prices]`.
         #[arg(long, default_value = "claude-sonnet-5-5")]
         model: String,
+        /// A path prefix beyond `crates/` and `docs/` the branch may change
+        /// (such as `xtask/`), when the brief names it; repeatable.
+        #[arg(long)]
+        allow: Vec<String>,
     },
     /// Inside an API builder's scope, before its sandbox: run the command
     /// if the scope's limits are in force.
@@ -50,6 +60,13 @@ pub enum Command {
     ApiScoped {
         #[arg(last = true)]
         command: Vec<String>,
+    },
+    /// Inside an API builder's sandbox: the session's MCP server,
+    /// posting tool calls through the relay on loopback `port`.
+    #[command(hide = true)]
+    ApiMcpInner {
+        #[arg(long)]
+        port: u16,
     },
     /// Inside an API builder's sandbox: relay loopback `port` to the
     /// harness socket and run the command.

@@ -83,6 +83,7 @@ impl Rig<'_> {
             index: 0,
             scale_factor: f64::from(self.transcript.scale),
             now,
+            resumed: false,
         })
     }
 }

@@ -6,7 +6,7 @@
 //! (slice 4), which never runs anything in it (the plan's "The clone is
 //! untrusted").
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -24,6 +24,8 @@ pub struct Order<'a> {
     pub brief: &'a Path,
     pub budget: f64,
     pub model: &'a str,
+    /// Paths beyond `crates/` and `docs/` the branch may change.
+    pub allow: &'a [String],
 }
 
 /// Runs `order`; fails unless the session ends with status 0.
@@ -56,12 +58,12 @@ type Ran = (Vec<String>, Ended, Result<(), String>);
 fn ran(order: &Order<'_>) -> Result<Ran, String> {
     crate::api_fds::refuse_inherited()?;
     crate::api_limits::no_core_dumps()?;
-    let (builder, routes, objects) = prepared(order)?;
+    let (builder, routes, host) = prepared(order)?;
     crate::api_server::serve(&builder.socket(), Arc::clone(&routes))?;
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     // every path from here drains, the session's failures included
     let ((mut lines, ended), drained) =
-        crate::api_build_drain::drained_after(served(order, (&builder, objects), &routes), || {
+        crate::api_build_drain::drained_after(served(order, (&builder, &host), &routes), || {
             crate::api_build_drain::drained(
                 &proxy.budget,
                 (&|| proxy.in_flight(), &proxy.curls),
@@ -75,34 +77,51 @@ fn ran(order: &Order<'_>) -> Result<Ran, String> {
     Ok((lines, ended, drained.and(agreed)))
 }
 
-/// The builder's clone made, and the routes with the key and budget.
-fn prepared(order: &Order<'_>) -> Result<(Builder, Arc<Routes>, PathBuf), String> {
+/// The order checked, the builder's clone made, the host's paths, and
+/// the routes.
+fn prepared(order: &Order<'_>) -> Result<(Builder, Arc<Routes>, Host), String> {
     let config = crate::config::Config::load().map_err(|e| e.to_string())?;
     let budget = Budget::new(order.budget, crate::api_prices::prices(&config)?)?;
     budget.price(order.model)?;
+    crate::api_push::session_name(order.name)?;
+    let allowed = crate::api_push_checks::allowed(order.allow)?;
     let builder = Builder::new(order.name, &crate::api_host::home()?)?;
     let secret = crate::api_build_setup::key(&builder.home.join(KEY_FILE))?;
     let (main, objects) = crate::api_clone::main_repository()?;
     let branch = crate::api_fences_run::branch(&builder);
     crate::api_clone::make(&builder, (&main, &objects), &branch)?;
+    let host = crate::api_host::host(objects)?;
+    let routes = routes(&builder, (main, &host, allowed), (secret, budget))?;
+    Ok((builder, Arc::new(routes), host))
+}
+
+/// The harness server's routes: the key and budget, `ask_lead`'s
+/// questions, and `request_push`.
+fn routes(
+    builder: &Builder,
+    (main, host, allowed): (std::path::PathBuf, &Host, Vec<String>),
+    (secret, budget): (crate::ux_secret::Secret, Budget),
+) -> Result<Routes, String> {
     let staging = crate::api_build_setup::private(&builder.root().join("requests"))?;
-    let routes = Arc::new(Routes {
+    let questions = crate::api_build_setup::private(&builder.root().join("questions"))?;
+    let push = crate::api_push::Pusher::new(main, builder.clone(), host.clone(), allowed);
+    Ok(Routes {
         proxy: Some(Proxy::new(secret, budget, staging)),
+        asks: Some(crate::api_ask::Asks::for_run(&questions, &run_id())?),
+        push: Some(push),
         ..Routes::default()
-    });
-    Ok((builder, routes, objects))
+    })
 }
 
 /// The fences proven and the session run: the fences' lines, and how the
 /// session ended.
 fn served(
     order: &Order<'_>,
-    (builder, objects): (&Builder, PathBuf),
+    (builder, host): (&Builder, &Host),
     routes: &Routes,
 ) -> Result<(Vec<String>, Ended), String> {
-    let host = crate::api_host::host(objects)?;
-    let lines = proven(builder, &host)?;
-    let ended = session(order, (builder, &host), routes)?;
+    let lines = proven(builder, host)?;
+    let ended = session(order, (builder, host), routes)?;
     Ok((lines, ended))
 }
 
@@ -120,4 +139,13 @@ fn session(
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     let session = sandboxed(builder, host, &words)?;
     crate::api_session::run(session, (order.brief, &result), &proxy.budget)
+}
+
+/// This run's name among the builder's runs: when it started and its
+/// process, unique on the machine.
+fn run_id() -> String {
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("run-{}-{}", since.as_secs(), std::process::id())
 }

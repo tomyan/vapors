@@ -18,14 +18,19 @@ fn group(pid_file: &std::path::Path) -> Child {
         .expect("the group")
 }
 
-/// Whether `pid` runs, from /proc: gone on `NotFound`, ended as a zombie
-/// (a killed orphan stays one until init reaps it, which `kill -0`
-/// counts as alive); any other read error or shape panics.
+/// Whether `pid` runs, from /proc: gone on `NotFound`, or on ESRCH (the
+/// process was reaped between the open and the read: in a pid namespace
+/// its init reaps an orphan at once, which failed this test inside the
+/// API builder's sandbox on 2026-11-17), ended as a zombie (a killed
+/// orphan stays one until init reaps it, which `kill -0` counts as
+/// alive); any other read error or shape panics.
 fn alive(pid: &str) -> bool {
+    const ESRCH: i32 = 3;
     let path = format!("/proc/{pid}/stat");
     let stat = match std::fs::read_to_string(&path) {
         Ok(stat) => stat,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return false,
+        Err(e) if e.raw_os_error() == Some(ESRCH) => return false,
         Err(e) => panic!("{path}: {e}"),
     };
     let state = stat

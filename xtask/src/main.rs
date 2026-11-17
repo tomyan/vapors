@@ -3,6 +3,7 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+mod api_ask;
 mod api_budget;
 mod api_build_drain;
 mod api_build_report;
@@ -19,15 +20,25 @@ mod api_http;
 mod api_inner;
 mod api_json_strict;
 mod api_limits;
+mod api_mcp_inner;
 mod api_paths;
 mod api_prices;
+mod api_push;
+mod api_push_checks;
+mod api_push_ci;
+mod api_push_fetch;
+mod api_push_history;
+mod api_push_remote;
+mod api_push_text;
 mod api_refusals;
 mod api_request_content;
 mod api_request_policy;
 mod api_sandbox;
 mod api_server;
+mod api_server_ask;
 mod api_server_proxy;
 mod api_session;
+mod api_timed;
 mod api_tool_prompt;
 mod api_upstream;
 mod api_usage;
@@ -195,17 +206,20 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::ApiFences { name } => return api_fences_run::run(&name),
+        Command::ApiMcpInner { port } => return api_mcp_inner::run(port),
         Command::ApiBuild {
             name,
             brief,
             budget,
             model,
+            allow,
         } => {
             let order = api_build_run::Order {
                 name: &name,
                 brief: &brief,
                 budget,
                 model: &model,
+                allow: &allow,
             };
             return api_build_run::run(&order);
         }
@@ -247,10 +261,14 @@ fn main() -> ExitCode {
         } => return ux_review::run(dry_run, pr, measure_image_cost),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
-        Command::Ci => match web::web_package() {
-            Ok(package) => return ci_shared::run(&steps::ci(&package), &reporter),
-            Err(message) => return fail("ci", &message),
-        },
+        Command::Ci { except } => {
+            let steps =
+                web::web_package().and_then(|package| steps::without(steps::ci(&package), &except));
+            match steps {
+                Ok(steps) => return ci_shared::run(&steps, &reporter),
+                Err(message) => return fail("ci", &message),
+            }
+        }
         Command::Wasm => match web::web_package() {
             Ok(package) => steps::wasm_lint(&package),
             Err(message) => return fail("wasm", &message),

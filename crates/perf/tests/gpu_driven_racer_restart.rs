@@ -27,6 +27,7 @@ fn frame(driven: &mut DrivenRacer, gpu: &Gpu, texture: &wgpu::Texture, index: us
         index: index as u64,
         scale_factor: 1.0,
         now,
+        resumed: false,
     };
     let next = driven.app().frame(&frame);
     driven

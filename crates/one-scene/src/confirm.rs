@@ -28,7 +28,7 @@ pub fn confirm(scene: &OneScene, frame: usize) -> Result<(), String> {
             frame,
             &format!("cube {}", cube + 1),
             drawn(&scene, node)?,
-            want.cube(cube),
+            (want.cube(cube), true),
         )?;
     }
     Ok(())

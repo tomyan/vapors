@@ -67,6 +67,7 @@ fn gpu_an_app_given_an_atlas_the_device_cannot_hold_stops_at_its_first_frame_nam
         index: 0,
         scale_factor: 1.0,
         now: Instant::now(),
+        resumed: false,
     });
 
     // Then

@@ -22,34 +22,26 @@ fn a_second_click_on_a_light_turns_it_off() {
 }
 
 #[test]
-fn the_third_cube_hides_and_the_night_comes_in_turn() {
+fn the_night_comes_and_goes_in_turn() {
     // Then
-    assert!(!gone(Duration::from_millis(4_999)) && gone(Duration::from_secs(5)));
-    assert!(!gone(Duration::from_secs(10)));
     assert!(!night(Duration::from_millis(14_999)) && night(Duration::from_secs(15)));
     assert!(!night(Duration::from_secs(30)) && night(Duration::from_secs(45)));
 }
 
 #[test]
 fn every_kind_of_change_is_named_in_the_frame_it_is_due() {
-    // Given: 5 s is frame 312.5, so frame 313 is the first hidden
+    // Given: 15 s is frame 937.5, so frame 938 is the first night
     let names = |frame| changes_at(frame).join(", ");
 
     // Then
     assert_eq!(names(125), "click light 1");
-    assert_eq!(names(313), "cube 3 hidden");
-    assert_eq!(
-        names(625),
-        "click light 2, cube 3 shown, pointer over the cubes"
-    );
-    assert_eq!(
-        names(1250),
-        "click light 1, cube 3 shown, pointer off the cubes"
-    );
-    assert_eq!(names(938), "cube 3 hidden, night on");
+    assert_eq!(names(313), "");
+    assert_eq!(names(625), "click light 2, pointer over the cubes");
+    assert_eq!(names(1250), "click light 1, pointer off the cubes");
+    assert_eq!(names(938), "night on");
     assert_eq!(
         names(1875),
-        "click light 3, cube 3 shown, night off, pointer over the cubes"
+        "click light 3, night off, pointer over the cubes"
     );
     assert_eq!(names(1), "");
 }
@@ -84,7 +76,7 @@ fn the_hovered_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
 
     // Then
     assert!(now.hovered && now.lit[HOVER_CUBE]);
-    assert_eq!(middle, (GROUP_HOVER, true));
+    assert_eq!(middle, GROUP_HOVER);
 }
 
 #[test]
@@ -97,7 +89,7 @@ fn a_lit_cube_the_hover_does_not_colour_keeps_its_lit_colour() {
 
     // Then
     assert!(now.hovered && now.lit[0]);
-    assert_eq!(first.0, LIT);
+    assert_eq!(first, LIT);
 }
 
 #[test]
@@ -110,5 +102,5 @@ fn outside_the_window_the_lit_middle_cube_is_lit() {
 
     // Then
     assert!(!now.hovered);
-    assert_eq!(middle.0, LIT);
+    assert_eq!(middle, LIT);
 }

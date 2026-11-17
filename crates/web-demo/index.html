@@ -11,12 +11,18 @@
       canvas { width: 100vw; height: 100vh; display: block; touch-action: none; }
       /* The bar that steps through the demos (crates/web-demo/src/bar.rs):
          above the canvas, never over it. */
-      #demo-bar { height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #171b1f; color: #e4e8ec; font: 14px system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+      #demo-bar { min-height: 40px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; padding: 0 12px; background: #171b1f; color: #e4e8ec; font: 14px system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+      #demo-bar > * { line-height: 40px; }
       #demo-bar[hidden] { display: none; }
-      #demo-bar:not([hidden]) + canvas { height: calc(100vh - 40px); }
+      /* the bar's height, 40 px or more with the readout's row: --demo-bar,
+         kept by the observer in vaporsShowBar */
+      #demo-bar:not([hidden]) + canvas { height: calc(100vh - var(--demo-bar, 40px)); }
       #demo-bar:not([hidden]) ~ #open { top: 48px; }
       #demo-bar a { color: #8ab4f8; text-decoration: none; }
       #demo-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; color: #b7bec5; }
+      /* the GPU-time readout (?samples=): a row of its own, wrapped in full */
+      #demo-bar #demo-readout { flex: 0 0 100%; white-space: normal; line-height: 1.35; padding-bottom: 6px; color: #e4e8ec; }
+      #demo-readout[hidden] { display: none; }
       #status { position: fixed; left: 8px; bottom: 8px; margin: 0; color: #ddd; font: 14px system-ui, sans-serif; }
       #error { position: fixed; left: 8px; bottom: 32px; margin: 0; color: #fb4934; font: 14px system-ui, sans-serif; }
       #open { position: fixed; right: 8px; top: 8px; height: 44px; padding: 0 16px; font: 16px system-ui, sans-serif; }
@@ -51,7 +57,13 @@
           part('strong', title),
           Object.assign(part('span', line), { id: 'demo-line' }),
           link('demo-after', after, (name) => `${name} → ]`),
+          Object.assign(part('span', ''), { id: 'demo-readout', hidden: true }),
         );
+        // the readout's row changes the bar's height: the canvas takes the rest
+        new ResizeObserver(() => {
+          document.documentElement.style.setProperty('--demo-bar', `${bar.offsetHeight}px`);
+          window.dispatchEvent(new Event('resize'));
+        }).observe(bar);
         bar.hidden = false;
         const intoText = (target) =>
           target instanceof HTMLElement &&
@@ -81,7 +93,7 @@
           }
           return [innerWidth, innerHeight];
         };
-        // the demo bar, once shown, takes the top 40 px (bar.rs)
+        // the demo bar, once shown, takes the top 40 px or more (bar.rs)
         const barHeight = () => {
           const bar = document.getElementById('demo-bar');
           return bar && !bar.hidden ? bar.offsetHeight : 0;

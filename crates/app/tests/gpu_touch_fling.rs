@@ -48,6 +48,7 @@ fn frame(app: &mut ElementsApp, gpu: &Gpu, now: Instant) -> Next {
         index: 0,
         scale_factor: 1.0,
         now,
+        resumed: false,
     })
 }
 

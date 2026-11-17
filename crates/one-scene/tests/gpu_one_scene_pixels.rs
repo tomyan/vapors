@@ -37,6 +37,7 @@ fn five_frames(pointer: Option<[f32; 2]>) -> Vec<u8> {
             index,
             scale_factor: 1.0,
             now,
+            resumed: false,
         });
         rgba = read_rgba8(&gpu.device, &gpu.queue, &texture);
     }
