@@ -48,23 +48,47 @@ impl Request {
 ///
 /// A request this shape does not cover, or the reader failing.
 pub fn read(reader: &mut impl BufRead) -> Result<Request, String> {
+    let mut request = read_head(reader)?;
+    read_body(reader, &mut request)?;
+    Ok(request)
+}
+
+/// The request line and headers `reader` holds; the body is left to
+/// [`read_body`], so a caller can refuse before reading it.
+///
+/// # Errors
+///
+/// A request line other than `METHOD target HTTP/1.1`, a header name that
+/// is not a token, a control character in a header value, or the caps
+/// passed, each named (review of #476-#478, M8).
+pub fn read_head(reader: &mut impl BufRead) -> Result<Request, String> {
     let line = head_line(reader)?;
-    let mut parts = line.split(' ');
-    let (Some(method), Some(target), Some(_version)) = (parts.next(), parts.next(), parts.next())
-    else {
+    let parts: Vec<&str> = line.split(' ').collect();
+    let [method, target, "HTTP/1.1"] = parts[..] else {
         return Err(format!(
             "a request line that is not `METHOD target HTTP/1.1`: {line:?}"
         ));
     };
-    let headers = headers(reader)?;
-    let mut request = Request {
+    if !is_token(method) || target.chars().any(char::is_control) {
+        return Err(format!(
+            "a request line with a method or target this does not read: {line:?}"
+        ));
+    }
+    Ok(Request {
         method: method.to_owned(),
         target: target.to_owned(),
-        headers,
+        headers: headers(reader)?,
         body: Vec::new(),
-    };
-    request.body = body(reader, &request)?;
-    Ok(request)
+    })
+}
+
+/// Whether `text` is an HTTP token: the characters a method or header
+/// name may hold.
+fn is_token(text: &str) -> bool {
+    !text.is_empty()
+        && text
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c))
 }
 
 fn head_line(reader: &mut impl BufRead) -> Result<String, String> {
@@ -94,8 +118,25 @@ fn headers(reader: &mut impl BufRead) -> Result<Vec<(String, String)>, String> {
         let Some((name, value)) = line.split_once(':') else {
             return Err(format!("a header line that is not `name: value`: {line:?}"));
         };
-        headers.push((name.trim().to_ascii_lowercase(), value.trim().to_owned()));
+        let value = value.trim_matches([' ', '\t']);
+        if !is_token(name) || value.chars().any(|c| c.is_control() && c != '\t') {
+            return Err(format!(
+                "a header with a name that is not a token or a control character in its value: {line:?}"
+            ));
+        }
+        headers.push((name.to_ascii_lowercase(), value.to_owned()));
     }
+}
+
+/// `request`'s body, of its content-length, read from `reader`.
+///
+/// # Errors
+///
+/// A chunked body, a length that is not a number or past [`BODY_LIMIT`],
+/// or fewer bytes than the length.
+pub fn read_body(reader: &mut impl BufRead, request: &mut Request) -> Result<(), String> {
+    request.body = body(reader, request)?;
+    Ok(())
 }
 
 fn body(reader: &mut impl BufRead, request: &Request) -> Result<Vec<u8>, String> {

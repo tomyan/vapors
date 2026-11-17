@@ -28,6 +28,15 @@ pub struct Usage {
 }
 
 impl Price {
+    /// The most `demand` can cost: every output token it allows, and as
+    /// many input tokens as its body has bytes, each at the dearer of a
+    /// plain input token and a cache write.
+    #[allow(clippy::cast_precision_loss)] // token counts far below 2^52
+    pub fn worst(&self, demand: &crate::api_request_policy::Demand) -> f64 {
+        let input = self.input.max(self.cache_write);
+        (demand.max_tokens as f64 * self.output + demand.input_bound as f64 * input) / 1_000_000.0
+    }
+
     /// What `usage` costs, in dollars.
     #[allow(clippy::cast_precision_loss)] // token counts far below 2^52
     pub fn of(&self, usage: Usage) -> f64 {
