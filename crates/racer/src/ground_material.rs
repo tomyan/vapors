@@ -43,10 +43,5 @@ fn material(at: MaterialInput) -> vec4<f32> {
 ";
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn the_ground_reads_only_the_material_contract() {
-        let held = vapors_scene3d::Meshes::new().material(super::ground_material());
-        assert!(held.is_ok(), "{held:?}");
-    }
-}
+#[path = "ground_material_tests.rs"]
+mod tests;

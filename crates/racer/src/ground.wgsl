@@ -21,6 +21,8 @@ fn ground(q: vec2<f32>, pixel: f32) -> vec3<f32> {
     let stripe = select(0., 0.025, fract(q.y / 36.) > 0.5);
     var c = vec3(0.23, 0.35, 0.31) + stripe;
     c += (hash(floor(q / 2.)) - 0.5) * 0.018;
+    // Every track mask below is 0 beyond the verge's outer edge
+    if abs(distance) < TRACK_ROAD + 13. + pixel {
     c = mix(c, vec3(0.62,0.63,0.50), mask(abs(distance) - (TRACK_ROAD + 13.),pixel));
     let edge = select(vec3(0.90,0.87,0.75), vec3(0.77,0.29,0.23), sin(atan2(q.y,q.x) * 65.) > 0.);
     c = mix(c,edge,mask(abs(distance) - (TRACK_ROAD + 6.),pixel));
@@ -33,6 +35,7 @@ fn ground(q: vec2<f32>, pixel: f32) -> vec3<f32> {
     if fract(arc / 26.) > 0.65 {
         c = mix(c,vec3(0.58,0.63,0.58),mask(abs(distance)-0.65,pixel));
     }
+    }
     // Start stripe, clockwise arrow, and starting-grid boxes.
     if abs(q.x)<7. && abs(q.y+TRACK_RADIUS)<TRACK_ROAD-5. {
         c = select(vec3(0.16,0.20,0.21),vec3(0.94,0.91,0.78), (i32(floor(q.x/7.))+i32(floor(q.y/7.))) % 2 == 0);
@@ -43,7 +46,9 @@ fn ground(q: vec2<f32>, pixel: f32) -> vec3<f32> {
         if abs(grid.y)<8. { c = mix(c,vec3(0.60,0.65,0.60),mask(line,pixel)); }
     }
     // Ground shadows beneath the solid building and trees.
-    c = mix(c,vec3(0.14,0.25,0.23),mask(box(q-vec2(-30.,36.),vec2(100.,36.)),pixel));
+    if all(abs(q-vec2(-30.,36.)) < vec2(100.,36.) + pixel) {
+        c = mix(c,vec3(0.14,0.25,0.23),mask(box(q-vec2(-30.,36.),vec2(100.,36.)),pixel));
+    }
     let cell = floor(q/62.); let centre = (cell+0.5)*62.;
     if abs(circuit(centre)) > TRACK_ROAD+37. && length(centre)>250. {
         c = mix(c,vec3(0.16,0.27,0.24),mask(length(q-centre-vec2(5.,7.))-17.,pixel));

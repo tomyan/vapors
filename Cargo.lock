@@ -3226,6 +3226,7 @@ dependencies = [
 name = "vapors-racer"
 version = "0.0.0"
 dependencies = [
+ "naga",
  "png",
  "vapors-app",
  "vapors-compiler",
