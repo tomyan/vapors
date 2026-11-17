@@ -53,6 +53,9 @@ pub struct FrameEncoder {
     open: Open,
     refusal: RefCell<Option<ArenaFull>>,
     clock: Option<FrameClock>,
+    /// The multisampled views cleared in this encoder: a pass may load
+    /// only these (`frame_encoder_parts.rs` `assert_cleared`).
+    cleared: RefCell<Vec<wgpu::TextureView>>,
 }
 
 impl FrameEncoder {
@@ -84,6 +87,7 @@ impl FrameEncoder {
             open: Open(Arc::new(AtomicBool::new(true))),
             refusal: RefCell::new(None),
             clock: None,
+            cleared: RefCell::new(Vec::new()),
         }
     }
 
@@ -126,6 +130,7 @@ impl FrameEncoder {
             .as_ref()
             .is_some_and(|pass| pass.is_on(views));
         if !is_open {
+            self.assert_cleared(views);
             self.begin(queue, views, wgpu::LoadOp::Load);
         }
         RefMut::map(self.pass.borrow_mut(), |open| {
@@ -137,6 +142,9 @@ impl FrameEncoder {
     /// the target's) to `color` in a render pass left open for the draws
     /// on them that follow.
     pub(crate) fn clear(&self, queue: &wgpu::Queue, views: PassViews<'_>, color: wgpu::Color) {
+        self.cleared
+            .borrow_mut()
+            .extend(views.multisampled.cloned());
         self.begin(queue, views, wgpu::LoadOp::Clear(color));
     }
 

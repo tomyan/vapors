@@ -136,6 +136,7 @@ impl TextPipeline {
             work,
             kept,
             identity,
+            samples,
             ..
         } = self;
         let (vertices, count) = match from {
@@ -151,7 +152,7 @@ impl TextPipeline {
         let bind_group = atlas_texture.bind_group((own, generation), |view| {
             pipeline::bind_group(target.device, work, layout, view, sampler, (slots, table))
         });
-        target.draw_pass(|pass| {
+        target.draw_pass(("text", *samples), |pass| {
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, bind_group, &[params]);
             pass.set_vertex_buffer(0, vertices);

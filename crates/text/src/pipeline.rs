@@ -44,6 +44,8 @@ pub(crate) const PARAMS_SIZE: usize = 32;
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
+    /// The samples it was made for.
+    pub(crate) samples: vapors_renderer::Samples,
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) sampler: wgpu::Sampler,
     /// The blend parameters with the viewport and a scroll frame's
@@ -62,14 +64,15 @@ pub struct TextPipeline {
 }
 
 impl TextPipeline {
-    /// A pipeline for passes of `pass` (a format alone is one sample), with an atlas texture matching
-    /// `atlas`'s coverage page.
+    /// A pipeline for passes of `pass` (a format alone is one sample),
+    /// with an atlas texture matching `atlas`'s coverage page.
     #[must_use]
     pub fn new(
         device: &wgpu::Device,
         pass: impl Into<vapors_renderer::PassFormat>,
         atlas: &GlyphAtlas,
     ) -> Self {
+        let pass = pass.into();
         let shader = vapors_renderer::pipelines::shader_module(
             device,
             wgpu::ShaderModuleDescriptor {
@@ -84,7 +87,8 @@ impl TextPipeline {
             immediate_size: 0,
         });
         Self {
-            pipeline: render_pipeline(device, &pipeline_layout, &shader, pass.into()),
+            pipeline: render_pipeline(device, &pipeline_layout, &shader, pass),
+            samples: pass.samples,
             layout,
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("text nearest"),
