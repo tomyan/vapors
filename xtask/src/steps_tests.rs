@@ -83,7 +83,7 @@ fn the_wasm_release_step_lints_the_package_as_trunk_builds_it() {
 #[test]
 fn the_deny_step_checks_every_section_within_its_deadline() {
     // When
-    let step = deny();
+    let step = super::deny_with(None);
 
     // Then
     assert_eq!(step.reproduce(), "cargo deny check");
@@ -112,5 +112,42 @@ fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
             "nightly issues",
             "clippy"
         ]
+    );
+}
+
+#[test]
+fn the_deny_step_runs_every_check_offline_when_the_sandbox_says_so() {
+    // When
+    let step = super::deny_with(Some(std::ffi::OsStr::new("1")));
+
+    // Then
+    assert_eq!(step.reproduce(), "cargo deny --offline check");
+}
+
+#[test]
+fn the_deny_step_refuses_a_value_of_its_variable_it_does_not_know() {
+    // Given: a word, and bytes that are not UTF-8
+    let not_unicode = std::os::unix::ffi::OsStrExt::from_bytes(b"1\xff");
+    for value in [std::ffi::OsStr::new("yes"), not_unicode] {
+        // When
+        let step = super::deny_with(Some(value));
+
+        // Then: a step that fails, naming the value
+        assert_eq!(step.program, "sh", "{value:?}");
+        assert!(
+            step.fix.contains(&format!("VAPORS_DENY_OFFLINE={value:?}")),
+            "{}",
+            step.fix
+        );
+    }
+}
+
+#[test]
+fn the_gate_refuses_to_run_while_deny_is_switched_offline() {
+    assert_eq!(super::refuse_deny_offline(None), Ok(()));
+    let refused = super::refuse_deny_offline(Some(std::ffi::OsStr::new("1"))).expect_err("refused");
+    assert!(
+        refused.starts_with("VAPORS_DENY_OFFLINE=\"1\" is set"),
+        "{refused}"
     );
 }
