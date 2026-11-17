@@ -9,7 +9,11 @@ use vapors_scene::Rect;
 use super::{ImagePipeline, Quads};
 use crate::image_binding::TextureBinding;
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
-use crate::{KeptRange, Target, TransformTable};
+use crate::{ClipTable, KeptRange, Target, TransformTable};
+
+/// Where a kept quad is drawn: the transform table and its frame's and
+/// row's entries in it, and the clip table and its clip's entry.
+pub type ImagePlace<'a> = ((&'a mut TransformTable, u32, u32), (&'a mut ClipTable, u32));
 
 impl ImagePipeline {
     /// The vertex bytes of a quad over each of `rects` (device pixels),
@@ -35,26 +39,27 @@ impl ImagePipeline {
 
     /// Draws `bound`'s texture over the `index`th quad `kept` holds, at
     /// its frame's entry `frame` in `table` and its row's entry `row` (0,
-    /// the identity, for a quad in no lane row), in `target`, inside the
-    /// target's scissor; not when the view slot is refused (the refusal
-    /// is on the encoder).
+    /// the identity, for a quad in no lane row), under its clip's entry
+    /// `clip` in `clips` (0 for none), in `target`; not when the view slot
+    /// is refused (the refusal is on the encoder).
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline or holds no `index`th quad,
-    /// or `table` is not the table this pipeline's kept draws bind
-    /// (one table a pipeline).
+    /// or `table` or `clips` is not the table this pipeline's kept draws
+    /// bind (one of each a pipeline).
     pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         bound: &TextureBinding,
         (kept, index): (&KeptRange, u32),
-        (table, frame, row): (&mut TransformTable, u32, u32),
+        ((table, frame, row), (clips, clip)): ImagePlace<'_>,
     ) {
         let vertices = self.vertices(kept, index);
-        let Some(view) = self.view_slot(target, (frame, row)) else {
+        let Some(view) = self.view_slot(target, (frame, row, clip)) else {
             return;
         };
+        self.adopt_clips(clips);
         let id = *self.table_id.get_or_insert(table.id());
         assert_eq!(
             id,
@@ -65,11 +70,26 @@ impl ImagePipeline {
             table.id()
         );
         table.prepare(target.queue);
+        clips.prepare(target.queue);
         self.record(
             target,
             bound,
             (Quads::Kept(kept), vertices),
-            (Some(table), view),
+            (Some((table, clips)), view),
+        );
+    }
+
+    /// Panics unless `clips` is the clip table this pipeline's kept draws
+    /// bind: one a pipeline, as with the transform table.
+    fn adopt_clips(&mut self, clips: &ClipTable) {
+        let id = *self.clips_id.get_or_insert(clips.id());
+        assert_eq!(
+            id,
+            clips.id(),
+            "image quads: a kept draw binds clip table {}, after table {id}: a pipeline draws \
+             from one clip table (image_kept.rs); give each painter its own pipelines; \
+             reproduce with `cargo xtask test`",
+            clips.id()
         );
     }
 

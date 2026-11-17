@@ -137,7 +137,7 @@ pub(crate) fn text_source() -> String {
     format!(
         "{}{}",
         include_str!("text.wgsl"),
-        vapors_renderer::clip_source(4)
+        vapors_renderer::clip_source(0, 4)
     )
 }
 

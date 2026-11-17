@@ -57,18 +57,13 @@ impl Textures {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, moved, at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
+        (items, kept, moved, mut at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
     ) {
         for (place, item) in (0..).zip(items) {
             if let Item::Image { image, .. } = item {
                 let bound = self.bound(pipeline, target, painted.image(*image));
-                let row = at.row_entry(moved.item_row(place as usize));
-                pipeline.draw_kept(
-                    target,
-                    bound,
-                    (kept, place),
-                    (&mut *at.table, at.frame, row),
-                );
+                let drawn = at.image_place((place, moved.item_row(place as usize)));
+                pipeline.draw_kept(target, bound, (kept, place), drawn);
             }
         }
     }

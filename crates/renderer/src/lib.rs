@@ -70,7 +70,7 @@ pub use frame_clock::FrameClock;
 pub use frame_encoder::FrameEncoder;
 pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
-pub use image::ImagePipeline;
+pub use image::{ImagePipeline, ImagePlace};
 pub use image_binding::{Sampling, TextureBinding};
 pub use instanced_bytes::{ClipRuns, assert_clip_runs, assert_rows, clip_of};
 pub use kept_bind_group::{Generations, KeptBindGroup};

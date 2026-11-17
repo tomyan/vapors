@@ -32,8 +32,9 @@ const PAGE_BYTES: u64 = 1024 * 1024;
 const C_GLYPH_BYTES: u64 = 72;
 /// An image quad: 6 vertices of 4 floats.
 const IMAGE_QUAD_BYTES: u64 = 6 * 16;
-/// The image pipeline's viewport and shift uniform, written on its first draw.
-const VIEW_UNIFORM_BYTES: u64 = 16;
+/// The image pipeline's view uniform (the viewport, and the quad's frame,
+/// row and clip entries: flat-scene F3.1b), written on its first draw.
+const VIEW_UNIFORM_BYTES: u64 = 32;
 
 const SWATCH: &str = ".swatch { width: 8px; height: 8px; background-color: #0000ff; \
     box-shadow: 2px 2px 2px #000000; }";
