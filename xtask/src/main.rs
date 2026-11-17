@@ -5,16 +5,21 @@
 
 // Relaxed guard, declared: the API builder's sandbox
 // (docs/plans/api-builder.md) is read by `cargo xtask api-fences`, which
-// lands two PRs on (the #467 split); until then only its tests use it.
+// lands in the next PR (the #467 split); until then only its tests use it.
 // Retired by that PR, which removes these allows.
-#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
+mod api_clone;
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_fds;
-#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_host;
-#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+mod api_inner;
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_paths;
-#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
 mod api_sandbox;
+#[allow(dead_code, reason = "used by api-fences, the next PR")]
+mod api_server;
 mod builds;
 mod builds_config;
 mod builds_tree;
@@ -178,6 +183,11 @@ fn main() -> ExitCode {
     let steps = match cli.command {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
+        Command::ApiRelayInner {
+            port,
+            socket,
+            command,
+        } => return api_inner::run(port, &socket, &command),
         Command::CheckFiles => return files::run(),
         Command::Quality {
             distributions,
