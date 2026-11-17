@@ -20,7 +20,7 @@ use crate::surface::SurfaceRenderer;
 #[derive(Default)]
 pub(super) struct AppSurfaces {
     pending: Vec<(String, Box<dyn SurfaceRenderer>)>,
-    shared: Rc<RefCell<Shared>>,
+    pub(super) shared: Rc<RefCell<Shared>>,
 }
 
 impl ElementsApp {

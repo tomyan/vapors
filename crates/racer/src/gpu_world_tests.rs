@@ -1,17 +1,20 @@
 //! GPU tier: the racer's world in the scene (one-scene R3a1) draws what
-//! the Track draws: in the fixed and the following camera, on a
-//! landscape and a portrait target, and close on the car. Ground and
-//! objects go through the scene's one view-projection, so this is the
-//! ground and object check (`docs/plans/3d-2.md`) on the racer's
-//! geometry, with the Track as the reference: wherever the Track's
-//! picture is flat, the scene's pixel matches it
-//! (`gpu_world_compare.rs`). The car's roof lands where
-//! `Projection::project` puts it; the scene's draws are pinned.
+//! the Track drew, recorded as golden pictures before R3a2 deleted it:
+//! in the fixed and the following camera, on a landscape and a portrait
+//! target, and close on the car. Ground and objects go through the
+//! scene's one view-projection, so this is the ground and object check
+//! (`docs/plans/3d-2.md`) on the racer's geometry: wherever the golden
+//! picture is flat, the scene's pixel matches it (`gpu_world_compare.rs`).
+//! The car's roof lands where `Projection::project` puts it; the scene's
+//! draws are pinned.
 
 use vapors_app::SurfaceSize;
+use vapors_renderer::Samples;
 
+use crate::gpu_frames::WORLD_DRAWS;
 use crate::gpu_world_compare::{agreement, roof_pixel};
-use crate::gpu_world_rig::{LANDSCAPE, PORTRAIT, Rig, by_track};
+use crate::gpu_world_golden::golden;
+use crate::gpu_world_rig::{LANDSCAPE, PORTRAIT, Rig};
 use crate::model::{Camera, RADIUS, Race};
 
 /// The car on the bottom straight, heading along it.
@@ -54,8 +57,8 @@ fn close(_: &Race) -> Camera {
 /// The car roof's colour: its top face, lit 1.
 const ROOF: [u8; 4] = [245, 158, 82, 255];
 
-/// The scene's draws: the composition, the ground and the nine parts.
-const DRAWS: u64 = 11;
+/// The scene's draws: the composition and the world's.
+const DRAWS: u64 = 1 + WORLD_DRAWS;
 
 /// The fewest flat pixels each check compares, under what ANV (UHD 630)
 /// and llvmpipe gave on 2026-11-17: fixed 19,012 and 18,774; following
@@ -65,55 +68,117 @@ const FEWEST_LANDSCAPE: usize = 15_000;
 const FEWEST_PORTRAIT: usize = 12_000;
 const FEWEST_CLOSE: usize = 50_000;
 
-/// The racer's world through `camera` at `size`, against the Track's:
-/// at least `fewest` flat pixels compared (fewer means the ground's noise
-/// or the target changed, and the check would compare too little), none
-/// apart; the roof where `project` puts it; the draws pinned.
-fn check(camera: fn(&Race) -> Camera, size: SurfaceSize, fewest: usize) {
-    // Given
+/// The most flat pixels a check lets differ by 3 to 6 (the ground's
+/// noise, `gpu_world_compare.rs`), by adapter. On hardware, where the
+/// goldens were recorded (ANV): 0 to 1 measured on 2026-11-17, at 1 and
+/// at 4 samples. A pixel further apart than 6 fails every check.
+const NOISY_HARDWARE: usize = 10;
+
+/// On a software adapter (llvmpipe), whose `sin` hash rounds otherwise:
+/// fixed 863, following 953, portrait 1,036 and close 7,991 measured, at
+/// 1 and at 4 samples. These caps do not hide the mirror or a sign error,
+/// which land beyond 6: with the root group's mirror dropped, close 16,229
+/// apart, fixed 4,640, following 4,776, portrait 2,745; with the yaw's sign
+/// flipped, following 13,674 and portrait 11,440 (the fixed and close
+/// cameras' yaw is 0). ANV gave the same apart counts within 0.5 %.
+const NOISY_FIXED: usize = 1_100;
+const NOISY_FOLLOWING: usize = 1_200;
+const NOISY_PORTRAIT: usize = 1_300;
+const NOISY_CLOSE: usize = 10_000;
+
+/// The racer's world through `camera` at `size` against the golden
+/// picture `name` (the Track's, `gpu_world_golden.rs`): at least
+/// `fewest` flat pixels compared (fewer means the ground's noise or the
+/// target changed, and the check would compare too little), at most
+/// `noisy` of them 3 to 6 apart and none further; the roof where
+/// `project` puts it; the draws pinned.
+fn check(
+    name: &str,
+    camera: fn(&Race) -> Camera,
+    size: SurfaceSize,
+    (fewest, software_noisy): (usize, usize),
+) {
     let gpu = vapors_gpu_harness::gpu();
+    let noisy = if software(&gpu) {
+        software_noisy
+    } else {
+        NOISY_HARDWARE
+    };
+    for samples in [Samples::One, Samples::Four] {
+        check_at((name, camera, size), samples, &gpu, (fewest, noisy));
+    }
+}
+
+/// Whether `gpu` is a software adapter (llvmpipe), whose `sin` hash
+/// rounds otherwise than the hardware the goldens were recorded on.
+fn software(gpu: &vapors_gpu_harness::Gpu) -> bool {
+    gpu.adapter.get_info().device_type == wgpu::DeviceType::Cpu
+}
+
+fn check_at(
+    (name, camera, size): (&str, fn(&Race) -> Camera, SurfaceSize),
+    samples: Samples,
+    gpu: &vapors_gpu_harness::Gpu,
+    (fewest, noisy): (usize, usize),
+) {
+    // Given
     let race = race();
     let camera = camera(&race);
-    let track = by_track(&gpu, (&race, &camera), size);
-    let mut rig = Rig::new(&race, &camera, size);
+    let reference = golden(name, size);
+    let mut rig = Rig::new(&race, &camera, size, samples);
 
     // When
-    let (work, scene) = rig.frame(&gpu);
+    let (work, scene) = rig.frame(gpu);
 
     // Then
-    let (flat, apart) = agreement(size, &track, &scene);
+    let found = agreement(size, &reference, &scene);
+    let at_samples = format!("{name} at {} samples", samples.count());
     assert!(
-        flat >= fewest,
-        "{flat} flat pixels, under the {fewest} this check compares: the ground's noise or the target changed, so it would compare too little; reproduce with `cargo nextest run -p vapors-racer gpu_the_racers_world`"
+        found.flat >= fewest,
+        "{at_samples}: {} flat pixels, under the {fewest} this check compares: the ground's noise or the target changed, so it would compare too little; reproduce with `cargo nextest run -p vapors-racer gpu_the_racers_world`",
+        found.flat
     );
-    assert_eq!(apart, 0, "{apart} of {flat} flat pixels differ");
+    assert!(
+        found.apart == 0 && found.noisy <= noisy,
+        "{at_samples}: {found:?}, at most {noisy} noisy"
+    );
     let (x, y) = roof_pixel(&rig, &race);
     let at = ((y * size.width + x) * 4) as usize;
     let pixel = |pixels: &[u8]| -> [u8; 4] { pixels[at..at + 4].try_into().expect("four bytes") };
     assert_eq!(
-        (pixel(&scene), pixel(&track)),
+        (pixel(&scene), pixel(&reference)),
         (ROOF, ROOF),
-        "at ({x}, {y})"
+        "{at_samples} at ({x}, {y})"
     );
     assert_eq!(work.draw_calls, DRAWS);
 }
 
 #[test]
-fn gpu_the_racers_world_draws_what_the_track_draws_in_the_fixed_camera() {
-    check(fixed, LANDSCAPE, FEWEST_LANDSCAPE);
+fn gpu_the_racers_world_draws_the_golden_picture_in_the_fixed_camera() {
+    check("fixed", fixed, LANDSCAPE, (FEWEST_LANDSCAPE, NOISY_FIXED));
 }
 
 #[test]
-fn gpu_the_racers_world_draws_what_the_track_draws_in_the_following_camera() {
-    check(following, LANDSCAPE, FEWEST_LANDSCAPE);
+fn gpu_the_racers_world_draws_the_golden_picture_in_the_following_camera() {
+    check(
+        "following",
+        following,
+        LANDSCAPE,
+        (FEWEST_LANDSCAPE, NOISY_FOLLOWING),
+    );
 }
 
 #[test]
-fn gpu_the_racers_world_draws_what_the_track_draws_on_a_portrait_target() {
-    check(following, PORTRAIT, FEWEST_PORTRAIT);
+fn gpu_the_racers_world_draws_the_golden_picture_on_a_portrait_target() {
+    check(
+        "following-portrait",
+        following,
+        PORTRAIT,
+        (FEWEST_PORTRAIT, NOISY_PORTRAIT),
+    );
 }
 
 #[test]
-fn gpu_the_racers_world_draws_what_the_track_draws_close_on_the_car() {
-    check(close, LANDSCAPE, FEWEST_CLOSE);
+fn gpu_the_racers_world_draws_the_golden_picture_close_on_the_car() {
+    check("close", close, LANDSCAPE, (FEWEST_CLOSE, NOISY_CLOSE));
 }

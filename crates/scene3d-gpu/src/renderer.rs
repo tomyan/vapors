@@ -105,7 +105,9 @@ impl SurfaceRenderer for SceneRenderer {
             .camera
             .write(&frame, view_projection(&scene, frame.size)?);
         mounted.write_slots(&frame, &scene, &nodes)?;
-        Ok(mounted.draw(&mut frame, attached, &nodes)?)
+        mounted.draw(&mut frame, attached, &nodes)?;
+        self.log.rendered();
+        Ok(())
     }
 }
 

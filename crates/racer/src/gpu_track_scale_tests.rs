@@ -1,7 +1,7 @@
 //! GPU tier: the track shows the same colours at device scale 1 and 2
 //! for the same CSS size, sampled on flat sky or road, an edge and a
 //! gradient (docs/gpu-surface.md, 3D slice 1c PR 6).
-use crate::gpu_frames::{WINDOW, pixel_in, track_alone_in};
+use crate::gpu_frames::{WINDOW, pixel_in, world_alone_in};
 use crate::gpu_track_resize_tests::{DOUBLE, drawn_in, racing};
 use vapors_gpu_harness::gpu;
 
@@ -84,7 +84,7 @@ fn gpu_the_track_shows_the_same_colour_at_one_and_two_times_scale() {
     let gpu = gpu();
     let (mut racer, now) = racing(&gpu);
     let single = drawn_in(&mut racer, &gpu, WINDOW, now);
-    let alone = track_alone_in(&racer, &gpu, WINDOW);
+    let alone = world_alone_in(&racer, &gpu, WINDOW);
     let points = sampled(&track_points(&single, &alone));
 
     // When

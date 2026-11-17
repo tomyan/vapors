@@ -136,6 +136,11 @@ impl ElementsApp {
 /// frames.
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
+        if let Err(message) = self.not_preparing("event") {
+            report_error(&message);
+            self.failure.set(&message);
+            return;
+        }
         match self.deliver(&event, platform, Hosting::Alone) {
             // Before the first frame nothing is on screen, so the event
             // was aimed at nothing; it is dropped.
@@ -152,7 +157,10 @@ impl App for ElementsApp {
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         #[cfg(not(target_family = "wasm"))]
         self.deliver_pastes();
-        match self.run_phases(frame).and_then(|()| self.sync_animating()) {
+        let ran = self
+            .not_preparing("frame")
+            .and_then(|()| self.run_phases(frame));
+        match ran.and_then(|()| self.sync_animating()) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
                 report_error(&message);
@@ -205,6 +213,8 @@ mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_preparing.rs"]
+mod preparing;
 #[path = "elements_app_readout.rs"]
 mod readout;
 #[path = "elements_app_shown.rs"]
@@ -215,6 +225,7 @@ mod start;
 mod surface_handle;
 #[path = "elements_app_surfaces.rs"]
 mod surfaces;
+pub use preparing::Preparing;
 // For the root `gpu_` test module (the tier split needs a gpu_ id).
 #[cfg(test)]
 pub(crate) use surfaces::give_one_loop_waker_to;

@@ -53,14 +53,8 @@ impl Racer {
     pub fn controls(&self) -> Controls {
         self.run.driving.controls()
     }
-    /// After the app's frame: what the track's hook refused, then the status.
-    pub(super) fn after_frame(&self, frame: u64) -> Result<(), String> {
-        self.track
-            .after_frame()
-            .map_err(|error| format!("the racer's track surface refused: {error}"))?;
-        self.report_frame(frame)
-    }
-    fn report_frame(&self, frame: u64) -> Result<(), String> {
+    /// After the app's frame: the status.
+    pub(super) fn report_frame(&self, frame: u64) -> Result<(), String> {
         if self.inspect {
             vapors_platform::report_status(&self.status(frame)?);
         } else if frame == 0 {

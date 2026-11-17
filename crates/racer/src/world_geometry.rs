@@ -149,3 +149,7 @@ pub fn car(sink: &mut dyn Sink) {
     cuboid(sink, Part::Stripes, [-16.0, -1.0, 9.1], [10.0, 2.0, 0.2]);
     cuboid(sink, Part::Stripes, [8.0, -1.0, 9.1], [8.0, 2.0, 0.2]);
 }
+
+#[cfg(test)]
+#[path = "world_geometry_tests.rs"]
+mod tests;

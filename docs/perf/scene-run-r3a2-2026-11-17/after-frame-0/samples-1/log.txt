@@ -1,0 +1,19 @@
+settled after 461 s, load 1.37 3.19 5.87; busiest:
+%CPU     ELAPSED COMMAND
+29.1 13-05:59:45 claude
+ 2.2  5-09:52:49 tailscaled
+ 1.3 13-05:59:51 kcompactd0
+ 1.1  8-19:04:40 sccache
+ 0.8 13-05:59:50 kswapd0
+run1-cold start 16:53:21 load 1.37 3.19 5.87
+run1-cold end 16:53:48 exit 0 load 0.98 2.95 5.72
+run1-warm start 16:53:48 load 0.98 2.95 5.72
+run1-warm end 16:54:15 exit 0 load 0.98 2.76 5.57
+run2-cold start 16:54:15 load 0.98 2.76 5.57
+run2-cold end 16:54:42 exit 0 load 0.99 2.62 5.45
+run2-warm start 16:54:42 load 0.99 2.62 5.45
+run2-warm end 16:55:10 exit 0 load 0.79 2.41 5.29
+run3-cold start 16:55:10 load 0.79 2.41 5.29
+run3-cold end 16:55:37 exit 0 load 0.59 2.23 5.15
+run3-warm start 16:55:37 load 0.59 2.23 5.15
+run3-warm end 16:56:05 exit 0 load 0.75 2.13 5.04

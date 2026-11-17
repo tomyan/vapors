@@ -186,3 +186,62 @@ fn invalidating_after_an_app_that_never_ran_is_dropped_is_refused() {
         Err(InvalidateError::LoopClosed("track".into()))
     );
 }
+
+#[test]
+fn an_invalidation_while_the_next_frame_is_prepared_wakes_no_loop() {
+    // Given: the loop runs
+    let mut app = app();
+    let handle = app.mount("track", Box::new(Blank)).expect("mounts");
+    let platform = Platform::detached();
+    app.event(Event::PointerLeft, &platform);
+    let _ = platform.take_redraw_request();
+
+    // When: one while preparing, one after
+    let preparing = app.preparing();
+    let prepared = handle.clone().invalidate();
+    drop(preparing);
+    let woke_during = platform.take_redraw_request();
+    let after = handle.clone().invalidate();
+
+    // Then: the first is for the next frame and woke nothing; the second
+    // wakes the loop as before
+    assert_eq!(prepared, Ok(Invalidated::ForTheNextFrame));
+    assert!(
+        !woke_during,
+        "an invalidation while preparing woke the loop"
+    );
+    assert_eq!(after, Ok(Invalidated::Woke));
+    assert!(platform.take_redraw_request());
+}
+
+#[test]
+fn an_event_while_a_preparing_guard_lives_is_refused_naming_the_fix() {
+    // Given: a guard kept past its preparation
+    let mut app = app();
+    let _kept = app.preparing();
+
+    // When
+    app.event(Event::PointerLeft, &Platform::detached());
+
+    // Then
+    let failure = app.failure().get().unwrap_or_default();
+    assert!(
+        failure.contains("drop the guard before calling ElementsApp::event"),
+        "{failure:?}"
+    );
+}
+
+#[test]
+fn a_refusal_for_an_unmounted_surface_names_the_fix() {
+    // When
+    let refused = InvalidateError::NotMounted("track".into()).to_string();
+
+    // Then
+    assert!(
+        refused.contains("\"track\" has no renderer mounted")
+            && refused.contains(
+                "mount one with ElementsApp::mount and call through the handle it returns"
+            ),
+        "{refused}"
+    );
+}

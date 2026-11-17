@@ -79,6 +79,28 @@ pub(super) fn render_into(
     Ok(())
 }
 
+/// `renderer`'s first render into `backing` at `App::start`, on an
+/// encoder of its own submitted on `queue`: frame 0 composites it, and
+/// pays for none of the renderer's first-render work (uploads, a
+/// pipeline's first use). Its work is not counted: no frame drew it.
+pub(super) fn render_at_start(
+    renderer: &mut Box<dyn SurfaceRenderer>,
+    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    backing: &Backing,
+) -> Result<(), SurfaceError> {
+    let mut encoder = device.create_command_encoder(&ENCODER);
+    renderer.render(SurfaceFrame {
+        device,
+        queue,
+        encoder: &mut encoder,
+        view: &backing.view,
+        size: backing.size,
+        work: &WorkCounter::default(),
+    })?;
+    queue.submit([encoder.finish()]);
+    Ok(())
+}
+
 /// A backing is rendered into, sampled, and copyable both ways.
 const USAGE: wgpu::TextureUsages = wgpu::TextureUsages::RENDER_ATTACHMENT
     .union(wgpu::TextureUsages::TEXTURE_BINDING)

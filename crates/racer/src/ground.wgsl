@@ -5,8 +5,7 @@
 // point in the simulation's X, Y; `pixel` is how many ground units one
 // device pixel spans, so each edge ramps over about a pixel. The track's
 // constants, TRACK_STRAIGHT, TRACK_RADIUS and TRACK_ROAD, are put before
-// this from `model.rs`, so the Track renderer and the ground material
-// draw from this one text.
+// this from `model.rs`.
 
 fn box(q: vec2<f32>, b: vec2<f32>) -> f32 {
     let d = abs(q) - b;

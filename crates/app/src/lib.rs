@@ -44,7 +44,7 @@ pub use document_input::{
 };
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
-    Invalidated, PerFrame, StartState, SurfaceHandle,
+    Invalidated, PerFrame, Preparing, StartState, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,

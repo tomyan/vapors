@@ -55,11 +55,7 @@ pub fn workloads_at(samples: Samples) -> Vec<(String, (Option<usize>, Make))> {
         all.push((format!("{count} rows, {change:?}"), (Some(count), make)));
     }
     for (name, racing) in [("racer, paused", false), ("racer, racing", true)] {
-        let make: Make = Box::new(move || {
-            let mut racer = RacerFrames::new(racing);
-            racer.set_samples(samples);
-            Box::new(racer)
-        });
+        let make: Make = Box::new(move || Box::new(RacerFrames::at(racing, samples)));
         all.push((name.into(), (None, make)));
     }
     all

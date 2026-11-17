@@ -3,20 +3,22 @@
 //! loop, and the frames after it render nothing, as the browser
 //! regressions' idle counts need (`scripts/check-racer-*.mjs`).
 use crate::app::Racer;
-use crate::gpu_frames::{idle_in_loop, looped, space};
+use crate::gpu_frames::{drive, idle_in_loop, idle_in_loop_at, looped, space};
 use std::time::Duration;
 use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{App, Instant, Next, Platform};
+use vapors_renderer::Samples;
 
 /// A 60 Hz frame interval, as the browser's.
 const INTERVAL: Duration = Duration::from_millis(16);
 
 #[test]
 fn gpu_the_frame_that_pauses_the_race_is_the_last() {
-    // Given: racing in a loop
+    // Given: racing in a loop, the car moving, so the world changes on
+    // every frame up to the pause
     let (gpu, platform) = (gpu(), Platform::detached());
     let mut racer = idle_in_loop(&gpu, &platform);
-    racer.command("toggle").expect("drives");
+    drive(&mut racer);
     let mut now = Instant::now();
     for _ in 0..3 {
         now += INTERVAL;
@@ -45,7 +47,7 @@ fn gpu_the_frame_that_pauses_the_race_is_the_last() {
 fn gpu_the_frame_that_ends_a_paused_camera_transition_is_the_last() {
     // Given: idle in a loop; a camera toggle moves the camera while paused
     let (gpu, platform) = (gpu(), Platform::detached());
-    let mut racer = idle_in_loop(&gpu, &platform);
+    let mut racer = idle_in_loop_at(&gpu, &platform, Samples::One);
     racer.command("camera").expect("toggles the camera");
     let mut now = Instant::now();
 

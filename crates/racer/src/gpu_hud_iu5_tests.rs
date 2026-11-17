@@ -10,7 +10,7 @@
 //! calls. What a changed text costs (text layouts, boxes, atlas bytes)
 //! does not hold yet: IU3/IU4 targets in docs/plans/3d-1c.md.
 use crate::app::Racer;
-use crate::gpu_frames::{frame_at, idle};
+use crate::gpu_frames::{WORLD_DRAWS, drive, frame_at, idle};
 use std::time::Duration;
 use vapors_app::FrameCounts;
 use vapors_gpu_harness::{Gpu, gpu};
@@ -81,6 +81,14 @@ fn work(racer: &Racer, renders: u64) -> Work {
     }
 }
 
+/// `idle`'s draws with the world rendered: the HUD's the same, the
+/// surfaces' its composition and the world's.
+fn rendering(idle: [u64; 6]) -> [u64; 6] {
+    let mut drawn = idle;
+    drawn[5] += WORLD_DRAWS;
+    drawn
+}
+
 fn draws(counts: &FrameCounts) -> [u64; 6] {
     [
         counts.shadows,
@@ -130,7 +138,7 @@ fn gpu_an_animating_frame_behind_an_unchanged_hud_does_no_hud_work() {
             frame.laid_out <= idle_update.laid_out,
             "{frame:?}; idle {idle_update:?}"
         );
-        assert_eq!(frame.draws, idle_update.draws, "{frame:?}");
+        assert_eq!(frame.draws, rendering(idle_update.draws), "{frame:?}");
     }
 }
 
@@ -139,7 +147,7 @@ fn gpu_a_racing_frame_restyles_nothing_and_renders_the_track_once() {
     // Given
     let gpu = gpu();
     let mut clocked = Clocked::idle(&gpu);
-    clocked.racer.command("toggle").expect("drives");
+    drive(&mut clocked.racer);
 
     // When: the first frames show the race's message and button label
     let racing = clocked.frames(&gpu, 2, 5);
