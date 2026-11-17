@@ -30,6 +30,7 @@ mod api_sandbox;
 mod api_server;
 #[allow(dead_code, reason = "constructed by api-build, the next PR")]
 mod api_server_proxy;
+mod api_tool_prompt;
 mod api_upstream;
 mod api_usage;
 mod builds;
