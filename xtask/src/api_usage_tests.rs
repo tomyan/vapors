@@ -60,6 +60,10 @@ fn usage_the_prices_cannot_express_is_not_counted() {
         ("server_tool_use", "{\"web_search_requests\":1}"),
         ("speed", "\"fast\""),
         ("inference_geo", "\"us\""),
+        (
+            "iterations",
+            "[{\"type\":\"compaction\",\"input_tokens\":5}]",
+        ),
         ("a_new_field", "1"),
     ] {
         let body =
@@ -70,6 +74,19 @@ fn usage_the_prices_cannot_express_is_not_counted() {
             "{field}: {counted:?}"
         );
     }
+}
+
+#[test]
+fn a_whole_api_error_body_with_no_usage_is_an_error_naming_its_type() {
+    let counted =
+        scanned(&[r#"{"type":"error","error":{"type":"overloaded_error","message":"x"}}"#]);
+    assert_eq!(counted, Counted::Error("overloaded_error".into()));
+}
+
+#[test]
+fn empty_iterations_are_counted() {
+    let counted = scanned(&["{\"model\":\"m\",\"usage\":{\"input_tokens\":4,\"iterations\":[]}}"]);
+    assert!(matches!(counted, Counted::Whole(..)), "{counted:?}");
 }
 
 #[test]

@@ -22,14 +22,13 @@ const PRICED: [&str; 4] = [
 
 /// Usage fields that carry no price of their own: their values are
 /// checked (`unpriced`), the rest are refused.
-const DESCRIPTIVE: [&str; 7] = [
+const DESCRIPTIVE: [&str; 6] = [
     "cache_creation",
     "server_tool_use",
     "service_tier",
     "inference_geo",
     "speed",
     "output_tokens_details",
-    "iterations",
 ];
 
 /// What one response counted.
@@ -40,6 +39,12 @@ pub enum Counted {
     /// It did not end whole (cut, or not a body the proxy reads): why.
     /// Charged at the request's worst case, which bounds it.
     Cut(String),
+    /// A body that is whole and is an API error, `{"type": "error"}`,
+    /// with no usage: its error type. The API bills nothing for an error
+    /// it answered (review of #476-#478, N2b), so the proxy charges 0
+    /// when the status was not 2xx and curl ended well
+    /// (`api_server_proxy.rs`); anything else is charged as cut.
+    Error(String),
     /// It reported usage the prices cannot express: why. Charged at the
     /// worst case, and the session stops, as the worst case may not bound
     /// it.
@@ -132,6 +137,10 @@ fn whole_body(body: &[u8]) -> Counted {
     let Ok(value) = serde_json::from_slice::<Value>(body) else {
         return Counted::Cut("a response body that is not JSON".into());
     };
+    if value["type"] == "error" && value.get("usage").is_none() {
+        let kind = value["error"]["type"].as_str().unwrap_or_default();
+        return Counted::Error(crate::api_refusals::escaped(kind));
+    }
     let (Some(usage), Some(model)) = (value["usage"].as_object(), value["model"].as_str()) else {
         return Counted::Cut("a response with no usage or no model".into());
     };
@@ -149,8 +158,10 @@ fn whole_body(body: &[u8]) -> Counted {
 }
 
 /// Refuses a usage field the prices cannot express: an unknown field,
-/// an hour-long cache write, a server tool's use, or a tier, region or
-/// speed with a price of its own.
+/// an hour-long cache write, a server tool's use, a tier, region or
+/// speed with a price of its own, or `iterations` that is not empty:
+/// sampling a compaction ran, billed apart from the four counts, which
+/// the proxy does not sum (review of #476-#478, N2b).
 fn unpriced(usage: &Map<String, Value>) -> Result<(), String> {
     for (field, value) in usage {
         let fine = PRICED.contains(&field.as_str())
@@ -159,6 +170,7 @@ fn unpriced(usage: &Map<String, Value>) -> Result<(), String> {
                 "server_tool_use" => value.as_object().is_none_or(|uses| uses.values().all(zero)),
                 "service_tier" | "speed" => value.is_null() || value == "standard",
                 "inference_geo" => value.is_null() || value == "global" || value == "not_available",
+                "iterations" => value.is_null() || value.as_array().is_some_and(Vec::is_empty),
                 name => DESCRIPTIVE.contains(&name),
             };
         if !fine {

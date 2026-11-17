@@ -18,11 +18,13 @@ mod api_host;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
 mod api_http;
 mod api_inner;
+mod api_json_strict;
 mod api_limits;
 mod api_paths;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
 mod api_prices;
 mod api_refusals;
+mod api_request_content;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
 mod api_request_policy;
 mod api_sandbox;
