@@ -15,8 +15,20 @@ This change makes both run once:
 
 The release verification is kept.
 
-Measured as the attribution was: `vapors-perf --first-frame 10000` on
-the judged profile, median of 3 runs, outputs in `bookkeeping-2026-11-17/`.
+Measured with the attribution's command and profile (`vapors-perf
+--first-frame 10000`, judged, median of 3 runs; outputs in
+`bookkeeping-2026-11-17/`), but not its settled load: these runs started
+at load averages of 7.9 to 18.0, where the attribution settled to 1.43.
+Only the instruction counts are quoted, since they move little with
+load (the spread between runs is under 0.05 M); the times in the raw
+files are not comparable and are not quoted.
+
+"This change" was measured at e4be3ecd, a commit the squash merge
+removes. The merged tree differs from it in: an `if let` chain
+(formatting); `refuse_key` also dropping the key's sharing decision,
+which runs only when a key is refused; and a count of sheet hashes,
+which rises only when a hash is taken. None of these runs per element
+or per mount on this page.
 
 | point | revision | mount | start: style |
 |---|---|---|---|

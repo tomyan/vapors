@@ -70,6 +70,7 @@ impl Sheets {
         let Some(claimed) = sheet.hash() else {
             return true;
         };
+        self.hashes_taken += 1;
         if claimed == vapors_css::sheet_hash::sheet_hash(sheet.text()) {
             return true;
         }

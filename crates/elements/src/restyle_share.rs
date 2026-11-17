@@ -110,8 +110,9 @@ impl Document {
         }
         // check 1 first, once per key: a sheet registered with other text
         // is that, not a disagreement of the sharing answers (review of
-        // #437, M2). A refused key is not decided, so each of its
-        // elements comes here and is refused again.
+        // #437, M2). A refused key is not decided (`refuse_key` drops a
+        // decision), so each of its elements comes here and is refused
+        // again.
         if let Some(winners) = key.winners.compiled() {
             self.compiled_key(key, winners)?;
         }

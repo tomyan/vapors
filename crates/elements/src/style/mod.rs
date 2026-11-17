@@ -88,6 +88,8 @@ pub(crate) struct Sheets {
     /// and its text's hash (`sheet_hashes`).
     components: std::collections::HashMap<(sheet_hashes::SheetKind, String), sheet_hashes::Held>,
     refused: Vec<ElementError>,
+    /// Compiled sheets' texts hashed to check their claims.
+    pub(crate) hashes_taken: usize,
 }
 
 impl Sheets {
@@ -103,6 +105,7 @@ impl Sheets {
             rust: rust_sheets::RustSheets::default(),
             components: std::collections::HashMap::new(),
             refused: Vec::new(),
+            hashes_taken: 0,
         }
     }
 

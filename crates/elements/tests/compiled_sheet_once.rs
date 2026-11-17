@@ -72,3 +72,52 @@ fn mounting_the_genuine_sheet_again_changes_nothing() {
         assert_eq!(doc.update_counts().elements_restyled, 0, "global {global}");
     }
 }
+
+#[test]
+fn a_refused_other_text_mount_records_no_claim_against_the_held_text() {
+    // Given: the genuine sheet, then other text under its name (refused),
+    // then the genuine text claiming the other text's hash
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let other = ".card { color: blue; }";
+    doc.add_style(CompiledSheet::for_tests_hashed(OWN, CARD, sheet_hash(CARD)));
+    doc.add_style(CompiledSheet::for_tests_hashed(
+        OWN,
+        other,
+        sheet_hash(other),
+    ));
+
+    // When
+    doc.add_style(CompiledSheet::for_tests_hashed(
+        OWN,
+        CARD,
+        sheet_hash(other),
+    ));
+
+    // Then: the forged claim is checked, and refused
+    let refused = format!("{:?}", doc.update(VIEWPORT).err().expect("refused"));
+    assert!(
+        refused.contains("for text that hashes otherwise"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn a_repeat_mount_of_a_known_sheet_takes_no_hash() {
+    for global in [false, true] {
+        // Given
+        let mut doc = Document::new(FontSystem::bundle_only());
+        let sheet = CompiledSheet::for_tests_hashed(OWN, CARD, sheet_hash(CARD));
+
+        // When: mounted three times
+        for _ in 0..3 {
+            if global {
+                doc.add_global_style(sheet);
+            } else {
+                doc.add_style(sheet);
+            }
+        }
+
+        // Then
+        assert_eq!(doc.sheet_hashes_taken(), 1, "global {global}");
+    }
+}

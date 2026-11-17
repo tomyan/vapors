@@ -178,10 +178,14 @@ impl Document {
         Err(ElementError::Refused(why))
     }
 
-    /// Refuses every later element of `key` in this `Kept`.
+    /// Refuses every later element of `key` in this `Kept`: its rules
+    /// become the refusal, and its sharing decision is dropped, so a later
+    /// element re-enters `shareable`, whose check 1 meets the refusal,
+    /// rather than taking a share-table hit past it.
     pub(crate) fn refuse_key(&mut self, key: &StyleKey, why: &str) {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.shared.compiled.insert(address, Err(why.to_owned()));
+        kept.shared.shareable.remove(&address);
     }
 }

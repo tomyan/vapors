@@ -16,6 +16,15 @@ impl Document {
         self.sheets.hash_of(sheet)
     }
 
+    /// How many compiled sheets' texts were hashed to check their claim
+    /// (`Sheets::compiled_text`): once per sheet, text and claim, not per
+    /// mount, which a test holds.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn sheet_hashes_taken(&self) -> usize {
+        self.sheets.hashes_taken
+    }
+
     /// Whether every sheet `key`'s winners index is the one the compiler
     /// read. A sheet absent from the cascade is not a mismatch (its rules
     /// apply nowhere), unless it is the user-agent sheet or the key's
