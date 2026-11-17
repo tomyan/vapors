@@ -1,19 +1,23 @@
-//! GPU tier: kept quads and shadows drawn under a scroll frame's shift
-//! (IU4 4c, `docs/plans/iu4.md` section 3): bytes kept in the frame's
-//! coordinates land moved by the shift, as the same items drawn at the
-//! moved place do; a frame drawing them at a new shift writes one
-//! uniform value and no instance bytes.
+//! GPU tier: kept quads, shadows and closed forms drawn under a scroll
+//! frame's shift (IU4 4c, `docs/plans/iu4.md` section 3), held in the
+//! frame's entry of the transform table (`docs/plans/flat-scene-f2.md`):
+//! bytes kept in the frame's coordinates land moved by the shift, as the
+//! same items drawn at the moved place do; a frame drawing them at a new
+//! shift writes one table entry, and no uniform or instance bytes.
 
 #[path = "support/frame.rs"]
 mod frame;
 #[path = "support/retained.rs"]
 mod retained;
+#[path = "support/table.rs"]
+mod table;
 
 use frame::{BACKGROUND, quad, rgba, square, target};
 use retained::{Frame, RED, kept};
+use table::table;
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::{
-    ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target,
+    ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline, Target,
 };
 use vapors_scene::{Color, Rect, Shadow};
 
@@ -29,10 +33,10 @@ fn gpu_kept_quads_drawn_with_a_shift_match_the_quad_drawn_at_the_moved_place() {
 
     // When: kept at 4, 4 and drawn shifted by 3, 5
     let shifted = drawn_on_square(|pipeline: &mut QuadPipeline, target| {
-        let range = pipeline
-            .keep(target, &QuadPipeline::bytes(&at(4.0, 4.0)))
-            .expect("room");
-        pipeline.draw_kept(target, &range, Shift::whole([3.0, 5.0]));
+        let mut table = table(target, [3.0, 5.0], &[]);
+        let bytes = QuadPipeline::bytes_in(&at(4.0, 4.0), table.frame, &[]);
+        let range = pipeline.keep(target, &bytes).expect("room");
+        pipeline.draw_kept(target, &range, (&mut table.transforms, 0));
         pipeline.release(range);
     });
 
@@ -45,7 +49,7 @@ fn gpu_kept_quads_drawn_with_a_shift_match_the_quad_drawn_at_the_moved_place() {
 }
 
 #[test]
-fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
+fn gpu_kept_quads_drawn_at_a_new_shift_write_one_table_entry_and_no_uniform_or_instances() {
     // Given: a red quad kept and drawn unshifted in one frame
     let mut frame = Frame::new(gpu());
     let first = frame.encoder();
@@ -53,6 +57,7 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
     frame.draw(&first, &red);
     first.submit(&frame.gpu.queue).expect("no refusal");
     let _ = frame.pipeline.take_work();
+    let _ = frame.table.take_written();
     frame.texture = square(&frame.gpu, retained::SIDE).0;
     frame.view = frame
         .texture
@@ -60,15 +65,16 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
 
     // When: drawn two pixels right in the next
     let second = frame.encoder();
-    frame.draw_shifted(&second, &red, Shift::whole([2.0, 0.0]));
+    frame.draw_shifted(&second, &red, [2.0, 0.0]);
     second.submit(&frame.gpu.queue).expect("no refusal");
 
     // Then
     let work = frame.pipeline.take_work();
     assert_eq!(frame.row(), [BACKGROUND, BACKGROUND, RED]);
-    // one view written: the viewport, the shift and the rows' offsets
-    // (row_offsets.rs), 16 + 1024 bytes
-    assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 1040));
+    // the frame's entry written, 64 bytes; the view (the viewport and the
+    // rows' first entry) and the instances unchanged
+    assert_eq!(frame.table.take_written(), (1, 64));
+    assert_eq!((work.uniform_writes, work.buffer_bytes), (0, 0));
     frame.pipeline.release(red);
 }
 
@@ -127,9 +133,10 @@ fn gpu_kept_shadows_drawn_with_a_shift_match_the_shadow_drawn_at_the_moved_place
 
     // When: kept at 4, 4 and drawn shifted by 3, 5
     let shifted = drawn_on_square(|pipeline: &mut ShadowPipeline, at| {
-        let bytes = ShadowPipeline::bytes(&[shadow(4.0, 4.0)]);
+        let mut table = table(at, [3.0, 5.0], &[]);
+        let bytes = ShadowPipeline::bytes_in(&[shadow(4.0, 4.0)], table.frame, &[]);
         let range = pipeline.keep(at, &bytes).expect("room");
-        pipeline.draw_kept(at, &range, Shift::whole([3.0, 5.0]));
+        pipeline.draw_kept(at, &range, (&mut table.transforms, 0));
         pipeline.release(range);
     });
 
@@ -162,9 +169,10 @@ fn gpu_kept_closed_forms_drawn_with_a_shift_match_the_shape_drawn_at_the_moved_p
 
     // When: kept at 4, 4 and drawn shifted by 3, 5
     let shifted = drawn_on_square(|pipeline: &mut ClosedFormPipeline, at| {
-        let bytes = ClosedFormPipeline::bytes(&[circle(4.0, 4.0)]);
+        let mut table = table(at, [3.0, 5.0], &[]);
+        let bytes = ClosedFormPipeline::bytes_in(&[circle(4.0, 4.0)], table.frame, &[]);
         let range = pipeline.keep(at, &bytes).expect("room");
-        pipeline.draw_kept(at, &range, Shift::whole([3.0, 5.0]));
+        pipeline.draw_kept(at, &range, (&mut table.transforms, 0));
         pipeline.release(range);
     });
 

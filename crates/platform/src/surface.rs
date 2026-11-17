@@ -56,7 +56,8 @@ impl Gpu {
             .create_surface(Arc::clone(window))
             .map_err(|e| PlatformError::Surface(e.to_string()))?;
         let adapter = choose_adapter(&instance, &surface).await?;
-        let required_limits = vapors_gpu::raised_limits(&adapter.limits())?;
+        let downlevel = adapter.get_downlevel_capabilities().flags;
+        let required_limits = vapors_gpu::raised_limits(&adapter.limits(), downlevel)?;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("vapors window"),

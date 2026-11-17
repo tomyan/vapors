@@ -5,13 +5,13 @@
 #![allow(dead_code)]
 
 use vapors_gpu_harness::{Gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline, Shift};
+use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline, TransformTable, translation};
 
 use super::frame::{pixel, quad, square, target};
 
 pub const SIDE: u32 = 4;
-/// A quad's instance bytes: eight `vec4`s and the row index padded to
-/// sixteen bytes (`instanced.rs`).
+/// A quad's instance bytes: eight `vec4`s, then the row index and the
+/// frame's entry padded to sixteen bytes (`instanced.rs`).
 pub const QUAD_BYTES: u64 = 144;
 /// A kept buffer's first size (`FIRST_SIZE` in `retained.rs`).
 pub const FIRST_SIZE: u64 = 64 * 1024;
@@ -22,23 +22,29 @@ pub const RED: [u8; 4] = [255, 0, 0, 255];
 pub const GREEN: [u8; 4] = [0, 255, 0, 255];
 pub const BLUE: [u8; 4] = [0, 0, 255, 255];
 
-/// A square to draw on and a quad pipeline.
+/// A square to draw on, a quad pipeline, and a transform table whose
+/// frame entry the kept quads are in.
 pub struct Frame {
     pub gpu: Gpu,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub pipeline: QuadPipeline,
+    pub table: TransformTable,
+    entry: Option<u32>,
 }
 
 impl Frame {
     pub fn new(gpu: Gpu) -> Self {
         let (texture, view) = square(&gpu, SIDE);
         let pipeline = QuadPipeline::new(&gpu.device, texture.format());
+        let table = TransformTable::new(&gpu.device, "test transforms");
         Self {
             gpu,
             texture,
             view,
             pipeline,
+            table,
+            entry: None,
         }
     }
 
@@ -49,18 +55,26 @@ impl Frame {
         (count, x, colour): (usize, f32, [u8; 4]),
     ) -> Option<KeptRange> {
         let quads = vec![quad([x, 0.0, x + 1.0, 1.0], colour); count];
+        let frame = *self
+            .entry
+            .get_or_insert_with(|| self.table.take(encoder, 1).expect("room"));
         let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.keep(&at, &QuadPipeline::bytes(&quads))
+        self.pipeline
+            .keep(&at, &QuadPipeline::bytes_in(&quads, frame, &[]))
     }
 
     pub fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {
-        self.draw_shifted(encoder, kept, Shift::NONE);
+        self.draw_shifted(encoder, kept, [0.0, 0.0]);
     }
 
-    /// Draws `kept` moved by `shift`, device pixels.
-    pub fn draw_shifted(&mut self, encoder: &FrameEncoder, kept: &KeptRange, shift: Shift) {
+    /// Draws `kept` with its frame's entry moved by `shift`, device
+    /// pixels.
+    pub fn draw_shifted(&mut self, encoder: &FrameEncoder, kept: &KeptRange, shift: [f32; 2]) {
+        let frame = self.entry.expect("a quad kept first");
+        let queue = &self.gpu.queue;
+        self.table.set(encoder, queue, frame, &[translation(shift)]);
         let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.draw_kept(&at, kept, shift);
+        self.pipeline.draw_kept(&at, kept, (&mut self.table, 0));
     }
 
     /// The colours of the top row's first three pixels.

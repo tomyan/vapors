@@ -50,16 +50,17 @@ pub(crate) struct RunBytes {
 }
 
 /// `run`'s instance or vertex bytes, as its pipeline draws them, a
-/// shape run's entries from `shapes`; shadow and quad items each in its
-/// row of `rows` (none for a batch in one frame). Images and surfaces,
-/// drawn an item at a time, carry their row in the shift; shapes and
-/// meshes are batched in their row's own frame (vapors-elements
-/// `framed_batches.rs` `resolved`), so they have no rows.
+/// shape run's entries from `shapes`; shadow, quad and shape items each
+/// in the transform table's entry `frame` and its row of `rows` (none for
+/// a batch in one frame). Images and surfaces, drawn an item at a time,
+/// carry their row in the shift; shapes and meshes are batched in their
+/// row's own frame (vapors-elements `framed_batches.rs` `resolved`), so
+/// their `rows` are empty.
 ///
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
 pub(crate) fn run_bytes(
-    (run, rows): (&Run, &[u32]),
+    (run, frame, rows): (&Run, u32, &[u32]),
     shapes: &ShapeStore,
 ) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {
@@ -68,10 +69,11 @@ pub(crate) fn run_bytes(
         return Ok(RunBytes { bytes, meshes });
     }
     let bytes = match run {
-        Run::Shadows(shadows) => ShadowPipeline::bytes_in_rows(shadows, rows),
-        Run::Quads(quads) => QuadPipeline::bytes_in_rows(quads, rows),
+        Run::Shadows(shadows) => ShadowPipeline::bytes_in(shadows, frame, rows),
+        Run::Quads(quads) => QuadPipeline::bytes_in(quads, frame, rows),
         Run::Shapes(items) => {
-            ClosedFormPipeline::bytes(&shapes.closed_forms(items).map_err(PaintError::Shape)?)
+            let forms = shapes.closed_forms(items).map_err(PaintError::Shape)?;
+            ClosedFormPipeline::bytes_in(&forms, frame, rows)
         }
         Run::Images(items) | Run::Surfaces(items) => {
             ImagePipeline::rect_bytes(items.iter().map(item_rect))
@@ -90,5 +92,27 @@ fn item_rect(item: &Item) -> Rect {
     match item {
         Item::Image { rect, .. } | Item::Surface { rect, .. } => *rect,
         other => unreachable!("an image or surface run holds {other:?}"),
+    }
+}
+
+/// Refuses, naming batch `key` and the item, an item row of `rows` that
+/// is not in the batch's own range of `range` rows. An item whose row
+/// were past it would read the table's next entries: another batch's
+/// rows, or a frame's shift (`painter_transforms.rs`).
+///
+/// # Panics
+///
+/// As said; an empty range (a batch in one frame) holds no row, so any
+/// row index is past it.
+pub(crate) fn rows_in_range(key: vapors_elements::BatchKey, rows: &[u32], range: usize) {
+    let past = rows.iter().position(|&row| row as usize >= range);
+    if let Some(at) = past {
+        panic!(
+            "item {at} of batch {key:?} names row {}, past the {range} rows of the batch's range \
+             in the transform table: each item of a batch over a lane's rows names one of the \
+             rows the batch's offsets give (vapors-elements framed_batches_rows.rs); reproduce \
+             with `cargo xtask test`",
+            rows[at]
+        );
     }
 }

@@ -93,6 +93,12 @@ impl WorkCounter {
         self.buffer_bytes.fetch_add(len(data), Ordering::Relaxed);
     }
 
+    /// Counts `bytes` written to a buffer by a writer that counts its own
+    /// writes (the transform table), into this counter too.
+    pub(crate) fn count_buffer_bytes(&self, bytes: u64) {
+        self.buffer_bytes.fetch_add(bytes, Ordering::Relaxed);
+    }
+
     /// [`WorkCounter::write_buffer`] of a uniform value, counting the
     /// write as well as `data`.
     pub fn write_uniform(

@@ -6,7 +6,7 @@
 //! device pixel past the shape for the outer half's fragments.
 
 use crate::instanced::{Instanced, instance_bytes, rowed_instances};
-use crate::{ClosedFormShape, GpuWork, KeptRange, RowOffsets, Shift, Target};
+use crate::{ClosedFormShape, GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws closed-form shapes. Create once per target
 /// format.
@@ -16,10 +16,8 @@ impl ClosedFormPipeline {
     /// Four-float attributes an instance holds.
     const VEC4S: u32 = 5;
 
-    /// Bytes per instance in a draw's or a kept buffer: the attributes and
-    /// the row index after them (`instanced.rs`), which
-    /// `closed_forms_2d.wgsl` does not read: closed forms are never
-    /// batched across a lane's rows (`unrowed` in the app's painter).
+    /// Bytes per instance in a draw's or a kept buffer: the attributes,
+    /// then the row's index and the frame's entry (`instanced.rs`).
     pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
 
     /// Build the pipeline for targets of `format`.
@@ -30,6 +28,7 @@ impl ClosedFormPipeline {
             format,
             "closed forms",
             concat!(
+                include_str!("transform_table.wgsl"),
                 include_str!("closed_forms_2d.wgsl"),
                 include_str!("closed_forms_shared.wgsl")
             ),
@@ -43,15 +42,25 @@ impl ClosedFormPipeline {
         self.0.draw(target, &Self::bytes(shapes));
     }
 
-    /// The instance bytes of `shapes`, as a draw writes them: each in
-    /// row 0, as the instanced layout takes a row index after an
-    /// instance's floats (`instanced.rs`). Shapes are batched in one frame
-    /// each, never across a lane's rows, so the shader reads no row.
+    /// The instance bytes of `shapes`, as a draw writes them: each on
+    /// the page.
     #[must_use]
     pub fn bytes(shapes: &[ClosedFormShape]) -> Vec<u8> {
+        Self::bytes_in(shapes, 0, &[])
+    }
+
+    /// The instance bytes of `shapes`, each in frame `frame` (its entry
+    /// in the transform table), item `i` in row `rows[i]` of its batch's
+    /// range, or every item in row 0 for an empty `rows`.
+    ///
+    /// # Panics
+    ///
+    /// As [`QuadPipeline::bytes_in`](crate::QuadPipeline::bytes_in).
+    #[must_use]
+    pub fn bytes_in(shapes: &[ClosedFormShape], frame: u32, rows: &[u32]) -> Vec<u8> {
         rowed_instances(
             ("closed forms", Self::VEC4S as usize),
-            (shapes, &[]),
+            (shapes, frame, rows),
             |shape| shape.instance().to_vec(),
         )
     }
@@ -65,14 +74,20 @@ impl ClosedFormPipeline {
         self.0.keep(target, bytes)
     }
 
-    /// Draws the shapes `kept` holds into `target`, moved by `shift`
-    /// (device pixels: a scroll frame's), in one draw call.
+    /// Draws the shapes `kept` holds into `target`, each at its frame's
+    /// entry in `table` and its row's in its batch's range from
+    /// `rows_base`, in one draw call.
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline.
-    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
+    pub fn draw_kept(
+        &mut self,
+        target: &Target<'_>,
+        kept: &KeptRange,
+        table: (&mut TransformTable, u32),
+    ) {
+        self.0.draw_kept(target, kept, table);
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

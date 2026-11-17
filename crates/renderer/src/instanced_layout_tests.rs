@@ -1,67 +1,57 @@
-//! The view uniform's layout in each shader that reads it agrees with
-//! the bytes `instanced.rs` writes: the table starts where the head
-//! ends, and holds `RowOffsets::CAPACITY` rows.
+//! The view uniform's layout in each shader that reads the transform
+//! table agrees with the bytes `instanced.rs` writes (`view_bytes`): the
+//! size at 0, the rows' first entry at 8, within `VIEW_SIZE` bytes; and
+//! the table is the storage buffer at binding 1.
 
 use super::VIEW_SIZE;
-use crate::RowOffsets;
 
-/// The offset and length of struct member `rows` of global `name` in the
-/// shader `source`, as naga lays the WGSL out.
-fn rows_layout(source: &str, name: &str) -> (u32, u32) {
-    let module = naga::front::wgsl::parse_str(&RowOffsets::shader(source)).expect("parses");
-    let mut global = module.global_variables.iter().map(|(_, global)| global);
-    let view = global.find(|global| global.name.as_deref() == Some(name));
-    let ty = &module.types[view.expect("the uniform").ty];
-    let naga::TypeInner::Struct { members, .. } = &ty.inner else {
-        panic!("{name} is not a struct");
-    };
-    let rows = members
-        .iter()
-        .find(|member| member.name.as_deref() == Some("rows"));
-    let rows = rows.expect("a rows member");
-    let naga::TypeInner::Array { size, .. } = module.types[rows.ty].inner else {
-        panic!("rows is not an array");
-    };
-    let naga::ArraySize::Constant(len) = size else {
-        panic!("rows has no constant length");
-    };
-    (rows.offset, len.get())
-}
-
-#[test]
-fn each_instanced_shaders_table_starts_after_the_head_and_holds_the_capacity() {
-    let head = u32::try_from(VIEW_SIZE - RowOffsets::CAPACITY * 8).expect("small");
-    let pairs = u32::try_from(RowOffsets::CAPACITY / 2).expect("small");
-    for (name, source) in [
-        ("quads", include_str!("quads.wgsl")),
-        ("shadows", include_str!("shadows.wgsl")),
-    ] {
-        assert_eq!(rows_layout(source, "view"), (head, pairs), "{name}.wgsl");
-    }
-}
-
-#[test]
-fn the_closed_form_shader_reads_no_rows() {
-    // Given: the 2D closed-form shader, whose instances carry a row
-    // index no row table moves: closed forms are never batched across a
-    // lane's rows (`unrowed` in the app's painter, vapors-elements
-    // `framed_batches.rs` `resolved`), and draw with `RowOffsets::NONE`
-    let source = concat!(
-        include_str!("closed_forms_2d.wgsl"),
-        include_str!("closed_forms_shared.wgsl")
-    );
+/// The view's members as (name, offset), its span, and the table's
+/// binding, in the shader `source` as naga lays the WGSL out.
+fn layout(source: &str) -> (Vec<(String, u32)>, u32, Option<u32>) {
     let module = naga::front::wgsl::parse_str(source).expect("parses");
-
-    // When
-    let mut globals = module.global_variables.iter().map(|(_, global)| global);
-    let view = globals.find(|global| global.name.as_deref() == Some("view"));
-    let ty = &module.types[view.expect("the uniform").ty];
-
-    // Then: its view uniform has no table of row offsets, so a table
-    // passed to it would be ignored, not read
-    let naga::TypeInner::Struct { members, .. } = &ty.inner else {
+    let named = |name: &str| {
+        module
+            .global_variables
+            .iter()
+            .map(|(_, global)| global)
+            .find(|global| global.name.as_deref() == Some(name))
+    };
+    let ty = &module.types[named("view").expect("the uniform").ty];
+    let naga::TypeInner::Struct { members, span } = &ty.inner else {
         panic!("view is not a struct");
     };
-    let names: Vec<_> = members.iter().filter_map(|m| m.name.as_deref()).collect();
-    assert_eq!(names, ["size", "shift"], "closed_forms_2d.wgsl");
+    let members = members
+        .iter()
+        .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
+        .collect();
+    let binding = named("transforms")
+        .and_then(|t| t.binding.as_ref())
+        .map(|b| b.binding);
+    (members, *span, binding)
+}
+
+#[test]
+fn each_instanced_shader_reads_the_view_and_the_table_as_written() {
+    let table = include_str!("transform_table.wgsl");
+    for (name, source) in [
+        ("quads", format!("{table}{}", include_str!("quads.wgsl"))),
+        (
+            "shadows",
+            format!("{table}{}", include_str!("shadows.wgsl")),
+        ),
+        (
+            "closed forms",
+            format!(
+                "{table}{}{}",
+                include_str!("closed_forms_2d.wgsl"),
+                include_str!("closed_forms_shared.wgsl")
+            ),
+        ),
+    ] {
+        let (members, span, binding) = layout(&source);
+        let expected = [("size".to_owned(), 0), ("rows_base".to_owned(), 8)];
+        assert_eq!(members, expected, "{name}");
+        assert!(span as usize <= VIEW_SIZE, "{name}: a view of {span} bytes");
+        assert_eq!(binding, Some(1), "{name}: the table's binding");
+    }
 }

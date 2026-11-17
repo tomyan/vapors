@@ -15,7 +15,8 @@ struct Instance {
     @location(5) bottom_color: vec4<f32>,
     @location(6) left_color: vec4<f32>,
     @location(7) radii: vec4<f32>,         // top-left, top-right, bottom-right, bottom-left
-    @location(8) row: u32,                 // the row's index in view.rows
+    @location(8) row: u32,                 // the row's index in its batch's range
+    @location(9) frame: u32,               // the frame's entry in the transform table
 }
 
 struct Out {
@@ -31,23 +32,6 @@ struct Out {
     @location(8) @interpolate(flat) radii: vec4<f32>,
 }
 
-// The target's size, the shift of the frame the instances are in, and
-// the offsets of the rows of a lane they are in, two to each vec4
-// (row_offsets.rs), all added to their positions (device pixels, whole).
-struct View {
-    size: vec2<f32>,
-    shift: vec2<f32>,
-    rows: array<vec4<f32>, ROW_PAIRS>,
-}
-
-@group(0) @binding(0) var<uniform> view: View;
-
-// Row `row`'s offset from the frame.
-fn row_offset(row: u32) -> vec2<f32> {
-    let pair = view.rows[row / 2u];
-    return select(pair.xy, pair.zw, row % 2u == 1u);
-}
-
 @vertex
 fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     var corners = array<vec2<f32>, 6>(
@@ -56,8 +40,7 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     );
     let pixel = mix(instance.rect.xy, instance.rect.zw, corners[vertex]);
     var out: Out;
-    let on_target = pixel + view.shift + row_offset(instance.row);
-    out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
+    out.position = clip_position(placed(pixel, instance.frame, instance.row));
     out.pixel = pixel;
     out.rect = instance.rect;
     out.background = instance.background;

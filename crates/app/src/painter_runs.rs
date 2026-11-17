@@ -65,6 +65,7 @@ impl ScenePainter {
     ) -> Result<(), PaintError> {
         let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
         let moved = Moved {
+            frame: kept.frames[at],
             shift: Shift::whole(frame.shift),
             table,
             offsets,

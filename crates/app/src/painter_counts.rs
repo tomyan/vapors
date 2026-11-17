@@ -79,6 +79,12 @@ pub struct FrameCounts {
     /// Glyph and icon lookups in the atlas: 0 on a frame whose text and
     /// icon batches are all kept.
     pub atlas_lookups: u64,
+    /// Entries of the transform table written: a frame's when its shift
+    /// changed, a lane batch's rows' when their offsets did; 0 on an
+    /// idle frame (`painter_transforms.rs`).
+    pub transform_writes: u64,
+    /// Bytes of those writes, 64 an entry.
+    pub transform_bytes: u64,
     /// Times the atlas cleared every pin to make room
     /// (`vapors_text::AtlasPins`): each makes every kept text and icon
     /// batch built again on its next draw.
@@ -179,6 +185,8 @@ impl ScenePainter {
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
         (self.counts.batches_written, self.counts.batches_kept) = self.kept.drawn();
+        (self.counts.transform_writes, self.counts.transform_bytes) =
+            self.transforms.table.take_written();
         self.counts.retained_bytes = self.retained_bytes() + self.mesh_entries.bytes();
         self.counts.atlas_lookups = self.atlas.lookups() - self.counts.atlas_lookups;
         self.counts.atlas_pin_clears = self.atlas.pin_clears() - self.counts.atlas_pin_clears;

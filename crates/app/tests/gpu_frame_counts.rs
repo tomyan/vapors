@@ -15,13 +15,15 @@ use vapors_scene::{RgbaImage, Size};
 use vapors_text::AtlasConfig;
 
 /// The view uniform written for a batch's first draw: the viewport and
-/// shift, then the 128 rows' offsets (`row_offsets.rs` in vapors-renderer).
-const VIEW_BYTES: u64 = 16 + 128 * 8;
-/// One instance (8 four-float attributes and its row index, padded to
-/// 16 bytes) and the view uniform.
+/// the batch's first row entry in the transform table (`instanced.rs` in
+/// vapors-renderer); the frame's shift is in the table, counted apart
+/// (`FrameCounts::transform_bytes`).
+const VIEW_BYTES: u64 = 16;
+/// One instance (8 four-float attributes, its row index and its frame's
+/// entry, padded to 16 bytes) and the view uniform.
 const ONE_QUAD_BYTES: u64 = 8 * 16 + 16 + VIEW_BYTES;
-/// One shadow instance (7 four-float attributes and its row index,
-/// padded) and the view uniform.
+/// One shadow instance (7 four-float attributes, its row index and its
+/// frame's entry, padded) and the view uniform.
 const ONE_SHADOW_BYTES: u64 = 7 * 16 + 16 + VIEW_BYTES;
 /// The atlas page, one coverage byte per pixel, uploaded whole.
 const PAGE_BYTES: u64 = 1024 * 1024;

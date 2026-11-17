@@ -1,15 +1,7 @@
 // The page's vertex stage for closed-form shapes (the rest is
 // closed_forms_shared.wgsl): the instance's affine transform takes shape
-// units to device pixels on the target.
-
-// The target's size, and the shift of the scroll frame the instances
-// are in, added to their positions (device pixels, whole).
-struct View {
-    size: vec2<f32>,
-    shift: vec2<f32>,
-}
-
-@group(0) @binding(0) var<uniform> view: View;
+// units to device pixels in its frame, and the transform table
+// (transform_table.wgsl) places them on the target.
 
 // The padding in local units along x and y that moves each edge of the
 // box MARGIN device pixels out, perpendicular to it, under any affine
@@ -22,14 +14,18 @@ fn padding(linear: vec4<f32>) -> vec2<f32> {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
+fn vs_main(
+    @builtin(vertex_index) vertex: u32,
+    instance: Instance,
+    @location(5) row: u32,   // the row's index in its batch's range
+    @location(6) frame: u32, // the frame's entry in the transform table
+) -> Out {
     let box = local_box(instance);
     let pad = padding(instance.linear);
     let local = mix(box.xy - pad, box.zw + pad, quad_corner(vertex));
     let m = instance.linear;
     let pixel = vec2(m.x * local.x + m.z * local.y, m.y * local.x + m.w * local.y) + instance.shift.xy;
-    let on_target = pixel + view.shift;
-    let position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
+    let position = clip_position(placed(pixel, frame, row));
     return vertex_out(instance, local, position);
 }
 
