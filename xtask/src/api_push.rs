@@ -102,17 +102,33 @@ impl Pusher {
         ))
     }
 
-    /// The commits from where `tip` left `origin/main` checked to be a
-    /// line, and their diff checked; the lines it changes.
+    /// The commits from where `tip` left `origin/main` checked: a line,
+    /// their authors and messages fit to publish, and each commit's diff
+    /// from its parent and the whole diff checked, so no commit carries
+    /// what the whole diff does not show (verify of slice 4, V1). The
+    /// lines the whole diff changes.
     fn checked(&self, bare: &Path, tip: &str) -> Result<u64, String> {
-        let origin_main = crate::queue_git::git(&self.main, &["rev-parse", ORIGIN_MAIN])?;
+        let deadline = crate::api_push_fetch::LOCAL_GIT_DEADLINE;
+        let origin_main =
+            crate::api_timed::git_within(&self.main, &["rev-parse", ORIGIN_MAIN], deadline)?;
         let fork = bare_git(bare, &["merge-base", &origin_main, tip])
             .map_err(|why| format!("{tip} shares no history with origin/main: {why}"))?;
         let range = format!("{fork}..{tip}");
         let rev_list = bare_git(bare, &["rev-list", "--parents", &range])?;
         crate::api_push_history::linear(&rev_list, &fork)?;
-        let diff =
-            |format: &str| bare_git(bare, &["diff", "--no-renames", format, "-z", &fork, tip]);
+        let log = bare_git(bare, &["log", "--format=%an%n%cn%n%B", &range])?;
+        crate::api_push_text::published("the pushed commits' names and messages", &log)?;
+        for line in rev_list.lines() {
+            let (commit, parent) = line.split_once(' ').unwrap_or((line, ""));
+            self.diff_checked(bare, (parent, commit))
+                .map_err(|why| format!("commit {commit}: {why}"))?;
+        }
+        self.diff_checked(bare, (&fork, tip))
+    }
+
+    /// The diff from `from` to `to` checked by `api_push_checks`.
+    fn diff_checked(&self, bare: &Path, (from, to): (&str, &str)) -> Result<u64, String> {
+        let diff = |format: &str| bare_git(bare, &["diff", "--no-renames", format, "-z", from, to]);
         crate::api_push_checks::checked(&diff("--numstat")?, &diff("--raw")?, &self.allowed)
     }
 }

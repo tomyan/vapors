@@ -29,6 +29,7 @@ mod api_push_ci;
 mod api_push_fetch;
 mod api_push_history;
 mod api_push_remote;
+mod api_push_text;
 mod api_refusals;
 mod api_request_content;
 mod api_request_policy;

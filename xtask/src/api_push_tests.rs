@@ -19,3 +19,96 @@ fn the_push_starts_only_if_it_can_end_within_the_calls_deadline() {
     let refused = time_left_to_push(late).expect_err("refused");
     assert!(refused.contains("nothing was pushed"), "{refused}");
 }
+
+mod history {
+    use std::path::Path;
+
+    use super::super::Pusher;
+    use crate::api_push_fetch::git;
+
+    /// A repository whose `origin/main` is one commit, the pusher reading
+    /// it, and `commits` (path, content or `None` to remove, message) on
+    /// top; the tip.
+    fn repository(dir: &Path, commits: &[(&str, Option<&str>, &str)]) -> (Pusher, String) {
+        git(dir, &["init", "--quiet", "-b", "api/b"]).expect("init");
+        let commit = |message: &str| {
+            let identity = ["-c", "user.name=t", "-c", "user.email=t@t"];
+            git(
+                dir,
+                &[
+                    &identity[..],
+                    &["commit", "--quiet", "--allow-empty", "-m", message],
+                ]
+                .concat(),
+            )
+            .expect("committed");
+        };
+        commit("base");
+        git(dir, &["update-ref", "refs/remotes/origin/main", "HEAD"]).expect("main");
+        for (path, content, message) in commits {
+            match content {
+                Some(content) => {
+                    std::fs::create_dir_all(dir.join(path).parent().expect("a parent"))
+                        .expect("made");
+                    std::fs::write(dir.join(path), content).expect("written");
+                    git(dir, &["add", path]).expect("added");
+                }
+                None => git(dir, &["rm", "--quiet", path])
+                    .map(|_| ())
+                    .expect("removed"),
+            }
+            commit(message);
+        }
+        let builder = crate::api_paths::Builder::new("b", dir).expect("a builder");
+        let host = crate::api_sandbox::Host {
+            xtask: "/x".into(),
+            claude: "/c".into(),
+            objects: "/o".into(),
+            render_nodes: Vec::new(),
+            advisories: Vec::new(),
+        };
+        let allowed = crate::api_push_checks::allowed(&[]).expect("defaults");
+        let tip = git(dir, &["rev-parse", "HEAD"]).expect("a tip");
+        (Pusher::new(dir.to_owned(), builder, host, allowed), tip)
+    }
+
+    #[test]
+    fn a_commit_that_carries_what_a_later_one_removes_is_refused() {
+        // Given: xtask/ added, then removed; the whole diff is empty
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let (pusher, tip) = repository(
+            dir.path(),
+            &[
+                ("xtask/x.rs", Some("x\n"), "add"),
+                ("xtask/x.rs", None, "remove"),
+            ],
+        );
+
+        // When
+        let refused = pusher.checked(dir.path(), &tip).expect_err("refused");
+
+        // Then
+        assert!(
+            refused.contains("xtask/x.rs is outside crates/, docs/"),
+            "{refused}"
+        );
+    }
+
+    #[test]
+    fn a_commit_message_that_closes_an_issue_is_refused() {
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let (pusher, tip) = repository(dir.path(), &[("crates/a.rs", Some("a\n"), "Fixes #7")]);
+        let refused = pusher.checked(dir.path(), &tip).expect_err("refused");
+        assert!(
+            refused.starts_with("the pushed commits' names and messages says"),
+            "{refused}"
+        );
+    }
+
+    #[test]
+    fn a_line_of_clean_commits_passes_with_its_lines() {
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let (pusher, tip) = repository(dir.path(), &[("crates/a.rs", Some("a\nb\n"), "rows")]);
+        assert_eq!(pusher.checked(dir.path(), &tip), Ok(2));
+    }
+}

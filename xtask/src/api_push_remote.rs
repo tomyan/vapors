@@ -3,9 +3,7 @@
 //! host's GitHub credential (`gh auth git-credential`), with git's
 //! terminal prompt off and a deadline, so it can neither stall on a
 //! prompt nor read any other config (review of slice 4, H2). The PR's
-//! title and body are the session's text published under the owner's
-//! account, so mentions, closing keywords and control bytes are refused
-//! (L3).
+//! title and body are checked by `api_push_text`.
 
 use std::path::Path;
 use std::process::Command;
@@ -23,11 +21,6 @@ pub const GH_DEADLINE: Duration = Duration::from_secs(60);
 /// The credential helper the push is given: the host's gh login.
 const HELPER: &str = "!gh auth git-credential";
 
-/// The words GitHub reads as closing an issue when followed by `#N`.
-const CLOSING: [&str; 9] = [
-    "close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved",
-];
-
 /// `tip` pushed from `bare` to `branch` on the main repository's
 /// `origin`, without the pre-push hook.
 ///
@@ -36,7 +29,8 @@ const CLOSING: [&str; 9] = [
 /// The remote not read or not https, or the push failing or passing
 /// [`PUSH_DEADLINE`], naming why.
 pub fn pushed(main: &Path, bare: &Path, (tip, branch): (&str, &str)) -> Result<(), String> {
-    let remote = crate::queue_git::git(main, &["remote", "get-url", "origin"])?;
+    let deadline = crate::api_push_fetch::LOCAL_GIT_DEADLINE;
+    let remote = crate::api_timed::git_within(main, &["remote", "get-url", "origin"], deadline)?;
     let home = crate::api_host::home()?;
     pushed_to(bare, (&remote, &home), (tip, branch), HELPER)
 }
@@ -149,43 +143,14 @@ fn gh(dir: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&ended.stdout).trim().to_owned())
 }
 
-/// Refuses a PR title or body holding a control byte but newline and
-/// tab, an @-mention, or a closing keyword before an issue reference.
+/// Refuses a PR title or body `api_push_text` would not publish.
 ///
 /// # Errors
 ///
-/// The first such, named.
+/// The first refusal, naming the part.
 pub fn pr_text(title: &str, body: &str) -> Result<(), String> {
-    for (part, text) in [("title", title), ("body", body)] {
-        if let Some(c) = text
-            .chars()
-            .find(|&c| c.is_control() && c != '\n' && c != '\t')
-        {
-            return Err(format!(
-                "the PR {part} holds the control character {c:?}: send text only"
-            ));
-        }
-        if let Some(at) = text
-            .find('@')
-            .filter(|&at| text[at + 1..].starts_with(|c: char| c.is_ascii_alphanumeric()))
-        {
-            return Err(format!(
-                "the PR {part} mentions {:?}: GitHub would notify them; leave out the @",
-                &text[at..text.len().min(at + 20)]
-            ));
-        }
-        let words: Vec<&str> = text.split_whitespace().collect();
-        let closes = words.windows(2).find(|pair| {
-            CLOSING.contains(&pair[0].to_lowercase().trim_end_matches(':')) && pair[1].contains('#')
-        });
-        if let Some(pair) = closes {
-            return Err(format!(
-                "the PR {part} says {:?}, which closes an issue on merge: the lead links issues",
-                pair.join(" ")
-            ));
-        }
-    }
-    Ok(())
+    crate::api_push_text::published("the PR title", title)?;
+    crate::api_push_text::published("the PR body", body)
 }
 
 #[cfg(test)]
