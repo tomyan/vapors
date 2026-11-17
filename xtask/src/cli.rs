@@ -25,6 +25,17 @@ pub enum Command {
     },
     /// Run everything CI runs, in CI's order, stopping at the first failure.
     Ci,
+    /// Inside an API builder's sandbox: relay loopback `port` to the
+    /// harness socket and run the command.
+    #[command(hide = true)]
+    ApiRelayInner {
+        #[arg(long)]
+        port: u16,
+        #[arg(long)]
+        socket: PathBuf,
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
     /// Check every pinned tool is installed at its pinned version.
     #[command(hide = true)]
     CheckTools,
