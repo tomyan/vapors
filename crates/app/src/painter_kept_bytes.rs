@@ -52,10 +52,9 @@ pub(crate) struct RunBytes {
 /// `run`'s instance or vertex bytes, as its pipeline draws them, a
 /// shape run's entries from `shapes`; shadow, quad and shape items each
 /// in the transform table's entry `frame` and its row of `rows` (none for
-/// a batch in one frame). Images and surfaces, drawn an item at a time,
-/// carry their row in the shift; shapes and meshes are batched in their
-/// row's own frame (vapors-elements `framed_batches.rs` `resolved`), so
-/// their `rows` are empty.
+/// a batch in one frame); meshes too, their item bytes the same layout
+/// though each item is its own draw. Images and surfaces carry their
+/// frame and row in their draw's uniform.
 ///
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
@@ -65,7 +64,7 @@ pub(crate) fn run_bytes(
 ) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {
         let (instances, meshes) = shapes.mesh_instances(items).map_err(PaintError::Shape)?;
-        let bytes = MeshPipeline::bytes(&instances);
+        let bytes = MeshPipeline::bytes_in(&instances, frame, rows);
         return Ok(RunBytes { bytes, meshes });
     }
     let bytes = match run {

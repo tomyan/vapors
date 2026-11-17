@@ -257,9 +257,13 @@ kept as a second path).
     more kept text memory and text upload on a rebuild; a 13-glyph run
     keeps 3120 bytes where it kept 2816 (`gpu_frame_counts_kinds.rs`). Every vertex of an F2
     batch has the same frame, so the frame could go in the params
-    uniform, which has 12 spare bytes. It stays per vertex because F3
-    joins batches across frames (`flat-scene.md`, the F3 row), and a
-    joined batch's glyphs are then in different frames.
+    uniform, which has 12 spare bytes. The 24 bytes a glyph are a known
+    cost owned by F3.3 (lead, L10, 2026-11-17): F3.1 joins batches
+    within a frame only, and joining across frames is F3.3, decided on
+    W4's numbers (`flat-scene-f3.md`). If F3.3 joins across frames, a
+    joined batch's glyphs are in different frames and the per-vertex
+    index is used; if F3.3 is dropped, moving the index into the params
+    uniform is the follow-up.
   - The params uniform is gamma, contrast, the viewport and the draw's
     first row entry (32 bytes, where it was 32 plus a 1 KiB row table).
   - The table is at binding 3.
@@ -306,3 +310,39 @@ kept as a second path).
   background (two batches a part) rewrite one range's rows after an
   insert.
 
+## As built: F2.3a
+
+The lead's answers to the F2.3 questions (L4, 2026-11-17): the frame
+and row go in the mesh item's bytes; elements' batching may change for
+the shape cut (F2.3b); the 128-row cap stays; `Shift` becomes
+`[f32; 2]` with the whole-pixel refusal kept; the 3D path is F8's.
+
+- **Meshes on the table.** A mesh item's bytes are its 48 bytes of
+  floats, then its row's index and its frame's entry, padded to 64
+  bytes (`MeshPipeline::bytes_in`). The two indices share vertex
+  location 15 as a `Uint32x2`: the triangle and item attributes
+  already take 15 of the 16 locations WebGPU's default limits give.
+  The view uniform is the size and `rows_base`, as for the instanced
+  pipelines, and the table is at binding 1. The pipeline refuses a
+  second table and keeps its own identity table for immediate draws,
+  counting that table's first write.
+- **The 3D path is unchanged.** `ProjectiveMeshes` keeps the 48-byte
+  item and its own buffers (`meshes_setup.rs` `buffers`); the page's
+  pipeline adds the indices (`page_buffers`).
+- **The painter.** Mesh batches take a frame entry and a row range as
+  every other kept batch does, so `unrowed`, which refused a mesh batch
+  with rows, is gone. The elements cut that keeps shapes in a lane row
+  in the row's own frame is still there; F2.3b removes it.
+- **Retired in the renderer.** `Shift`, `RowOffsets`,
+  `UniformSlots::slot_with_rows`, the uniform-only bind group layout and
+  `viewport_bytes`. `assert_rows` caps a batch's rows at vapors-scene's
+  `ROWS_PER_BATCH`. The whole-pixel refusal for a frame's shift is now
+  made where the frame's entry is set (vapors-app
+  `painter_transforms.rs` `whole`).
+- **Candidate, no owner: lift the 128-row cap.** With the row offsets
+  in the transform table rather than a 1 KiB uniform, nothing in the
+  pipelines needs a batch's range to stay at 128 rows. Lifting it would
+  merge longer lane runs into fewer batches, at the cost of larger
+  ranges to rewrite when a batch's rows change. It is a separate change
+  and needs a measurement of draws and table writes on a long lane page
+  first.

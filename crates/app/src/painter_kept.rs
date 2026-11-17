@@ -18,7 +18,7 @@
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{
     ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
-    Target,
+    Target, TransformTable,
 };
 use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
@@ -81,7 +81,7 @@ impl ScenePainter {
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let rows = moved.rows.items();
-        let Some((frame, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, rows_base)) = self.table_entries(target, moved) else {
             return Ok(());
         };
         // image and surface bytes name no entry: their draw's uniform does
@@ -99,7 +99,7 @@ impl ScenePainter {
         else {
             return Ok(());
         };
-        let (range, shift) = (kept.range, moved.shift);
+        let range = kept.range;
         let table = (&mut self.transforms.table, rows_base);
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, table),
@@ -111,7 +111,7 @@ impl ScenePainter {
                     &mut self.meshes,
                     shapes,
                     target,
-                    (range, kept.meshes, unrowed(shift, rows)),
+                    (range, kept.meshes, table),
                 )?;
             }
             Run::Images(items) => {
@@ -131,20 +131,11 @@ impl ScenePainter {
         Ok(())
     }
 
-    /// For the runs placed through the transform table (all but meshes):
-    /// their frame's entry, set to its shift, and the first of their lane
-    /// part's rows' entries (0 for a batch in one frame); `(0, 0)` for
-    /// meshes. `None` when the table could not grow (the refusal is on
-    /// the target's encoder).
-    fn table_entries(
-        &mut self,
-        target: &Target<'_>,
-        run: &Run,
-        moved: &Moved<'_>,
-    ) -> Option<(u32, u32)> {
-        if matches!(run, Run::Meshes(_)) {
-            return Some((0, 0));
-        }
+    /// A run's frame's entry in the transform table, set to its shift,
+    /// and the first of its lane part's rows' entries (0 for a batch in
+    /// one frame). `None` when the table could not grow (the refusal is
+    /// on the target's encoder).
+    fn table_entries(&mut self, target: &Target<'_>, moved: &Moved<'_>) -> Option<(u32, u32)> {
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
@@ -166,7 +157,7 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let Some((frame, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, rows_base)) = self.table_entries(target, moved) else {
             return Ok(());
         };
         let parts = (&mut self.text, &mut self.atlas);
@@ -239,26 +230,6 @@ impl Pipelines<'_> {
     }
 }
 
-/// `shift`, for a mesh batch, which is batched in one frame
-/// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
-/// frame's shift, with no rows (meshes move to the transform table in
-/// flat-scene F2.3).
-///
-/// # Panics
-///
-/// When the batch has rows: the mesh pipeline has no table of row
-/// offsets, so every row would draw at the first's place.
-fn unrowed(shift: vapors_renderer::Shift, rows: &[u32]) -> vapors_renderer::Shift {
-    assert!(
-        rows.is_empty(),
-        "a mesh batch spans {} items' rows, and its pipeline takes no table of row \
-         offsets: shapes and meshes in a lane row are batched in the row's frame \
-         (vapors-elements framed_batches.rs `resolved`); reproduce with `cargo xtask test`",
-        rows.len()
-    );
-    shift
-}
-
 /// The blend a text or icon run draws with.
 fn blend(run: &Run) -> BlendParams {
     match run {
@@ -281,7 +252,7 @@ fn item_place(
 }
 
 /// Draws a mesh batch's instances `range` holds, its items' entries
-/// `items` from `shapes`, moved by `shift`.
+/// `items` from `shapes`, placed through `table` from its rows' first.
 ///
 /// # Errors
 /// An item whose entry the store has not uploaded.
@@ -289,10 +260,10 @@ fn draw_meshes(
     meshes: &mut MeshPipeline,
     (shapes, entries): (&ShapeStore, &mut vapors_renderer::MeshEntries),
     target: &Target<'_>,
-    (range, items, shift): (&KeptRange, &[usize], vapors_renderer::Shift),
+    (range, items, table): (&KeptRange, &[usize], (&mut TransformTable, u32)),
 ) -> Result<(), PaintError> {
     let drawn = shapes.uploaded(items).map_err(PaintError::Shape)?;
-    meshes.draw_kept(target, range, shift, (entries, drawn.as_slice()));
+    meshes.draw_kept(target, range, table, (entries, drawn.as_slice()));
     Ok(())
 }
 

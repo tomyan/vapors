@@ -32,6 +32,14 @@ const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
     12 => Float32x4, 13 => Float32x4, 14 => Float32x4
 ];
 
+/// The page's item: [`ITEM`], then its row's index and its frame's entry
+/// in the transform table (`meshes.rs` `bytes_in`) as one attribute, the
+/// triangle and item taking 15 of the 16 locations WebGPU's default
+/// limits give.
+const PAGE_ITEM: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    12 => Float32x4, 13 => Float32x4, 14 => Float32x4, 15 => Uint32x2
+];
+
 const fn corner(k: usize) -> usize {
     offset_of!(MeshTriangle, corners) + k * size_of::<MeshCorner>()
 }
@@ -95,6 +103,7 @@ pub(crate) fn render_pipeline(
             label: Some("meshes"),
             source: wgpu::ShaderSource::Wgsl(
                 concat!(
+                    include_str!("transform_table.wgsl"),
                     include_str!("meshes_2d.wgsl"),
                     include_str!("meshes_shared.wgsl")
                 )
@@ -107,7 +116,7 @@ pub(crate) fn render_pipeline(
         bind_group_layouts: &[Some(layout)],
         immediate_size: 0,
     });
-    let buffers = buffers();
+    let buffers = page_buffers();
     crate::pipelines::render_pipeline(
         device,
         &wgpu::RenderPipelineDescriptor {
@@ -139,6 +148,19 @@ pub(crate) fn render_pipeline(
 }
 
 /// An entry's triangles, then the item, at stride 0.
+/// The page's buffers: [`buffers`], the item with its row and frame.
+fn page_buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
+    let [triangles, _] = buffers();
+    [
+        triangles,
+        Some(wgpu::VertexBufferLayout {
+            array_stride: 0,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &PAGE_ITEM,
+        }),
+    ]
+}
+
 pub(crate) fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     [
         Some(wgpu::VertexBufferLayout {

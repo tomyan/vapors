@@ -3,9 +3,7 @@
 //! entry in the transform table (`transform_table.rs`), padded to 16
 //! bytes; and the view uniform's bytes.
 
-use vapors_scene::Size;
-
-use crate::{RowOffsets, Shift};
+use vapors_scene::{ROWS_PER_BATCH, Size};
 
 /// Bytes per instance of `vec4s` four-float attributes: the attributes and
 /// the row index after them, padded to 16 bytes, as kept instances are
@@ -19,20 +17,6 @@ pub(crate) const fn instance_bytes(vec4s: u32) -> usize {
 /// `meshes.rs`, `closed_forms_3d.rs`).
 pub(crate) fn float_bytes(floats: impl IntoIterator<Item = f32>) -> Vec<u8> {
     floats.into_iter().flat_map(f32::to_le_bytes).collect()
-}
-
-/// The viewport uniform's bytes for a pipeline that draws one item a
-/// draw (images): its size and `shift`, two floats each; an item's row
-/// offset is in its shift.
-#[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
-    let [dx, dy] = shift.pixels();
-    let floats = [viewport.width as f32, viewport.height as f32, dx, dy];
-    let mut bytes = [0; 16];
-    for (at, float) in floats.into_iter().enumerate() {
-        bytes[at * 4..at * 4 + 4].copy_from_slice(&float.to_le_bytes());
-    }
-    bytes
 }
 
 /// The view uniform's size: [`view_bytes`].
@@ -94,7 +78,7 @@ pub(crate) fn rowed_instances<T>(
 
 /// Refuses, naming `label`, rows that are not empty or one index for
 /// each of `items` items, every one below the most rows a batch's range
-/// holds ([`RowOffsets::CAPACITY`]).
+/// holds ([`ROWS_PER_BATCH`], vapors-scene `batch.rs`).
 ///
 /// # Panics
 ///
@@ -109,16 +93,13 @@ pub fn assert_rows(label: &str, items: usize, rows: &[u32]) {
          frame (instanced.rs); reproduce with `cargo xtask test`",
         rows.len()
     );
-    let past = rows
-        .iter()
-        .position(|&row| row as usize >= RowOffsets::CAPACITY);
+    let past = rows.iter().position(|&row| row as usize >= ROWS_PER_BATCH);
     if let Some(at) = past {
         panic!(
-            "{label}: item {at} names row {}, past the {} rows a batch's table holds; split the \
-             run into batches of at most that many rows (row_offsets.rs); reproduce with \
+            "{label}: item {at} names row {}, past the {} rows a batch's range holds; split the \
+             run into batches of at most that many rows (vapors-scene batch.rs); reproduce with \
              `cargo xtask test`",
-            rows[at],
-            RowOffsets::CAPACITY
+            rows[at], ROWS_PER_BATCH
         );
     }
 }

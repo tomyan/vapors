@@ -270,9 +270,7 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
-pub(crate) use crate::instanced_bytes::{
-    VIEW_SIZE, float_bytes, instance_bytes, rowed_instances, viewport_bytes,
-};
+pub(crate) use crate::instanced_bytes::{VIEW_SIZE, float_bytes, instance_bytes, rowed_instances};
 
 #[cfg(test)]
 #[path = "instanced_layout_tests.rs"]
