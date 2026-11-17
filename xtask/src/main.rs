@@ -23,6 +23,10 @@ mod api_limits;
 mod api_mcp_inner;
 mod api_paths;
 mod api_prices;
+#[allow(dead_code, reason = "used by request_push, the next PR")]
+mod api_push_checks;
+#[allow(dead_code, reason = "used by request_push, the next PR")]
+mod api_push_fetch;
 mod api_refusals;
 mod api_request_content;
 mod api_request_policy;
@@ -251,10 +255,14 @@ fn main() -> ExitCode {
         } => return ux_review::run(dry_run, pr, measure_image_cost),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
-        Command::Ci => match web::web_package() {
-            Ok(package) => return ci_shared::run(&steps::ci(&package), &reporter),
-            Err(message) => return fail("ci", &message),
-        },
+        Command::Ci { except } => {
+            let steps =
+                web::web_package().and_then(|package| steps::without(steps::ci(&package), &except));
+            match steps {
+                Ok(steps) => return ci_shared::run(&steps, &reporter),
+                Err(message) => return fail("ci", &message),
+            }
+        }
         Command::Wasm => match web::web_package() {
             Ok(package) => steps::wasm_lint(&package),
             Err(message) => return fail("wasm", &message),

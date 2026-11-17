@@ -116,6 +116,33 @@ fn wasm_release(web_package: &str) -> Step {
 
 /// Everything CI runs, fastest first. `web_package` is `web.package`
 /// from `.config/factory.toml`.
+/// `steps` without those named in `except`, each skip printed: for a
+/// caller that cannot run them and declares why at its call
+/// (`api_push.rs`).
+///
+/// # Errors
+///
+/// A name no step has, naming the steps there are.
+pub fn without(steps: Vec<Step>, except: &[String]) -> Result<Vec<Step>, String> {
+    if let Some(unknown) = except
+        .iter()
+        .find(|name| steps.iter().all(|step| &step.name != *name))
+    {
+        let names: Vec<&str> = steps.iter().map(|step| step.name.as_str()).collect();
+        return Err(format!(
+            "--except {unknown}: ci has no such step ({})",
+            names.join(", ")
+        ));
+    }
+    for name in except {
+        println!("skip {name}: --except, declared by the caller");
+    }
+    Ok(steps
+        .into_iter()
+        .filter(|step| !except.contains(&step.name))
+        .collect())
+}
+
 pub fn ci(web_package: &str) -> Vec<Step> {
     vec![
         tools(),

@@ -24,7 +24,13 @@ pub enum Command {
         ci: bool,
     },
     /// Run everything CI runs, in CI's order, stopping at the first failure.
-    Ci,
+    Ci {
+        /// A step not run, by name: for a caller that cannot run it and
+        /// declares why at its call (`api_push.rs`); repeatable. A name
+        /// ci has no step for is refused.
+        #[arg(long)]
+        except: Vec<String>,
+    },
     /// Make API builder `<name>`'s clone and prove its sandbox's fences
     /// (docs/plans/api-builder.md); the builder is removed afterwards.
     ApiFences {
