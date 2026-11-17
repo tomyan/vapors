@@ -169,6 +169,7 @@ impl ScenePainter {
         let Some((frame, clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
+        self.clips.runs = clips; // text keeps the scissor until F3.1b
         let parts = (&mut self.text, &mut self.atlas);
         let rows = (
             (frame, clips.as_slice()),
