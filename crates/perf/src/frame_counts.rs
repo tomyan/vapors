@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use vapors_app::SURFACE_PHASE;
 use vapors_renderer::WRITE_PHASE;
 
 use crate::counter_samples::CounterSamples;
@@ -61,8 +62,8 @@ impl Rise {
     /// that writes no buffer enters no `write` span).
     pub(crate) fn with_phases(self, (phases, phase_counters): Phases) -> Counted {
         Counted {
-            instructions: self.instructions.zip(phases.map(with_write)),
-            counters: self.counters.zip(phase_counters.map(with_write)),
+            instructions: self.instructions.zip(phases.map(with_maybe_entered)),
+            counters: self.counters.zip(phase_counters.map(with_maybe_entered)),
         }
     }
 }
@@ -84,8 +85,18 @@ pub(crate) type Phases = (
     Option<BTreeMap<String, Reading>>,
 );
 
-fn with_write<T: Default>(mut phases: BTreeMap<String, T>) -> BTreeMap<String, T> {
-    phases.entry(WRITE_PHASE.into()).or_default();
+/// The phases a frame may enter none of: `write` (nothing uploaded) and
+/// `surface` (no `gpu-surface` on the page). Every frame records them,
+/// as 0 when not entered, so each run has a value for every phase.
+pub(crate) const MAYBE_ENTERED: [&str; 2] = [WRITE_PHASE, SURFACE_PHASE];
+
+/// `phases` with each of [`MAYBE_ENTERED`] it lacks, as 0.
+pub(crate) fn with_maybe_entered<T: Default>(
+    mut phases: BTreeMap<String, T>,
+) -> BTreeMap<String, T> {
+    for phase in MAYBE_ENTERED {
+        phases.entry(phase.into()).or_default();
+    }
     phases
 }
 

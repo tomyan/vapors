@@ -25,6 +25,9 @@ pub struct FrameClock {
     pairs: Cell<u32>,
     /// Sections timed whose encoders have not been submitted.
     unsubmitted: Cell<u32>,
+    /// The pairs that time a section (a `gpu-surface` render), not a
+    /// pass of the frame's encoder: the reading's `surfaces`.
+    sections: std::cell::RefCell<Vec<u32>>,
     submitted: bool,
 }
 
@@ -37,6 +40,7 @@ impl FrameClock {
             capacity,
             pairs: Cell::new(0),
             unsubmitted: Cell::new(0),
+            sections: std::cell::RefCell::default(),
             submitted: false,
         }
     }
@@ -65,6 +69,7 @@ impl FrameClock {
         let Some(pair) = self.next_pair() else {
             return record(encoder);
         };
+        self.sections.borrow_mut().push(pair);
         marker_pass(
             encoder,
             view,
@@ -136,6 +141,7 @@ impl FrameClock {
         SlotState::Mapping {
             frame: self.frame,
             pairs: self.pairs.get(),
+            sections: self.sections.take(),
             outcome,
         }
     }
@@ -161,6 +167,7 @@ fn zero(frame: u64) -> FrameReading {
         frame,
         pairs: 0,
         time: Ok(std::time::Duration::ZERO),
+        surfaces: std::time::Duration::ZERO,
     }
 }
 

@@ -11,20 +11,25 @@
 
 use vapors_gpu_harness::Gpu;
 
+use crate::args::SceneProfile;
 use crate::driver::RUN_FRAMES;
+use crate::run::Workload;
 use crate::sampler::{JudgedFrame, Sampler};
 use crate::scene_judge::{
     BUDGET, load_average, over_budget, quiet, require_hardware, require_timestamps,
 };
 use crate::scene_kind::SceneKind;
 use crate::scene_report::{over_budget_lines, report};
+use crate::scene_size::Resized;
 use crate::shader_cache::shader_cache;
 
 /// The revision the harness was built from (`build.rs`).
 pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
 
 /// Runs `kind` driven for [`RUN_FRAMES`] frames on the GPU `open` makes,
-/// after the shader cache is read, and prints the report.
+/// after the shader cache is read, and prints the report: at `profile`'s
+/// size when it has one, and without the budget's verdict, on any
+/// adapter, when it is `profile_only`.
 ///
 /// # Errors
 /// Mesa's shader cache not chosen, a software adapter, a device without
@@ -34,12 +39,13 @@ pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
 pub fn run(
     open: impl FnOnce() -> Gpu,
     (kind, samples): (SceneKind, vapors_renderer::Samples),
+    profile: SceneProfile,
 ) -> Result<(), String> {
     let reproduce = reproducing(kind);
     let cache = shader_cache(|name| std::env::var(name).ok()).map_err(&reproduce)?;
     let gpu = open();
-    let start =
-        before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
+    let start = before_frame_zero(&gpu.adapter.get_info(), gpu.device.features(), profile)
+        .map_err(&reproduce)?;
     println!(
         "Revision: {REVISION}\nProfile: {}\nShader cache: {}",
         crate::build_profile::scene_header(crate::build_profile::BUILT),
@@ -49,14 +55,38 @@ pub fn run(
         "Frames: {RUN_FRAMES}, each held to the frame budget, no warmup; load average at the start {start:.2}; samples {}\n",
         samples.count()
     );
-    let mut workload = kind.workload(samples).map_err(&reproduce)?;
+    let mut workload = sized(kind.workload(samples).map_err(&reproduce)?, profile);
+    println!("{}", profile_line(workload.size(), profile));
     let run = Sampler::new(&gpu)
         .judged(&mut *workload, RUN_FRAMES)
         .map_err(&reproduce)?;
     println!("{}", start_up_line(run.start_up));
     let end = load_average();
     println!("{}", report(&run.frames, start, end.clone().ok(), kind));
-    verdict(&run.frames, end, kind)
+    let judged: &[JudgedFrame] = if profile.profile_only {
+        &[]
+    } else {
+        &run.frames
+    };
+    verdict(judged, end, kind)
+}
+
+/// `workload`, at `profile`'s size when it names one.
+fn sized(workload: Box<dyn Workload>, profile: SceneProfile) -> Box<dyn Workload> {
+    match profile.size {
+        Some(size) => Box::new(Resized::new(workload, size)),
+        None => workload,
+    }
+}
+
+/// The run's size, and whether it is judged.
+fn profile_line((width, height): (u32, u32), profile: SceneProfile) -> String {
+    let judged = if profile.profile_only {
+        "not judged (--profile-only): no budget verdict, any adapter"
+    } else {
+        "judged against the frame budget"
+    };
+    format!("Size: {width} x {height}; {judged}\n")
 }
 
 /// A refusal of `kind`'s run, with the command that reproduces it.
@@ -66,10 +96,29 @@ fn reproducing(kind: SceneKind) -> impl Fn(String) -> String {
 
 /// The refusals on the GPU `info` names, with `features`, and on the
 /// machine's load: the load at the start when the run may go on.
-fn before_frame_zero(info: &wgpu::AdapterInfo, features: wgpu::Features) -> Result<f64, String> {
-    require_hardware(info.device_type, &info.name, &info.driver)?;
-    require_timestamps(features, &info.name)?;
+fn before_frame_zero(
+    info: &wgpu::AdapterInfo,
+    features: wgpu::Features,
+    profile: SceneProfile,
+) -> Result<f64, String> {
+    let adapter = (info.device_type, info.name.as_str(), info.driver.as_str());
+    require_adapter(adapter, features, profile)?;
     quiet("start", load_average())
+}
+
+/// The refusals on the adapter (its type, name and driver), with
+/// `features`.
+fn require_adapter(
+    (device_type, name, driver): (wgpu::DeviceType, &str, &str),
+    features: wgpu::Features,
+    profile: SceneProfile,
+) -> Result<(), String> {
+    // Relaxed for --profile-only, which reports and judges nothing: a
+    // software adapter's times are profiled (13b), never held to the budget.
+    if !profile.profile_only {
+        require_hardware(device_type, name, driver)?;
+    }
+    require_timestamps(features, name)
 }
 
 /// The start-up's line: `App::start`'s time, before frame 0 and not

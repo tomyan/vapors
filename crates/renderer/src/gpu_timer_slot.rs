@@ -22,6 +22,8 @@ pub(crate) enum SlotState {
     Mapping {
         frame: u64,
         pairs: u32,
+        /// The pairs that time a section (`FrameClock::time_section`).
+        sections: Vec<u32>,
         outcome: Receiver<MapOutcome>,
     },
     /// Known without reading: missing, or no pairs written.
@@ -34,7 +36,11 @@ pub(crate) enum Finished {
     /// Nothing finished: free, recording or still mapping.
     Nothing,
     /// The read-back buffer is mapped: read `pairs` pairs, then unmap it.
-    Mapped { frame: u64, pairs: u32 },
+    Mapped {
+        frame: u64,
+        pairs: u32,
+        sections: Vec<u32>,
+    },
     /// The frame's reading, with nothing to read.
     Reading(FrameReading),
 }
@@ -53,7 +59,19 @@ impl SlotState {
         }
         match (std::mem::take(self), outcome) {
             (Self::Done(reading), _) => Finished::Reading(reading),
-            (Self::Mapping { frame, pairs, .. }, Ok(Ok(()))) => Finished::Mapped { frame, pairs },
+            (
+                Self::Mapping {
+                    frame,
+                    pairs,
+                    sections,
+                    ..
+                },
+                Ok(Ok(())),
+            ) => Finished::Mapped {
+                frame,
+                pairs,
+                sections,
+            },
             (Self::Mapping { frame, pairs, .. }, failed) => {
                 Finished::Reading(missing(frame, pairs, map_failure(failed)))
             }
@@ -88,6 +106,7 @@ pub(crate) fn missing(frame: u64, pairs: u32, why: GpuMissing) -> FrameReading {
         frame,
         pairs,
         time: Err(why),
+        surfaces: std::time::Duration::ZERO,
     }
 }
 

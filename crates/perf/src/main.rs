@@ -52,6 +52,7 @@ fn run() -> Result<(), String> {
         mount_memory,
         first_frame,
         scene_run,
+        scene,
         samples,
     } = options;
     if let Some(kind) = scene_run {
@@ -60,7 +61,7 @@ fn run() -> Result<(), String> {
             print_adapter(&gpu);
             gpu
         };
-        return scene_run::run(open, (kind, samples));
+        return scene_run::run(open, (kind, samples), scene);
     }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);

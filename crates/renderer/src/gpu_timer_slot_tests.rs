@@ -9,6 +9,7 @@ fn mapping(frame: u64) -> (SlotState, mpsc::Sender<MapOutcome>) {
     let state = SlotState::Mapping {
         frame,
         pairs: 2,
+        sections: vec![1],
         outcome,
     };
     (state, sender)
@@ -36,8 +37,15 @@ fn a_done_mapping_is_handed_over_for_reading_and_the_slot_freed() {
     // When
     let finished = slot.take_finished();
 
-    // Then
-    assert_eq!(finished, Finished::Mapped { frame: 7, pairs: 2 });
+    // Then: the section pairs ride along, for the reading's `surfaces`
+    assert_eq!(
+        finished,
+        Finished::Mapped {
+            frame: 7,
+            pairs: 2,
+            sections: vec![1]
+        }
+    );
     assert!(matches!(slot, SlotState::Free));
 }
 
@@ -86,6 +94,7 @@ fn a_reading_known_without_mapping_is_handed_over_once() {
         frame: 3,
         pairs: 0,
         time: Ok(Duration::ZERO),
+        surfaces: Duration::ZERO,
     };
     let mut slot = SlotState::Done(reading.clone());
 

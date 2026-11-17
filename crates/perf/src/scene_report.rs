@@ -35,6 +35,7 @@ pub fn report(frames: &[JudgedFrame], start: f64, end: Option<f64>, kind: SceneK
         over_budget(frames).len()
     );
     times_table(&mut out, frames);
+    crate::scene_report_phases::phases_table(&mut out, frames);
     work_table(&mut out, frames);
     first_frames(&mut out, frames);
     slowest_frames(&mut out, frames, kind);
@@ -66,9 +67,13 @@ fn times_table(out: &mut String, frames: &[JudgedFrame]) {
 
 type Pick<T> = fn(&JudgedFrame) -> T;
 
-const TIMES: [(&str, Pick<Duration>); 3] = [
+const TIMES: [(&str, Pick<Duration>); 5] = [
     ("frame (CPU)", |f| f.cpu),
     ("GPU time", |f| f.gpu),
+    ("GPU, in gpu-surface renders", |f| f.surfaces),
+    ("GPU, in the page's passes", |f| {
+        f.gpu.saturating_sub(f.surfaces)
+    }),
     ("frame to idle", |f| f.idle),
 ];
 
@@ -139,7 +144,7 @@ fn over_budget_line(f: &JudgedFrame, changes: &[String]) -> String {
     )
 }
 
-fn micros(time: Duration) -> String {
+pub(crate) fn micros(time: Duration) -> String {
     format!("{:.1}", time.as_secs_f64() * 1e6)
 }
 

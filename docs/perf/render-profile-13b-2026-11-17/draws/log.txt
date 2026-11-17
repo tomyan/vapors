@@ -1,0 +1,72 @@
+settled after 0 s, load 1.18 2.77 9.60; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:47:25 claude
+28.2       00:00 xtask
+ 2.2  5-13:40:29 tailscaled
+ 1.3 13-09:47:31 kcompactd0
+ 1.1  8-22:52:20 sccache
+draws-racer-1x-own start 20:41:01 load 1.18 2.77 9.60
+draws-racer-1x-own end 20:41:30 exit 0 load 1.13 2.63 9.37
+settled after 0 s, load 1.12 2.60 9.33; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:47:56 claude
+ 2.2  5-13:41:00 tailscaled
+ 1.3 13-09:48:01 kcompactd0
+ 1.1  8-22:52:51 sccache
+ 0.8 13-09:48:01 kswapd0
+draws-racer-1x-1920x1080 start 20:41:31 load 1.12 2.60 9.33
+draws-racer-1x-1920x1080 end 20:42:27 exit 0 load 0.84 2.28 8.83
+settled after 0 s, load 0.84 2.28 8.83; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:48:52 claude
+ 3.8       00:01 gh
+ 2.2  5-13:41:56 tailscaled
+ 1.3 13-09:48:58 kcompactd0
+ 1.1  8-22:53:48 sccache
+draws-racer-4x-own start 20:42:28 load 0.84 2.28 8.83
+draws-racer-4x-own end 20:43:05 exit 0 load 0.93 2.14 8.54
+settled after 0 s, load 0.94 2.12 8.50; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:49:31 claude
+ 2.2  5-13:42:35 tailscaled
+ 1.3 13-09:49:36 kcompactd0
+ 1.1  8-22:54:26 sccache
+ 0.8 13-09:49:36 kswapd0
+draws-racer-4x-1920x1080 start 20:43:06 load 0.94 2.12 8.50
+draws-racer-4x-1920x1080 end 20:44:02 exit 0 load 0.92 1.89 8.05
+settled after 0 s, load 0.92 1.89 8.05; busiest:
+%CPU     ELAPSED COMMAND
+ 100       00:00 clippy-driver
+ 100       00:00 clippy-driver
+ 100       00:00 clippy-driver
+99.6       00:03 clippy-driver
+29.6 13-09:50:28 claude
+draws-one-scene-1x-own start 20:44:04 load 0.92 1.89 8.05
+draws-one-scene-1x-own end 20:44:15 exit 0 load 1.39 1.96 8.01
+settled after 0 s, load 1.36 1.94 7.97; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:50:40 claude
+ 3.7       00:03 xtask
+ 2.2  5-13:43:44 tailscaled
+ 1.3 13-09:50:46 kcompactd0
+ 1.1  8-22:55:36 sccache
+draws-one-scene-1x-1920x1080 start 20:44:16 load 1.36 1.94 7.97
+draws-one-scene-1x-1920x1080 end 20:44:37 exit 1 load 1.82 2.00 7.86
+settled after 30 s, load 1.36 1.87 7.63; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:51:32 claude
+ 2.2  5-13:44:36 tailscaled
+ 1.3 13-09:51:38 kcompactd0
+ 1.1  8-22:56:27 sccache
+ 1.1       00:07 gh
+draws-one-scene-4x-own start 20:45:08 load 1.36 1.87 7.63
+draws-one-scene-4x-own end 20:45:26 exit 0 load 1.23 1.81 7.48
+settled after 0 s, load 1.23 1.81 7.48; busiest:
+%CPU     ELAPSED COMMAND
+29.6 13-09:51:51 claude
+ 2.2  5-13:44:55 tailscaled
+ 1.3 13-09:51:57 kcompactd0
+ 1.1  8-22:56:47 sccache
+ 0.8 13-09:51:57 kswapd0
+draws-one-scene-4x-1920x1080 start 20:45:27 load 1.23 1.81 7.48
+draws-one-scene-4x-1920x1080 end 20:46:02 exit 0 load 1.10 1.71 7.24

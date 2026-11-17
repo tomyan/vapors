@@ -14,6 +14,7 @@ fn read(frame: u64, time: Result<Duration, GpuMissing>) -> GpuTime {
         pairs: 2,
         time,
         resolution: TICK,
+        surfaces: Duration::ZERO,
     })
 }
 

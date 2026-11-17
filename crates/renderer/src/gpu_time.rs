@@ -31,6 +31,10 @@ pub struct GpuReading {
     /// The sum of the pairs' spans, or why there is none. The GPU's
     /// work outside render passes (buffer writes, copies) is not in it.
     pub time: Result<Duration, GpuMissing>,
+    /// The part of `time` spent in `gpu-surface` renders (each a timed
+    /// section); the rest is the frame's own passes. Zero when `time` is
+    /// missing.
+    pub surfaces: Duration,
     /// The smallest step [`GpuReading::time`] can show.
     pub resolution: GpuResolution,
 }
@@ -75,6 +79,7 @@ pub(crate) struct FrameReading {
     pub(crate) frame: u64,
     pub(crate) pairs: u32,
     pub(crate) time: Result<Duration, GpuMissing>,
+    pub(crate) surfaces: Duration,
 }
 
 /// Why a timed frame has no GPU time.
@@ -147,6 +152,14 @@ impl fmt::Display for GpuMissing {
 ///
 /// # Errors
 /// [`GpuMissing::Backwards`] for a pair whose end is before its start.
+/// The ticks of the pairs `sections` names (`FrameClock::time_section`'s),
+/// start and end each: what a frame's `surfaces` sums.
+pub(crate) fn section_ticks(ticks: &[u64], sections: &[u32]) -> Vec<u64> {
+    let pairs = ticks.as_chunks::<2>().0;
+    let named = sections.iter().filter_map(|&pair| pairs.get(pair as usize));
+    named.flatten().copied().collect()
+}
+
 pub(crate) fn sum_pairs(ticks: &[u64], period: f64) -> Result<Duration, GpuMissing> {
     let mut sum = 0u64;
     for &[start, end] in ticks.as_chunks::<2>().0 {

@@ -4,6 +4,10 @@
 //! command encoder and submission order; the renderer owns what it
 //! draws.
 
+/// The `draw step` phase of a `gpu-surface` renderer's `render`: the
+/// harness reports it by this name (`vapors_perf::report::PHASES`).
+pub const SURFACE_PHASE: &str = "surface";
+
 /// The backing texture's format: 8-bit RGBA holding sRGB-encoded values
 /// with straight (not premultiplied) alpha, as an `img` texture does.
 /// The painter composites it with ordinary alpha blending.

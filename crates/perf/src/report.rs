@@ -4,6 +4,7 @@
 use std::fmt::Write;
 use std::time::Duration;
 
+use vapors_app::SURFACE_PHASE;
 use vapors_renderer::WRITE_PHASE;
 
 use crate::instruction_samples::InstructionSamples;
@@ -16,14 +17,17 @@ use crate::stats::{Distribution, median_count};
 /// draw call's bind group and render pass, and `finish` on the frame's
 /// encoder), `write` (`Queue::write_buffer` and `write_texture`) and
 /// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
-/// repack and per `gpu-surface` that renders); the rest of draw is the
+/// repack and per `gpu-surface` that renders), and `surface` (a
+/// `gpu-surface` renderer's `render`: a scene's prepare and record,
+/// its own writes and encodes within it); the rest of draw is the
 /// painter's own work. The app's other phases are [`APP_PHASES`].
-pub const PHASES: [&str; 9] = [
+pub const PHASES: [&str; 10] = [
     "update",
     "style",
     "layout",
     "paint",
     "draw",
+    SURFACE_PHASE,
     "batches",
     "encode",
     WRITE_PHASE,
@@ -40,7 +44,7 @@ pub const APP_PHASES: [&str; 5] = ["input", "tasks", "tick", "accessibility", "r
 
 /// Every phase a frame records, in frame order: [`PHASES`] and
 /// [`APP_PHASES`]. What the first frame reports and `--scaling` judges.
-pub const EVERY_PHASE: [&str; 14] = [
+pub const EVERY_PHASE: [&str; 15] = [
     "input",
     "tasks",
     "tick",
@@ -50,6 +54,7 @@ pub const EVERY_PHASE: [&str; 14] = [
     "paint",
     "accessibility",
     "draw",
+    SURFACE_PHASE,
     "batches",
     "encode",
     WRITE_PHASE,

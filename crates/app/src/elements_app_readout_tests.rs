@@ -11,6 +11,7 @@ fn reading(frame: u64, time: Result<Duration, GpuMissing>) -> GpuTime {
         pairs: 2,
         time,
         resolution: GpuResolution::Tick(Duration::from_nanos(83)),
+        surfaces: Duration::ZERO,
     })
 }
 

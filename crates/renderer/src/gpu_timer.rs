@@ -6,7 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::frame_clock::{FrameClock, PAIR_BYTES};
-use crate::gpu_time::{FrameReading, GpuMissing, GpuReading, GpuResolution, GpuTime, sum_pairs};
+use crate::gpu_time::{
+    FrameReading, GpuMissing, GpuReading, GpuResolution, GpuTime, section_ticks, sum_pairs,
+};
 use crate::gpu_timer_slot::{Finished, SlotState};
 
 /// Frames whose timestamps may be on their way back at once. A
@@ -83,6 +85,7 @@ impl GpuTimer {
             frame: latest.frame,
             pairs: latest.pairs,
             time: latest.time.clone(),
+            surfaces: latest.surfaces,
             resolution: self.resolution,
         };
         self.latest
@@ -123,17 +126,26 @@ impl GpuTimer {
         match finished {
             Finished::Nothing => None,
             Finished::Reading(reading) => Some(reading),
-            Finished::Mapped { frame, pairs } => Some(self.read(slot, frame, pairs)),
+            Finished::Mapped {
+                frame,
+                pairs,
+                sections,
+            } => Some(self.read(slot, (frame, pairs), &sections)),
         }
     }
 
-    fn read(&self, slot: &Slot, frame: u64, pairs: u32) -> FrameReading {
+    fn read(&self, slot: &Slot, (frame, pairs): (u64, u32), sections: &[u32]) -> FrameReading {
         let ticks = ticks(&slot.readable, pairs);
         slot.readable.unmap();
+        let surfaces = ticks
+            .as_ref()
+            .ok()
+            .and_then(|ticks| sum_pairs(&section_ticks(ticks, sections), self.period).ok());
         FrameReading {
             frame,
             pairs,
             time: ticks.and_then(|ticks| sum_pairs(&ticks, self.period)),
+            surfaces: surfaces.unwrap_or_default(),
         }
     }
 
