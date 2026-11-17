@@ -101,6 +101,14 @@ its PR merges, empty it and keep the directory:
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.
+- A test costs no more time, memory or GPU than the value it pins
+  needs, because every test runs on every push and the suite only
+  grows. It runs only the frames, units and machinery its assertion
+  reads: a test of counts does not run the timing sampler, and a test of
+  one frame's state sets that state directly rather than stepping to it.
+  Raising a test's deadline in `.config/nextest.toml` needs its measured
+  time and the reason it cannot be cheaper, in the comment beside it.
+  Review judges a new test's cost (`docs/review.md`).
 - Files about 200 lines, functions 10 to 15 lines, no `unsafe`. The
   checks sit at the tail (`cargo xtask lint`: `[files] max_lines` in
   `.config/factory.toml`, clippy's `too_many_lines` and

@@ -44,6 +44,19 @@ since it is allowed at its site or failing. The numbers and where they came from
 - `#[rustfmt::skip]`, a widened line, or code moved into a macro to
   shorten a count is the same finding.
 
+## What a test costs
+
+- Every test runs on every push, so a test's time, memory and GPU use
+  is judged like its correctness. A finding is a test that does work
+  its assertion does not read: timing or tracing machinery around a
+  count, more frames than the pinned frame needs, a page larger than
+  the behaviour needs, its own GPU or app where a shared one would do.
+  The fix names the cheaper setup and asks the author to show it pins
+  the same value.
+- A test that takes more than a few seconds in debug states its
+  measured time in the PR. A raised deadline in `.config/nextest.toml`
+  without a measured time and a reason beside it is a finding.
+
 ## How to report
 
 Each finding names the file and line, what it reaches through or
