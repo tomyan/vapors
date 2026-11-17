@@ -46,16 +46,17 @@ since it is allowed at its site or failing. The numbers and where they came from
 
 ## What a test costs
 
-- Every test runs on every push, so a test's time, memory and GPU use
-  is judged like its correctness. A finding is a test that does work
-  its assertion does not read: timing or tracing machinery around a
-  count, more frames than the pinned frame needs, a page larger than
-  the behaviour needs, its own GPU or app where a shared one would do.
-  The fix names the cheaper setup and asks the author to show it pins
-  the same value.
-- A test that takes more than a few seconds in debug states its
-  measured time in the PR. A raised deadline in `.config/nextest.toml`
-  without a measured time and a reason beside it is a finding.
+- A test's time, memory and GPU use is judged like its correctness
+  (the rule is in CLAUDE.md). A finding is a test that does work its
+  assertion does not read: timing or tracing machinery around a count,
+  more frames than the pinned frame needs, a page larger than the
+  behaviour needs, its own GPU or app where a shared one would do. The
+  fix names the cheaper setup and asks the author to show it pins the
+  same value.
+- A test over 5 s in a debug build without its measured time in the
+  PR, or an override in `.config/nextest.toml` that raises a deadline
+  without a measured time and a reason beside it, is a finding. No
+  tool checks either yet; the reviewer does.
 
 ## How to report
 
