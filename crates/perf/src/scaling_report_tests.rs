@@ -51,6 +51,20 @@ fn growth_fails_naming_the_change_the_phase_and_the_command() {
 }
 
 #[test]
+fn a_reported_change_names_the_slice_that_turns_its_judging_on() {
+    // Given: counts that grow with the page
+    let growing = scaling([1000, 3000, 10_000]);
+
+    // When
+    let line =
+        verdict(RowChange::PositionedInsert, "PositionedInsert", &growing).expect("reported");
+
+    // Then
+    assert!(line.starts_with("scaling: reported, not judged"), "{line}");
+    assert!(line.contains("splice-layout.md slice 3b"), "{line}");
+}
+
+#[test]
 fn constant_counts_pass() {
     let line = verdict(RowChange::Class, "Class", &scaling([1000, 1000, 1000])).expect("flat");
     assert!(line.starts_with("scaling: pass"), "{line}");

@@ -93,6 +93,9 @@ pub fn verdict(change: RowChange, title: &str, scaling: &Scaling) -> Result<Stri
              the other phases are reported, not judged: property 3 (the splice step) is not built",
             held_flat(flat)
         ),
+        Judged::Reported { owner } => {
+            format!("scaling: reported, not judged, {title}: its judging is turned on by {owner}")
+        }
         Judged::EveryPhase => format!(
             "scaling: pass, every {title} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),

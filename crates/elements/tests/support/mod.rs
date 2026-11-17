@@ -22,6 +22,7 @@ pub mod number_page;
 pub mod oracle;
 pub mod parent_pages;
 pub mod pointer;
+pub mod positioned_rows;
 pub mod random_css;
 pub mod range_page;
 pub mod roles_page;

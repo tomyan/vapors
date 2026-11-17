@@ -80,6 +80,16 @@ pub const SCROLL_SIZE_A11Y_PER_ROW: u64 = 1;
 /// an allocator decision), then 2% again.
 pub const FLEX_TEXT_FRAME_PERCENT: u64 = 3;
 
+/// Who turns `PositionedInsert`'s judging on. Measured judged
+/// (2026-11-17): layout about 10,000, paint about 13,000 and
+/// accessibility about 6,900 instructions per extra row. The fixed footer
+/// is an out-of-flow child of the body, so the body's lane is declined
+/// (`LaneDecline::OutOfFlowChild`). Without the footer, the same insert
+/// passes Insert's rule (accessibility 1220 to 1237 per row).
+pub const POSITIONED_INSERT_OWNER: &str = "splice-layout.md slice 3b (a lane container's \
+     absolute and fixed children placed from the tree): the body's lane is declined for the \
+     fixed footer; 3b judges this change as Insert";
+
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Judged {
@@ -105,6 +115,13 @@ pub enum Judged {
         /// Phases whose cost may not grow with the rows.
         flat: &'static [&'static str],
     },
+    /// Nothing judged: the change's work grows with the page today, and
+    /// `owner` names the slice that makes it flat and then turns its
+    /// judging on. A change is never reported without one.
+    Reported {
+        /// The slice, and what it changes, by its plan's name.
+        owner: &'static str,
+    },
 }
 
 impl Judged {
@@ -116,10 +133,15 @@ impl Judged {
                 phase: "frame (CPU)",
                 percent: FLEX_TEXT_FRAME_PERCENT,
             },
-            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::HoveredClass => {
-                Self::EveryPhase
-            }
+            RowChange::Idle
+            | RowChange::Text
+            | RowChange::Class
+            | RowChange::HoveredClass
+            | RowChange::PositionedClass => Self::EveryPhase,
             // style flat since docs/perf/insert-style-2026-11-13.md
+            RowChange::PositionedInsert => Self::Reported {
+                owner: POSITIONED_INSERT_OWNER,
+            },
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
                 flat: &["style"],

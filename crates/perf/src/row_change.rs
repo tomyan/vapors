@@ -31,11 +31,19 @@ pub enum RowChange {
     /// a long text in the same frame: the body is laid out again while
     /// it scrolls (review-v243 M2).
     ScrollSize,
+    /// `Class` on the positioned rows page (flat-scene W6,
+    /// `positioned_rows.rs`): every seventh row `position: relative;
+    /// z-index: 1` and a fixed footer, so paint order is not tree order;
+    /// the edited row is the positioned one at or before the middle.
+    PositionedClass,
+    /// `Insert` on the positioned rows page: a plain row put in before
+    /// the middle row, then removed.
+    PositionedInsert,
 }
 
 impl RowChange {
     /// Every change, in the order the harness lists them.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::Idle,
         Self::Text,
         Self::FlexText,
@@ -46,6 +54,8 @@ impl RowChange {
         Self::Resize,
         Self::Scroll,
         Self::ScrollSize,
+        Self::PositionedClass,
+        Self::PositionedInsert,
     ];
 
     /// The change `name` spells, as `{:?}` prints it.
@@ -66,10 +76,10 @@ impl RowChange {
     #[must_use]
     pub fn frame_kinds(self) -> &'static [&'static str] {
         match self {
-            Self::Insert | Self::FlexInsert => &["insert", "remove"],
+            Self::Insert | Self::FlexInsert | Self::PositionedInsert => &["insert", "remove"],
             Self::Resize => &["taller", "shorter"],
             Self::ScrollSize => &["longer label", "shorter label"],
-            Self::Class | Self::HoveredClass => &["add", "remove"],
+            Self::Class | Self::HoveredClass | Self::PositionedClass => &["add", "remove"],
             Self::Idle | Self::Text | Self::FlexText | Self::Scroll => &["every"],
         }
     }

@@ -25,6 +25,9 @@ use rows_page::{Edit, row, rows_page, rows_viewport};
 #[allow(dead_code, clippy::pedantic)] // the tests' file: `set_middle_text` and `row_text` are theirs
 #[path = "../../elements/tests/support/flex_list.rs"]
 pub(crate) mod flex_list;
+#[allow(clippy::pedantic)] // the tests' file
+#[path = "../../elements/tests/support/positioned_rows.rs"]
+pub(crate) mod positioned_rows;
 
 pub use crate::row_change::RowChange;
 use crate::rows_list::Page;
@@ -57,6 +60,9 @@ impl Rows {
             RowChange::HoveredClass => page.rows().edit(Edit::Hover),
             RowChange::Resize => page.rows().rows_resizable(),
             RowChange::Scroll | RowChange::ScrollSize => page.rows().body_scrolls(),
+            RowChange::PositionedClass | RowChange::PositionedInsert => {
+                positioned_rows::make_positioned(page.rows());
+            }
             RowChange::Idle
             | RowChange::Text
             | RowChange::FlexText
@@ -156,7 +162,10 @@ impl Workload for Rows {
             }
             RowChange::FlexText => self.page.set_list_value(sample),
             RowChange::Class | RowChange::HoveredClass => self.page.rows().edit(Edit::ToggleClass),
-            RowChange::Insert => self.toggle_inserted_row(),
+            RowChange::Insert | RowChange::PositionedInsert => self.toggle_inserted_row(),
+            RowChange::PositionedClass => {
+                positioned_rows::toggle_positioned_marked(self.page.rows());
+            }
             RowChange::FlexInsert => self.toggle_inserted_list_row(),
             RowChange::Resize => self.page.rows().toggle_tall(),
             RowChange::Scroll => self.scroll_body(),
