@@ -9,6 +9,7 @@ mod support;
 use support::{Rig, at};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{AxElement, Document, Viewport};
+use vapors_scene3d::{NodeKind, Projection};
 use vapors_scene3d_components::{Group, GroupProps};
 
 #[test]
@@ -52,6 +53,24 @@ fn a_transform_change_recomputes_that_node_alone() {
     let group = scene.children(scene.root()).unwrap()[1];
     let mesh = scene.children(group).unwrap()[0];
     assert_eq!(scene.update(), [mesh]);
+}
+
+#[test]
+fn a_lens_change_sets_the_cameras_projection() {
+    // Given
+    let rig = Rig::new();
+    let wider = Projection::orthographic(8.0, 0.1, 100.0).unwrap();
+
+    // When
+    rig.signals.lens.set(wider);
+
+    // Then
+    let scene = rig.scene.borrow();
+    let camera = scene.children(scene.root()).unwrap()[0];
+    let NodeKind::Camera { projection, .. } = scene.kind(camera).unwrap() else {
+        panic!("the camera");
+    };
+    assert_eq!(*projection, wider);
 }
 
 #[test]

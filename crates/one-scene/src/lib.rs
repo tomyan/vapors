@@ -139,7 +139,7 @@ fn props(
         cube: Some(shapes::cube(&mut store).map_err(|e| e.to_string())?),
         ground: Some(shapes::ground(&mut store).map_err(|e| e.to_string())?),
         eye: Some(CameraHandle::new()),
-        lens: Some(lens),
+        lens: Some(Signal::new(lens)),
         time,
         frames,
     })

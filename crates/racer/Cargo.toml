@@ -23,6 +23,7 @@ wgpu.workspace = true
 [dev-dependencies]
 vapors-gpu-harness.workspace = true
 vapors-scene.workspace = true
+vapors-scene3d-components.workspace = true
 vapors-scene3d-gpu.workspace = true
 
 [build-dependencies]

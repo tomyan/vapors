@@ -1,5 +1,6 @@
 //! The ground material test's target (`gpu_ground_material_tests.rs`):
-//! an odd-sized square drawn into, and the pixels it samples.
+//! an odd-sized square drawn into, and the pixels it samples; and a
+//! renderer drawn at any size (`gpu_world_tests.rs`).
 
 use vapors_app::{SURFACE_FORMAT, SurfaceFrame, SurfaceRenderer, SurfaceSize, WorkCounter};
 use vapors_gpu_harness::{Gpu, read_rgba8};
@@ -20,17 +21,27 @@ fn size() -> SurfaceSize {
 
 /// `renderer` mounted and sized to the `SIDE` square.
 pub fn mount(renderer: &mut dyn SurfaceRenderer, gpu: &Gpu) {
-    renderer.mount(&gpu.device).expect("mounts");
-    renderer.resize(&gpu.device, size()).expect("resizes");
+    mount_at(renderer, gpu, size());
 }
 
 /// A draw of `renderer` into a fresh `SIDE` square: its RGBA.
 pub fn drawn(renderer: &mut dyn SurfaceRenderer, gpu: &Gpu) -> Vec<u8> {
+    drawn_at(renderer, gpu, size())
+}
+
+/// `renderer` mounted and sized to `size`.
+pub fn mount_at(renderer: &mut dyn SurfaceRenderer, gpu: &Gpu, size: SurfaceSize) {
+    renderer.mount(&gpu.device).expect("mounts");
+    renderer.resize(&gpu.device, size).expect("resizes");
+}
+
+/// A draw of `renderer` into a fresh texture of `size`: its RGBA.
+pub fn drawn_at(renderer: &mut dyn SurfaceRenderer, gpu: &Gpu, size: SurfaceSize) -> Vec<u8> {
     let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("ground material test"),
         size: wgpu::Extent3d {
-            width: SIDE,
-            height: SIDE,
+            width: size.width,
+            height: size.height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -50,7 +61,7 @@ pub fn drawn(renderer: &mut dyn SurfaceRenderer, gpu: &Gpu) -> Vec<u8> {
         queue: &gpu.queue,
         encoder: &mut encoder,
         view: &view,
-        size: size(),
+        size,
         work: &work,
     };
     renderer.render(frame).expect("renders");
