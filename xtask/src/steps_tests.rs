@@ -27,6 +27,7 @@ fn ci_runs_fastest_checks_first() {
             "wasm",
             "wasm release",
             "unit",
+            "host",
             "gpu"
         ]
     );

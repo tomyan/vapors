@@ -60,15 +60,21 @@ fn harness_source() -> String {
 }
 
 #[test]
-fn the_unit_tier_leaves_out_the_gpu_and_pmu_tests() {
+fn the_unit_tier_leaves_out_the_gpu_pmu_and_host_tests() {
     // When
     let step = unit();
 
     // Then
     assert_eq!(
         step.args.last().map(String::as_str),
-        Some(format!("not ({GPU_TESTS}) and not ({PMU_TESTS})").as_str())
+        Some(format!("not ({GPU_TESTS}) and not ({PMU_TESTS}) and not ({HOST_TESTS})").as_str())
     );
+}
+
+#[test]
+fn the_host_tier_runs_the_host_tests_alone() {
+    let step = host();
+    assert_eq!(step.args.last().map(String::as_str), Some(HOST_TESTS));
 }
 
 #[test]

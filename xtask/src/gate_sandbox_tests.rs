@@ -62,10 +62,50 @@ fn a_machine_without_bwrap_is_refused_naming_the_fix() {
     assert!(refusal.contains("hide_gpu_device = \"false\""), "{refusal}");
 }
 
+/// A stand-in for bwrap at a path in a scratch directory: a script that
+/// prints `listed` and exits with `code`.
+fn fake_bwrap(name: &str, listed: &str, code: i32) -> (crate::scratch::Scratch, String) {
+    let dir = crate::scratch::dir(name);
+    let program = dir.join("bwrap");
+    std::fs::write(
+        &program,
+        format!("#!/bin/sh\nprintf '%s' '{listed}'\nexit {code}\n"),
+    )
+    .expect("written");
+    let executable = std::os::unix::fs::PermissionsExt::from_mode(0o755);
+    std::fs::set_permissions(&program, executable).expect("mode");
+    (dir, program.display().to_string())
+}
+
 #[test]
-fn where_there_is_a_render_node_bwrap_hides_dev_dri() {
+fn a_bwrap_that_lists_nothing_hides_dev_dri_and_one_that_lists_or_fails_does_not() {
+    // Given: bwrap's answers given, not asked, as an API builder's
+    // sandbox has no bwrap that can run (its real twin is
+    // host_where_there_is_a_render_node_bwrap_hides_dev_dri, the host tier)
+    let (_empty, hides) = fake_bwrap("bwrap-hides", "", 0);
+    let (_listed, shows) = fake_bwrap("bwrap-shows", "renderD128", 0);
+    let (_failed, fails) = fake_bwrap("bwrap-fails", "", 1);
+
+    // Then
+    assert_eq!(check_with(&hides), Ok(()));
+    assert!(
+        check_with(&shows)
+            .expect_err("listed")
+            .contains("it listed `renderD128`")
+    );
+    assert!(
+        check_with(&fails)
+            .expect_err("failed")
+            .contains("did not run with /dev/dri hidden")
+    );
+}
+
+#[test]
+fn host_where_there_is_a_render_node_bwrap_hides_dev_dri() {
     // Given: the dev box has one; GitHub's runner has none (and no bwrap),
-    // and there the gate runs steps as they are
+    // and there the gate runs steps as they are. The real bwrap, so the
+    // host tier (steps_tiers.rs HOST_TESTS); its unit twin is
+    // a_bwrap_that_lists_nothing_hides_dev_dri_and_one_that_lists_or_fails_does_not
     if !has_render_node(Path::new("/dev/dri")).expect("readable") {
         assert_eq!(
             wrap(&Config::parse("").expect("empty")),

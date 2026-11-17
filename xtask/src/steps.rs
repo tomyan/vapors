@@ -8,7 +8,7 @@ use crate::steps_checks::{builds, files, imports, layers, nightly, nightly_issue
 
 #[path = "steps_tiers.rs"]
 mod tiers;
-use tiers::{gpu, pmu, unit};
+use tiers::{gpu, host, pmu, unit};
 
 fn tools() -> Step {
     Step::new(
@@ -131,6 +131,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         wasm(web_package),
         wasm_release(web_package),
         unit(),
+        host(),
         gpu(),
     ]
 }
@@ -167,6 +168,11 @@ pub fn unit_tests() -> Vec<Step> {
 /// The GPU tier.
 pub fn gpu_tests() -> Vec<Step> {
     vec![gpu()]
+}
+
+/// The host tier: what only the host has (`steps_tiers.rs` `HOST_TESTS`).
+pub fn host_tests() -> Vec<Step> {
+    vec![host()]
 }
 
 /// The hardware-counter tier: never part of `ci`.

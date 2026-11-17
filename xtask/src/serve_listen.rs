@@ -53,6 +53,15 @@ fn owned_by(unit: &str, port: u16) -> Result<(), String> {
         "systemctl",
         &["--user", "show", "-p", "MainPID", "--value", unit],
     )?;
+    owned_by_main(unit, &main, port)
+}
+
+/// Whether the listener on `port` is `unit`'s, whose main pid systemd
+/// gave as `main` ("0" for a unit not running). Split from [`owned_by`]
+/// so its test runs where there is no user bus to ask (an API builder's
+/// sandbox): the test gives systemd's answer; `cargo xtask serve` on the
+/// host asks systemd itself.
+fn owned_by_main(unit: &str, main: &str, port: u16) -> Result<(), String> {
     let listening = output("ss", &["-ltnpH", &format!("sport = :{port}")])?;
     let owner = listener(&listening);
     if owner.as_ref().is_some_and(|(_, pid)| *pid == main.trim()) {
