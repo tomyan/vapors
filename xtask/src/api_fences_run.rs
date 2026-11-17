@@ -15,6 +15,7 @@ use crate::api_sandbox::{BIN, Host, RELAY_PORT, arguments};
 /// Proves builder `name`'s fences.
 pub fn run(name: &str) -> ExitCode {
     let proven = crate::api_fds::refuse_inherited()
+        .and_then(|()| crate::api_limits::no_core_dumps())
         .and_then(|()| crate::api_host::home())
         .and_then(|home| Builder::new(name, &home))
         .and_then(|builder| made_and_proven(&builder));
@@ -144,7 +145,7 @@ fn inside(builder: &Builder, host: &Host, script: &str) -> Result<Ran, String> {
 /// the check.
 pub fn sandboxed(builder: &Builder, host: &Host, command: &[&str]) -> Result<Command, String> {
     crate::api_fds::refuse_inherited()?;
-    let mut scoped = crate::api_limits::scope();
+    let mut scoped = crate::api_limits::scope(&host.xtask);
     scoped
         .arg("bwrap")
         .args(arguments(builder, host, RELAY_PORT))

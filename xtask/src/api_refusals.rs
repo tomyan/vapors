@@ -22,16 +22,23 @@ pub struct Refusals {
 impl Refusals {
     /// `why` printed, escaped and cut, and kept while fewer than [`KEPT`]
     /// are; counted always.
+    /// The first [`KEPT`] are printed too; after them, one line every
+    /// [`KEPT`] more, so a loop of refusals cannot flood the terminal
+    /// (review of #476-#478, L5).
     pub fn push(&self, why: &str) {
         let entry = escaped(why);
-        eprintln!("api-build: refused: {entry}");
         let Ok(mut log) = self.log.lock() else {
-            eprintln!("api-build: the refusal log's lock was poisoned; this refusal is only here");
+            eprintln!(
+                "api-build: refused: {entry} (the refusal log's lock was poisoned; this refusal is only here)"
+            );
             return;
         };
         log.1 += 1;
         if log.0.len() < KEPT {
+            eprintln!("api-build: refused: {entry}");
             log.0.push(entry);
+        } else if log.1 % KEPT as u64 == 0 {
+            eprintln!("api-build: {} requests refused so far", log.1);
         }
     }
 

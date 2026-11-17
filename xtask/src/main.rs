@@ -23,6 +23,8 @@ mod api_paths;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
 mod api_prices;
 mod api_refusals;
+#[allow(dead_code, reason = "used by the API route, the next PR")]
+mod api_request_policy;
 mod api_sandbox;
 mod api_server;
 #[allow(dead_code, reason = "used by the API route, the next PR")]
@@ -191,6 +193,7 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::ApiFences { name } => return api_fences_run::run(&name),
+        Command::ApiScoped { command } => return api_limits::scoped(&command),
         Command::ApiRelayInner {
             port,
             socket,
