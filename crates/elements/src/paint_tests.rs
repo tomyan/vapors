@@ -29,3 +29,27 @@ fn a_half_snapped_then_moved_by_a_whole_number_is_the_moved_half_snapped() {
         assert_eq!(shifted_after, half_up(value + shift), "{value} by {shift}");
     }
 }
+
+#[test]
+#[should_panic(expected = "no frame class set")]
+fn placing_a_box_with_no_frame_class_set_panics() {
+    let rect = crate::layout::BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: 10.0,
+        height: 10.0,
+    };
+    super::snapped_in(None, rect, 1.0);
+}
+
+#[test]
+#[should_panic(expected = "flat-scene F4a")]
+fn placing_a_box_under_an_affine_frame_panics_naming_f4a() {
+    let rect = crate::layout::BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: 10.0,
+        height: 10.0,
+    };
+    super::snapped_in(Some(vapors_scene::TransformClass::Affine), rect, 1.0);
+}

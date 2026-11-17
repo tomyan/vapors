@@ -73,28 +73,39 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         "box slot {slot}'s outline ring is grown from {border_box:?}, not whole device pixels \
          (paint.rs `snapped`); reproduce with `cargo xtask test`"
     );
-    let [left, top] = [
-        border_box.left - ring.rect.left,
-        border_box.top - ring.rect.top,
-    ];
-    let [right, bottom] = [
-        ring.rect.right - border_box.right,
-        ring.rect.bottom - border_box.bottom,
-    ];
-    let reaches = [left, top, right, bottom];
-    if reaches.iter().any(|reach| !reach.is_finite()) {
-        return;
-    }
     assert!(
-        reaches
-            .iter()
-            .all(|reach| (reach - left).abs() <= REACH_TOLERANCE),
+        ring_grown_evenly(ring.rect, border_box),
         "box slot {slot}'s outline ring {:?} is not grown evenly from its border box \
          {border_box:?} (paint_outline.rs `ring_quad`); reproduce with `cargo xtask test`",
         ring.rect
     );
 }
 
+/// Whether `ring` is `border_box` grown by one reach on every side, to
+/// [`REACH_TOLERANCE`]. A side whose box edge is infinite has no reach
+/// and is left out (the relaxation of `whole_or_infinite`, issue #449);
+/// any other reach must be finite, so a NaN one fails.
+fn ring_grown_evenly(ring: Rect, border_box: Rect) -> bool {
+    let sides = [
+        (border_box.left, border_box.left - ring.left),
+        (border_box.top, border_box.top - ring.top),
+        (border_box.right, ring.right - border_box.right),
+        (border_box.bottom, ring.bottom - border_box.bottom),
+    ];
+    let mut reaches = sides
+        .iter()
+        .filter(|(edge, _)| !edge.is_infinite())
+        .map(|&(_, reach)| reach);
+    let Some(first) = reaches.next() else {
+        return true;
+    };
+    first.is_finite() && reaches.all(|reach| (reach - first).abs() <= REACH_TOLERANCE)
+}
+
 fn snaps(input: &PaintInput<'_>) -> bool {
     input.class.is_some_and(TransformClass::snaps)
 }
+
+#[cfg(test)]
+#[path = "repaint_check_tests.rs"]
+mod tests;

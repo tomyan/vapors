@@ -89,18 +89,27 @@ impl<'a> PaintInput<'a> {
     /// boxes under other transforms are painted unsnapped from
     /// flat-scene F4a.
     pub(crate) fn snapped(&self, rect: BoxRect) -> Rect {
-        match self.class {
-            Some(TransformClass::WholeTranslate) => snapped(rect, self.scale),
-            Some(class) => panic!(
-                "a box in a frame of class {class:?} is painted: only boxes under a whole \
-                 translation are painted before flat-scene F4a (docs/plans/flat-scene.md \
-                 section 8); reproduce with `cargo xtask test`"
-            ),
-            None => panic!(
-                "a box's edges are placed with no frame class set: `Repaint` sets it before \
-                 each box (repaint.rs); reproduce with `cargo xtask test`"
-            ),
-        }
+        snapped_in(self.class, rect, self.scale)
+    }
+}
+
+/// `rect` in device pixels at `scale` as a frame of class `class` places
+/// it ([`PaintInput::snapped`]).
+///
+/// # Panics
+/// As [`PaintInput::snapped`].
+pub(crate) fn snapped_in(class: Option<TransformClass>, rect: BoxRect, scale: f32) -> Rect {
+    match class {
+        Some(TransformClass::WholeTranslate) => snapped(rect, scale),
+        Some(class) => panic!(
+            "a box in a frame of class {class:?} is painted: only boxes under a whole \
+             translation are painted before flat-scene F4a (docs/plans/flat-scene.md \
+             section 8); reproduce with `cargo xtask test`"
+        ),
+        None => panic!(
+            "a box's edges are placed with no frame class set: `Repaint` sets it before \
+             each box (repaint.rs); reproduce with `cargo xtask test`"
+        ),
     }
 }
 
