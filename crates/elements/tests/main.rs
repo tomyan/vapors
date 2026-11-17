@@ -4,6 +4,7 @@
 //! when this declares it: `every_test_file_is_a_module` refuses one it
 //! does not.
 
+mod clip_chain;
 mod compiled_mount_order;
 mod compiled_sharing;
 mod compiled_sheet_once;

@@ -40,6 +40,10 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) {
         for (slot, from) in again {
+            let links = crate::clip_chain::links(self.order, &painted.frames, slot);
+            if links > crate::MAX_CLIP_CHAIN {
+                input.long_chains.push((slot, links));
+            }
             let kept = self.painted(slot, from, input, painted);
             let border_box = input.snapped(self.rects[slot]);
             match not_placed(&kept, border_box) {

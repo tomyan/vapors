@@ -40,7 +40,7 @@ impl Document {
         (boxes, stackings): (&[LayoutBox], &Stackings),
         (from, lanes): (&PaintedFrom, &crate::layout::SharedLanes),
         changed: &ChangedSlots,
-    ) -> (Painted, Vec<crate::paint_refusals::NotPlaced>) {
+    ) -> (Painted, crate::paint_refusals::Refused) {
         let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let text = (&mut self.fonts, &mut self.texts);
@@ -63,7 +63,11 @@ impl Document {
             from,
             (&scrolls, &lanes),
         );
-        (painted, input.unresolvable)
+        let refused = crate::paint_refusals::Refused {
+            unplaced: input.unresolvable,
+            long_chains: input.long_chains,
+        };
+        (painted, refused)
     }
 }
 
