@@ -69,3 +69,37 @@ about half `box_style`, a sixth `decoration`.
   unknown one naming it; `auto_tracks` of `auto` is the empty list,
   of one size one track.
 - Every css and elements test passes with the assertions on.
+
+## Re-measured on main, 2026-11-17
+
+After compiled winners (B2 to B3b) merged, slice B was merged with
+main at 9547e1a4. Before is main at 9547e1a4; after is that merge
+(c8fd3bc0). Both are judged builds of `vapors-perf`, with outputs in
+`style-declared-2026-11-17/`. Commands:
+`--instructions 50 --only "3000 rows, Class" 5`, and
+`60 --scaling Class 10` and `60 --scaling Insert 10`.
+
+| workload | phase | before | after |
+|---|---|---|---|
+| 3000 rows, Class (`--instructions`) | style | 426,007 | 414,484 (−11.5k, −2.7%) |
+| `--scaling Class`, add frames, 1000 / 3000 / 10000 rows | style | 424,181 / 425,207 / 424,022 | 416,129 / 417,124 / 415,047 |
+| `--scaling Insert`, insert frames, 1000 / 3000 / 10000 rows | style | 395,800 / 398,125 / 390,778 | 386,446 / 386,413 / 375,244 |
+
+The Class edit derives 4 used styles (the run's counts line), so the
+saving is about 2.9k instructions per restyled element, down from 4.4k
+against the older base. Both scaling runs still pass "style flat".
+
+Where `check_honoured`'s declared-only walk sits beside compiled
+winners: both compute paths, the full cascade and `compute_compiled`,
+build through `compute::style`, so `Declared` is recorded the same way
+on each. B3a's verification compares whole computed styles, and their
+equality includes `Declared`, so a compiled style that disagrees on
+which longhands were declared is refused like any other disagreement.
+That happens on the first element of each state in release, and on
+every element in debug builds. The release sharing check (B3b) decides
+whether a key may share, which `Declared` does not enter. A shared
+style carries the `Declared` of the element it was computed for; share
+keys include the parent's kept style, which is where the inherited
+bits come from. `crates/elements/tests/honoured_compiled.rs` pins the
+walk on a compiled element: a deferred property that a compiled winner
+declares is refused at that element only, on both verification paths.
