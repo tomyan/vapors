@@ -5,7 +5,8 @@
 //! named.
 
 /// The files with a bare cargo command, and why each compiles nothing.
-const BARE: [(&str, &str); 5] = [
+const BARE: [(&str, &str); 6] = [
+    ("api_push.rs", "cargo deny fetch db, a download"),
     ("builds.rs", "cargo tree"),
     ("layers.rs", "cargo metadata"),
     ("screenshot_package.rs", "cargo metadata"),

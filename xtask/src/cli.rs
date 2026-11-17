@@ -49,6 +49,10 @@ pub enum Command {
         /// The model, which must have a price in `[api_build.prices]`.
         #[arg(long, default_value = "claude-sonnet-5-5")]
         model: String,
+        /// A path prefix beyond `crates/` and `docs/` the branch may change
+        /// (such as `xtask/`), when the brief names it; repeatable.
+        #[arg(long)]
+        allow: Vec<String>,
     },
     /// Inside an API builder's scope, before its sandbox: run the command
     /// if the scope's limits are in force.

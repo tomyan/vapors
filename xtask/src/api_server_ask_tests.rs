@@ -39,3 +39,29 @@ fn an_ask_on_a_run_with_no_questions_directory_is_refused() {
     let answer = asked(r#"{"question":"which?"}"#, &Routes::default());
     assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
 }
+
+#[test]
+fn a_push_without_a_title_and_a_body_or_on_a_run_with_no_pusher_is_refused() {
+    let request = |body: &str| {
+        let request = format!(
+            "POST /api-build/push HTTP/1.1\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let (mut client, mut server) = UnixStream::pair().expect("a pair");
+        client.write_all(request.as_bytes()).expect("sent");
+        client.shutdown(Shutdown::Write).expect("shut");
+        answered(&mut server, &Routes::default());
+        drop(server);
+        let mut answer = String::new();
+        let _ = client.read_to_string(&mut answer);
+        answer
+    };
+    for body in [
+        r#"{"title":"t"}"#,
+        r#"{"title":"t","body":"b"}"#,
+        "not json",
+    ] {
+        let answer = request(body);
+        assert!(answer.starts_with("HTTP/1.1 403"), "{body}: {answer}");
+    }
+}

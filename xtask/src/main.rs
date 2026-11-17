@@ -23,9 +23,8 @@ mod api_limits;
 mod api_mcp_inner;
 mod api_paths;
 mod api_prices;
-#[allow(dead_code, reason = "used by request_push, the next PR")]
+mod api_push;
 mod api_push_checks;
-#[allow(dead_code, reason = "used by request_push, the next PR")]
 mod api_push_fetch;
 mod api_refusals;
 mod api_request_content;
@@ -208,12 +207,14 @@ fn main() -> ExitCode {
             brief,
             budget,
             model,
+            allow,
         } => {
             let order = api_build_run::Order {
                 name: &name,
                 brief: &brief,
                 budget,
                 model: &model,
+                allow: &allow,
             };
             return api_build_run::run(&order);
         }
