@@ -88,6 +88,15 @@ main at 9547e1a4. Before is main at 9547e1a4; after is that merge
 The Class edit derives 4 used styles (the run's counts line), so the
 saving is about 2.9k instructions per restyled element, down from 4.4k
 against the older base. Both scaling runs still pass "style flat".
+Those figures cover the runtime cascade only: the edited elements are
+unkeyed (`Styles (last frame): ... unkeyed 4`).
+
+The keyed path, where elements take compiled winners and share styles,
+is measured on the Mount page's first frame (`--first-frame 10000`, 3
+runs each, files `*-first-frame-*.txt`). `App::start`'s style phase
+goes from 448,166,356 to 447,827,342 instructions (median), a saving of
+0.34 M (0.08%). A shared element takes its `Used` from `SharedUsed`
+and does not run `check_honoured` again, so the saving there is small.
 
 Where `check_honoured`'s declared-only walk sits beside compiled
 winners: both compute paths, the full cascade and `compute_compiled`,

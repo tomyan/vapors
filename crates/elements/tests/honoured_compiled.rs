@@ -86,7 +86,13 @@ fn a_deferred_property_a_compiled_winner_declares_is_refused_there_only() {
         // When
         let errors = refusals(&mut doc);
 
-        // Then: one refusal, at the spinner, for animation-name
+        // Then: the spinner's style came from its compiled winners, and
+        // one refusal, at the spinner, for animation-name
+        let counts = doc.update_counts();
+        assert_eq!(
+            counts.winners_compiled, 1,
+            "release path {release}: {counts:?}"
+        );
         let deferred: Vec<&String> = errors.iter().filter(|e| e.contains(DEFERRED)).collect();
         assert_eq!(deferred.len(), 1, "release path {release}: {errors:?}");
         assert!(

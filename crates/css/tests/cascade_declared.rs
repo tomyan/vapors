@@ -63,3 +63,15 @@ fn a_declaration_three_ancestors_up_reaches_an_inherited_property() {
         "letter-spacing"
     ));
 }
+
+#[test]
+fn a_deferred_inherited_property_declared_on_the_parent_is_declared_on_the_child() {
+    // font-feature-settings is deferred by vapors-elements and inherited:
+    // the bit its check_honoured walk visits reaches the child
+    let src = ".p { font-feature-settings: \"liga\" 0; }";
+    assert!(declared_at(
+        src,
+        &["div.p", "span.c"],
+        "font-feature-settings"
+    ));
+}

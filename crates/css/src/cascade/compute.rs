@@ -78,7 +78,8 @@ pub(crate) fn style(
         .longhands
         .iter()
         .map(|w| w.as_ref().map(|c| (c.sheet, c.position)))
-        .collect();
+        .collect::<Vec<_>>();
+    let declared = Declared::of(&positions, parent);
     Ok(ComputedStyle {
         values,
         custom,
@@ -86,7 +87,7 @@ pub(crate) fn style(
         root_font_size,
         color,
         positions,
-        declared: Declared::of(winners, parent),
+        declared,
     })
 }
 

@@ -65,3 +65,29 @@ fn a_page_with_no_deferred_declarations_updates() {
     let updated = doc.update(viewport(100.0, 100.0));
     assert!(updated.is_ok(), "{:?}", updated.err());
 }
+
+#[test]
+fn an_inherited_deferred_property_is_refused_once_naming_its_declarer() {
+    // Given: font-feature-settings, deferred and inherited, declared on
+    // the parent
+    let mut doc = document();
+    let body = doc.body();
+    let parent = element(&mut doc, body, "div", "ligatures");
+    element(&mut doc, parent, "span", "inside");
+    doc.add_stylesheet("t.css", ".ligatures { font-feature-settings: \"liga\" 0; }")
+        .expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then: the child's walk visits the inherited bit (cascade_declared.rs)
+    // and its refusal is the declarer's, so one, naming the parent
+    let deferred: Vec<&String> = errors.iter().filter(|e| e.contains(DEFERRED)).collect();
+    assert_eq!(deferred.len(), 1, "{errors:?}");
+    assert!(
+        deferred[0].contains("font-feature-settings") && deferred[0].contains("ligatures"),
+        "{}",
+        deferred[0]
+    );
+    assert!(!deferred[0].contains("inside"), "{}", deferred[0]);
+}
