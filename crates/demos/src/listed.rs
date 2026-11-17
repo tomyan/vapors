@@ -128,7 +128,7 @@ pub const DEMOS: &[Listed] = &[
     app(
         "one-scene",
         "One scene",
-        "HTML over a 3D scene styled by CSS: the blue cube hides every other 5 s, night toggles every 15 s, and you click a light to change it",
+        "HTML over a 3D scene styled by CSS: three cubes turn, night toggles every 15 s, and you click a light to change it",
     ),
     app(
         "racer",

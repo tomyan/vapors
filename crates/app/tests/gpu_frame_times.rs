@@ -73,5 +73,6 @@ fn run_frame(app: &mut ElementsApp, gpu: &Gpu, index: u64) {
         index,
         scale_factor: 1.0,
         now: Instant::now(),
+        resumed: false,
     });
 }

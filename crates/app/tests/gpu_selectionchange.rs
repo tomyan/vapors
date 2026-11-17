@@ -72,6 +72,7 @@ fn gpu_two_caret_moves_between_frames_fire_one_selectionchange() {
             index: 0,
             scale_factor: 1.0,
             now: Instant::now(),
+            resumed: false,
         });
     };
     for event in [

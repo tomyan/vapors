@@ -82,6 +82,7 @@ fn drawn(
         index,
         scale_factor: 1.0,
         now: Instant::now(),
+        resumed: false,
     };
     let next = workload.app().frame(&frame);
     wait(&gpu.device, FRAME_DEADLINE)?;

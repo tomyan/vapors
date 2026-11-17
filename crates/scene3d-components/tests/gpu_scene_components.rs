@@ -41,6 +41,7 @@ fn frame(app: &mut ElementsApp, gpu: &Gpu) -> (Next, GpuWork, Vec<u8>) {
         index: 0,
         scale_factor: 1.0,
         now: Instant::now(),
+        resumed: false,
     });
     let pixels = read_rgba8(&gpu.device, &gpu.queue, &texture);
     (next, app.frame_counts().surfaces, pixels)

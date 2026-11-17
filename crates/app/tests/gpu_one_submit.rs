@@ -62,6 +62,7 @@ fn submits_in_frame(app: &mut ElementsApp, gpu: &Gpu, now: Instant) -> (Next, u6
         index: 0,
         scale_factor: 1.0,
         now,
+        resumed: false,
     });
     (next, last_submission(gpu) - before - 1)
 }

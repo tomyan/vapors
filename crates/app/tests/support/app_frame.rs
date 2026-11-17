@@ -25,6 +25,7 @@ pub fn app_frame_at(app: &mut ElementsApp, gpu: &Gpu, now: Instant) -> (Next, Ve
         index: 0,
         scale_factor: 1.0,
         now,
+        resumed: false,
     });
     (next, read_rgba8(&gpu.device, &gpu.queue, &texture))
 }

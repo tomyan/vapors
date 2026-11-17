@@ -60,6 +60,7 @@ pub(crate) fn frame_in(
         index: 1,
         scale_factor: f64::from(window.scale),
         now,
+        resumed: false,
     });
     (next, read_rgba8(&gpu.device, &gpu.queue, &texture))
 }

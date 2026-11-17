@@ -23,6 +23,9 @@ pub struct Handler {
     window: Option<Arc<Window>>,
     gpu: Option<Gpu>,
     presented: u64,
+    /// Whether the last frame asked for no next one (`Next::Wait`,
+    /// `WaitUntil`), so the next follows a wait; true before the first.
+    waited: bool,
     /// Redraws in a row whose surface failed; see [`acquire`].
     missed: u32,
     error: Option<PlatformError>,
@@ -57,6 +60,7 @@ impl Handler {
             window: None,
             gpu: None,
             presented: 0,
+            waited: true,
             missed: 0,
             error: None,
             stopped_for_gpu: false,
@@ -161,8 +165,10 @@ impl Handler {
             index: self.presented,
             scale_factor: window.scale_factor(),
             now,
+            resumed: self.waited,
         };
         let next = self.app.frame(&frame);
+        self.waited = next != Next::Continue;
         gpu.queue.present(surface_texture);
         self.presented += 1;
         self.app.drawn(&self.platform);

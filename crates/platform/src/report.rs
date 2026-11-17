@@ -59,7 +59,7 @@ pub fn report_status(text: &str) {
 }
 
 /// A readout for a run by hand (a GPU time): stdout natively; on the web
-/// the demo bar's line ([`crate::page::READOUT_ID`]), or the status line
+/// the demo bar's readout row ([`crate::page::READOUT_ID`]), or the status line
 /// on a page without the bar, shown either way.
 pub fn report_readout(text: &str) {
     #[cfg(target_family = "wasm")]

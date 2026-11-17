@@ -92,13 +92,14 @@ impl ElementsApp {
         self.readout = Some(super::readout::GpuReadout::new(self.samples));
     }
 
-    /// Writes the readout's line, when one is due after a frame at `now`.
-    pub(super) fn read_out(&mut self, now: vapors_platform::Instant) {
+    /// Writes the readout's line, when one is due after a frame at `now`,
+    /// which `resumed` after a wait or not (`Frame::resumed`).
+    pub(super) fn read_out(&mut self, (now, resumed): (vapors_platform::Instant, bool)) {
         let gpu = self.timer.gpu();
         let Some(line) = self
             .readout
             .as_mut()
-            .and_then(|readout| readout.take(&gpu, now))
+            .and_then(|readout| readout.take(&gpu, (now, resumed)))
         else {
             return;
         };

@@ -61,6 +61,7 @@ fn gpu_the_label_strip_stays_on_top_of_a_painter_that_fills_the_viewport() {
         index: 0,
         scale_factor: 1.0,
         now: vapors_platform::Instant::now(),
+        resumed: false,
     });
 
     // Then: the strip's corner is the strip, below it the painter's fill
