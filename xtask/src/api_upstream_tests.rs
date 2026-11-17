@@ -98,12 +98,17 @@ mod forwarded {
         program.display().to_string()
     }
 
-    /// A request forwarded through `curl`, the session reading all of it
-    /// (`reads`) or closing after the first read; what it counted, and
-    /// whether the staged body was left.
+    /// A request forwarded through a stand-in printing `output`, the
+    /// session reading all of it (`reads`) or closing after the first
+    /// read; what it counted, and whether the staged body was left.
     fn counted(output: &str, (code, hold): (i32, u32), reads: bool) -> (Counted, bool) {
         let dir = tempfile::tempdir().expect("a scratch directory");
         let curl = fake_curl(dir.path(), output, (code, hold));
+        through(&curl, dir.path(), reads)
+    }
+
+    /// A request forwarded through `curl`, its body staged in `dir`.
+    fn through(curl: &str, dir: &std::path::Path, reads: bool) -> (Counted, bool) {
         let secret =
             Secret::new("sk-ant-a-key-long-enough-to-guard-0123456789".into()).expect("a key");
         let request = Request {
@@ -112,7 +117,7 @@ mod forwarded {
             headers: Vec::new(),
             body: b"{}".to_vec(),
         };
-        let staged_at = dir.path().join("1.json");
+        let staged_at = dir.join("1.json");
         let (mut session, mut ours) = UnixStream::pair().expect("a pair");
         let reader = std::thread::spawn(move || {
             if reads {
@@ -125,10 +130,39 @@ mod forwarded {
         });
         let staged = Staged::new(staged_at.clone(), &request.body).expect("staged");
         let forwarded =
-            forward_by(&curl, &request, (&secret, &staged), &mut ours).expect("forwarded");
+            forward_by(curl, &request, (&secret, &staged), &mut ours).expect("forwarded");
         drop((staged, ours));
         reader.join().expect("the reader");
         (forwarded.counted, staged_at.exists())
+    }
+
+    #[test]
+    fn curl_runs_with_only_the_path_in_its_environment() {
+        // Given: a stand-in that records its environment; this test's own
+        // environment holds HOME and more
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let curl = dir.path().join("curl");
+        let recorded = dir.path().join("env");
+        let script = format!(
+            "#!/bin/sh\nenv > {}\ncat > /dev/null\nprintf 'HTTP/1.1 200 OK\\r\\n\\r\\n'\n",
+            recorded.display()
+        );
+        std::fs::write(&curl, script).expect("written");
+        std::fs::set_permissions(&curl, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .expect("mode");
+
+        // When
+        let _ = through(&curl.display().to_string(), dir.path(), true);
+
+        // Then: PATH, and what sh sets itself, nothing else
+        let env = std::fs::read_to_string(recorded).expect("recorded");
+        let names: Vec<&str> = env
+            .lines()
+            .filter_map(|line| line.split('=').next())
+            .collect();
+        let theirs = ["PATH", "PWD", "SHLVL", "_", "OLDPWD"];
+        assert!(names.iter().all(|name| theirs.contains(name)), "{env}");
+        assert!(env.contains("PATH=/usr/bin:/bin\n"), "{env}");
     }
 
     #[test]

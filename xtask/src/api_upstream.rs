@@ -25,6 +25,9 @@ pub const API: &str = "https://api.anthropic.com";
 /// and the proxy's only ends a request the client has stopped waiting for.
 pub const REQUEST_DEADLINE: Duration = Duration::from_hours(1);
 
+/// The only variable curl's environment holds: where to find curl.
+const CURL_PATH: &str = "/usr/bin:/bin";
+
 /// Request headers not forwarded: the key the session holds is a dummy,
 /// and the rest belong to the hop, not the request.
 const DROPPED: [&str; 8] = [
@@ -128,6 +131,10 @@ fn started(
     (secret, staged): (&Secret, &Path),
 ) -> Result<Child, String> {
     let mut command = Command::new(program);
+    // curl's environment is cleared (review of #476-#478, N5): no
+    // SSLKEYLOGFILE to write the TLS secrets out, no proxy variable, no
+    // CA bundle in place of the system's
+    command.env_clear().env("PATH", CURL_PATH);
     command.args(arguments(&request.method, &request.target, staged));
     let mut child = command
         .stdin(Stdio::piped())
