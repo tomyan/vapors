@@ -141,14 +141,18 @@ fn state_once_killed(pid: &str) -> Option<char> {
     }
 }
 
-/// `pid`'s state from /proc/<pid>/stat: none when the process is gone or
-/// a zombie. Any other read error or a line of another shape panics,
-/// naming the pid and what was read, rather than counting as ended.
+/// `pid`'s state from /proc/<pid>/stat: none when the process is gone (the
+/// file not found, or ESRCH: reaped between the open and the read, which
+/// failed this test in a ci run on 2026-11-17) or a zombie. Any other read
+/// error or a line of another shape panics, naming the pid and what was
+/// read, rather than counting as ended.
 fn running_state(pid: &str) -> Option<char> {
+    const ESRCH: i32 = 3;
     let path = format!("/proc/{pid}/stat");
     let stat = match std::fs::read_to_string(&path) {
         Ok(stat) => stat,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) if e.raw_os_error() == Some(ESRCH) => return None,
         Err(e) => panic!("{path}: {e}"),
     };
     let state = stat
