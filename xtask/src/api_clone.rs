@@ -15,6 +15,11 @@ use std::path::{Path, PathBuf};
 use crate::api_paths::Builder;
 use crate::queue_git::git;
 
+/// The main repository's fetch of `origin` before a clone (verify of
+/// slice 4, V3): a fetch from GitHub takes seconds from this host; 120 s,
+/// as `request_push`'s push, is room for a slow network.
+const ORIGIN_FETCH_DEADLINE: std::time::Duration = std::time::Duration::from_secs(120);
+
 /// The one ref of the main repository's a clone holds.
 pub const ORIGIN_MAIN: &str = "refs/remotes/origin/main";
 
@@ -60,7 +65,7 @@ pub fn make(
             builder.root().display()
         ));
     }
-    git(main, &["fetch", "--quiet", "origin"])?;
+    crate::api_timed::git_within(main, &["fetch", "--quiet", "origin"], ORIGIN_FETCH_DEADLINE)?;
     let made = cloned(builder, (main, objects), branch).and_then(|()| directories(builder));
     if made.is_err() {
         for left in [builder.root(), builder.target()] {

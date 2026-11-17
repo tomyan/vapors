@@ -55,10 +55,13 @@ pub fn fetched(
         .map_err(|e| format!("writing {}: {e}", alternates.display()))?;
     let refspec = format!("+refs/heads/{branch}:refs/heads/{branch}");
     let clone = text(&builder.clone_dir());
+    let upload_pack = upload_pack(&builder.clone_dir(), objects)?;
     let fetch = [
         "-c",
         "transfer.fsckObjects=true",
         "fetch",
+        "--upload-pack",
+        &upload_pack,
         "--quiet",
         "--no-tags",
         "--no-recurse-submodules",
@@ -71,10 +74,67 @@ pub fn fetched(
     Ok(bare)
 }
 
-/// Refuses a clone whose repository the session has re-pointed: the host's
-/// upload-pack follows `.git` as a gitfile, symlinked object directories
-/// and alternates, any of which could reach another repository's objects
-/// on the host (review of slice 4, M1). Checked without following links.
+/// The upload-pack the fetch runs: inside bwrap, seeing only the clone
+/// and the main repository's objects, read-only, with no network and
+/// nothing else of the host (verify of slice 4, V1). A link the session
+/// planted anywhere in the clone's `.git` (a fan-out directory, a pack, a
+/// gitfile, alternates), even one swapped in after `clone_as_made`, names
+/// nothing inside, so no other repository's objects can be read. The
+/// clone's directory is bound, not its `.git`, as the session cannot
+/// replace the directory itself; git runs it through `sh -c`, so each
+/// word is quoted.
+///
+/// # Errors
+///
+/// A path holding a `'`, which the quoting cannot carry.
+fn upload_pack(clone: &Path, objects: &Path) -> Result<String, String> {
+    let mut words: Vec<String> = [
+        "bwrap",
+        "--unshare-all",
+        "--die-with-parent",
+        "--new-session",
+        "--clearenv",
+        "--setenv",
+        "PATH",
+        "/usr/bin:/bin",
+        "--ro-bind",
+        "/usr",
+        "/usr",
+        "--symlink",
+        "usr/bin",
+        "/bin",
+        "--symlink",
+        "usr/lib",
+        "/lib",
+        "--symlink",
+        "usr/lib64",
+        "/lib64",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    for bound in [clone, objects] {
+        words.extend(["--ro-bind".to_owned(), text(bound), text(bound)]);
+    }
+    words.push("git-upload-pack".to_owned());
+    if let Some(word) = words.iter().find(|word| word.contains('\'')) {
+        return Err(format!(
+            "{word:?} holds a quote: request_push cannot fetch from it"
+        ));
+    }
+    Ok(words
+        .iter()
+        .map(|word| format!("'{word}'"))
+        .collect::<Vec<_>>()
+        .join(" "))
+}
+
+/// Refuses a clone whose repository the session has re-pointed (review of
+/// slice 4, M1), checked without following links: a first check, before
+/// the sandboxed upload-pack (`upload_pack`), which is the guard.
 fn clone_as_made(clone: &Path, objects: &Path) -> Result<(), String> {
     let git_dir = clone.join(".git");
     for (path, what) in [
@@ -91,8 +151,7 @@ fn clone_as_made(clone: &Path, objects: &Path) -> Result<(), String> {
         }
     }
     let alternates = git_dir.join("objects/info/alternates");
-    let found = std::fs::read_to_string(&alternates)
-        .map_err(|e| format!("reading {}: {e}", alternates.display()))?;
+    let found = alternates_of(&alternates)?;
     if found != format!("{}\n", objects.display()) {
         return Err(format!(
             "{} names {found:?}, not the main repository's objects: nothing is fetched",
@@ -101,6 +160,28 @@ fn clone_as_made(clone: &Path, objects: &Path) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// The alternates file read without following a link, and at most
+/// [`ALTERNATES_BYTES`]: a FIFO, `/dev/zero` or a link to either is
+/// refused, not read (verify of slice 4, V3).
+fn alternates_of(path: &Path) -> Result<String, String> {
+    let meta =
+        std::fs::symlink_metadata(path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+    if !meta.file_type().is_file() || meta.len() > ALTERNATES_BYTES {
+        return Err(format!(
+            "{} is not a file of at most {ALTERNATES_BYTES} bytes: nothing is fetched",
+            path.display()
+        ));
+    }
+    let mut found = String::new();
+    let file = std::fs::File::open(path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+    std::io::Read::read_to_string(&mut std::io::Read::take(file, ALTERNATES_BYTES), &mut found)
+        .map_err(|e| format!("reading {}: {e}", path.display()))?;
+    Ok(found)
+}
+
+/// The most of an alternates file read: `api_clone` writes one path.
+const ALTERNATES_BYTES: u64 = 4096;
 
 /// git in `dir` (never the clone), hooks off, `file://` allowed for the
 /// clone, its environment cleared to [`GIT_ENV`], within

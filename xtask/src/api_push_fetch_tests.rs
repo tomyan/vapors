@@ -13,6 +13,9 @@ fn marking(dir: &Path, name: &str, marker: &Path) -> String {
     script.display().to_string()
 }
 
+// The fetches below run upload-pack in bwrap (`upload_pack`), which
+// only the host can start: they are host_ tests (`steps_tiers.rs`).
+
 /// A home with a builder `b`, the main repository's objects, and the
 /// builder's clone as `api_clone` makes it: one commit on `api/b`,
 /// alternates naming the main objects.
@@ -85,7 +88,7 @@ fn hostile(fixture: &Fixture, marker: &Path) {
 }
 
 #[test]
-fn the_branch_is_fetched_into_a_bare_repository_and_nothing_of_the_clones_runs() {
+fn host_the_branch_is_fetched_into_a_bare_repository_and_nothing_of_the_clones_runs() {
     // Given
     let fixture = fixture();
     let marker = fixture.home.path().join("ran");
@@ -104,7 +107,7 @@ fn the_branch_is_fetched_into_a_bare_repository_and_nothing_of_the_clones_runs()
 }
 
 #[test]
-fn a_branch_not_in_the_clone_says_to_commit_on_it() {
+fn host_a_branch_not_in_the_clone_says_to_commit_on_it() {
     let fixture = fixture();
     let refused =
         fetched(&fixture.builder, &fixture.objects, ("api/other", 1)).expect_err("refused");
@@ -115,7 +118,7 @@ fn a_branch_not_in_the_clone_says_to_commit_on_it() {
 }
 
 #[test]
-fn each_push_fetches_into_a_repository_of_its_own() {
+fn host_each_push_fetches_into_a_repository_of_its_own() {
     let fixture = fixture();
     let first = fetched(&fixture.builder, &fixture.objects, ("api/b", 1)).expect("fetched");
     let again = fetched(&fixture.builder, &fixture.objects, ("api/b", 1)).expect_err("refused");
@@ -172,7 +175,7 @@ fn a_clone_repointed_at_other_objects_is_refused_before_anything_is_fetched() {
 }
 
 #[test]
-fn a_tree_git_would_refuse_to_check_out_is_refused_at_the_fetch() {
+fn host_a_tree_git_would_refuse_to_check_out_is_refused_at_the_fetch() {
     // Given: a commit whose tree has an entry named `..`
     let fixture = fixture();
     let clone = fixture.builder.clone_dir();
@@ -207,4 +210,69 @@ fn a_tree_git_would_refuse_to_check_out_is_refused_at_the_fetch() {
 
     // Then
     assert!(refused.contains("fetching branch api/b"), "{refused}");
+}
+
+#[test]
+fn host_an_object_directory_linked_to_another_repository_hands_over_nothing() {
+    // Given: the clone's fan-out directory for a blob that only another
+    // repository on the host holds, linked there, and a commit that
+    // adds and a commit that removes a file naming that blob (the
+    // verify's probe 1)
+    let fixture = fixture();
+    let other = fixture.home.path().join("private");
+    std::fs::create_dir_all(&other).expect("made");
+    git(&other, &["init", "--quiet"]).expect("init");
+    std::fs::write(other.join("secret.txt"), "private\n").expect("written");
+    let blob = git(&other, &["hash-object", "-w", "secret.txt"]).expect("a blob");
+    let clone = fixture.builder.clone_dir();
+    let fan_out = |root: &Path| root.join(".git/objects").join(&blob[..2]);
+    let _ = std::fs::remove_dir_all(fan_out(&clone));
+    std::os::unix::fs::symlink(fan_out(&other), fan_out(&clone)).expect("linked");
+    let entry = format!("100644,{blob},crates/secret.txt");
+    git(&clone, &["update-index", "--add", "--cacheinfo", &entry]).expect("staged");
+    commit(&clone, &["commit", "--quiet", "-m", "add"]);
+    git(&clone, &["rm", "--quiet", "--cached", "crates/secret.txt"]).expect("unstaged");
+    commit(&clone, &["commit", "--quiet", "-m", "remove"]);
+
+    // When
+    let fetched = fetched(&fixture.builder, &fixture.objects, ("api/b", 1));
+
+    // Then: refused, and the blob is nowhere in the push repository
+    assert!(fetched.is_err(), "{fetched:?}");
+    let bare = fixture.builder.root().join("push-1.git");
+    assert!(
+        git(&bare, &["cat-file", "-e", &blob]).is_err(),
+        "the other repository's blob was handed over"
+    );
+}
+
+#[test]
+fn an_alternates_file_that_is_a_fifo_or_a_link_is_refused_unread() {
+    for swap in ["fifo", "link"] {
+        // Given
+        let fixture = fixture();
+        let alternates = fixture
+            .builder
+            .clone_dir()
+            .join(".git/objects/info/alternates");
+        std::fs::remove_file(&alternates).expect("removed");
+        if swap == "fifo" {
+            let made = std::process::Command::new("mkfifo")
+                .arg(&alternates)
+                .status()
+                .expect("mkfifo");
+            assert!(made.success());
+        } else {
+            std::os::unix::fs::symlink("/dev/zero", &alternates).expect("linked");
+        }
+
+        // When
+        let refused = fetched(&fixture.builder, &fixture.objects, ("api/b", 1)).expect_err(swap);
+
+        // Then
+        assert!(
+            refused.contains("is not a file of at most 4096 bytes"),
+            "{swap}: {refused}"
+        );
+    }
 }
