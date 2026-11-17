@@ -10,6 +10,7 @@ mod image;
 mod scissor;
 mod shape;
 mod transform;
+mod transform_class;
 
 pub use batch::{Batch, Batched, ROWS_PER_BATCH, Run, batched, culled};
 pub use color::Color;
@@ -18,3 +19,4 @@ pub use image::RgbaImage;
 pub use scissor::Scissor;
 pub use shape::{RuntimeRef, Shape, ShapeKind, ShapeRef};
 pub use transform::{Size, Transform};
+pub use transform_class::TransformClass;

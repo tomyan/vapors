@@ -29,3 +29,22 @@ fn a_shifted_shape_moves_its_translation_and_bounds() {
     );
     assert_eq!(moved, Item::Shape(expected));
 }
+
+#[test]
+#[cfg(debug_assertions)]
+fn the_repaint_check_skips_an_infinite_edge_and_refuses_a_nan_one() {
+    // Given
+    let quad = |right: f32| {
+        Item::Quad(vapors_scene::Quad::fill(
+            Rect::new(1.0, 2.0, right, 4.0),
+            Color::default(),
+        ))
+    };
+
+    // When
+    let answers =
+        [f32::INFINITY, f32::NAN, 3.5, 3.0].map(|right| super::whole_where_finite(&quad(right)));
+
+    // Then
+    assert_eq!(answers, [true, false, false, true]);
+}

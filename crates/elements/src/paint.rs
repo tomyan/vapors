@@ -4,7 +4,7 @@
 //! Chromium snaps it.
 
 use vapors_dom::NodeId;
-use vapors_scene::{Rect, Scene};
+use vapors_scene::{Rect, Scene, TransformClass};
 use vapors_text::FontSystem;
 
 use crate::layout::{BoxRect, LayoutBox};
@@ -42,6 +42,10 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) placement: &'a crate::placement::Placement,
     /// The lanes, which lane frames read their shifts from.
     pub(crate) lanes: &'a crate::layout::SharedLanes,
+    /// The class of the frame the box being painted is in, which decides
+    /// whether its edges are snapped (`input.snapped`); set by `Repaint`
+    /// before each box (`frames.rs` `FrameAt::class`).
+    pub(crate) class: Option<TransformClass>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -73,6 +77,29 @@ impl<'a> PaintInput<'a> {
             shapes,
             placement: &from.placement,
             lanes,
+            class: None,
+        }
+    }
+
+    /// `rect` in device pixels as the frame of the box being painted
+    /// places it: snapped under a whole translation (`snapped`).
+    ///
+    /// # Panics
+    /// No box's frame is set, or the frame is not a whole translation:
+    /// boxes under other transforms are painted unsnapped from
+    /// flat-scene F4a.
+    pub(crate) fn snapped(&self, rect: BoxRect) -> Rect {
+        match self.class {
+            Some(TransformClass::WholeTranslate) => snapped(rect, self.scale),
+            Some(class) => panic!(
+                "a box in a frame of class {class:?} is painted: only boxes under a whole \
+                 translation are painted before flat-scene F4a (docs/plans/flat-scene.md \
+                 section 8); reproduce with `cargo xtask test`"
+            ),
+            None => panic!(
+                "a box's edges are placed with no frame class set: `Repaint` sets it before \
+                 each box (repaint.rs); reproduce with `cargo xtask test`"
+            ),
         }
     }
 }

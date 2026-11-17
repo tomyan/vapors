@@ -137,6 +137,8 @@ mod range_drag;
 mod range_input;
 mod range_paint;
 mod repaint;
+#[cfg(debug_assertions)]
+mod repaint_check;
 mod restyle;
 mod restyle_check;
 mod restyle_children;

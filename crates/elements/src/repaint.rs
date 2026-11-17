@@ -40,6 +40,14 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
+            #[cfg(debug_assertions)]
+            crate::repaint_check::assert_painted_whole(
+                &kept,
+                input.snapped(self.rects[slot]),
+                slot,
+                input,
+            );
+            input.class = None;
             kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
             painted.items_built += kept.items();
@@ -57,6 +65,7 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) -> KeptBox {
         self.scratch.slabs = take(&mut painted.slabs);
+        input.class = Some(painted.frames.class_of(from.frame));
         let clip = self.order.clips.own(slot);
         clip_to(clip, input, &mut self.scratch.scene);
         paint_box(self.boxes, self.rects, slot, input, &mut self.scratch);
@@ -77,10 +86,15 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) {
         for &slot in slots {
+            let frame = kept_mut(painted, slot).from.frame;
+            input.class = Some(painted.frames.class_of(frame));
             clip_to(self.order.clips.own(slot), input, &mut self.scratch.scene);
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
+            #[cfg(debug_assertions)]
+            crate::repaint_check::assert_snapped_whole(thumb.items().iter(), slot, input);
+            input.class = None;
             painted.items_built += thumb.items().len();
             kept_mut(painted, slot).set_thumb(thumb);
         }

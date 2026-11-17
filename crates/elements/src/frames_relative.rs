@@ -40,21 +40,22 @@ impl Frames {
     /// composed from its outer frame, memoised until the next update.
     pub(super) fn relative_at(&self, frame: usize) -> Option<FrameAt> {
         let part = *self.relative.get(&frame)?;
-        Some(self.memoised(frame, || self.composed(part, self.at(part.outer))))
+        Some(self.memoised(frame, || self.composed(frame, part, self.at(part.outer))))
     }
 
     /// Scroll frame `frame` composed from its outer frame worked out
     /// afresh, reading and filling no memo, for the debug checks.
     pub(super) fn relative_afresh(&self, frame: usize) -> Option<FrameAt> {
         let part = *self.relative.get(&frame)?;
-        Some(self.composed(part, self.resolved_afresh(part.outer)))
+        Some(self.composed(frame, part, self.resolved_afresh(part.outer)))
     }
 
-    /// A frame of own part `part` in a frame at `outer`, on the page.
-    fn composed(&self, part: Relative, outer: FrameAt) -> FrameAt {
+    /// Frame `frame`, of own part `part` in a frame at `outer`, on the
+    /// page.
+    fn composed(&self, frame: usize, part: Relative, outer: FrameAt) -> FrameAt {
         let shift = [outer.shift[0] + part.own[0], outer.shift[1] + part.own[1]];
         let inner = part.inner.map(|clip| self.css_rect(outer, clip));
-        self.frame_at(shift, meet(inner, outer.clip))
+        self.frame_at((frame, outer.class), shift, meet(inner, outer.clip))
     }
 }
 

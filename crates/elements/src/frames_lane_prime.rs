@@ -45,18 +45,25 @@ impl Frames {
             shift: outer.shift,
             clip,
             device_clip: clip.map(|clip| snapped(clip, self.scale)),
+            class: outer.class,
         }
     }
 
-    /// The frame of a child `offset` down the lane at `base`, from the
-    /// lane's `template`.
+    /// The frame of the child in `slot`, `offset` down the lane at
+    /// `base`, from the lane's `template`.
     #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
-    pub(super) fn lane_child_at(&self, template: FrameAt, base: LaneBase, offset: f64) -> FrameAt {
+    pub(super) fn lane_child_at(
+        &self,
+        template: FrameAt,
+        base: LaneBase,
+        (slot, offset): (usize, f64),
+    ) -> FrameAt {
         let down = (f64::from(base.origin) + offset) * f64::from(self.scale);
-        FrameAt {
-            shift: [template.shift[0], template.shift[1] + down as f32],
-            ..template
-        }
+        let shift = [template.shift[0], template.shift[1] + down as f32];
+        #[cfg(debug_assertions)]
+        super::super::assert_whole_shift(slot, template.class, shift);
+        let _ = slot;
+        FrameAt { shift, ..template }
     }
 
     /// Resolves the frames of this update's started children, one pass
@@ -107,7 +114,10 @@ impl Frames {
                 if table.len() <= slot {
                     table.resize(slot + 1, NOT_PRIMED);
                 }
-                table[slot] = (index, self.lane_child_at(template, base, offset).shift);
+                table[slot] = (
+                    index,
+                    self.lane_child_at(template, base, (slot, offset)).shift,
+                );
             });
     }
 
@@ -145,7 +155,7 @@ impl Frames {
             .as_ref()
             .expect("lane bases come with their lanes");
         let folded = shared.borrow().frame_offset(container, slot);
-        let folded = folded.map(|offset| self.lane_frame_at(base, offset, outer));
+        let folded = folded.map(|offset| self.lane_frame_at(base, (slot, offset), outer));
         assert_eq!(
             Some(primed),
             folded,

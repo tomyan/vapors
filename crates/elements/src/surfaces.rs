@@ -27,10 +27,7 @@ pub(crate) fn paint(
     let (Some(name), &Content::Element(node)) = (&layout_box.surface, &layout_box.content) else {
         return;
     };
-    let rect = crate::paint::snapped(
-        crate::clip::content_box(layout_box, border_box),
-        input.scale,
-    );
+    let rect = input.snapped(crate::clip::content_box(layout_box, border_box));
     if input.used[&node].visible && rect.width() > 0.0 && rect.height() > 0.0 {
         push(out, name, rect);
     }

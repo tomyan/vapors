@@ -8,7 +8,7 @@
 use vapors_scene::{Color, Item, Quad, Rect};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 use crate::style::outline::Outline;
 
@@ -28,7 +28,7 @@ pub(crate) fn paint_outline(
         return;
     };
     if let Some(ring) = ring_quad(
-        snapped(rect, input.scale),
+        input.snapped(rect),
         &outline,
         used.decoration.radii,
         input.scale,

@@ -6,7 +6,7 @@
 use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
-use crate::paint::{PaintInput, snapped};
+use crate::paint::PaintInput;
 use crate::painting::Painting;
 
 /// The mark's inset from each edge, as a fraction of the content box's
@@ -39,7 +39,7 @@ pub(crate) fn paint(
     if mark.width <= 0.0 || mark.height <= 0.0 || used.parts.mark_color.a <= 0.0 {
         return;
     }
-    let mut quad = Quad::fill(snapped(mark, input.scale), used.parts.mark_color);
+    let mut quad = Quad::fill(input.snapped(mark), used.parts.mark_color);
     quad.radii = [input.scale; 4];
     out.scene.push(Item::Quad(quad));
 }

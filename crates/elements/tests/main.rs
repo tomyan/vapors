@@ -159,6 +159,7 @@ mod order_splice_declined;
 mod order_splice_long;
 mod order_splice_moved;
 mod outline;
+mod outline_scale;
 mod paint;
 mod paint_labels;
 mod pointer_capture;

@@ -104,6 +104,13 @@ impl Frames {
         changed
     }
 
+    /// The frame the content of the lane holding the child in `frame` is
+    /// in, when `frame` is a framed lane child; no fold.
+    pub(super) fn lane_parent(&self, frame: usize) -> Option<usize> {
+        let container = self.lanes.shared.as_ref()?.borrow().container_of(frame)?;
+        Some(self.lanes.bases.get(&container)?.parent)
+    }
+
     /// How many lane frames a fold of their lane worked out since the
     /// lanes were set: those read and neither primed nor read before.
     #[cfg(test)]
@@ -155,14 +162,19 @@ impl Frames {
     /// is in read through `outer`.
     fn lane_resolved(&self, frame: usize, outer: &dyn Fn(usize) -> FrameAt) -> Option<FrameAt> {
         let (base, offset) = self.lane_place(frame)?;
-        Some(self.lane_frame_at(base, offset, outer(base.parent)))
+        Some(self.lane_frame_at(base, (frame, offset), outer(base.parent)))
     }
 
-    /// The frame of a child `offset` down a lane at `base`, its
-    /// container's content in the frame at `outer`.
+    /// The frame of a child, by its slot and its offset down a lane at
+    /// `base`, its container's content in the frame at `outer`.
     #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
-    pub(super) fn lane_frame_at(&self, base: LaneBase, offset: f64, outer: FrameAt) -> FrameAt {
-        self.lane_child_at(self.lane_template(base, outer), base, offset)
+    pub(super) fn lane_frame_at(
+        &self,
+        base: LaneBase,
+        child: (usize, f64),
+        outer: FrameAt,
+    ) -> FrameAt {
+        self.lane_child_at(self.lane_template(base, outer), base, child)
     }
 
     /// The base of the framed lane `frame` is a child of and the
