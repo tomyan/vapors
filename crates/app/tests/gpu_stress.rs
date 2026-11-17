@@ -28,6 +28,7 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: 640,
             height: 400,

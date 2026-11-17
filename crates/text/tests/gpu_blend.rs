@@ -54,6 +54,7 @@ fn render(text: &str, ink: Color, background: Color, params: BlendParams) -> Vec
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: WIDTH,
             height: HEIGHT,

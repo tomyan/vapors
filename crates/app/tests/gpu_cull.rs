@@ -53,6 +53,7 @@ fn drawn(css: &str, text: &str) -> (Vec<u8>, FrameCounts) {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: size,
         scissor: None,
     };

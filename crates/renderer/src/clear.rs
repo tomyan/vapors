@@ -52,7 +52,7 @@ pub fn clear_view(
 pub fn clear_target(target: &Target<'_>, color: Color) {
     target
         .encoder
-        .clear(target.queue, target.view, to_wgpu(color));
+        .clear(target.queue, target.views(), to_wgpu(color));
 }
 
 fn clear_pass(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, color: Color) {

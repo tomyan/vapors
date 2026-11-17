@@ -45,6 +45,7 @@ fn render(icon: &Icon, colour: Color) -> Vec<u8> {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

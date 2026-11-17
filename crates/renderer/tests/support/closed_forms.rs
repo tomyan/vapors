@@ -70,6 +70,7 @@ pub fn coverage_on(side: u32, shapes: &[ClosedFormShape]) -> Vec<f32> {
         queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport,
         scissor: None,
     };

@@ -95,7 +95,7 @@ const fn attribute(
 pub(crate) fn render_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
-    format: wgpu::TextureFormat,
+    pass: crate::PassFormat,
 ) -> wgpu::RenderPipeline {
     let shader = crate::pipelines::shader_module(
         device,
@@ -133,14 +133,14 @@ pub(crate) fn render_pipeline(
                 entry_point: Some("fs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format,
+                    format: pass.format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
+            multisample: pass.samples.state(),
             multiview_mask: None,
             cache: None,
         },

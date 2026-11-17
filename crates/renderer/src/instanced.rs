@@ -19,6 +19,8 @@ const VERTICES_PER_QUAD: u32 = 6;
 pub(crate) struct Instanced {
     label: &'static str,
     pipeline: wgpu::RenderPipeline,
+    /// The samples it was made for.
+    samples: crate::Samples,
     binding: TableBinding,
     instances: FrameArena,
     kept: Retained,
@@ -32,7 +34,7 @@ pub(crate) type Table<'a> = (&'a mut TransformTable, u32);
 impl Instanced {
     pub(crate) fn new(
         device: &wgpu::Device,
-        format: wgpu::TextureFormat,
+        pass: crate::PassFormat,
         label: &'static str,
         source: &str,
         vec4s: u32,
@@ -54,7 +56,8 @@ impl Instanced {
         };
         Self {
             label,
-            pipeline: render_pipeline(device, binding.layout(), &shader, format, instance),
+            pipeline: render_pipeline(device, binding.layout(), &shader, pass, instance),
+            samples: pass.samples,
             binding,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             kept: Retained::new(device, label, wgpu::BufferUsages::VERTEX),
@@ -168,7 +171,7 @@ impl Instanced {
             Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
         };
         let group = self.binding.group(target, table, &self.work);
-        target.draw_pass(|pass| {
+        target.draw_pass((self.label, self.samples), |pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, group, &[viewport]);
             pass.set_vertex_buffer(0, instances);

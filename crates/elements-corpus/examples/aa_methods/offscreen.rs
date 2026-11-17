@@ -31,6 +31,7 @@ pub fn drawn_on(
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport,
         scissor: None,
     });

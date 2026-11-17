@@ -20,12 +20,13 @@ impl ClosedFormPipeline {
     /// then the row's index and the frame's entry (`instanced.rs`).
     pub const INSTANCE_BYTES: usize = instance_bytes(Self::VEC4S);
 
-    /// Build the pipeline for targets of `format`.
+    /// Build the pipeline for passes of `pass` (a format alone is one
+    /// sample).
     #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
         Self(Instanced::new(
             device,
-            format,
+            pass.into(),
             "closed forms",
             concat!(
                 include_str!("transform_table.wgsl"),

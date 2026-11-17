@@ -48,6 +48,7 @@ pub fn coverage(meshes: &[Drawn]) -> Vec<f32> {
         queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport,
         scissor: None,
     };
