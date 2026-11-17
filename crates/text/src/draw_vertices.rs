@@ -2,6 +2,8 @@
 //! its row's index and its frame's entry, padded as the kept buffer takes
 //! them.
 
+use vapors_renderer::ClipRuns;
+
 use crate::pipeline::{FLOATS_PER_VERTEX, VERTEX_SIZE};
 
 /// Little-endian bytes of vertex floats, each vertex in row 0 of frame
@@ -10,21 +12,24 @@ use crate::pipeline::{FLOATS_PER_VERTEX, VERTEX_SIZE};
 /// (`vapors-renderer`'s retained.rs); the padding, under one vertex, is
 /// never drawn (`vertex_count` rounds down).
 pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
-    rowed_vertex_bytes(floats, (&[floats.len() / FLOATS_PER_VERTEX], 0, &[]))
+    rowed_vertex_bytes(floats, (&[floats.len() / FLOATS_PER_VERTEX], (0, &[]), &[]))
 }
 
 /// As [`vertex_bytes`], every vertex in the transform table's entry
 /// `frame`, draw `i`'s `vertices[i]` vertices in row `rows[i]` of the
-/// batch's range, or every vertex in row 0 for an empty `rows`.
+/// batch's range (every vertex in row 0 for an empty `rows`) and under
+/// its clip's entry from `clips` (`vapors_renderer::clip_of`; none for
+/// an empty `clips`).
 ///
 /// # Panics
 ///
 /// When the floats are not whole vertices, the draws' vertices are not
-/// the floats', or `rows` is neither empty nor one row a draw inside the
-/// table (`vapors_renderer::assert_rows`).
+/// the floats', `rows` is neither empty nor one row a draw inside the
+/// table (`vapors_renderer::assert_rows`), or `clips` is not runs from
+/// draw 0 rising inside the draws (`vapors_renderer::assert_clip_runs`).
 pub(crate) fn rowed_vertex_bytes(
     floats: &[f32],
-    (vertices, frame, rows): (&[usize], u32, &[u32]),
+    (vertices, (frame, clips), rows): (&[usize], (u32, ClipRuns<'_>), &[u32]),
 ) -> Vec<u8> {
     assert!(
         floats.len().is_multiple_of(FLOATS_PER_VERTEX),
@@ -41,14 +46,17 @@ pub(crate) fn rowed_vertex_bytes(
          test`"
     );
     vapors_renderer::assert_rows("text", vertices.len(), rows);
+    vapors_renderer::assert_clip_runs("text", vertices.len(), clips);
     let mut chunks = floats.chunks(FLOATS_PER_VERTEX);
     let mut bytes = Vec::new();
     for (at, &count) in vertices.iter().enumerate() {
         let row = rows.get(at).copied().unwrap_or(0);
+        let clip = vapors_renderer::clip_of(clips, at);
         for vertex in chunks.by_ref().take(count) {
             bytes.extend(vertex.iter().flat_map(|f| f.to_le_bytes()));
             bytes.extend(row.to_le_bytes());
             bytes.extend(frame.to_le_bytes());
+            bytes.extend(clip.to_le_bytes());
         }
     }
     bytes.resize(bytes.len().next_multiple_of(16), 0);

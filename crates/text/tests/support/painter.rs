@@ -35,6 +35,8 @@ pub struct Painter {
     pub pipeline: TextPipeline,
     /// The transform table the pipeline's kept draws bind.
     pub table: TransformTable,
+    /// The clip table they bind.
+    pub clips: vapors_renderer::ClipTable,
 }
 
 /// What one draw produced: the target's pixels and the atlas bytes uploaded.
@@ -53,12 +55,14 @@ impl Painter {
         let atlas = GlyphAtlas::new(config);
         let pipeline = TextPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm, &atlas);
         let table = TransformTable::new(&gpu.device, "test transforms");
+        let clips = vapors_renderer::ClipTable::new(&gpu.device, "test clips");
         Self {
             gpu,
             system: FontSystem::bundle_only(),
             atlas,
             pipeline,
             table,
+            clips,
         }
     }
 
@@ -122,7 +126,7 @@ impl Painter {
             &mut TextPipeline,
             &mut GlyphAtlas,
             &RenderTarget<'_>,
-            &mut TransformTable,
+            (&mut TransformTable, &mut vapors_renderer::ClipTable),
         ) -> Result<(), AtlasError>,
     ) -> Drawn {
         let gpu = &self.gpu;
@@ -135,7 +139,7 @@ impl Painter {
             &mut self.pipeline,
             &mut self.atlas,
             &target,
-            &mut self.table,
+            (&mut self.table, &mut self.clips),
         )
         .expect("draws");
         encoder.submit(&gpu.queue).expect("no draw refused");

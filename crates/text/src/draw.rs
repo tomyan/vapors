@@ -4,7 +4,7 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed, TransformTable};
+use vapors_renderer::{ClipTable, KeptRange, Placed, TransformTable};
 use vapors_scene::Size;
 
 use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline};
@@ -114,17 +114,19 @@ impl TextPipeline {
             return;
         };
         self.identity.prepare_counted(target.queue, &self.work);
+        self.no_clips.prepare_counted(target.queue, &self.work);
         self.record_draw(target, Vertices::Placed(&vertices), (None, params));
     }
 
     /// Records a draw of the vertices `from` holds with the params slot
-    /// at `params`, through the kept bind group over `table` (the
-    /// pipeline's identity table for `None`).
+    /// at `params`, through the kept bind group over `tables`, the
+    /// transform and clip tables (the pipeline's identity table and its
+    /// table of no clips for `None`).
     pub(crate) fn record_draw(
         &mut self,
         target: &RenderTarget<'_>,
         from: Vertices<'_>,
-        (table, params): (Option<&TransformTable>, u32),
+        (tables, params): (Option<(&TransformTable, &ClipTable)>, u32),
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let Self {
@@ -136,6 +138,7 @@ impl TextPipeline {
             work,
             kept,
             identity,
+            no_clips,
             samples,
             ..
         } = self;
@@ -146,11 +149,18 @@ impl TextPipeline {
                 (kept.slice(target.encoder, range), count)
             }
         };
-        let own = table.is_none();
-        let table = table.unwrap_or(identity);
-        let generation = (slots.generation(), table.generation());
+        let own = tables.is_none();
+        let (table, clips) = tables.unwrap_or((identity, no_clips));
+        let generation = [slots.generation(), table.generation(), clips.generation()];
         let bind_group = atlas_texture.bind_group((own, generation), |view| {
-            pipeline::bind_group(target.device, work, layout, view, sampler, (slots, table))
+            pipeline::bind_group(
+                target.device,
+                work,
+                layout,
+                view,
+                sampler,
+                (slots, (table, clips)),
+            )
         });
         target.draw_pass(("text", *samples), |pass| {
             pass.set_pipeline(pipeline);

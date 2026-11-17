@@ -4,7 +4,7 @@
 //! kept one) and the bind group over them, kept between frames. Create
 //! once per target format.
 
-use vapors_renderer::{FrameArena, Retained, TransformTable, UniformSlots, WorkCounter};
+use vapors_renderer::{ClipTable, FrameArena, Retained, TransformTable, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
 use crate::atlas_texture::AtlasTexture;
@@ -33,8 +33,9 @@ impl Default for BlendParams {
 /// Floats per vertex: position 2, uv 2, colour 4.
 pub(crate) const FLOATS_PER_VERTEX: usize = 8;
 /// A vertex's bytes: its floats, then its row's index in its draw's
-/// range and its frame's entry in the transform table (`u32` each).
-pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 8) as u64;
+/// range, its frame's entry in the transform table and its clip's in the
+/// clip table (`u32` each).
+pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 12) as u64;
 
 /// Bytes of the params uniform: gamma, contrast, the viewport and the
 /// first entry of the draw's row range in the transform table, padded to
@@ -58,8 +59,12 @@ pub struct TextPipeline {
     pub(crate) kept: Retained,
     /// The identity alone, for immediate draws, which are on the page.
     pub(crate) identity: TransformTable,
-    /// The id of the table kept draws bind: one table a pipeline.
+    /// A clip table of no clips, for immediate draws.
+    pub(crate) no_clips: ClipTable,
+    /// The ids of the transform and clip tables kept draws bind: one of
+    /// each a pipeline.
     pub(crate) table_id: Option<u64>,
+    pub(crate) clips_id: Option<u64>,
     pub(crate) work: WorkCounter,
 }
 
@@ -77,7 +82,7 @@ impl TextPipeline {
             device,
             wgpu::ShaderModuleDescriptor {
                 label: Some("text"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(text_source().into()),
             },
         );
         let layout = bind_group_layout(device);
@@ -106,7 +111,9 @@ impl TextPipeline {
             ),
             kept: Retained::new(device, "text kept", wgpu::BufferUsages::VERTEX),
             identity: TransformTable::new(device, "text identity"),
+            no_clips: ClipTable::new(device, "text no clips"),
             table_id: None,
+            clips_id: None,
             work: WorkCounter::default(),
         }
     }
@@ -124,8 +131,18 @@ impl TextPipeline {
     }
 }
 
-/// The bind group over the atlas view, the sampler and the params
-/// slots' buffer, counted in `work`: made once per buffer by
+/// The text shader with the clip shader after it, the clip table at
+/// binding 4 (`vapors_renderer::clip_source`).
+pub(crate) fn text_source() -> String {
+    format!(
+        "{}{}",
+        include_str!("text.wgsl"),
+        vapors_renderer::clip_source(4)
+    )
+}
+
+/// The bind group over the atlas view, the sampler, the params slots'
+/// buffer and the tables, counted in `work`: made once per buffer by
 /// [`TextPipeline::draw`], which keeps it.
 pub(crate) fn bind_group(
     device: &wgpu::Device,
@@ -133,7 +150,7 @@ pub(crate) fn bind_group(
     layout: &wgpu::BindGroupLayout,
     view: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
-    (params, table): (&UniformSlots<PARAMS_SIZE>, &TransformTable),
+    (params, (table, clips)): (&UniformSlots<PARAMS_SIZE>, (&TransformTable, &ClipTable)),
 ) -> wgpu::BindGroup {
     work.create_bind_group(
         device,
@@ -156,6 +173,10 @@ pub(crate) fn bind_group(
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: table.binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: clips.binding(),
                 },
             ],
         },

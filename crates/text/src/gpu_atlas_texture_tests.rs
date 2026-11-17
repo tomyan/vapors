@@ -18,8 +18,17 @@ fn made_for_a_draw(
     let layout = bind_group_layout(device);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let table = TransformTable::new(device, "test transforms");
-    atlas.bind_group((false, (params.generation(), table.generation())), |view| {
-        bind_group(device, &work, &layout, view, &sampler, (params, &table))
+    let clips = vapors_renderer::ClipTable::new(device, "test clips");
+    let generation = [params.generation(), table.generation(), clips.generation()];
+    atlas.bind_group((false, generation), |view| {
+        bind_group(
+            device,
+            &work,
+            &layout,
+            view,
+            &sampler,
+            (params, (&table, &clips)),
+        )
     });
     work.take().bind_groups_made
 }

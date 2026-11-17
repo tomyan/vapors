@@ -101,7 +101,7 @@ pub fn clip_of(clips: &[(u32, u32)], at: usize) -> u32 {
 /// # Panics
 ///
 /// As said.
-fn assert_clip_runs(label: &str, items: usize, clips: &[(u32, u32)]) {
+pub fn assert_clip_runs(label: &str, items: usize, clips: &[(u32, u32)]) {
     let rising = clips.windows(2).all(|pair| pair[0].0 < pair[1].0);
     let from_zero = clips.first().is_none_or(|&(first, _)| first == 0);
     let inside = clips

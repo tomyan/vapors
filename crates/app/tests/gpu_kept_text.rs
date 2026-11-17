@@ -94,7 +94,7 @@ fn gpu_text_repainted_in_another_colour_is_built_again_from_its_new_layout() {
     );
     assert_eq!(
         counts.texts.buffer_bytes,
-        2 * 240,
-        "Ab's two glyphs, six 40-byte vertices each (flat-scene F2.2): {counts:?}"
+        2 * 264,
+        "Ab's two glyphs, six 44-byte vertices each (flat-scene F2.2, F3.1b): {counts:?}"
     );
 }

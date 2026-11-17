@@ -41,14 +41,14 @@ fn entries(
 fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, AtlasPins) {
     let layout = painter.layout(text);
     let kept = RefCell::new(None);
-    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, (table, clips)| {
         let draw = TextDraw {
             layout: &layout,
             origin: [2.0, 4.0],
         };
         let (bytes, pins) = TextPipeline::text_bytes(atlas, &[draw])?;
         let range = pipeline.keep(target, &bytes).expect("kept");
-        let params = (BlendParams::default(), table, 0);
+        let params = (BlendParams::default(), (table, clips), 0);
         pipeline.draw_kept(target, atlas, (&range, &pins), params);
         *kept.borrow_mut() = Some((range, pins));
         Ok(())
@@ -61,8 +61,13 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
 /// bytes it wrote.
 fn draw_again(painter: &mut Painter, kept: (&KeptRange, &AtlasPins)) -> (Vec<u8>, u64) {
     let written = RefCell::new(0);
-    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
-        pipeline.draw_kept(target, atlas, kept, (BlendParams::default(), table, 0));
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, (table, clips)| {
+        pipeline.draw_kept(
+            target,
+            atlas,
+            kept,
+            (BlendParams::default(), (table, clips), 0),
+        );
         *written.borrow_mut() = pipeline.take_work().buffer_bytes;
         Ok(())
     });
@@ -109,9 +114,9 @@ fn gpu_kept_text_drawn_after_the_atlas_grew_and_repacked_panics() {
 
     // When: large glyphs grow the page, which repacks it, then "Hello"
     // is drawn from its bytes
-    painter.frame_with_table(|pipeline, atlas, target, table| {
+    painter.frame_with_table(|pipeline, atlas, target, (table, clips)| {
         pipeline.draw(target, atlas, &large, [0.0, 60.0], BlendParams::default())?;
-        let params = (BlendParams::default(), table, 0);
+        let params = (BlendParams::default(), (table, clips), 0);
         pipeline.draw_kept(target, atlas, (&range, &pins), params);
         Ok(())
     });
@@ -126,7 +131,7 @@ fn kept_in(
 ) -> Vec<u8> {
     let layouts: Vec<_> = texts.iter().map(|text| painter.layout(text)).collect();
     let kept = RefCell::new(None);
-    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, (table, clips)| {
         let (frame, rows_base) = entries(table, target, (shift, offsets));
         let draws: Vec<_> = layouts
             .iter()
@@ -135,9 +140,9 @@ fn kept_in(
                 origin: [2.0, 4.0],
             })
             .collect();
-        let (bytes, pins) = TextPipeline::text_bytes_in(atlas, &draws, (frame, rows))?;
+        let (bytes, pins) = TextPipeline::text_bytes_in(atlas, &draws, (frame, &[], rows))?;
         let range = pipeline.keep(target, &bytes).expect("kept");
-        let params = (BlendParams::default(), table, rows_base);
+        let params = (BlendParams::default(), (table, clips), rows_base);
         pipeline.draw_kept(target, atlas, (&range, &pins), params);
         *kept.borrow_mut() = Some((range, pins));
         Ok(())
@@ -217,7 +222,21 @@ fn gpu_a_text_pipeline_given_a_second_transform_table_refuses_it() {
     let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
     painter.frame(|pipeline, atlas, target| {
         let mut second = TransformTable::new(target.device, "second");
-        let params = (BlendParams::default(), &mut second, 0);
+        let mut clips = vapors_renderer::ClipTable::new(target.device, "clips");
+        let params = (BlendParams::default(), (&mut second, &mut clips), 0);
+        pipeline.draw_kept(target, atlas, (&range, &pins), params);
+        Ok(())
+    });
+}
+
+#[test]
+#[should_panic(expected = "a pipeline draws from one clip table")]
+fn gpu_a_text_pipeline_given_a_second_clip_table_refuses_it() {
+    let mut painter = Painter::new(PAGE);
+    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
+    painter.frame_with_table(|pipeline, atlas, target, (table, _)| {
+        let mut second = vapors_renderer::ClipTable::new(target.device, "second");
+        let params = (BlendParams::default(), (table, &mut second), 0);
         pipeline.draw_kept(target, atlas, (&range, &pins), params);
         Ok(())
     });

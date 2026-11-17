@@ -18,7 +18,7 @@ use text::TextGpu;
 
 /// The transform entry a run's items name, and their clip entries as
 /// runs `(first item, entry)` (`vapors_renderer::clip_of`).
-type Named<'a> = (u32, &'a [(u32, u32)]);
+pub(super) type Named<'a> = (u32, &'a [(u32, u32)]);
 
 /// A batch's rows' indices, and how many rows its range holds.
 type RowsIn<'a> = (&'a [u32], usize);
@@ -188,10 +188,16 @@ impl KeptGpu {
     /// written with (flat-scene-f3.md item 11). Undrawn batches are
     /// released first, and a drawn one holds its entries, so none does.
     pub(super) fn assert_none_names_clip(&self, freed: &[u32]) {
-        let named = self.entries.iter().find_map(|(key, gpu)| {
-            let entry = gpu.clips.iter().find(|(_, entry)| freed.contains(entry))?;
-            Some((key, entry.1))
-        });
+        let instanced = self
+            .entries
+            .iter()
+            .find_map(|(key, gpu)| Some((key, freed_entry(&gpu.clips, freed)?)));
+        let texts = || {
+            self.texts
+                .iter()
+                .find_map(|(key, gpu)| Some((key, gpu.names_clip(freed)?)))
+        };
+        let named = instanced.or_else(texts);
         if let Some((key, entry)) = named {
             panic!(
                 "kept batch {key:?} names clip entry {entry}, given back: its bytes would read \
@@ -206,6 +212,16 @@ impl KeptGpu {
         let texts: u64 = self.texts.values().map(TextGpu::len).sum();
         self.entries.values().map(|gpu| gpu.len).sum::<u64>() + texts
     }
+}
+
+/// The first of the clip entries `clips` (runs `(first item, entry)`)
+/// names that is in `freed`: what a kept batch's bytes would read after
+/// the entry was given back.
+pub(super) fn freed_entry(clips: &[(u32, u32)], freed: &[u32]) -> Option<u32> {
+    clips
+        .iter()
+        .map(|&(_, entry)| entry)
+        .find(|entry| freed.contains(entry))
 }
 
 impl Gpu {
@@ -223,3 +239,7 @@ impl Gpu {
         let _ = (run, frame, rows, at, shapes); // only the debug build's compare uses them
     }
 }
+
+#[cfg(test)]
+#[path = "painter_kept_gpu_tests.rs"]
+mod tests;

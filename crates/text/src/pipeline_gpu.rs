@@ -50,19 +50,28 @@ pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout 
                 },
                 count: None,
             },
-            // the transform table (vapors-renderer transform_table.rs)
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            // the transform table (vapors-renderer transform_table.rs): the
+            // vertex places by it, the fragment's clip walk reads each
+            // clip's frame in it
+            storage(3, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            // the clip table (vapors-renderer clip_table.rs, clip.wgsl)
+            storage(4, wgpu::ShaderStages::FRAGMENT),
         ],
     })
+}
+
+/// A read-only storage buffer at `binding`, seen by `visibility`.
+fn storage(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
 }
 
 pub(crate) fn render_pipeline(
@@ -93,8 +102,8 @@ pub(crate) fn render_pipeline(
     )
 }
 
-const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
-    0 => Float32x2, 1 => Float32x2, 2 => Float32x4, 3 => Uint32, 4 => Uint32
+const ATTRIBUTES: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
+    0 => Float32x2, 1 => Float32x2, 2 => Float32x4, 3 => Uint32, 4 => Uint32, 5 => Uint32
 ];
 const BUFFERS: [Option<wgpu::VertexBufferLayout<'static>>; 1] = [Some(wgpu::VertexBufferLayout {
     array_stride: VERTEX_SIZE,

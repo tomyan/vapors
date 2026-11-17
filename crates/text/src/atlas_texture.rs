@@ -12,9 +12,9 @@ pub(crate) struct AtlasTexture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     /// Over the pipeline's own identity table, for immediate draws.
-    own_group: KeptBindGroup,
-    /// Over a painter's transform table, for kept draws.
-    table_group: KeptBindGroup,
+    own_group: KeptBindGroup<[u64; 3]>,
+    /// Over a painter's transform and clip tables, for kept draws.
+    table_group: KeptBindGroup<[u64; 3]>,
 }
 
 impl AtlasTexture {
@@ -39,12 +39,12 @@ impl AtlasTexture {
         &self.texture
     }
 
-    /// The bind group over the uniform buffer and transform table of
-    /// `generation`, for the pipeline's own table (`own`) or a
+    /// The bind group over the uniform buffer, transform table and clip
+    /// table of `generation`, for the pipeline's own tables (`own`) or a
     /// painter's: the kept one, or one `make` makes over the view.
     pub(crate) fn bind_group(
         &mut self,
-        (own, generation): (bool, vapors_renderer::Generations),
+        (own, generation): (bool, [u64; 3]),
         make: impl FnOnce(&wgpu::TextureView) -> wgpu::BindGroup,
     ) -> &wgpu::BindGroup {
         let Self {

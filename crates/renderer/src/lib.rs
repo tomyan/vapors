@@ -60,7 +60,7 @@ mod work;
 
 pub use arena_full::{ArenaFull, Holding};
 pub use clear::{clear, clear_target, clear_view};
-pub use clip_table::{ClipEntry, ClipTable, clip_prelude};
+pub use clip_table::{ClipEntry, ClipTable, clip_prelude, clip_source};
 pub use closed_form_shape::{ClosedFormError, ClosedFormShape};
 pub use closed_forms::ClosedFormPipeline;
 pub use closed_forms_3d::{CLOSED_FORM_STRIDE, CLOSED_FORMS_3D_WGSL, ProjectiveClosedForms};
@@ -72,7 +72,7 @@ pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
 pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
-pub use instanced_bytes::{ClipRuns, assert_rows, clip_of};
+pub use instanced_bytes::{ClipRuns, assert_clip_runs, assert_rows, clip_of};
 pub use kept_bind_group::{Generations, KeptBindGroup};
 pub use kept_range::KeptRange;
 pub use mesh_entries::{MeshEntries, MeshEntry, mesh_entry_bytes};

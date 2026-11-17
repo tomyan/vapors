@@ -347,3 +347,31 @@ Each check is proven by a break.
   (`vapors-app` `gpu_clip_joins.rs`: four boxes in a strip, each
   clipping a wider red box) drew its quads in 5 calls before step 2 and
   draws them in 1, each box's red cut by its own clip.
+
+## As built: F3.1b, text and icons on the clip table (1 of 3)
+
+- **The split (F2 to the lead; order, L63).** F3.1b in three PRs: text
+  and icons; images and surfaces; then meshes, with the scissor path
+  and `assert_agrees` retired. The third waits for lane3's F8b, which
+  reworks the mesh pipeline for scene meshes: two builders on it at
+  once would conflict.
+- **Text.** Each text vertex carries its clip's entry beside its row and
+  frame (44 bytes, was 40). `text.wgsl` is concatenated with
+  `clip.wgsl`, which now takes the table's binding and the draw's first
+  row entry from the pipeline (`clip_source(binding)`), and the fragment
+  multiplies its alpha by the clip's coverage. The text pipeline binds
+  the clip table at 4 (the transform table, at 3, is now seen by the
+  fragment too) and refuses a second, as it refuses a second transform
+  table; its immediate draws bind a table of no clips.
+- **Joins.** `Run::clipped_by_table` holds text and icons, so their runs
+  join across clips, and their scissor is the frame's clip only.
+- **Counts.** The rows page's idle frame: 35 text draws to 18 (each
+  value's text joins its row's label and the button text before it),
+  52 draws to 35; its 17 button quads keep the text runs apart. Joining
+  across those quads is a question of paint order, not of clips: it is
+  F3.3's and F13's (the lead, L66), not F3.1b's.
+  The counter demo's kept bytes and the kept-text bytes grew by 4 a
+  vertex.
+- **Pixels.** `gpu_text_clip_edge.rs`: text through a clip edge at 1x
+  and 2x draws inside the clip as it draws unclipped and nothing
+  outside, the scissor's pixels at a whole-pixel edge.

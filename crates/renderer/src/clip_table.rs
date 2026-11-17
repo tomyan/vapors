@@ -116,6 +116,19 @@ pub fn clip_prelude() -> String {
     )
 }
 
+/// The clip shader a 2D pipeline's shader is concatenated with: the
+/// prelude ([`clip_prelude`]), `clip.wgsl`, and the clip table declared
+/// at `binding` of group 0, the pipeline's own place for it. The
+/// pipeline's shader declares `transforms`, the transform table.
+#[must_use]
+pub fn clip_source(binding: u32) -> String {
+    format!(
+        "{}{}@group(0) @binding({binding}) var<storage, read> clips: array<Clip>;\n",
+        clip_prelude(),
+        include_str!("clip.wgsl")
+    )
+}
+
 #[cfg(test)]
 #[path = "clip_table_tests.rs"]
 mod tests;

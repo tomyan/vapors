@@ -81,15 +81,16 @@ fn a_batch_keeps_its_items_in_order() {
 
 #[test]
 fn a_change_of_clip_starts_a_batch_of_a_kind_the_scissor_clips() {
-    // Given: a text, two texts under a clip, a text with the clip lifted
+    // Given: an image, two images under a clip, an image with the clip
+    // lifted
     let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
     let mut scene = Scene::new();
-    scene.push(text(0));
+    scene.push(picture(0));
     scene.set_clip(Some(clip));
-    scene.push(text(1));
-    scene.push(text(2));
+    scene.push(picture(1));
+    scene.push(picture(2));
     scene.set_clip(None);
-    scene.push(text(3));
+    scene.push(picture(3));
 
     // When
     let batches = batches(&scene);
@@ -238,7 +239,7 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
 }
 
 #[test]
-fn quads_shadows_and_shapes_join_across_clips_and_every_other_kind_splits() {
+fn quads_shadows_shapes_text_and_icons_join_across_clips_and_every_other_kind_splits() {
     // Given: each kind, two items under two clips
     let (a, b) = (
         Some(Rect::new(0.0, 0.0, 4.0, 4.0)),
@@ -248,14 +249,14 @@ fn quads_shadows_and_shapes_join_across_clips_and_every_other_kind_splits() {
         (quad(0.0), true),
         (Item::Shadow(a_shadow()), true),
         (a_shape(ShapeKind::ClosedForm), true),
-        (text(0), false),
+        (text(0), true),
         (
             Item::Icon {
                 icon: IconId(0),
                 rect: Rect::new(0.0, 0.0, 4.0, 4.0),
                 colour: Color::from_rgba8(0, 0, 0, 255),
             },
-            false,
+            true,
         ),
         (picture(0), false),
         (

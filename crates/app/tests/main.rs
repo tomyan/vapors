@@ -81,6 +81,7 @@ mod gpu_surface;
 mod gpu_surface_cull;
 mod gpu_surface_lifecycle;
 mod gpu_surface_refusals;
+mod gpu_text_clip_edge;
 mod gpu_tooltip;
 mod gpu_tooltip_app;
 mod gpu_touch_fling;

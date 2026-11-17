@@ -36,5 +36,5 @@ fn vs_main(
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
     let colour = covered(in, dpdx(in.local), dpdy(in.local));
-    return vec4(colour.rgb, colour.a * clip_coverage(in.position.xy, in.clip, in.row));
+    return vec4(colour.rgb, colour.a * clip_coverage(in.position.xy, in.clip, in.row, view.rows_base));
 }

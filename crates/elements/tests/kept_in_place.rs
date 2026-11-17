@@ -106,9 +106,10 @@ fn batching_the_view_equals_batching_its_flat_scene_on_the_rows_page() {
     assert_eq!(batched, scene.to_scene().batches(view));
     assert!(batched.culled > 0, "the rows below the view are culled");
     assert!(
-        batched
-            .batches
+        batched.batches.iter().any(|batch| batch
+            .clips
+            .runs()
             .iter()
-            .any(|batch| batch.clips.union().is_some())
+            .any(|(_, clip)| clip.is_some()))
     );
 }
