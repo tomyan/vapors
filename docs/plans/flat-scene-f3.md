@@ -237,9 +237,13 @@ The six recommendations of the first draft are taken:
 - **F3.1b (owns the split):** the image and text pipelines on the clip
   table, on F2.2 (the lead, 2026-11-17). Until it lands, quads, shadows
   and shapes take their clip from the table while text and images keep
-  the scissor, and a debug check holds the two together
-  (`painter_clips.rs` `assert_agrees`); F3.1b retires the scissor path
-  and that check.
+  the scissor. A check in every build holds the two together
+  (`painter_clips.rs` `assert_agrees`): for each clipped instanced
+  batch, the clip entry's rectangle moved by the translation its frame
+  entry holds must land where the scissor path puts the batch's clip
+  with the frame's shift. F3.1b retires the scissor path and that check.
+  Clip edges must be whole device pixels until F4a (`assert_whole`),
+  as the one-pixel edge equals the scissor only there.
 - **F3.2:** rounded clips with the radii rules, the four refusals
   retired (each test converted into a test of the clip drawn), the
   elliptical refusal, the Chromium fixture, hit testing.

@@ -50,41 +50,25 @@ impl ScenePainter {
                     .check_clipped(target.device, painted, &batch.run)?;
                 continue;
             };
-            let scissor = self.scissor((target, &clipped), (batch, kept.frames[at]), frame);
+            let scissor = Self::scissor((target, &clipped), batch, frame);
             self.draw_placed(&scissor, (painted, kept), (places, at, frame))?;
         }
         Ok(())
     }
 
-    /// The scissor batch `batch` in `in_frame` is drawn under: for quads,
+    /// The scissor batch `batch` is drawn under: for quads,
     /// shadows and shapes, only the frame's clip, their own clip coming
     /// from the clip table as coverage (flat-scene F3.1); for the rest,
     /// `batch_scissor`, the batch's clip on the page, as before, until F3.1b.
-    #[cfg_attr(
-        not(debug_assertions),
-        allow(
-            clippy::unused_self,
-            reason = "the debug build's agreement check reads self.clips"
-        )
-    )]
     fn scissor<'t>(
-        &self,
         (target, batch_scissor): (&Target<'t>, &Target<'t>),
-        (batch, in_frame): (&vapors_scene::Batch, vapors_elements::BatchFrame),
+        batch: &vapors_scene::Batch,
         frame: vapors_elements::FrameDraw,
     ) -> Target<'t> {
         if on_the_clip_table(&batch.run) {
             return clipped(target, frame.on_page(None))
                 .expect("inside the batch's clip on the page, so inside the frame's clip");
         }
-        #[cfg(debug_assertions)]
-        if let Some(clip) = batch.clip {
-            let page = frame.on_page(Some(clip));
-            self.clips
-                .assert_agrees((in_frame, clip), (frame.shift, frame.clip), page);
-        }
-        #[cfg(not(debug_assertions))]
-        let _ = in_frame; // only the debug build's agreement check reads it
         *batch_scissor
     }
 
@@ -104,6 +88,7 @@ impl ScenePainter {
             offsets,
             rows: kept.rows.get(at).unwrap_or_default(),
             clip: kept.batched.batches[at].clip,
+            draw: frame,
         };
         let run = &kept.batched.batches[at].run;
         self.draw_run(target, painted, (run, kept.keys[at], at), &moved)

@@ -133,7 +133,7 @@ impl ScenePainter {
                     .transforms
                     .frame_entry(target, moved.frame, moved.shift)?;
                 let clip = match moved.clip {
-                    Some(clip) => self.clips.entry(target, (moved.frame, frame), clip)?,
+                    Some(clip) => self.clip_entry(target, (frame, clip), moved)?,
                     None => 0,
                 };
                 let rows_base = self.transforms.rows_base(target, key, moved.offsets)?;
@@ -141,6 +141,20 @@ impl ScenePainter {
             }
             _ => Some((0, 0, 0)),
         }
+    }
+
+    /// The entry of `clip` in `moved`'s frame, whose transform entry is
+    /// `frame`, checked against the scissor path's placing of it.
+    fn clip_entry(
+        &mut self,
+        target: &Target<'_>,
+        (frame, clip): (u32, vapors_scene::Rect),
+        moved: &Moved<'_>,
+    ) -> Option<u32> {
+        let at = self.clips.entry(target, (moved.frame, frame), clip)?;
+        let tables = (&self.transforms.table, &self.clips.table);
+        super::clips::assert_agrees(tables, at, (clip, moved.draw));
+        Some(at)
     }
 
     /// Draws `run`, a text or icon batch keyed `key`, from its kept

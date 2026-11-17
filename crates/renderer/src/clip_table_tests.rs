@@ -43,8 +43,29 @@ fn a_given_back_entry_holds_the_poison_until_written() {
     // Then
     assert!(entries.get(at).given_back);
     assert!(entries.get(at).rect.iter().all(|v| v.is_nan()));
-    assert_eq!(entries.take_poisoned(), Some((at, at)));
-    assert_eq!(entries.take_poisoned(), None);
+    assert_eq!(entries.take_poisoned(), vec![(at, at)]);
+    assert_eq!(entries.take_poisoned(), vec![]);
+}
+
+#[test]
+fn two_entries_given_back_apart_are_poisoned_apart_and_counted_once_each() {
+    // Given: entries 2 and 40 set, the live ones between untouched
+    let mut entries = Entries::<ClipEntry>::new(64);
+    assert_eq!(entries.take(40), Some(1), "entries 1 to 40 taken");
+    let set = |entries: &mut Entries<ClipEntry>, at| {
+        entries.set(at, &[ClipEntry::rect([0.0, 0.0, 8.0, 8.0], 0)], 1);
+    };
+    set(&mut entries, 2);
+    set(&mut entries, 40);
+    entries.take_changed();
+
+    // When
+    entries.give(2, 1);
+    entries.give(40, 1);
+
+    // Then
+    assert_eq!(entries.take_poisoned(), vec![(2, 2), (40, 40)]);
+    assert_eq!(entries.take_changed(), 2);
 }
 
 #[test]

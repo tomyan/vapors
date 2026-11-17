@@ -218,10 +218,27 @@ impl Instanced {
         (tables, viewport): (Option<(&TransformTable, &ClipTable)>, u32),
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let group = self.bind_group(target.device, tables);
         let instances = match from {
             Instances::Placed(placed) => placed.slice(),
             Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
         };
+        target.draw_pass(|pass| {
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &group, &[viewport]);
+            pass.set_vertex_buffer(0, instances);
+            self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
+        });
+    }
+
+    /// The bind group of the viewports and `tables` (this pipeline's own
+    /// identity and empty clip table for none), made when one of their
+    /// buffers is new; a handle to the kept one.
+    fn bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        tables: Option<(&TransformTable, &ClipTable)>,
+    ) -> wgpu::BindGroup {
         let (kept_group, (table, clips)) = match tables {
             Some(tables) => (&mut self.table_group, tables),
             None => (&mut self.own_group, (&self.identity, &self.no_clips)),
@@ -233,19 +250,11 @@ impl Instanced {
         ];
         let (label, layout, work) = (self.label, &self.layout, &self.work);
         let viewports = &self.viewports;
-        let group = kept_group.of(joined(generations), || {
-            group(
-                target.device,
-                (label, layout, work),
-                (viewports, table, clips),
-            )
-        });
-        target.draw_pass(|pass| {
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, group, &[viewport]);
-            pass.set_vertex_buffer(0, instances);
-            self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
-        });
+        kept_group
+            .of(joined(generations), || {
+                group(device, (label, layout, work), (viewports, table, clips))
+            })
+            .clone()
     }
 }
 

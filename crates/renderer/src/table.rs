@@ -116,7 +116,7 @@ impl<V: EntryValue> Table<V> {
     }
 
     fn write_poison(&mut self, queue: &wgpu::Queue) {
-        if let Some(span) = self.entries.take_poisoned() {
+        for span in self.entries.take_poisoned() {
             self.write(queue, span);
         }
     }
@@ -153,6 +153,13 @@ impl<V: EntryValue> Table<V> {
     /// The entries and bytes written since last asked.
     pub fn take_written(&mut self) -> (u64, u64) {
         std::mem::take(&mut self.written)
+    }
+
+    /// How many entries' values changed since last asked, a given-back
+    /// entry's poison included: unlike [`Table::take_written`], not the
+    /// whole buffer a new one writes.
+    pub fn take_changed(&mut self) -> u64 {
+        self.entries.take_changed()
     }
 
     fn write(&mut self, queue: &wgpu::Queue, (first, last): (u32, u32)) {
@@ -220,5 +227,11 @@ impl TransformTable {
     /// (`table_entries.rs` `Entries::set`).
     pub fn set(&mut self, frame: &FrameEncoder, queue: &wgpu::Queue, at: u32, values: &[Matrix]) {
         self.set_values(frame, queue, (at, values));
+    }
+
+    /// The matrix entry `at` holds.
+    #[must_use]
+    pub fn matrix(&self, at: u32) -> Matrix {
+        self.get(at)
     }
 }

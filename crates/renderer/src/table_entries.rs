@@ -22,13 +22,15 @@ pub trait EntryValue: Copy + PartialEq + std::fmt::Debug {
 }
 
 /// The entries: their values, the free ranges, the encoder that last
-/// wrote each, and the given-back span not yet written with the poison.
+/// wrote each, the given-back spans not yet written with the poison, and
+/// how many values changed since last asked.
 #[derive(Debug)]
 pub(crate) struct Entries<V> {
     values: Vec<V>,
     free: FreeRanges,
     written_in: Vec<u64>,
-    poisoned: Option<(u32, u32)>,
+    poisoned: Vec<(u32, u32)>,
+    changed: u64,
 }
 
 impl<V: EntryValue> Entries<V> {
@@ -39,7 +41,8 @@ impl<V: EntryValue> Entries<V> {
             values: vec![V::FIRST; capacity as usize],
             free: FreeRanges::after(1, size),
             written_in: vec![0; capacity as usize],
-            poisoned: None,
+            poisoned: Vec::new(),
+            changed: 0,
         }
     }
 
@@ -62,16 +65,21 @@ impl<V: EntryValue> Entries<V> {
         if let Some(poison) = V::POISON {
             let span = (at, at + count - 1);
             self.values[at as usize..=span.1 as usize].fill(poison);
-            self.poisoned = Some(
-                self.poisoned
-                    .map_or(span, |(a, b)| (a.min(span.0), b.max(span.1))),
-            );
+            self.poisoned.push(span);
+            self.changed += u64::from(count);
         }
     }
 
-    /// The span given back since last asked, to write with the poison.
-    pub(crate) fn take_poisoned(&mut self) -> Option<(u32, u32)> {
-        self.poisoned.take()
+    /// The spans given back since last asked, each to write with the
+    /// poison: apart, so the live entries between two are not written.
+    pub(crate) fn take_poisoned(&mut self) -> Vec<(u32, u32)> {
+        std::mem::take(&mut self.poisoned)
+    }
+
+    /// How many values changed since last asked: those set to another
+    /// value, and those given back with the poison.
+    pub(crate) fn take_changed(&mut self) -> u64 {
+        std::mem::take(&mut self.changed)
     }
 
     /// Room for `capacity` entries, the new ones free.
@@ -104,6 +112,7 @@ impl<V: EntryValue> Entries<V> {
                  reproduce with `cargo xtask test`"
             );
             (self.values[index], self.written_in[index]) = (*value, encoder);
+            self.changed += 1;
             let index = u32::try_from(index).expect("an entry of the table");
             changed = Some(changed.map_or((index, index), |(first, _)| (first, index)));
         }

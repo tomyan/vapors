@@ -28,6 +28,11 @@ const SCALE: f32 = 2.0;
 
 /// The list of `CSS` with twelve rows, updated.
 fn list() -> Document {
+    list_at(SCALE)
+}
+
+/// The list of `CSS` with twelve rows, updated at `scale`.
+fn list_at(scale: f32) -> Document {
     let mut elements = vec![(None, "div", "list")];
     for row in 0..12 {
         let at = 1 + row * 3;
@@ -36,7 +41,7 @@ fn list() -> Document {
         elements.push((Some(at + 1), "div", "wide"));
     }
     let mut doc = document(CSS, &elements);
-    update(&mut doc, SCALE);
+    update(&mut doc, scale);
     doc
 }
 
@@ -65,14 +70,25 @@ fn gpu_the_first_frame_writes_the_clips_drawn_under_and_a_scroll_none() {
     let (_, scroll) = drawn(&mut rig, &doc);
     let (_, idle) = drawn(&mut rig, &doc);
 
-    // Then: one entry a row in view, 48 bytes each; none after
-    assert!(first.clip_writes > 0, "{first:?}");
-    assert_eq!(first.clip_bytes, first.clip_writes * 48, "{first:?}");
+    // Then: one entry for each of the 3 rows in view; written as a new
+    // table's 64 entries when the first batch binds it, then each of the
+    // 3 as it is set, 48 bytes each; none after
+    assert_eq!(first.clip_entries_changed, 3, "{first:?}");
     assert_eq!(
-        scroll.clip_writes, 2,
+        (first.clip_writes, first.clip_bytes),
+        (67, 67 * 48),
+        "{first:?}"
+    );
+    assert_eq!(
+        (scroll.clip_entries_changed, scroll.clip_writes),
+        (2, 2),
         "the row entering, the poison of the row leaving: {scroll:?}"
     );
-    assert_eq!((idle.clip_writes, idle.clip_bytes), (0, 0), "{idle:?}");
+    assert_eq!(
+        (idle.clip_writes, idle.clip_entries_changed),
+        (0, 0),
+        "{idle:?}"
+    );
 }
 
 #[test]
@@ -122,9 +138,8 @@ fn gpu_a_clip_resized_under_kept_bytes_draws_as_a_fresh_painter_does() {
 fn gpu_text_and_a_quad_under_one_clip_in_a_scrolled_frame_draw_as_afresh() {
     // Given: each row's clipped box holds text as well as its quad, so a
     // text batch (still under the scissor until F3.1b) and a quad batch
-    // (on the clip table) share a clip in the scroll frame; the debug
-    // build holds the two answers together (painter_clips.rs
-    // `assert_agrees`)
+    // (on the clip table) share a clip in the scroll frame; every build
+    // holds the two answers together (painter_clips.rs `assert_agrees`)
     let mut doc = list();
     let list_node = doc.children(doc.body())[0];
     for row in doc.children(list_node) {
@@ -143,4 +158,31 @@ fn gpu_text_and_a_quad_under_one_clip_in_a_scrolled_frame_draw_as_afresh() {
 
     // Then
     assert!(kept == fresh, "the scrolled rows drew other than afresh");
+}
+
+#[test]
+fn gpu_clips_at_a_fractional_scale_are_whole_device_pixels_and_draw_as_afresh() {
+    // Given: at 2.75 the 6 px clips are 16.5 device px wide before paint
+    // snaps them; an edge that is not whole would be refused
+    // (painter_clips.rs `assert_whole`)
+    let mut doc = list_at(2.75);
+    let mut rig = Rig::new();
+    drawn(&mut rig, &doc);
+
+    // When
+    let list_node = doc.children(doc.body())[0];
+    assert!(
+        doc.scroll_node_by(list_node, [0.0, 4.0]),
+        "the list scrolls"
+    );
+    update(&mut doc, 2.75);
+    let (kept, counts) = drawn(&mut rig, &doc);
+    let (fresh, _) = drawn(&mut Rig::new(), &doc);
+
+    // Then
+    assert!(kept.contains(&255), "the rows drew nothing");
+    assert!(
+        kept == fresh,
+        "the scrolled rows drew other than afresh: {counts:?}"
+    );
 }

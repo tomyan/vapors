@@ -10,7 +10,7 @@ use vapors_renderer::{FrameEncoder, Target};
 use vapors_scene::{Rect, Size};
 use vapors_text::FontSystem;
 
-use super::Clips;
+use super::{Clips, assert_whole};
 
 /// The frame of the one batch of a page of one red div.
 fn a_frame() -> BatchFrame {
@@ -103,4 +103,18 @@ fn gpu_a_frame_entry_given_back_under_a_held_clip_is_refused() {
 
     // When: frame entry 5 is given back
     clips.assert_none_names(&[5]);
+}
+
+#[test]
+fn a_clip_with_whole_device_pixel_edges_is_accepted() {
+    assert_whole(Rect::new(-3.0, 0.0, 16.0, 11.0));
+}
+
+#[test]
+#[should_panic(
+    expected = "Rect { left: 0.0, top: 0.0, right: 16.5, bottom: 11.0 } has an edge \
+                           that is not a whole device pixel"
+)]
+fn a_clip_with_an_edge_half_a_device_pixel_off_is_refused() {
+    assert_whole(Rect::new(0.0, 0.0, 16.5, 11.0));
 }
