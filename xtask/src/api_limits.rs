@@ -19,6 +19,9 @@ pub const MEMORY_MAX: &str = "32G";
 /// that, far below the host's own limit, so a fork bomb stops here.
 pub const TASKS_MAX: &str = "4096";
 
+/// No swap, so [`MEMORY_MAX`] is not stretched by paging out.
+pub const MEMORY_SWAP_MAX: &str = "0";
+
 /// [`MEMORY_MAX`] in bytes, as the cgroup's `memory.max` shows it.
 pub const MEMORY_MAX_BYTES: u64 = 32 * 1024 * 1024 * 1024;
 
@@ -31,7 +34,7 @@ pub fn scope(xtask: &Path) -> Command {
     scope.args(["--user", "--scope", "--quiet", "--collect"]);
     for property in [
         format!("MemoryMax={MEMORY_MAX}"),
-        "MemorySwapMax=0".to_owned(),
+        format!("MemorySwapMax={MEMORY_SWAP_MAX}"),
         format!("TasksMax={TASKS_MAX}"),
     ] {
         scope.args(["-p", &property]);
@@ -42,7 +45,7 @@ pub fn scope(xtask: &Path) -> Command {
 
 /// `xtask api-scoped -- <command>`: inside the scope, reads the scope's
 /// cgroup and runs `command` only if its memory and task limits are the
-/// ones asked for. A user manager without the memory or pids controller
+/// ones asked for, swap included. A user manager without the memory or pids controller
 /// accepts the properties and enforces nothing, saying nothing (review of
 /// #476-#478, M5); this says so and stops.
 pub fn scoped(command: &[String]) -> ExitCode {
@@ -84,6 +87,7 @@ pub fn in_force(cgroup: &str, root: &Path) -> Result<(), String> {
     let dir = root.join(path.trim_start_matches('/'));
     for (file, expected) in [
         ("memory.max", MEMORY_MAX_BYTES.to_string()),
+        ("memory.swap.max", MEMORY_SWAP_MAX.to_owned()),
         ("pids.max", TASKS_MAX.to_owned()),
     ] {
         let found = std::fs::read_to_string(dir.join(file)).map_err(|e| {

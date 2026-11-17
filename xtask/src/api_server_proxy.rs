@@ -73,11 +73,14 @@ pub fn proxied(
 }
 
 fn judged(stream: &mut UnixStream, routes: &Routes, proxy: &Proxy, request: &Request) {
-    let demand = match crate::api_request_policy::judged(&request.target, &request.body) {
-        Ok(demand) => demand,
+    let judged = match betas(request)
+        .and_then(|()| crate::api_request_policy::judged(&request.target, &request.body))
+    {
+        Ok(judged) => judged,
         Err(why) => return refuse(stream, routes, &why),
     };
-    let ticket = match demand
+    let ticket = match judged
+        .demand
         .as_ref()
         .map(|demand| proxy.budget.admit(demand))
         .transpose()
@@ -85,29 +88,51 @@ fn judged(stream: &mut UnixStream, routes: &Routes, proxy: &Proxy, request: &Req
         Ok(ticket) => ticket,
         Err(why) => return refuse(stream, routes, &why),
     };
-    let counted = forwarded(stream, proxy, request);
-    if let (Some(ticket), Some(demand)) = (ticket, demand) {
-        let counted = counted
-            .unwrap_or_else(|| Counted::Whole(crate::api_prices::Usage::default(), demand.model));
-        proxy.budget.settle(ticket, &counted);
+    let counted = forwarded(stream, proxy, request, &judged.body);
+    if let (Some(ticket), Some(demand)) = (ticket, judged.demand) {
+        proxy
+            .budget
+            .settle(ticket, &settled(counted, &demand.model));
     }
 }
 
-/// `request` forwarded; what it counted, or `None` for an error the API
-/// answered whole, which it bills nothing for. One that never got a head
-/// counts as cut, charged at its worst case.
-fn forwarded(stream: &mut UnixStream, proxy: &Proxy, request: &Request) -> Option<Counted> {
+/// Refuses an `anthropic-beta` header the proxy cannot price
+/// (`api_request_policy::betas`).
+fn betas(request: &Request) -> Result<(), String> {
+    request
+        .headers
+        .iter()
+        .filter(|(name, _)| name == "anthropic-beta")
+        .try_for_each(|(_, value)| crate::api_request_policy::betas(value))
+}
+
+/// What a forwarded request is charged: an API error answered whole with
+/// a status that is not 2xx bills nothing, so it is settled at zero
+/// (review of #476-#478, N2b); an error body with a 2xx status is
+/// ambiguous and is charged as cut; anything else as it counted.
+fn settled((status, counted): (u16, Counted), model: &str) -> Counted {
+    match counted {
+        Counted::Error(_) if !(200..300).contains(&status) => {
+            Counted::Whole(crate::api_prices::Usage::default(), model.to_owned())
+        }
+        Counted::Error(why) => Counted::Cut(format!("an error body with status {status}: {why}")),
+        counted => counted,
+    }
+}
+
+/// `body` forwarded as `request`; its status and what it counted. One
+/// that never got a head counts as cut, charged at its worst case.
+fn forwarded(
+    stream: &mut UnixStream,
+    proxy: &Proxy,
+    request: &Request,
+    body: &[u8],
+) -> (u16, Counted) {
     let number = proxy.staged.fetch_add(1, Ordering::Relaxed);
-    let sent = Staged::new(proxy.staging.join(format!("{number}.json")), &request.body)
+    let sent = Staged::new(proxy.staging.join(format!("{number}.json")), body)
         .and_then(|staged| crate::api_upstream::forward(request, &proxy.secret, &staged, stream));
     match sent {
-        Ok(forwarded)
-            if !(200..300).contains(&forwarded.status)
-                && !matches!(forwarded.counted, Counted::Cut(_)) =>
-        {
-            None
-        }
-        Ok(forwarded) => Some(forwarded.counted),
+        Ok(forwarded) => (forwarded.status, forwarded.counted),
         Err(why) => {
             let target = crate::api_refusals::escaped(&request.target);
             eprintln!(
@@ -115,7 +140,11 @@ fn forwarded(stream: &mut UnixStream, proxy: &Proxy, request: &Request) -> Optio
                 request.method
             );
             reply(stream, "502 Bad Gateway", &why);
-            Some(Counted::Cut(why))
+            (502, Counted::Cut(why))
         }
     }
 }
+
+#[cfg(test)]
+#[path = "api_server_proxy_tests.rs"]
+mod tests;

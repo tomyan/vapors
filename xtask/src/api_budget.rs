@@ -4,9 +4,16 @@
 //! (`api_prices.rs` `Price::worst`), stays within the budget; it is then
 //! settled at what its response counted, or at its worst case when the
 //! response did not end whole (review of #476-#478, M9). So the spend
-//! never passes the budget: overshoot is zero by construction, as no
-//! response can cost more than its worst case; one that does stops the
-//! session. The CLI's `--max-budget-usd` counts too; this count holds
+//! never passes the budget while no response costs more than its worst
+//! case; one that does stops the session.
+//!
+//! The worst case holds because of what the proxy forwards
+//! (`api_request_policy.rs`, review of #476-#478, N1): input is
+//! bounded by the body's bytes because every content block forwarded is
+//! text, a tool call or result, or thinking, where a token stands for at
+//! least one byte; images and documents, whose tokens their bytes do
+//! not bound, are refused; the tool-use system prompt, which is not in
+//! the body, is added as a constant. Output is bounded by `max_tokens`. The CLI's `--max-budget-usd` counts too; this count holds
 //! whatever the CLI does.
 
 use std::collections::BTreeMap;
@@ -121,7 +128,9 @@ impl Budget {
                 ),
                 Err(why) => (worst, Some(why)),
             },
-            Counted::Cut(_) => (worst, None),
+            // An error is charged here as cut: only the proxy, which saw
+            // the status, settles one the API answered whole at zero.
+            Counted::Cut(_) | Counted::Error(_) => (worst, None),
             Counted::Unpriced(why) => (worst, Some(why.clone())),
         };
         let Ok(mut state) = self.state.lock() else {
