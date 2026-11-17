@@ -172,3 +172,55 @@ fn curl_never_expands_the_target_or_goes_through_a_proxy() {
     assert!(args.iter().any(|arg| arg == "--globoff"), "{args:?}");
     assert!(args.windows(2).any(|w| w == ["--noproxy", "*"]), "{args:?}");
 }
+
+mod write_bound {
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    use super::super::{Staged, forward_by};
+    use crate::api_http::Request;
+    use crate::api_usage::Counted;
+    use crate::ux_secret::Secret;
+
+    #[test]
+    fn a_session_that_never_reads_ends_its_request_at_the_write_bound() {
+        // Given: a curl stand-in with 4 MB to write, and a session that
+        // holds its socket open but never reads, under a 50 ms bound in
+        // place of the server's 60 s
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let curl = dir.path().join("curl");
+        let script = "#!/bin/sh\ntrap '' PIPE\ncat > /dev/null\nprintf 'HTTP/1.1 200 OK\\r\\n\\r\\n'\nhead -c 4000000 /dev/zero\n";
+        std::fs::write(&curl, script).expect("written");
+        std::fs::set_permissions(&curl, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .expect("mode");
+        let (_session, mut ours) = UnixStream::pair().expect("a pair");
+        ours.set_write_timeout(Some(Duration::from_millis(50)))
+            .expect("bounded");
+        let secret =
+            Secret::new("sk-ant-a-key-long-enough-to-guard-0123456789".into()).expect("a key");
+        let request = Request {
+            method: "POST".into(),
+            target: "/v1/messages".into(),
+            headers: Vec::new(),
+            body: b"{}".to_vec(),
+        };
+        let staged = Staged::new(dir.path().join("1.json"), &request.body).expect("staged");
+
+        // When
+        let started = Instant::now();
+        let forwarded = forward_by(
+            &curl.display().to_string(),
+            &request,
+            (&secret, &staged),
+            &mut ours,
+        );
+
+        // Then: ended at the bound, as a cut
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
+        assert!(matches!(forwarded.map(|f| f.counted), Ok(Counted::Cut(_))));
+    }
+}

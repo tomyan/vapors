@@ -73,3 +73,21 @@ fn the_api_is_refused_on_a_run_with_no_key() {
     assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
     assert_eq!(refused, ["POST /v1/messages"]);
 }
+
+#[test]
+fn every_connection_has_its_writes_bounded() {
+    // Given
+    let (mut client, mut server) = UnixStream::pair().expect("a socket pair");
+    client
+        .write_all(b"GET /api-build/ping HTTP/1.1\r\n\r\n")
+        .expect("sent");
+
+    // When
+    answered(&mut server, &Routes::default());
+
+    // Then: a session that stops reading holds a write for at most this
+    assert_eq!(
+        server.write_timeout().ok().flatten(),
+        Some(super::WRITE_DEADLINE)
+    );
+}
