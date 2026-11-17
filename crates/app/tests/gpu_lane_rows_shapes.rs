@@ -1,13 +1,14 @@
-//! GPU tier: shapes and meshes in a framed lane's rows (option (b) of
-//! the lane fold, `docs/plans/splice-layout.md` section 11.2): each row's
-//! shape step is batched in the row's own frame, drawn at that frame's
-//! shift, so after a row is put in at the top every row's rect (a closed
-//! form) and triangle (a mesh) are where the insert puts the row (scale
-//! 2).
+//! GPU tier: shapes and meshes in a framed lane's rows
+//! (`docs/plans/splice-layout.md` section 11.2; `flat-scene-f2.md`,
+//! F2.3b): each item names its row, placed by its row's entry in the
+//! transform table, so after a row is put in at the top every row's rect
+//! (a closed form) and triangle (a mesh) are where the insert puts the
+//! row (scale 2); and rows each holding a rect are one shape draw, each
+//! rect at its row's place.
 
 use crate::support_surface as support;
 
-use support::{BLUE, RED, Rig, document, pixel, update};
+use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 
@@ -17,10 +18,10 @@ const CSS: &str = ".row { height: 4px; } svg { display: block; }";
 /// Device pixels per CSS pixel.
 const SCALE: f32 = 2.0;
 
-/// A row holding a rect filling the svg's left half in `left` and a
-/// triangle filling its right half's top-left corner in `right`, put in
-/// the body before `before` (at the end when `None`).
-fn add_row(doc: &mut Document, (left, right): (&str, &str), before: Option<NodeId>) {
+/// A row holding a rect filling the svg's left half in `left` and, when
+/// `right` is given, a triangle filling its right half's top-left corner
+/// in it, put in the body before `before` (at the end when `None`).
+fn add_row(doc: &mut Document, (left, right): (&str, Option<&str>), before: Option<NodeId>) {
     let row = doc.create_element("div");
     doc.set_attribute(row, "class", "row");
     doc.insert_before(doc.body(), row, before);
@@ -37,7 +38,9 @@ fn add_row(doc: &mut Document, (left, right): (&str, &str), before: Option<NodeI
     doc.append(row, svg);
     let rect = [("x", "0"), ("y", "0"), ("width", "2"), ("height", "4")];
     let path = [("d", "M2 0 L4 0 L2 4 Z")];
-    for (tag, attributes, fill) in [("rect", &rect[..], left), ("path", &path[..], right)] {
+    let shapes = [("rect", &rect[..], Some(left)), ("path", &path[..], right)];
+    for (tag, attributes, fill) in shapes {
+        let Some(fill) = fill else { continue };
         let shape = doc.create_element(tag);
         for (name, value) in attributes.iter().chain(&[("fill", fill)]) {
             doc.set_attribute(shape, name, value);
@@ -47,22 +50,28 @@ fn add_row(doc: &mut Document, (left, right): (&str, &str), before: Option<NodeI
 }
 
 /// The colours of row `at`: red then blue on even rows, swapped on odd.
-fn colours(at: usize) -> (&'static str, &'static str) {
+fn colours(at: usize) -> (&'static str, Option<&'static str>) {
     if at.is_multiple_of(2) {
-        ("red", "blue")
+        ("red", Some("blue"))
     } else {
-        ("blue", "red")
+        ("blue", Some("red"))
     }
 }
 
-#[test]
-fn gpu_shape_rows_put_after_an_insert_draw_each_at_its_rows_offset() {
-    // Given: 40 rows, colours swapping row to row, drawn once
+/// 40 rows of `colours`, updated.
+fn rows_of(colours: fn(usize) -> (&'static str, Option<&'static str>)) -> Document {
     let mut doc = document(CSS, &[]);
     for at in 0..40 {
         add_row(&mut doc, colours(at), None);
     }
     update(&mut doc, SCALE);
+    doc
+}
+
+#[test]
+fn gpu_shape_rows_put_after_an_insert_draw_each_at_its_rows_offset() {
+    // Given: 40 rows, colours swapping row to row, drawn once
+    let mut doc = rows_of(colours);
     let mut rig = Rig::new();
     rig.draw(&doc).expect("paints");
 
@@ -98,4 +107,33 @@ fn gpu_shape_rows_put_after_an_insert_draw_each_at_its_rows_offset() {
         })
         .collect();
     assert_eq!(drawn, expected);
+}
+
+#[test]
+fn gpu_a_rect_in_each_row_put_after_an_insert_is_one_shape_draw_at_its_rows_place() {
+    // Given: 40 rows, each a rect, drawn once
+    let mut doc = rows_of(|at| (colours(at).0, None));
+    let mut rig = Rig::new();
+    rig.draw(&doc).expect("paints");
+
+    // When: a row put in at the top
+    let first = doc.children(doc.body())[0];
+    add_row(&mut doc, ("blue", None), Some(first));
+    update(&mut doc, SCALE);
+    let kept = rig.draw(&doc).expect("paints");
+
+    // Then: the lane is framed and its rects are one draw; each row's rect
+    // fills device x 0 to 4 of its 8 px row (the new blue row, then red
+    // and blue in turn) and the page's white is right of it
+    let counts = doc.update_counts();
+    assert!(counts.lanes_framed > 0, "{counts:?}");
+    let shapes = rig.painter.frame_counts().shapes;
+    assert_eq!(shapes.draw_calls, 1, "{shapes:?}");
+    let drawn: Vec<_> = (0..4)
+        .map(|row| (pixel(&kept, 1, row * 8 + 4), pixel(&kept, 6, row * 8 + 4)))
+        .collect();
+    assert_eq!(
+        drawn,
+        [(BLUE, WHITE), (RED, WHITE), (BLUE, WHITE), (RED, WHITE)]
+    );
 }
