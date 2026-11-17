@@ -122,6 +122,7 @@ mod paint_own;
 mod paint_partial;
 mod paint_partial_drawn;
 mod paint_partial_read;
+mod paint_refusals;
 mod painted;
 mod painted_batches;
 mod painted_positions;

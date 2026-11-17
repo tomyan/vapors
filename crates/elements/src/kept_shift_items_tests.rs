@@ -32,7 +32,7 @@ fn a_shifted_shape_moves_its_translation_and_bounds() {
 
 #[test]
 #[cfg(debug_assertions)]
-fn the_repaint_check_skips_an_infinite_edge_and_refuses_a_nan_one() {
+fn the_repaint_check_takes_only_whole_edges_an_infinite_one_included() {
     // Given
     let quad = |right: f32| {
         Item::Quad(vapors_scene::Quad::fill(
@@ -43,8 +43,9 @@ fn the_repaint_check_skips_an_infinite_edge_and_refuses_a_nan_one() {
 
     // When
     let answers =
-        [f32::INFINITY, f32::NAN, 3.5, 3.0].map(|right| super::whole_where_finite(&quad(right)));
+        [f32::INFINITY, f32::NAN, 3.5, 3.0].map(|right| super::whole_snapped(&quad(right)));
 
-    // Then
-    assert_eq!(answers, [true, false, false, true]);
+    // Then: an infinite edge is not whole; paint refuses its box first
+    // (issue #449), so none reaches the check
+    assert_eq!(answers, [false, false, false, true]);
 }

@@ -82,11 +82,13 @@ pub(crate) fn paint_all(
 }
 
 /// A paint of every box, for the debug build's check; the text cache
-/// is left as it was, so the check keeps no layout the update would not.
+/// and the boxes paint refused are left as they were, so the check keeps
+/// no layout and adds no refusal the update would not.
 fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let cache = input.cache.clone();
+    let refused = std::mem::take(&mut input.unresolvable);
     let painted = paint(boxes, rects, input);
-    *input.cache = cache;
+    (*input.cache, input.unresolvable) = (cache, refused);
     painted
 }
 

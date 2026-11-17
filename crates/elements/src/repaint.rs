@@ -40,13 +40,13 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
-            #[cfg(debug_assertions)]
-            crate::repaint_check::assert_painted_whole(
-                &kept,
-                input.snapped(self.rects[slot]),
-                slot,
-                input,
-            );
+            let border_box = input.snapped(self.rects[slot]);
+            if crate::paint::finite(border_box) {
+                #[cfg(debug_assertions)]
+                crate::repaint_check::assert_painted_whole(&kept, border_box, slot, input);
+            } else {
+                input.unresolvable.push((slot, self.rects[slot]));
+            }
             input.class = None;
             kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
@@ -92,8 +92,16 @@ impl<'a> Repaint<'a> {
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
+            // a box paint refuses (`unresolvable`) has thumbs from its
+            // infinite rect; the update is refused, so they are not checked
             #[cfg(debug_assertions)]
-            crate::repaint_check::assert_snapped_whole(thumb.items().iter(), slot, input);
+            if !input
+                .unresolvable
+                .iter()
+                .any(|&(refused, _)| refused == slot)
+            {
+                crate::repaint_check::assert_snapped_whole(thumb.items().iter(), slot, input);
+            }
             input.class = None;
             painted.items_built += thumb.items().len();
             kept_mut(painted, slot).set_thumb(thumb);

@@ -132,3 +132,7 @@ pub(crate) mod node_id {
         u64::deserialize(d).map(NodeId)
     }
 }
+
+#[cfg(test)]
+#[path = "a11y_tree_finite_tests.rs"]
+mod finite_tests;

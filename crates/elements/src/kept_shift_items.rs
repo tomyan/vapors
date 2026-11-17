@@ -12,35 +12,26 @@ pub(crate) fn whole_item(item: &Item) -> bool {
     edges_all(item, is_whole)
 }
 
-/// Whether every coordinate paint snaps in `item` is a whole number,
-/// infinite ones skipped, for the debug check after a repaint
-/// (`repaint_check.rs`). A shadow's caster alone: its blurred rect is
-/// the caster moved by the offset and grown by the spread, each times
-/// the scale and unsnapped (`paint_own.rs` `shadow_item`), as the
-/// corpus's Chromium comparisons pass it.
+/// Whether every coordinate paint snaps in `item` is a whole number, for
+/// the debug check after a repaint (`repaint_check.rs`); an edge that is
+/// not finite is not whole, and reaches the check only from a box paint
+/// refuses, which the check skips (`repaint.rs`, issue #449). A shadow's
+/// caster alone: its blurred rect is the caster moved by the offset and
+/// grown by the spread, each times the scale and unsnapped
+/// (`paint_own.rs` `shadow_item`), as the corpus's Chromium comparisons
+/// pass it.
 #[cfg(debug_assertions)]
-pub(crate) fn whole_where_finite(item: &Item) -> bool {
+pub(crate) fn whole_snapped(item: &Item) -> bool {
     match *item {
-        Item::Shadow(shadow) => rect_whole_where_finite(shadow.caster),
-        _ => edges_all(item, whole_or_infinite),
+        Item::Shadow(shadow) => rect_whole(shadow.caster),
+        _ => whole_item(item),
     }
 }
 
-/// Whether every edge of `rect` is a whole number, infinite ones
-/// skipped.
+/// Whether every edge of `rect` is a whole number.
 #[cfg(debug_assertions)]
-pub(crate) fn rect_whole_where_finite(rect: Rect) -> bool {
-    rect_all(rect, whole_or_infinite)
-}
-
-/// Relaxed: an infinite edge is not asked to be whole. It is not
-/// between pixels, and the a11y take refuses a box with one
-/// (`AxError::NotFinite`); paint does not yet, issue #449, whose fix
-/// (paint refusing the box) retires this. A NaN edge is not skipped: it
-/// fails, as it is neither infinite nor whole.
-#[cfg(debug_assertions)]
-fn whole_or_infinite(v: f32) -> bool {
-    v.is_infinite() || is_whole(v)
+pub(crate) fn rect_whole(rect: Rect) -> bool {
+    rect_all(rect, is_whole)
 }
 
 /// Whether `edge` holds of every coordinate of `item`'s rects; false

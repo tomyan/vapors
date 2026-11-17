@@ -4,7 +4,7 @@
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
 use crate::kept_paint::{PaintedFrom, keep, paint_all};
-use crate::layout::{LayoutBox, Rebuilt};
+use crate::layout::{BoxRect, LayoutBox, Rebuilt};
 use crate::paint::PaintInput;
 use crate::paint_order::{Patched, Stackings};
 use crate::painted::Painted;
@@ -40,7 +40,7 @@ impl Document {
         (boxes, stackings): (&[LayoutBox], &Stackings),
         (from, lanes): (&PaintedFrom, &crate::layout::SharedLanes),
         changed: &ChangedSlots,
-    ) -> Painted {
+    ) -> (Painted, Vec<(usize, BoxRect)>) {
         let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let text = (&mut self.fonts, &mut self.texts);
@@ -63,7 +63,7 @@ impl Document {
             from,
             (&scrolls, &lanes),
         );
-        painted
+        (painted, input.unresolvable)
     }
 }
 

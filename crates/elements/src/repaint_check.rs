@@ -6,7 +6,7 @@
 use vapors_scene::{Item, Rect, TransformClass};
 
 use crate::kept_box::KeptBox;
-use crate::kept_shift_items::{rect_whole_where_finite, snapped_kind, whole_where_finite};
+use crate::kept_shift_items::{rect_whole, snapped_kind, whole_snapped};
 use crate::paint::PaintInput;
 
 /// Panics, naming the slot and the item, when the box in `slot`, its
@@ -40,7 +40,7 @@ pub(crate) fn assert_snapped_whole<'i>(
     }
     for item in items.filter(|item| snapped_kind(item)) {
         assert!(
-            whole_where_finite(item),
+            whole_snapped(item),
             "box slot {slot}, in a frame of class {:?}, paints {item:?}, not whole device \
              pixels: snapped items under a whole translation are whole (paint.rs \
              `snapped`); reproduce with `cargo xtask test`",
@@ -69,7 +69,7 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         panic!("box slot {slot}'s outline paints {item:?}, not a ring quad (paint_outline.rs)")
     };
     assert!(
-        rect_whole_where_finite(border_box),
+        rect_whole(border_box),
         "box slot {slot}'s outline ring is grown from {border_box:?}, not whole device pixels \
          (paint.rs `snapped`); reproduce with `cargo xtask test`"
     );
@@ -82,9 +82,6 @@ fn assert_ring_on_box(item: &Item, border_box: Rect, slot: usize, input: &PaintI
         ring.rect.bottom - border_box.bottom,
     ];
     let reaches = [left, top, right, bottom];
-    if reaches.iter().any(|reach| !reach.is_finite()) {
-        return;
-    }
     assert!(
         reaches
             .iter()
