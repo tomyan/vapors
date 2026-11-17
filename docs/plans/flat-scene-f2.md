@@ -130,7 +130,8 @@ Each check is proven by a break.
 
 Answered by the lead (2026-11-17): each recommendation below is taken.
 Two indices; the closed-form and mesh pipelines are included; the split
-is F2a, F2b, F2c; Tom checks the Pixel 9 Pro at F2a's end, from a build
+is F2.1, F2.2, F2.3 (renamed from F2a, F2b, F2c, which clashed with
+`docs/F2c.md`, the CSS plan); Tom checks the Pixel 9 Pro at F2.1's end, from a build
 served on the tailnet.
 
 Decision (Tom, 2026-11-17, through the lead): a device without
@@ -155,25 +156,25 @@ kept as a second path).
 3. **The split.** Six pipelines, six shaders, the text crate and the
    app's painter come to more than one pull request of about 400 lines.
    Recommended, each keeping pixels unchanged:
-   - **F2a:** the table, the refusal, the page-contract case, and the
+   - **F2.1:** the table, the refusal, the page-contract case, and the
      quad and shadow pipelines on it.
-   - **F2b:** the image and text pipelines (icons included, which the
+   - **F2.2:** the image and text pipelines (icons included, which the
      text pipeline draws).
-   - **F2c:** the closed-form and mesh pipelines. This retires the shape
+   - **F2.3:** the closed-form and mesh pipelines. This retires the shape
      batch cut, `Shift` and the uniform row table.
 4. **The Pixel 9 Pro check.** It is by hand. I can serve the build on
    the tailnet (`cargo xtask serve`), and someone with the phone has to
-   open it and report. Who does it, and at which slice: F2a, the first
+   open it and report. Who does it, and at which slice: F2.1, the first
    to read the table?
 
-## As built: F2a
+## As built: F2.1
 
-- **Scope.** F2a moved the closed-form pipeline onto the table along
+- **Scope.** F2.1 moved the closed-form pipeline onto the table along
   with quads and shadows, because all three share `Instanced`
   (`renderer/src/instanced.rs`), and one pipeline cannot take both the
-  old and the new path. F2c keeps the mesh pipeline, the shape batch
+  old and the new path. F2.3 keeps the mesh pipeline, the shape batch
   cut, and the retirement of `Shift` and `RowOffsets`, which the image
-  and text pipelines read until F2b.
+  and text pipelines read until F2.2.
 - **Renderer.**
   - `TransformTable` (`transform_table.rs`) holds the entries on the
     CPU (`transform_entries.rs`): entry 0 is the identity, values are

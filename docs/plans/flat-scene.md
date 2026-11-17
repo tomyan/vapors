@@ -459,11 +459,12 @@ pub struct PaintUses {
 ```
 
 From the templates: `transform_classes` from the state of `transform`
-on every keyed element (constant `none`: `WholeTranslate` only; a
-constant translate with whole px at every scale in `@media` terms is
-not provable, since the scale is run-time, so any non-`none` constant
-or known-variable transform adds `Affine`; `perspective` or a 3D
-function adds `Projective`); `clip_kinds` from `overflow` and
+on every keyed element (a constant that is the identity at every
+scale factor, `none`, `scale(1)` or `translate(0, 0)`: `WholeTranslate`
+only, as section 4.3 decides at compile time; any other constant or
+known-variable transform adds `Affine`, which is conservative, since
+4.3 may classify it `WholeTranslate` at run time once the scale factor
+is known; `perspective` or a 3D function adds `Projective`); `clip_kinds` from `overflow` and
 `border-radius` winners together; `text_regimes` from the transform
 classes of elements that hold text; `scenes` from `<Scene>` tags;
 `pipelines` from the element kinds and paints present. A hand-built
@@ -956,7 +957,7 @@ content enters the list.
 | # | Slice | Content | Accepted when | Depends on |
 |---|---|---|---|---|
 | F1 | Transform class on frames | `TransformClass` in `vapors-scene`; each frame (`frames.rs`) carries `WholeTranslate`; paint takes `snap` from its frame's class (always true at this head; another class panics naming F4a); debug assertions that a `WholeTranslate` frame's shift is whole and that every snapped item under one is whole (`whole_item`). Design: `flat-scene-f1.md` | Pixels unchanged on every fixture; the assertions proven by breaking (a fractional shift panics naming the frame) | none |
-| F2 | The transform table | A `Retained` storage buffer of 4x4 entries; a `u32` index per instance in the quad, shadow, text and image layouts; the shaders read the table; `Shift` and the dynamic-offset slots retired for the painter (touche's immediate path untouched); a page-contract case that reads the table on SwiftShader; the Pixel 9 Pro checked by hand and recorded in `docs/web.md` | Scroll at 3,000 rows: writes equal to 4c's (one entry per scrolled frame); Idle 0; `kept_bytes` debug compare extended to the index; pixels unchanged; a device without vertex-stage storage buffers refused naming the limit (unit test with a faked limit) | F1 |
+| F2 | The transform table | In three parts, each keeping pixels unchanged (`flat-scene-f2.md`): F2.1 the table, the refusal, the page-contract case, quads, shadows and closed forms; F2.2 images, text and icons; F2.3 meshes, retiring the shape batch cut, `Shift` and the uniform row table. A `Retained` storage buffer of 4x4 entries; a `u32` index per instance in the quad, shadow, text and image layouts; the shaders read the table; `Shift` and the dynamic-offset slots retired for the painter (touche's immediate path untouched); a page-contract case that reads the table on SwiftShader; the Pixel 9 Pro checked by hand and recorded in `docs/web.md` | Scroll at 3,000 rows: writes equal to 4c's (one entry per scrolled frame); Idle 0; `kept_bytes` debug compare extended to the index; pixels unchanged; a device without vertex-stage storage buffers refused naming the limit (unit test with a faked limit) | F1 |
 | F3 | Clips as data | The clip table (rect and rounded rect, parent index); a `u32` clip index per instance; `clip.wgsl` shared by every pipeline; the scissor as the batch's bound; batches joined across frames and clips; `overflow: hidden` with `border-radius` and a rounded clip on a `gpu-surface` ancestor no longer refused | A Chromium fixture of a rounded scroller holding text, an image and a shadow at 1x and 2x passes the paint rules; W10 added; W1 and W4 added with before/after batch counts; the clip-depth refusal proven by breaking | F2 |
 | F4a | Boxes under an affine transform | CSS `transform: translate | scale` on elements accepted (the `Deferred` entry retired for those functions); a transformed element is a transform node with class from its matrix; items built unsnapped under `Affine`; `fwidth` scaling in `quads.wgsl` and `shadows.wgsl`; hit testing through the inverse; text under an `Affine` node refused naming F5; a static transform's class folded into the key (3.1 form 3) | Chromium fixtures at rest: a card at `translate(10.5px, 3.25px)` and at `scale(1.37)` pass the paint rules at 1x and 2x; `elementFromPoint` agrees on a click through the transform (events oracle); W7's page mounts (text replaced by boxes until F5) | F3; build-time-styles B1 for the key's class |
 | F4b | Animating transforms | A bound custom property read by `transform` as the run-time source; the animating state (4.3): class held through the motion, `SETTLE_FRAMES` declared with its reason, `UpdateCounts::parts_reclassed` (added here, with the code that increments it) at start and settle only; the table entry rewritten per frame | W7 (boxes): `parts_reclassed` 2 per cycle, `batches_written` 0 while moving, table writes 1 per moving frame; the centroid rule against an exact-coverage reference; a snap mid-motion proven to fail it by breaking (class recomputed per frame) | F4a |

@@ -232,7 +232,7 @@ impl Pipelines<'_> {
 /// `shift`, for a mesh batch, which is batched in one frame
 /// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
 /// frame's shift, with no rows (meshes move to the transform table in
-/// flat-scene F2c).
+/// flat-scene F2.3).
 ///
 /// # Panics
 ///
