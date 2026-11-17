@@ -1,4 +1,4 @@
-# touche's shell: a 44 px bar, the canvas, and from 600 px wide a
+# An editor shell: a 44 px bar, the canvas, and from 600 px wide a
 # 280 px side panel; under 600 px the canvas alone.
 pixel 4 4 #171b1f          the bar, top left
 pixel 4 43 #171b1f         the bar's last row

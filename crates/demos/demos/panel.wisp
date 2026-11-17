@@ -3,7 +3,7 @@ use crate::panel_row::{PanelRow, PanelRowProps};
 </script>
 
 <style>
-/* A touche-style side panel built from nested components, each with its
+/* A side panel built from nested components, each with its
    own <style>. This panel and its rows both use a `.title` class: the
    panel's `.panel .title` is more specific than the row's `.title`, so
    if scoping failed it would turn the rows' titles red. */
