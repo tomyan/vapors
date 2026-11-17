@@ -3,6 +3,18 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+// Relaxed guard, declared: the API builder's sandbox
+// (docs/plans/api-builder.md) is read by `cargo xtask api-fences`, which
+// lands two PRs on (the #467 split); until then only its tests use it.
+// Retired by that PR, which removes these allows.
+#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+mod api_fds;
+#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+mod api_host;
+#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+mod api_paths;
+#[allow(dead_code, reason = "used by api-fences, two PRs on")]
+mod api_sandbox;
 mod builds;
 mod builds_config;
 mod builds_tree;
