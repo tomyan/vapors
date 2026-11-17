@@ -6,7 +6,7 @@
 
 use vapors_elements::{BatchKey, KeptBatched, Painted};
 use vapors_renderer::Target;
-use vapors_scene::Run;
+use vapors_scene::{Rect, Run};
 
 use super::ScenePainter;
 use super::errors::PaintError;
@@ -65,7 +65,7 @@ impl ScenePainter {
         batch: &vapors_scene::Batch,
         frame: vapors_elements::FrameDraw,
     ) -> Target<'t> {
-        if on_the_clip_table(&batch.run) {
+        if scissor_clip(&batch.run, batch.clip).is_none() {
             return clipped(target, frame.on_page(None))
                 .expect("inside the batch's clip on the page, so inside the frame's clip");
         }
@@ -151,8 +151,25 @@ fn assert_parallel(kept: &KeptBatched) {
 
 /// Whether `run`'s items take their clip from the clip table (flat-scene
 /// F3.1): quads, shadows and closed-form shapes, the pipelines on F2.1's
-/// tables. The one answer: the scissor here and the clip entry in
-/// `painter_kept_entries.rs` both read it (verify of #463, 1).
-pub(super) fn on_the_clip_table(run: &Run) -> bool {
+/// tables. The one answer, which [`scissor_clip`] and [`table_clip`]
+/// read: a run is cut by exactly one of them.
+fn on_the_clip_table(run: &Run) -> bool {
     matches!(run, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
 }
+
+/// The clip of a batch's own, `clip`, that its scissor cuts to: none
+/// for a run on the clip table, whose scissor is its frame's clip only;
+/// `clip` for the rest.
+pub(super) fn scissor_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
+    if on_the_clip_table(run) { None } else { clip }
+}
+
+/// The clip a batch's instances read from the clip table: `clip` for a
+/// run on the table; none, entry 0, for the rest (`painter_kept_entries.rs`).
+pub(super) fn table_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
+    clip.filter(|_| on_the_clip_table(run))
+}
+
+#[cfg(test)]
+#[path = "painter_runs_tests.rs"]
+mod tests;
