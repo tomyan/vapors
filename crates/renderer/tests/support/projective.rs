@@ -13,7 +13,7 @@ use vapors_renderer::{
 };
 use vapors_scene::Color;
 
-const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const DEPTH: wgpu::TextureFormat = vapors_renderer::DEPTH_FORMAT;
 
 /// A camera that puts plane unit (x, y) at device pixel (x, y) of a
 /// `side` square target, +Y down, as the page's shapes are placed.

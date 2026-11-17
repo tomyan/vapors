@@ -1,0 +1,70 @@
+settled after 20 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:00 claude
+ 8.9       00:35 chromium
+ 5.5       00:34 chromium
+ 5.2       00:34 chromium
+ 5.1       00:34 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:00 claude
+ 8.8       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:00 claude
+ 8.8       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:00 claude
+ 8.8       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.8       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.8       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.7       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.7       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.7       00:35 chromium
+ 5.5       00:35 chromium
+ 5.1       00:35 chromium
+ 5.0       00:35 chromium
+settled after 0 s, load 1.38 9.05 13.93; busiest:
+%CPU     ELAPSED COMMAND
+29.9 13-11:58:01 claude
+ 8.7       00:35 chromium
+ 5.4       00:35 chromium
+ 5.1       00:35 chromium
+ 4.9       00:35 chromium

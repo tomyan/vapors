@@ -32,6 +32,7 @@ fn render(width: u32, height: u32, draw: impl FnOnce(&wgpu::Device, &Target<'_>)
             encoder: &encoder,
             view: &view,
             multisampled: None,
+            depth: None,
             viewport,
             scissor: None,
         },

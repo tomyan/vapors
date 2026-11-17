@@ -41,6 +41,7 @@ fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {
             encoder: &encoder,
             view: &view,
             multisampled: None,
+            depth: None,
             viewport,
             scissor: None,
         },

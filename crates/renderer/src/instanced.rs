@@ -20,7 +20,7 @@ const VERTICES_PER_QUAD: u32 = 6;
 
 pub(crate) struct Instanced {
     label: &'static str,
-    pipeline: wgpu::RenderPipeline,
+    pipeline: crate::DepthVariants,
     /// The samples it was made for.
     samples: crate::Samples,
     binding: TableBinding,
@@ -59,7 +59,16 @@ impl Instanced {
         };
         Self {
             label,
-            pipeline: render_pipeline(device, binding.layout(), &shader, pass, instance),
+            pipeline: crate::DepthVariants::new(|depth| {
+                render_pipeline(
+                    device,
+                    binding.layout(),
+                    &shader,
+                    pass,
+                    instance.clone(),
+                    depth,
+                )
+            }),
             samples: pass.samples,
             binding,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
@@ -176,7 +185,7 @@ impl Instanced {
         };
         let group = self.binding.group(target, tables, &self.work);
         target.draw_pass((self.label, self.samples), |pass| {
-            pass.set_pipeline(&self.pipeline);
+            pass.set_pipeline(self.pipeline.for_target(target));
             pass.set_bind_group(0, group, &[viewport]);
             pass.set_vertex_buffer(0, instances);
             self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);

@@ -1,0 +1,36 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Adapter type: IntegratedGpu
+Timestamp queries: true
+Revision: 89bc6f3efabe
+Profile: release (the shipped profile)
+Shader cache: /home/tom/.cache/w-lane/start-warm/cache-main, 1 entries at the start (warm)
+Load average at the start: 1.38
+
+First frame, 100 rows: mount 737.9 µs, App::start to idle 18158.0 µs, frame 0 to idle 4048.1 µs (to submit 2493.5 µs); mount to frame 0 idle 22944.0 µs.
+
+| part | phase | µs | instructions |
+|---|---|---|---|
+| mount | all | 737.9 | 3415539 |
+| start | all | 18158.0 | none |
+| start | layout | 6080.2 | 22626670 |
+| start | paint | 882.9 | 4164836 |
+| start | style | 940.8 | 6142859 |
+| start | write | 627.6 | 113825 |
+| frame | all | 2493.5 | 7293472 |
+| frame | to idle | 4048.1 | none |
+| frame | accessibility | 0.3 | 1438 |
+| frame | batches | 37.7 | 166874 |
+| frame | draw | 2458.6 | 7241436 |
+| frame | encode | 265.3 | 642304 |
+| frame | input | 0.4 | 1430 |
+| frame | layout | 6.2 | 5309 |
+| frame | paint | 0.5 | 2616 |
+| frame | record | 0.2 | 1419 |
+| frame | style | 2.8 | 2480 |
+| frame | submit | 158.0 | 63371 |
+| frame | tasks | 0.1 | 1419 |
+| frame | tick | 0.1 | 1419 |
+| frame | update | 17.9 | 23018 |
+| frame | write | 880.2 | 1049214 |
+
+Load average at the end: 1.38

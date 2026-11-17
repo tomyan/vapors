@@ -100,6 +100,7 @@ fn on_white(draw: impl FnOnce(&vapors_gpu_harness::Gpu, &Target<'_>)) -> Vec<u8>
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: SIZE,
             height: SIZE,

@@ -56,6 +56,7 @@ fn painted(css: &str, over: bool) -> Result<Vec<u8>, DrawOverError> {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: SIZE,
             height: SIZE,

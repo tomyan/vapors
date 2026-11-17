@@ -23,7 +23,7 @@ use vapors_app::{DrawOverError, PaintError, ScenePainter, Tooltip, TooltipError}
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, Target, clear};
+use vapors_renderer::{DepthAttachment, FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::FontSystem;
 
@@ -95,7 +95,11 @@ impl Rig {
 
     /// A painter at `samples` on the default test device.
     pub fn with_samples(samples: vapors_renderer::Samples) -> Self {
-        let gpu = gpu();
+        Self::with_samples_on(gpu(), samples)
+    }
+
+    /// As [`Rig::with_samples`], on `gpu`.
+    pub fn with_samples_on(gpu: Gpu, samples: vapors_renderer::Samples) -> Self {
         let pass = vapors_renderer::PassFormat {
             format: wgpu::TextureFormat::Rgba8Unorm,
             samples,
@@ -121,6 +125,49 @@ impl Rig {
     pub fn draw_at(&mut self, doc: &Document, size: Size) -> Result<Vec<u8>, PaintError> {
         let painted = doc.painted().expect("updated");
         self.on_target_of(size, |painter, target| painter.draw(target, painted))
+    }
+
+    /// `doc` drawn into a fresh target of `size` whose pass has a depth
+    /// attachment at the painter's `samples`, as a frame painting a scene
+    /// has (flat-scene F8a): its RGBA bytes.
+    pub fn draw_with_depth(
+        &mut self,
+        doc: &Document,
+        (size, samples): (Size, vapors_renderer::Samples),
+    ) -> Result<Vec<u8>, PaintError> {
+        let depth = DepthAttachment::new(&self.gpu.device, size, samples);
+        let painted = doc.painted().expect("updated");
+        self.on_target_of(size, |painter, target| {
+            let target = Target {
+                depth: Some(&depth),
+                ..*target
+            };
+            painter.draw(&target, painted)
+        })
+    }
+
+    /// The depth attachment's values, read back, after `doc` is drawn
+    /// with it into a fresh `SIZE` square target at one sample: by
+    /// `draw`, which clears the colour in the encoder, or by `draw_over`
+    /// (`over`), which loads it.
+    pub fn depth_after(&mut self, doc: &Document, over: bool) -> Vec<f32> {
+        let depth = DepthAttachment::new(&self.gpu.device, square(), vapors_renderer::Samples::One);
+        let painted = doc.painted().expect("updated");
+        self.on_fresh_target(|painter, target| {
+            let target = Target {
+                depth: Some(&depth),
+                ..*target
+            };
+            if over {
+                painter
+                    .draw_over(&target, painted)
+                    .map_err(|e| format!("{e:?}"))
+            } else {
+                painter.draw(&target, painted).map_err(|e| format!("{e:?}"))
+            }
+        })
+        .expect("draws");
+        read_depth(&self.gpu, depth.texture(), square())
     }
 
     /// `doc` drawn over a fresh `SIZE` square target: its RGBA bytes.
@@ -189,6 +236,7 @@ fn target<'a>(
         encoder,
         view,
         multisampled: None,
+        depth: None,
         viewport: size,
         scissor: None,
     }
@@ -198,4 +246,61 @@ fn target<'a>(
 pub fn pixel(rgba: &[u8], x: u32, y: u32) -> [u8; 4] {
     let at = ((y * SIZE + x) * 4) as usize;
     rgba[at..at + 4].try_into().expect("four bytes")
+}
+
+/// The `Depth32Float` values of `texture`, `size` pixels, read back.
+fn read_depth(gpu: &Gpu, texture: &wgpu::Texture, size: Size) -> Vec<f32> {
+    let row = (size.width * 4).next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+    let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("depth readback"),
+        size: u64::from(row * size.height),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::DepthOnly,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(row),
+                rows_per_image: None,
+            },
+        },
+        wgpu::Extent3d {
+            width: size.width,
+            height: size.height,
+            depth_or_array_layers: 1,
+        },
+    );
+    gpu.queue.submit([encoder.finish()]);
+    buffer
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, |mapped| mapped.expect("maps"));
+    gpu.device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .expect("the GPU finishes");
+    let bytes = buffer
+        .slice(..)
+        .get_mapped_range()
+        .expect("mapped")
+        .to_vec();
+    bytes
+        .chunks(row as usize)
+        .flat_map(|line| {
+            line[..(size.width * 4) as usize]
+                .as_chunks::<4>()
+                .0
+                .to_vec()
+        })
+        .map(f32::from_le_bytes)
+        .collect()
 }

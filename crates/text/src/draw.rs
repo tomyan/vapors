@@ -163,7 +163,7 @@ impl TextPipeline {
             )
         });
         target.draw_pass(("text", *samples), |pass| {
-            pass.set_pipeline(pipeline);
+            pass.set_pipeline(pipeline.for_target(target));
             pass.set_bind_group(0, bind_group, &[params]);
             pass.set_vertex_buffer(0, vertices);
             work.draw(pass, 0..count, 0..1);

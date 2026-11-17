@@ -54,6 +54,7 @@ fn drawn(css: &str, text: &str) -> (Vec<u8>, FrameCounts) {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: size,
         scissor: None,
     };

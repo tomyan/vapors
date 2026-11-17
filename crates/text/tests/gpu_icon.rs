@@ -46,6 +46,7 @@ fn render(icon: &Icon, colour: Color) -> Vec<u8> {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

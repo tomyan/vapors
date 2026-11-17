@@ -2,7 +2,6 @@
 //! buffer, and at 4 samples the multisampled colour the pass draws into
 //! and resolves into the backing (`docs/plans/flat-scene-f7.md`, F7b).
 
-use crate::pipeline::DEPTH_FORMAT;
 use vapors_app::SURFACE_FORMAT;
 use vapors_app::SurfaceSize;
 use vapors_renderer::Samples;
@@ -27,7 +26,11 @@ pub(crate) fn attachments(
         )
     });
     Attachments {
-        depth: texture(device, (size, samples), ("scene3d depth", DEPTH_FORMAT)),
+        depth: texture(
+            device,
+            (size, samples),
+            ("scene3d depth", vapors_renderer::DEPTH_FORMAT),
+        ),
         colour,
     }
 }

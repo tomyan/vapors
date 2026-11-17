@@ -50,6 +50,7 @@ pub fn render_page(
             encoder: &encoder,
             view: &view,
             multisampled: None,
+            depth: None,
             viewport,
             scissor: None,
         };
@@ -94,6 +95,7 @@ pub fn render_labels(
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport,
         scissor: None,
     };

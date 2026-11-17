@@ -14,7 +14,7 @@ use crate::{GpuWork, KeptRange, MeshShape, Retained, Target, TransformTable, Wor
 
 /// A pipeline that draws mesh items. Create once per target format.
 pub struct MeshPipeline {
-    pipeline: wgpu::RenderPipeline,
+    pipeline: crate::DepthVariants,
     /// The samples it was made for.
     samples: crate::Samples,
     binding: TableBinding,
@@ -29,7 +29,9 @@ impl MeshPipeline {
     pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
         let (binding, pass) = (TableBinding::new(device, "meshes", false), pass.into());
         Self {
-            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), pass),
+            pipeline: crate::DepthVariants::new(|depth| {
+                crate::meshes_setup::render_pipeline(device, binding.layout(), pass, depth)
+            }),
             samples: pass.samples,
             binding,
             kept: Retained::new(device, "meshes", wgpu::BufferUsages::VERTEX),
@@ -99,7 +101,7 @@ impl MeshPipeline {
             return;
         };
         let run = Draws {
-            pipeline: (&self.pipeline, self.samples),
+            pipeline: (self.pipeline.for_target(target), self.samples),
             bind_group: self
                 .binding
                 .group(target, table.map(|table| (table, None)), &self.work),

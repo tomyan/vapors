@@ -1007,7 +1007,7 @@ content enters the list.
 | F5 | Text under translation (regime B) | Atlas glyphs at fractional positions with bilinear sampling while the node animates; re-quantised at settle; the baseline not rounded while moving | W7 with text: `rasterisations` 0 while moving; the settle frame equals regime A's pixels for that transform (bytes compared); screenshots at the settle frame recorded; the Chromium comparison at rest before and after unchanged | F4b |
 | F6 | Text under rotation (regime C) | Glyph outlines tessellated into shape entries cached by (font, glyph, tolerance), behind `runtime-shapes`; drawn through the shapes pipeline with `adjust()`; `rotate()` and `skew()` accepted; the A/C weight difference measured at rest at 13, 16 and 28 px against Chromium at 0, 15, 45 and 90 degrees | The difference recorded with the paint rules' verdict per size; the switch rule's thresholds in `docs/text.md`; a rotated-text fixture passes or the question returns to Tom with the numbers | F5; one-scene S2, S3a2, S3b |
 | F7 | MSAA decision | The pass sample count from a page flag (the `PaintUses` field before F10 exists; 4x for a page with a scene, our reading of D2, `flat-scene-f7.md`); the painter built for the page's count, its 2D pipelines with it; a resolve into the target; `GpuTimer` A/B on the rows page, W10 and the racer page at 1 and 4 samples on the UHD 630 and the Pixel 9 Pro; a mesh fixture (a tilted cube's edge) compared with an 8x reference at 1 and 4 | The numbers in `docs/perf/`; decision D2 answered with them; pixels unchanged at 1 sample | F3 |
-| F8 | The scene in the one pass | `Item::Scene` as a context: the scene's range drawn in the painter's pass with the depth attachment (present only when a scene is on the page), the viewport depth slice per scene, the slice-count refusal; meshes as instances of one in `Retained` with the world matrix in the transform table (E1 (a)); application materials carried over (one-scene R2: a mesh drawn by an app's WGSL `material` function, given world position, its position in the scene's viewport and the viewport's size, the mesh's colour and shade, `vapors-scene3d` `material.rs`), a pipeline per material as the scene renderer builds them; in the one pass F8 gives `screen` and `size` the contract's meaning, the scene's viewport and not the page's (the scene's origin taken off the fragment's position), so a material drawn in either renderer is the same; `material()` called once per fragment, in the fragment stage, in uniform control flow (no branch or discard before it), since materials may take derivatives (the contract in `material.rs`; the racer's ground uses `fwidth`); a node may have determinant -1 (the racer's world group mirrors Y, one-scene 2.2), so a renderer that adds culling or lit normals flips front-face and the normal matrix for it (pinned by `shade/mirrored.rs`); a camera is rigid (`Scene::view_projection` refuses one that scales, shears or mirrors, `CameraError::NotRigid`), so its view may be built as a rigid inverse, and a zoom is a lens change (`Scene::set_projection`); `slots.rs` retired; the scene's offscreen texture and composite gone; `Item::Surface` kept for application renderers | The ground and object check (`3d-2.md`) passes in the one pass; two scenes on one page do not depth-test each other (pixel test); HTML over the scene unchanged; the racer's 60 s run (one-scene P0's judge) before and after in `docs/perf/` (before: `scene-run-r3a2-2026-11-17.md`, 1 and 4 samples); `passes` per frame pinned 1; `FrameCounts::surfaces` for the scene's work folded into the frame's counts with the pins moved, each proven by breaking | F2, F7; one-scene R3a2 (the racer on `SceneRenderer`) |
+| F8 | The scene in the one pass (decisions: "F8's decisions" below this table, L78; F8a1 built 2026-11-17, the 2D pipelines' depth variants) | A second renderer kind that draws in the painter's pass (Q1), not `Item::Scene` in vapors-app; the scene as a context: the scene's range drawn in the painter's pass with the depth attachment (present only when a scene is on the page), the viewport depth slice per scene, the slice-count refusal; meshes as instances of one in `Retained` with the world matrix in the transform table (E1 (a)); application materials carried over (one-scene R2: a mesh drawn by an app's WGSL `material` function, given world position, its position in the scene's viewport and the viewport's size, the mesh's colour and shade, `vapors-scene3d` `material.rs`), a pipeline per material as the scene renderer builds them; in the one pass F8 gives `screen` and `size` the contract's meaning, the scene's viewport and not the page's (the scene's origin taken off the fragment's position), so a material drawn in either renderer is the same; `material()` called once per fragment, in the fragment stage, in uniform control flow (no branch or discard before it), since materials may take derivatives (the contract in `material.rs`; the racer's ground uses `fwidth`); a node may have determinant -1 (the racer's world group mirrors Y, one-scene 2.2), so a renderer that adds culling or lit normals flips front-face and the normal matrix for it (pinned by `shade/mirrored.rs`); a camera is rigid (`Scene::view_projection` refuses one that scales, shears or mirrors, `CameraError::NotRigid`), so its view may be built as a rigid inverse, and a zoom is a lens change (`Scene::set_projection`); `slots.rs` retired; the scene's offscreen texture and composite gone; `Item::Surface` kept for application renderers | The ground and object check (`3d-2.md`) passes in the one pass; two scenes on one page do not depth-test each other (pixel test); HTML over the scene unchanged; the racer's 60 s run (one-scene P0's judge) before and after in `docs/perf/` (before: `scene-run-r3a2-2026-11-17.md`, 1 and 4 samples); `passes` per frame pinned 1; `FrameCounts::surfaces` for the scene's work folded into the frame's counts with the pins moved, each proven by breaking | F2, F7; one-scene R3a2 (the racer on `SceneRenderer`) |
 | F9 | Primitives under a scene node | Shapes (decal paths) as primitives with a 4x4 transform in the scene's context, depth bias, drawn after opaque meshes; a node may have determinant -1 (one-scene 2.2), so culling or lit normals flip front-face and the normal matrix for it, as in F8; `<Decal>` from one-scene S8 on this route; S7's `SurfaceFrame::shapes` not built or retired | One-scene S7's acceptance on this route (a decal on a plane at 60 degrees against an 8x reference; no depth fighting at the racer's widest zoom); a livery toggle writes paint bytes, no geometry | F8; one-scene S5b |
 | F10 | `PaintUses` | The compiler emits the table per crate from B1's classification over `transform`, `overflow-*`, `border-radius`, scene tags and element kinds; the registry makes pipelines from the merged table at mount; the unsnapped path, outline regime and clip kinds are built only when named; `paint_uses_unknown` for hand-built pages; `wisp-check --paint` prints the table and each element that widens it with `file:line` | Snapshot per demo and the racer; a `<Mesh>` added from Rust on a page whose crates name no scene refused naming the site; `paint_uses_unknown` 0 pinned on Mount, the racer and one demo; the debug within-table assertion proven by breaking | F4a, F8; build-time-styles B3b |
 | F11 | Projective transforms | `perspective`, `rotateX/Y/Z`, `rotate3d`, `matrix3d`, `transform-style: preserve-3d` (no plane splitting, as Chromium), `backface-visibility`, `transform-origin` with z: the `Projective` class; text in regime C; hit testing through the inverse with a singular matrix hitting nothing | WPT `css/css-transforms/` reftests named in design 09's oracle table run as pixel comparisons at rest; touche's layer-view card fixture passes; `getBoundingClientRect` agreement on the projected box; an HTML panel square to a perspective camera is classified by its plane's 2D mapping (the homography on the panel plane), not the 4x4 matrix, so constant depth reduces to a scale and a translation (Tom, 2026-11-17, through the lead, paraphrased). At the 1:1 distance, where one CSS pixel of the panel maps to one device pixel times the scale factor (the camera's distance equals its focal length in pixels, `viewport height / (2 tan(fov / 2))`), it is `WholeTranslate` and snaps (`panel_square_at_the_unit_distance_is_whole_translate`). Rotated by 0.5 degrees about its vertical axis, it is `Projective` (`panel_rotated_half_a_degree_is_projective`). The drift stays within 4.3's 1/64 device pixel over a 2,000 px panel, with the points F11 says bound a homography's drift (`tolerance_holds_over_a_2000_px_panel`). At any other distance it is a scale, so `Affine` and unsnapped (4.3's `ScaleTranslate` option would change that). Crossing the boundary is counted by F4b's `parts_reclassed`. Each check is proven by breaking it | F6, F4b |
@@ -1025,6 +1025,86 @@ it does not need F4a to F5. Workloads W6 (its own pull request after F1), W1, W4
 (F5), W9 (one-scene S3a1), W11 (F8), W12 (after F2s, for its sticky
 header), W2, W3, W5 (any time after
 F1) carry the measurements.
+
+F8's decisions (lead, L78, 2026-11-17, from N items 13 Q1 to Q12):
+
+- **How a scene reaches the pass (Q1 (a)).** vapors-app gains a second
+  renderer kind beside `SurfaceRenderer`, one that draws in the painter's
+  pass. It prepares first (uploads, its table entries through a handle
+  the painter gives it), then draws into the open pass with its viewport
+  and its depth slice set. `vapors-scene3d-gpu` implements it, so
+  vapors-app does not depend on scene3d. The `gpu-surface` element stays
+  the scene's box, and `Item::Surface` stays for offscreen application
+  renderers.
+- **Depth (Q2 (a), with L78's change).** Every 2D pipeline is built in
+  two variants, without and with a `Depth32Float` attachment (depth test
+  `Always`, no depth write). Both are built at the painter's making, for
+  every page, until F10's `PaintUses` says which pages need them: F0
+  refuses a judged frame that builds a pipeline. A frame attaches depth
+  only when it paints a scene. Built in F8a1 (`DepthVariants`,
+  `Target::depth`). Measured with `vapors-perf --first-frame 100`, cold
+  (Mesa's shader cache off), 5 runs each on the UHD 630: `App::start` to
+  idle took a median 162.8 ms at main (161.1 to 164.2) and 170.4 ms with
+  the variants (163.4 to 184.8), about 7.6 ms more. Frame 0 was
+  unchanged, at 4.1 to 4.3 ms. Warm (Mesa's shader cache filled by one
+  run of each binary first), 5 alternating runs each after the load
+  settled: a median 17.80 ms at main (17.68 to 18.16) and 21.07 ms with
+  the variants (20.81 to 21.32), about 3.3 ms more; frame 0 3.9 to
+  4.4 ms both ways (`docs/perf/f8a1-start-warm-2026-11-17/`). Only the
+  native build was measured: the web build on the Pixel 9 Pro, where each
+  pipeline goes through Dawn and Tint, is measured in F8a2 on a served
+  build, before F8a2 merges.
+- **The depth attachment (#493 review).** `DepthAttachment` is made by
+  the renderer, so its samples and size are checked on the CPU against
+  the target's, naming both. The frame's encoder clears a depth view on
+  its first pass in the encoder, whatever the colour load (a pass after
+  a clear outside the encoder loads its colour), and loads it after.
+- **Depth slices (Q3).** Scene `k` of the `N` painted in a frame draws in
+  `[k/N, (k+1)/N)` of the viewport's depth range, so `N` may change
+  between frames: depth is cleared each frame. More than 16 scenes on a
+  page are refused, naming the count. A pixel test covers two
+  overlapping scenes.
+- **Materials (Q4).** `screen` and `size` keep the contract's meaning,
+  the scene's viewport. A per-scene table entry holds the camera's
+  view-projection and the viewport's rect, and the shader takes the
+  origin off the fragment's position. R2b's ground pins carry over.
+- **Meshes (Q5).** Each mesh node is an instance (a transform index and
+  a colour) of its geometry, in `Retained`. Draws stay in tree order,
+  since R2a pins "first in the tree wins" on coplanar meshes, so a batch
+  is a run of consecutive nodes with the same geometry and material.
+- **Mirrored nodes (Q6).** F8 adds no culling and no lit normals, so
+  nothing flips; `shade/mirrored.rs` moves to the one pass.
+- **Derivatives (Q7 (a)).** No discard before `material()`. A scene
+  under a rect clip uses the scissor; under any other clip, coverage
+  multiplies the colour after `material()`.
+- **4x at the pass's end (Q8).** The 4x colour and the depth are
+  discarded after the resolve by default, and stored when a later pass
+  on the target (the tooltip's) is due. Pinned by a test, and measured
+  on the Pixel.
+- **Counts (Q9).** The scene's work moves from `FrameCounts::surfaces` to
+  a field of its own (`scenes`), so the IU tests still tell HUD work from
+  scene work. Each moved pin is proven by a break.
+- **Samples (Q10).** Scene pipelines take the painter's pass format, so
+  `SceneRenderer::with_samples` retires for the in-pass kind, and the
+  racer's 4x is the page's.
+- **Before and after (Q11).** Before is the "after frame 0's fix" sets of
+  `docs/perf/scene-run-r3a2-2026-11-17.md`, at 1 and 4 samples. After is
+  the same script at F8's head, 3 pairs each, with one pass per frame
+  pinned.
+- **Slices (Q12).** F8a, F8b, F8c and F8d in that order, each with an
+  Opus review. F8a is two pull requests:
+  - F8a1: the depth variants and the frame's optional depth attachment.
+  - F8a2: the in-pass renderer kind, the scene drawn in the pass with
+    its depth slice, and the racer and one-scene moved onto it.
+
+  F8b is meshes as instances (`slots.rs` retired). F8c is materials in
+  the pass; a baked ground texture (the render profile's option (3),
+  `docs/perf/render-profile-13b-2026-11-17.md`) stays a candidate there,
+  taken only if the racer still misses its targets after G1, F8a2 and
+  C1. F8d is the 4x discard, the counts and the runs; it also measures
+  again at 1920 x 1080 on ANV and on the Pixel, MSAA 4x against a post
+  pass over the scene's area, which decides D2 at large windows (Tom,
+  L93).
 
 Questions for F2s (open):
 

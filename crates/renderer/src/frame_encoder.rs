@@ -56,6 +56,9 @@ pub struct FrameEncoder {
     /// The multisampled views cleared in this encoder: a pass may load
     /// only these (`frame_encoder_parts.rs` `assert_cleared`).
     cleared: RefCell<Vec<wgpu::TextureView>>,
+    /// The depth views cleared in this encoder: each is cleared on its
+    /// first pass, whatever the colour does (`depth_load`).
+    depths_cleared: RefCell<Vec<wgpu::TextureView>>,
 }
 
 impl FrameEncoder {
@@ -88,6 +91,7 @@ impl FrameEncoder {
             refusal: RefCell::new(None),
             clock: None,
             cleared: RefCell::new(Vec::new()),
+            depths_cleared: RefCell::new(Vec::new()),
         }
     }
 
@@ -187,7 +191,8 @@ impl FrameEncoder {
         self.passes.set(self.passes.get() + 1);
         self.spent.pass();
         let writes = self.clock.as_ref().and_then(FrameClock::pass_writes);
-        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), views, load, writes);
+        let depth = self.depth_load(views.depth);
+        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), views, (load, depth), writes);
         *self.pass.borrow_mut() = Some(pass);
     }
 

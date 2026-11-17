@@ -46,6 +46,7 @@ mod gpu_clip_entries;
 mod gpu_clip_joins;
 mod gpu_cull;
 mod gpu_demos;
+mod gpu_depth_variants;
 mod gpu_draw_over;
 mod gpu_fixed_draw_costs;
 mod gpu_fling_replay;

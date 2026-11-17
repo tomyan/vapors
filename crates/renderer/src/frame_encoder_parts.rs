@@ -80,6 +80,21 @@ impl FrameEncoder {
         );
     }
 
+    /// How a pass loads the depth view `depth`: cleared to 1, the far
+    /// plane, on its first pass in this encoder, whatever the colour
+    /// does (a pass after a clear outside the encoder loads its colour),
+    /// and loaded after (#493 review, H). With no depth view, nothing.
+    pub(crate) fn depth_load(&self, depth: Option<&wgpu::TextureView>) -> wgpu::LoadOp<f32> {
+        let mut cleared = self.depths_cleared.borrow_mut();
+        match depth {
+            Some(view) if !cleared.contains(view) => {
+                cleared.push(view.clone());
+                wgpu::LoadOp::Clear(1.0)
+            }
+            _ => wgpu::LoadOp::Load,
+        }
+    }
+
     /// Records that a draw was refused; the first refusal is kept.
     pub(crate) fn refuse(&self, refusal: ArenaFull) {
         self.refusal.borrow_mut().get_or_insert(refusal);

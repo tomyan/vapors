@@ -1,0 +1,10 @@
+main 1 App::start to idle 18070.3 µs frame0 frame 0 to idle 3940.9 µs (warm) load 1.38 9.05 13.93
+branch 1 App::start to idle 21323.6 µs frame0 frame 0 to idle 4377.3 µs (warm) load 1.38 9.05 13.93
+main 2 App::start to idle 17799.6 µs frame0 frame 0 to idle 3888.3 µs (warm) load 1.38 9.05 13.93
+branch 2 App::start to idle 20809.2 µs frame0 frame 0 to idle 3983.6 µs (warm) load 1.38 9.05 13.93
+main 3 App::start to idle 17796.4 µs frame0 frame 0 to idle 4035.0 µs (warm) load 1.38 9.05 13.93
+branch 3 App::start to idle 21003.0 µs frame0 frame 0 to idle 4004.7 µs (warm) load 1.38 9.05 13.93
+main 4 App::start to idle 18158.0 µs frame0 frame 0 to idle 4048.1 µs (warm) load 1.38 9.05 13.93
+branch 4 App::start to idle 21232.5 µs frame0 frame 0 to idle 4018.0 µs (warm) load 1.38 9.05 13.93
+main 5 App::start to idle 17683.5 µs frame0 frame 0 to idle 3952.1 µs (warm) load 1.38 9.05 13.93
+branch 5 App::start to idle 21066.1 µs frame0 frame 0 to idle 3950.6 µs (warm) load 1.38 9.05 13.93

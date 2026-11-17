@@ -167,6 +167,7 @@ fn target<'a>(
         encoder,
         view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: WIDTH,
             height: HEIGHT,

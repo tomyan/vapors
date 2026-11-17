@@ -175,6 +175,7 @@ fn draw_on(rig: &mut Rig, doc: &Document, (side, scissor): (u32, Option<Scissor>
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: side,
             height: side,

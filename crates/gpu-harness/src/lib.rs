@@ -22,7 +22,9 @@ pub const TIER_ENV: &str = "VAPORS_TEST_TIER";
 /// The value of [`TIER_ENV`] in which [`gpu()`] refuses.
 pub const REFUSED_TIER: &str = "unit";
 
-/// The adapter this process is testing on, with its device and queue.
+/// The adapter this process is testing on, with its device and queue;
+/// a clone shares them.
+#[derive(Clone)]
 pub struct Gpu {
     /// The adapter, for its name and limits.
     pub adapter: wgpu::Adapter,

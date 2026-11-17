@@ -49,7 +49,7 @@ pub(crate) fn render_pipeline(
     device: &wgpu::Device,
     (layout, view): (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
     shader: &wgpu::ShaderModule,
-    pass: crate::PassFormat,
+    (pass, depth): (crate::PassFormat, crate::Depth),
 ) -> wgpu::RenderPipeline {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("image"),
@@ -78,7 +78,7 @@ pub(crate) fn render_pipeline(
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: crate::depth_variants::depth_2d(depth),
             multisample: pass.samples.state(),
             multiview_mask: None,
             cache: None,

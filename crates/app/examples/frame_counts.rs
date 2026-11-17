@@ -46,6 +46,7 @@ fn two_frames(gpu: &Gpu, shown: &vapors_demos::Shown) -> (FrameCounts, FrameCoun
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: Size {
             width: 640,
             height: 400,

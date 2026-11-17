@@ -43,6 +43,7 @@ fn render(gpu: &Gpu, name: &str, spec: &Spec, samples: Samples) -> Vec<u8> {
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport: size,
         scissor: None,
     };

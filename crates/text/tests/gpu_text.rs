@@ -65,6 +65,7 @@ fn render_under(
         encoder: &encoder,
         view: &view,
         multisampled: None,
+        depth: None,
         viewport,
         scissor,
     };
