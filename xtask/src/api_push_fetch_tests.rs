@@ -237,8 +237,15 @@ fn host_an_object_directory_linked_to_another_repository_hands_over_nothing() {
     // When
     let fetched = fetched(&fixture.builder, &fixture.objects, ("api/b", 1));
 
-    // Then: refused, and the blob is nowhere in the push repository
-    assert!(fetched.is_err(), "{fetched:?}");
+    // Then: refused by upload-pack itself, which started in bwrap and
+    // could not read the object (its pack-objects died: it ran, so bwrap
+    // started), not by bwrap failing to start
+    let refused = fetched.expect_err("refused");
+    assert!(
+        refused.contains("git upload-pack: git-pack-objects died"),
+        "{refused}"
+    );
+    // and the blob is nowhere in the push repository
     let bare = fixture.builder.root().join("push-1.git");
     assert!(
         git(&bare, &["cat-file", "-e", &blob]).is_err(),
