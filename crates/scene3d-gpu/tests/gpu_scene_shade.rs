@@ -2,6 +2,8 @@
 //! D4, row R1): two faces of one mesh, shades 0.65 and 1.0, under one
 //! colour, draw at 0.65 and 1.0 of it.
 
+#[path = "shade/materials.rs"]
+mod materials;
 mod support;
 
 use support::{Fixture, at, render};

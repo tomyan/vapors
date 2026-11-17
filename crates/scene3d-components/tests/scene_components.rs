@@ -2,6 +2,8 @@
 //! one scene node each, under the parent the anchor names, moved by
 //! their signals.
 
+#[path = "components/material.rs"]
+mod material;
 mod support;
 
 use support::{Rig, at};

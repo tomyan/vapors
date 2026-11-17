@@ -3,6 +3,8 @@
 
 #![allow(dead_code)] // each test file uses part of it
 
+pub mod materials;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{

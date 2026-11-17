@@ -1,5 +1,7 @@
 //! Frames the scene renderer refuses, naming the fix.
 
+#[path = "refusals/materials.rs"]
+mod materials;
 mod support;
 
 use support::{Fixture, RED, render};

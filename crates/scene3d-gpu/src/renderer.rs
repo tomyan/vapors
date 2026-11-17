@@ -1,7 +1,7 @@
 //! `SceneRenderer`: the scene on a `gpu-surface`.
 
 use crate::camera::{CameraUniform, view_projection};
-use crate::draw::{MeshNode, Pass, mesh_nodes, record};
+use crate::draw::{MeshNode, Pass, materials_built, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::log::Tracked;
 use crate::pipeline::Pipeline;
@@ -10,7 +10,7 @@ use crate::{FrameError, RendererLog, Resource, depth};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
-use vapors_scene3d::{Meshes, NodeId, Scene};
+use vapors_scene3d::{MaterialId, Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
 /// given to its [`Meshes`]. Each render borrows the `Meshes` mutably to
@@ -60,7 +60,7 @@ impl Drop for SceneRenderer {
 impl SurfaceRenderer for SceneRenderer {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
         let log = &self.log;
-        let pipeline = Pipeline::new(device);
+        let pipeline = Pipeline::new(device, self.meshes.borrow().materials());
         self.mounted = Some(Mounted {
             camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
             slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
@@ -85,6 +85,7 @@ impl SurfaceRenderer for SceneRenderer {
         let mut scene = self.scene.borrow_mut();
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
+        materials_built(&nodes, &meshes, mounted.pipeline.materials.len())?;
         mounted.geometry.upload_missing(&frame, &nodes);
         mounted
             .camera
@@ -132,13 +133,18 @@ impl Mounted {
         depth: &wgpu::TextureView,
         nodes: &[MeshNode],
     ) -> Result<(), FrameError> {
+        // in tree order: of two fragments at one depth the first drawn wins
+        // (depth `Less`), so the material does not reorder them
         let draws = nodes
             .iter()
             .filter(|mesh| mesh.visible)
-            .map(|mesh| Ok((self.offset(mesh.node), self.geometry.get(mesh)?)))
+            .map(|mesh| {
+                let material = mesh.material.map(MaterialId::index);
+                Ok((material, self.offset(mesh.node), self.geometry.get(mesh)?))
+            })
             .collect::<Result<Vec<_>, FrameError>>()?;
         let pass = Pass {
-            pipeline: &self.pipeline.render,
+            pipelines: (&self.pipeline.render, &self.pipeline.materials),
             camera: self.camera.bind_group(),
             slots: self.slots.bind_group(),
             colour: frame.view,

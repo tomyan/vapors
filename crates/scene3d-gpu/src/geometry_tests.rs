@@ -23,6 +23,7 @@ fn mesh_in(meshes: &mut Meshes) -> MeshNode {
         handle,
         colour,
         visible: true,
+        material: None,
     }
 }
 
