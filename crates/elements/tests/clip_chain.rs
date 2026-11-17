@@ -11,13 +11,21 @@ use vapors_elements::{Document, MAX_CLIP_CHAIN};
 /// `depth` scroll containers, each inside the last, and a leaf in the
 /// innermost.
 fn nested_scrollers(depth: usize) -> Document {
+    nested_scrollers_holding(depth, &["leaf"])
+}
+
+/// `depth` scroll containers, each inside the last, and the innermost
+/// holding a box of each class in `leaves`.
+fn nested_scrollers_holding(depth: usize, leaves: &[&str]) -> Document {
     let mut doc = document();
     let mut parent = doc.body();
     for _ in 0..depth {
         parent = element(&mut doc, parent, "div", "scroller");
     }
-    element(&mut doc, parent, "div", "leaf");
-    let css = ".scroller { overflow: auto; height: 50px; } .leaf { height: 100px; }";
+    for class in leaves {
+        element(&mut doc, parent, "div", class);
+    }
+    let css = ".scroller { overflow: auto; height: 50px; } .leaf, .second { height: 100px; }";
     doc.add_stylesheet("t.css", css).expect("parses");
     doc
 }
@@ -98,4 +106,27 @@ fn a_lane_row_under_a_clip_adds_a_link_and_one_under_none_does_not() {
 
     // Then: the row's frame under body's clip is one more link
     assert_eq!((clipped, unclipped), ((2, true), (1, true)));
+}
+
+#[test]
+fn two_boxes_past_the_limit_are_refused_once_naming_the_first_and_counting_the_other() {
+    // Given: two leaves in the innermost of the nested scrollers
+    let mut doc = nested_scrollers_holding(MAX_CLIP_CHAIN + 1, &["leaf", "second"]);
+
+    // When
+    let errors = doc.update(viewport(640.0, 400.0)).err().expect("refused");
+
+    // Then
+    let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
+    assert_eq!(messages.len(), 1, "{messages:?}");
+    assert!(
+        messages[0].starts_with("<div class=\"leaf\"> (box slot "),
+        "{}",
+        messages[0]
+    );
+    assert!(
+        messages[0].contains("; 1 other box is past it too;"),
+        "{}",
+        messages[0]
+    );
 }

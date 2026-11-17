@@ -37,7 +37,7 @@ fn longest_chains() -> Vec<(&'static str, usize)> {
 }
 
 #[test]
-fn no_fixture_s_clip_chain_is_past_the_limit() {
+fn the_corpus_s_longest_clip_chain_is_the_measured_one_and_none_is_past_the_limit() {
     // When
     let chains = longest_chains();
 
@@ -46,6 +46,15 @@ fn no_fixture_s_clip_chain_is_past_the_limit() {
         .iter()
         .max_by_key(|(_, links)| *links)
         .expect("fixtures");
+    assert_eq!(
+        longest.1,
+        vapors_elements::MEASURED_CORPUS_CLIP_CHAIN,
+        "the longest clip chain is {} links ({}), not the measurement MAX_CLIP_CHAIN \
+         cites: set the constant in crates/elements/src/clip_chain.rs and say so at \
+         MAX_CLIP_CHAIN",
+        longest.1,
+        longest.0
+    );
     eprintln!(
         "longest clip chain in the corpus: {} links ({})",
         longest.1, longest.0
