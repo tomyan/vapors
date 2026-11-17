@@ -73,8 +73,18 @@ impl Clips {
             None => self.table.take(target.encoder, 1)?,
         };
         let rect = [clip.left, clip.top, clip.right, clip.bottom];
-        let entry = ClipEntry::rect(rect, frame_entry);
-        self.table.set(target.encoder, target.queue, at, entry);
+        self.table.set(
+            target.encoder,
+            target.queue,
+            at,
+            ClipEntry::rect(rect, frame_entry),
+        );
+        self.hold(key, at, frame_entry);
+        Some(at)
+    }
+
+    /// `at` held for `key`, naming `frame_entry`, drawn this frame.
+    fn hold(&mut self, key: (BatchFrame, [u32; 4]), at: u32, frame_entry: u32) {
         let drawn = self.frame;
         self.held.insert(
             key,
@@ -84,7 +94,6 @@ impl Clips {
                 drawn,
             },
         );
-        Some(at)
     }
 
     /// Gives back the entries this frame did not draw, writing their
@@ -140,24 +149,19 @@ pub(super) fn assert_whole(clip: Rect) {
     );
 }
 
-/// Panics when the clip shader and the scissor path would put a clip in
-/// different places on the page. The shader reads clip entry `at`'s
-/// rectangle moved by the translation its frame entry holds in the
-/// transform table, and the instanced batch's scissor cuts it to the
-/// frame's clip; the scissor path (text and images until F3.1b) moves
-/// the batch's own `clip` by the frame's shift and cuts it to the same
-/// clip (`FrameDraw::on_page`). Every build: two table reads per clipped
-/// batch drawn. F3.1b retires it with the scissor path.
+/// Panics when the clip shader (`shader_rect`) and the scissor path
+/// would put a clip in different places on the page: the scissor path
+/// (text and images until F3.1b) moves the batch's own `clip` by the
+/// frame's shift and cuts it to the frame's clip (`FrameDraw::on_page`).
+/// Every build: two table reads per clipped batch drawn. F3.1b retires
+/// it with the scissor path.
 pub(super) fn assert_agrees(
     (transforms, clips): (&TransformTable, &ClipTable),
     at: u32,
     (clip, draw): (Rect, FrameDraw),
 ) {
     let entry = clips.entry(at);
-    let matrix = transforms.matrix(entry.frame);
-    let [left, top, right, bottom] = entry.rect;
-    let moved = Rect::new(left, top, right, bottom).offset([matrix[12], matrix[13]]);
-    let shader = draw.clip.map_or(moved, |outer| moved.intersection(outer));
+    let shader = shader_rect(transforms, &entry, draw.clip);
     assert_eq!(
         Some(shader),
         draw.on_page(Some(clip)),
@@ -168,6 +172,16 @@ pub(super) fn assert_agrees(
         entry.frame,
         draw.shift
     );
+}
+
+/// Where the clip shader puts `entry` on the page: its rectangle moved
+/// by the translation its frame entry holds in the transform table, cut
+/// by the instanced batch's scissor to the frame's clip `frame_clip`.
+fn shader_rect(transforms: &TransformTable, entry: &ClipEntry, frame_clip: Option<Rect>) -> Rect {
+    let matrix = transforms.matrix(entry.frame);
+    let [left, top, right, bottom] = entry.rect;
+    let moved = Rect::new(left, top, right, bottom).offset([matrix[12], matrix[13]]);
+    frame_clip.map_or(moved, |outer| moved.intersection(outer))
 }
 
 #[cfg(test)]

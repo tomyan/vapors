@@ -5,9 +5,9 @@
 use vapors_renderer::Target;
 use vapors_scene::Run;
 
-use super::Kind;
 use crate::painter::ScenePainter;
 use crate::painter::rows::Moved;
+use crate::painter::runs::table_clip;
 
 impl ScenePainter {
     /// A run's frame's entry in the transform table, set to its shift;
@@ -24,11 +24,7 @@ impl ScenePainter {
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
-        let on_the_table = matches!(
-            Kind::of_run(run),
-            Some(Kind::Shadows | Kind::Quads | Kind::ClosedForms)
-        );
-        let clip = match moved.clip.filter(|_| on_the_table) {
+        let clip = match table_clip(run, moved.clip) {
             Some(clip) => self.clip_entry(target, (frame, clip), moved)?,
             None => 0,
         };
