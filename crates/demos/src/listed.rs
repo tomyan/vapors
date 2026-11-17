@@ -67,7 +67,7 @@ pub const DEMOS: &[Listed] = &[
     elements(
         "shell",
         "Shell",
-        "F2c S4: touche's shell, a grid that drops its panel on a phone",
+        "F2c S4: an editor shell, a grid that drops its panel on a phone",
     ),
     elements(
         "panel",

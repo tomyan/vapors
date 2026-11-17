@@ -63,7 +63,7 @@ button:hover { background-color: #4a8be5; }
 .dismiss:hover { background-color: #b7bcc1; }
 </style>
 
-<div class="bar"><div class="title">touche</div><button onclick={saved}>Save</button><button onclick={failed}>Export</button></div>
+<div class="bar"><div class="title">vapors</div><button onclick={saved}>Save</button><button onclick={failed}>Export</button></div>
 <div class="canvas"></div>
 <div class="stack">
   {for toast in toasts.get() key=toast.0}

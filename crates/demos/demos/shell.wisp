@@ -37,7 +37,7 @@ button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 6px; b
 }
 </style>
 
-<div class="bar"><div class="title">touche</div><button>Open</button><button>Export</button></div>
+<div class="bar"><div class="title">vapors</div><button>Open</button><button>Export</button></div>
 <div class="canvas"></div>
 <div class="panel">
   <div class="layer">Curves</div>
