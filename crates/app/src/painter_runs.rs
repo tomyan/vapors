@@ -44,7 +44,7 @@ impl ScenePainter {
         for (at, batch) in kept.batched.batches.iter().enumerate() {
             let frame = places.frame(at, painted, kept);
             let Some(clipped) =
-                clipped(target, frame.on_page(batch.clip)).filter(|_| !batch.culled)
+                clipped(target, frame.on_page(batch.clips.union())).filter(|_| !batch.culled)
             else {
                 self.surfaces
                     .check_clipped(target.device, painted, &batch.run)?;
@@ -65,7 +65,7 @@ impl ScenePainter {
         batch: &vapors_scene::Batch,
         frame: vapors_elements::FrameDraw,
     ) -> Target<'t> {
-        if scissor_clip(&batch.run, batch.clip).is_none() {
+        if scissor_clip(&batch.run, batch.clips.union()).is_none() {
             return clipped(target, frame.on_page(None))
                 .expect("inside the batch's clip on the page, so inside the frame's clip");
         }
@@ -87,7 +87,7 @@ impl ScenePainter {
             offsets,
             rows_key,
             rows: kept.rows.get(at).unwrap_or_default(),
-            clip: kept.batched.batches[at].clip,
+            clips: &kept.batched.batches[at].clips,
             draw: frame,
         };
         let run = &kept.batched.batches[at].run;
@@ -149,25 +149,18 @@ fn assert_parallel(kept: &KeptBatched) {
     );
 }
 
-/// Whether `run`'s items take their clip from the clip table (flat-scene
-/// F3.1): quads, shadows and closed-form shapes, the pipelines on F2.1's
-/// tables. The one answer, which [`scissor_clip`] and [`table_clip`]
-/// read: a run is cut by exactly one of them.
-fn on_the_clip_table(run: &Run) -> bool {
-    matches!(run, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
-}
-
 /// The clip of a batch's own, `clip`, that its scissor cuts to: none
-/// for a run on the clip table, whose scissor is its frame's clip only;
-/// `clip` for the rest.
+/// for a run on the clip table ([`Run::clipped_by_table`], the one
+/// answer), whose scissor is its frame's clip only; `clip` for the rest.
 pub(super) fn scissor_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
-    if on_the_clip_table(run) { None } else { clip }
+    if run.clipped_by_table() { None } else { clip }
 }
 
-/// The clip a batch's instances read from the clip table: `clip` for a
-/// run on the table; none, entry 0, for the rest (`painter_kept_entries.rs`).
+/// The clip a batch's items under `clip` read from the clip table: `clip`
+/// for a run on the table; none, entry 0, for the rest
+/// (`painter_kept_entries.rs`).
 pub(super) fn table_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
-    clip.filter(|_| on_the_clip_table(run))
+    clip.filter(|_| run.clipped_by_table())
 }
 
 #[cfg(test)]

@@ -40,7 +40,7 @@ impl ShadowPipeline {
     /// The instance bytes of `shadows`, as a draw writes them.
     #[must_use]
     pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
-        Self::bytes_in(shadows, (0, 0), &[])
+        Self::bytes_in(shadows, (0, &[]), &[])
     }
 
     /// The instance bytes of `shadows`, each in frame `frame` (its entry
@@ -52,10 +52,14 @@ impl ShadowPipeline {
     /// When `rows` is neither empty nor one index an item, or names a row
     /// past a batch's range ([`ROWS_PER_BATCH`](vapors_scene::ROWS_PER_BATCH)).
     #[must_use]
-    pub fn bytes_in(shadows: &[Shadow], (frame, clip): (u32, u32), rows: &[u32]) -> Vec<u8> {
+    pub fn bytes_in(
+        shadows: &[Shadow],
+        (frame, clips): (u32, crate::ClipRuns<'_>),
+        rows: &[u32],
+    ) -> Vec<u8> {
         rowed_instances(
             ("shadows", Self::VEC4S as usize),
-            (shadows, (frame, clip), rows),
+            (shadows, (frame, clips), rows),
             instance,
         )
     }

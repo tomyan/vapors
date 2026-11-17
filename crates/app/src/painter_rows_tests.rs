@@ -70,7 +70,7 @@ fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
         offsets,
         rows_key: a_key(),
         rows,
-        clip: None,
+        clips: Box::leak(Box::new(vapors_scene::Clips::one(None))),
         draw: vapors_elements::FrameDraw {
             shift: [3.0, 5.0],
             clip: None,

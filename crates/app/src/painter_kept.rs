@@ -84,7 +84,7 @@ impl ScenePainter {
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let rows = moved.rows.items();
-        let Some((frame, clip, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
         // image and surface bytes name no entry: their draw's uniform does
@@ -97,7 +97,7 @@ impl ScenePainter {
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, ((named, clip), rows, moved.offsets.len()), key, at),
+            (run, ((named, &clips), rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
@@ -147,7 +147,7 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let Some((frame, _no_clip, rows_base)) = self.table_entries(target, run, moved) else {
+        let Some((frame, _no_clips, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
         let parts = (&mut self.text, &mut self.atlas);

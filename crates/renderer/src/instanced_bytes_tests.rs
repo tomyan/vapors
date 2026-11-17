@@ -18,7 +18,7 @@ fn two_quads() -> [Quad; 2] {
 #[test]
 fn an_item_in_the_last_row_a_batch_holds_is_written_with_its_frame() {
     // When: row 127, the last of 128
-    let bytes = QuadPipeline::bytes_in(&two_quads(), (9, 0), &[0, 127]);
+    let bytes = QuadPipeline::bytes_in(&two_quads(), (9, &[]), &[0, 127]);
 
     // Then: the second quad's row, then the frame's entry after it
     assert_eq!(bytes[144 + 128..144 + 132], 127u32.to_le_bytes());
@@ -30,7 +30,7 @@ fn an_item_in_the_last_row_a_batch_holds_is_written_with_its_frame() {
     expected = "quads: item 1 names row 128, past the 128 rows a batch's range holds; split the run into batches of at most that many rows (vapors-scene batch.rs)"
 )]
 fn an_item_past_the_rows_a_batch_holds_is_refused_naming_the_item_and_the_row() {
-    let _ = QuadPipeline::bytes_in(&two_quads(), (0, 0), &[0, 128]);
+    let _ = QuadPipeline::bytes_in(&two_quads(), (0, &[]), &[0, 128]);
 }
 
 #[test]
@@ -44,5 +44,26 @@ fn fewer_rows_than_items_are_refused() {
         caster: Rect::new(0.0, 0.0, 2.0, 2.0),
         caster_radii: [0.0; 4],
     };
-    let _ = ShadowPipeline::bytes_in(&[shadow, shadow], (0, 0), &[0]);
+    let _ = ShadowPipeline::bytes_in(&[shadow, shadow], (0, &[]), &[0]);
+}
+
+#[test]
+fn each_item_names_the_clip_entry_of_its_run() {
+    // Given: three quads, the first unclipped, the last two under entry 7
+    let quads = [two_quads()[0]; 3];
+
+    // When
+    let bytes = QuadPipeline::bytes_in(&quads, (9, &[(1, 7)]), &[]);
+
+    // Then: each instance's clip index, after its row and frame
+    let clip = |item: usize| bytes[item * 144 + 136..item * 144 + 140].to_vec();
+    assert_eq!(clip(0), 0u32.to_le_bytes());
+    assert_eq!(clip(1), 7u32.to_le_bytes());
+    assert_eq!(clip(2), 7u32.to_le_bytes());
+}
+
+#[test]
+#[should_panic(expected = "quads: clip runs [(1, 7), (1, 8)] for 2 items")]
+fn clip_runs_out_of_order_are_refused() {
+    let _ = QuadPipeline::bytes_in(&two_quads(), (0, &[(1, 7), (1, 8)]), &[]);
 }

@@ -80,7 +80,33 @@ fn a_batch_keeps_its_items_in_order() {
 }
 
 #[test]
-fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
+fn a_change_of_clip_starts_a_batch_of_a_kind_the_scissor_clips() {
+    // Given: a text, two texts under a clip, a text with the clip lifted
+    let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let mut scene = Scene::new();
+    scene.push(text(0));
+    scene.set_clip(Some(clip));
+    scene.push(text(1));
+    scene.push(text(2));
+    scene.set_clip(None);
+    scene.push(text(3));
+
+    // When
+    let batches = batches(&scene);
+
+    // Then: three batches, each under one clip
+    let shape: Vec<(Option<Option<Rect>>, usize)> = batches
+        .iter()
+        .map(|batch| (batch.clips.uniform(), batch.run.len()))
+        .collect();
+    assert_eq!(
+        shape,
+        [(Some(None), 1), (Some(Some(clip)), 2), (Some(None), 1)]
+    );
+}
+
+#[test]
+fn quads_join_across_clip_changes_each_keeping_its_clip() {
     // Given: a quad, two quads under a clip, a quad with the clip lifted
     let clip = Rect::new(0.0, 0.0, 4.0, 4.0);
     let mut scene = Scene::new();
@@ -94,15 +120,13 @@ fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
     // When
     let batches = batches(&scene);
 
-    // Then
-    let shape: Vec<(Option<Rect>, usize)> = batches
-        .iter()
-        .map(|batch| match &batch.run {
-            Run::Quads(quads) => (batch.clip, quads.len()),
-            other => panic!("expected quads, got {other:?}"),
-        })
-        .collect();
-    assert_eq!(shape, [(None, 1), (Some(clip), 2), (None, 1)]);
+    // Then: one batch, its clips in runs
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].run.len(), 4);
+    assert_eq!(
+        batches[0].clips.runs(),
+        [(0, None), (1, Some(clip)), (3, None)]
+    );
 }
 
 #[test]

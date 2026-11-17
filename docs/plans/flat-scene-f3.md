@@ -322,3 +322,28 @@ Each check is proven by a break.
   entry; a frame entry given back under a held clip refused). Pixels
   unchanged on every Chromium comparison and `gpu_*` test.
 
+
+## As built: F3.1, batches joined across clips (step 2)
+
+- **Order (the lead, L55).** Step 2's mechanism first, then F3.1b
+  (text and images onto the clip table) as one stack; the rows page's
+  draws (52 → about 18) move only once text joins.
+- **One answer.** `vapors-scene` `Run::clipped_by_table` says which runs
+  take their clip from the table (quads, shadows, closed-form shapes).
+  The batching, the scissor (`painter_runs.rs` `scissor_clip`) and the
+  clip entries (`table_clip`) all read it.
+- **Representation.** A scene `Batch` holds `Clips`: runs of items under
+  one clip, each `(first item, clip)`. `Batched::push` joins an item to
+  the last batch across a clip change when the run is clipped by the
+  table; every other kind still splits, one clip a batch. The painter
+  takes an entry for each run's clip and writes each instance's index
+  from its run (`vapors-renderer` `clip_of`), and a kept batch's bytes
+  are built again when any of its entries changes. A joined batch is
+  cut against the page by the union of its clips before it is drawn.
+- **Counts.** As the F3 baselines note predicted, nothing moves on W1
+  (nested scrollers), W4 (code blocks) or the rows page:
+  `gpu_f3_baselines.rs` and `gpu_rows_draws.rs` pass unchanged. A
+  fixture where quads split on a clip inside one frame
+  (`vapors-app` `gpu_clip_joins.rs`: four boxes in a strip, each
+  clipping a wider red box) drew its quads in 5 calls before step 2 and
+  draws them in 1, each box's red cut by its own clip.

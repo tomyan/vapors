@@ -89,7 +89,7 @@ fn gpu_kept_quads_drawn_with_a_range_short_of_their_rows_are_refused() {
         on_target(|painter, target| {
             for range in [3, 2] {
                 let pipelines = pipelines!(painter);
-                let drawn = (run, ((0, 0), &[2][..], range), key, at);
+                let drawn = (run, ((0, &[][..]), &[2][..], range), key, at);
                 let _ = painter
                     .kept
                     .range(pipelines, target, drawn)

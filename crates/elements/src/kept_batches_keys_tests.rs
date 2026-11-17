@@ -1,4 +1,4 @@
-use vapors_scene::{Batched, Color, Item, Quad, Rect, batched};
+use vapors_scene::{Batched, Item, Rect, TextId, batched};
 
 use super::KeptBatched;
 use crate::frames::PAGE;
@@ -11,9 +11,24 @@ const VIEW: Rect = Rect {
     bottom: 100.0,
 };
 
-pub(super) fn quad(top: f32, red: u8) -> Item {
+/// A text run `id` at `top`. Text, as its batches split at each clip
+/// change, which these tests use to make batches; quads join across
+/// clips (vapors-scene `Run::clipped_by_table`).
+pub(super) fn quad(top: f32, id: u8) -> Item {
+    Item::Text {
+        text: TextId(u32::from(id)),
+        origin: [10.0, top],
+        ink: Rect::new(10.0, top, 20.0, top + 10.0),
+    }
+}
+
+/// A quad at `top`.
+fn filled(top: f32) -> Item {
     let rect = Rect::new(10.0, top, 20.0, top + 10.0);
-    Item::Quad(Quad::fill(rect, Color::from_rgba8(red, 2, 3, 255)))
+    Item::Quad(vapors_scene::Quad::fill(
+        rect,
+        vapors_scene::Color::from_rgba8(1, 2, 3, 255),
+    ))
 }
 
 /// The batches of `items`, each under its clip.
@@ -148,11 +163,11 @@ fn a_run_equal_to_one_matched_from_the_start_is_not_matched_again_from_the_end()
 
 #[test]
 fn a_batch_whose_edge_went_from_minus_zero_to_zero_gets_a_new_key() {
-    // Given: the middle quad's top at -0.0
-    let was = keyed(three(quad(-0.0, 1)), None);
+    // Given: the middle batch a quad, its top at -0.0
+    let was = keyed(three(filled(-0.0)), None);
 
     // When: at 0.0, a run equal under == with other bytes
-    let again = keyed(three(quad(0.0, 1)), Some(&was));
+    let again = keyed(three(filled(0.0)), Some(&was));
 
     // Then
     assert_eq!((again.keys[0], again.keys[2]), (was.keys[0], was.keys[2]));

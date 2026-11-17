@@ -36,9 +36,9 @@ pub(crate) fn view_bytes(viewport: Size, rows_base: u32) -> [u8; VIEW_SIZE] {
 /// The instance bytes of `items` for the pipeline `label`: each item's
 /// `vec4s` four-float attributes (`floats`), then its row's index in
 /// `rows` (in its batch's range of the transform table), `frame`, its
-/// frame's entry in the table, and `clip`, its clip's entry in the clip
-/// table (0 for none), padded to 16 bytes. An empty `rows` puts
-/// every item in row 0 (a batch in one frame).
+/// frame's entry in the table, and its clip's entry in the clip table
+/// from `clips` ([`clip_of`]; 0 for none), padded to 16 bytes. An empty
+/// `rows` puts every item in row 0 (a batch in one frame).
 ///
 /// # Panics
 ///
@@ -49,10 +49,11 @@ pub(crate) fn view_bytes(viewport: Size, rows_base: u32) -> [u8; VIEW_SIZE] {
 /// reads them at.
 pub(crate) fn rowed_instances<T>(
     (label, vec4s): (&str, usize),
-    (items, (frame, clip), rows): (&[T], (u32, u32), &[u32]),
+    (items, (frame, clips), rows): (&[T], (u32, ClipRuns<'_>), &[u32]),
     floats: impl Fn(&T) -> Vec<f32>,
 ) -> Vec<u8> {
     assert_rows(label, items.len(), rows);
+    assert_clip_runs(label, items.len(), clips);
     let mut bytes = Vec::new();
     for (at, item) in items.iter().enumerate() {
         let floats = floats(item);
@@ -64,7 +65,7 @@ pub(crate) fn rowed_instances<T>(
         bytes.extend(floats.into_iter().flat_map(f32::to_le_bytes));
         bytes.extend(rows.get(at).copied().unwrap_or(0).to_le_bytes());
         bytes.extend(frame.to_le_bytes());
-        bytes.extend(clip.to_le_bytes());
+        bytes.extend(clip_of(clips, at).to_le_bytes());
         bytes.extend([0; 4]);
     }
     #[allow(clippy::cast_possible_truncation)] // a handful of vec4s
@@ -76,6 +77,38 @@ pub(crate) fn rowed_instances<T>(
          (instanced.rs `instance_bytes`)"
     );
     bytes
+}
+
+/// The clip entries of a batch's items, as runs `(first item, entry)`
+/// ([`clip_of`]).
+pub type ClipRuns<'a> = &'a [(u32, u32)];
+
+/// Item `at`'s clip entry in `clips`, runs of items under one clip as
+/// `(first item, entry)` in item order: the entry of the last run that
+/// starts at or before `at`; 0, no clip, before the first or with none.
+/// A batch joined across clips names several (flat-scene F3.1 step 2).
+#[must_use]
+pub fn clip_of(clips: &[(u32, u32)], at: usize) -> u32 {
+    let after = clips.partition_point(|&(first, _)| first as usize <= at);
+    after.checked_sub(1).map_or(0, |run| clips[run].1)
+}
+
+/// Refuses, naming `label`, clip runs whose first items do not rise or
+/// run past `items`: out of order, an item would read another's clip.
+///
+/// # Panics
+///
+/// As said.
+fn assert_clip_runs(label: &str, items: usize, clips: &[(u32, u32)]) {
+    let rising = clips.windows(2).all(|pair| pair[0].0 < pair[1].0);
+    let inside = clips
+        .last()
+        .is_none_or(|&(first, _)| (first as usize) < items.max(1));
+    assert!(
+        rising && inside,
+        "{label}: clip runs {clips:?} for {items} items: each run's first item must rise and \
+         fall inside the batch (instanced_bytes.rs clip_of); reproduce with `cargo xtask test`"
+    );
 }
 
 /// Refuses, naming `label`, rows that are not empty or one index for

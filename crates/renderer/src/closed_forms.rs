@@ -46,7 +46,7 @@ impl ClosedFormPipeline {
     /// the page.
     #[must_use]
     pub fn bytes(shapes: &[ClosedFormShape]) -> Vec<u8> {
-        Self::bytes_in(shapes, (0, 0), &[])
+        Self::bytes_in(shapes, (0, &[]), &[])
     }
 
     /// The instance bytes of `shapes`, each in frame `frame` (its entry
@@ -59,12 +59,12 @@ impl ClosedFormPipeline {
     #[must_use]
     pub fn bytes_in(
         shapes: &[ClosedFormShape],
-        (frame, clip): (u32, u32),
+        (frame, clips): (u32, crate::ClipRuns<'_>),
         rows: &[u32],
     ) -> Vec<u8> {
         rowed_instances(
             ("closed forms", Self::VEC4S as usize),
-            (shapes, (frame, clip), rows),
+            (shapes, (frame, clips), rows),
             |shape| shape.instance().to_vec(),
         )
     }

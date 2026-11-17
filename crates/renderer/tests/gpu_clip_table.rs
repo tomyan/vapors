@@ -33,7 +33,7 @@ fn drawn_under(
     let index = clip(&mut table, &at);
     let rows = if rows.is_empty() { vec![] } else { vec![row] };
     let whole = [quad([-32.0, -32.0, 48.0, 48.0], RED)];
-    let bytes = QuadPipeline::bytes_in(&whole, (table.frame, index), &rows);
+    let bytes = QuadPipeline::bytes_in(&whole, (table.frame, &[(0, index)]), &rows);
     let range = pipeline.keep(&at, &bytes).expect("room");
     let rows_base = table.rows_base;
     pipeline.draw_kept(

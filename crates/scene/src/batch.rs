@@ -1,17 +1,22 @@
-//! Runs of the scene's items that one pipeline draws under one clip,
-//! with the items that would change no visible pixel culled.
+//! Runs of the scene's items that one pipeline draws, with the items
+//! that would change no visible pixel culled. A run splits at a clip
+//! change unless its kind takes its clip from the clip table
+//! ([`Run::clipped_by_table`]), whose runs join across clips
+//! (flat-scene F3.1, step 2).
 
 use std::borrow::Borrow;
 
+pub use crate::batch_clips::Clips;
 use crate::display::{Item, Quad, Rect, Scene, Shadow};
 use crate::shape::{Shape, ShapeKind};
 
-/// Consecutive items of one kind under one clip: what a painter draws
-/// with one pipeline before switching to the next.
+/// Consecutive items of one kind: what a painter draws with one
+/// pipeline before switching to the next.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Batch {
-    /// The clip, device pixels; `None` draws unclipped.
-    pub clip: Option<Rect>,
+    /// Each item's clip, device pixels (`None` draws unclipped): one for
+    /// every item, but for a run [`Run::clipped_by_table`].
+    pub clips: Clips,
     /// True for culled surfaces, kept so the painter can refuse them as
     /// it refuses clipped ones: nothing in the batch is drawn.
     pub culled: bool,
@@ -122,22 +127,37 @@ impl Batched {
     }
 
     /// Adds `item` under `clip` to the last batch when it is of the same
-    /// kind, clip and culling, else as a new batch.
+    /// kind and culling, and of the same clip or a kind the clip table
+    /// clips; else as a new batch.
     fn push(&mut self, item: &Item, clip: Option<Rect>, culled: bool) {
         if let Some(last) = self.batches.last_mut()
-            && last.clip == clip
             && last.culled == culled
-            && last.run.push(item)
+            && (last.clips.last() == clip || last.run.clipped_by_table())
         {
-            return;
+            let at = last.run.len();
+            if last.run.push(item) {
+                last.clips.push(u32::try_from(at).unwrap_or(u32::MAX), clip);
+                return;
+            }
         }
         let mut run = Run::empty(item);
         run.push(item);
-        self.batches.push(Batch { clip, culled, run });
+        let clips = Clips::one(clip);
+        self.batches.push(Batch { clips, culled, run });
     }
 }
 
 impl Run {
+    /// Whether the run's items take their clip from the clip table as
+    /// coverage (flat-scene F3.1): quads, shadows and closed-form shapes.
+    /// Such a run joins items across clip changes; every other is cut by
+    /// the scissor, one clip a batch. The one answer the batching and the
+    /// painter read.
+    #[must_use]
+    pub fn clipped_by_table(&self) -> bool {
+        matches!(self, Run::Quads(_) | Run::Shadows(_) | Run::Shapes(_))
+    }
+
     /// How many items the run holds.
     #[must_use]
     pub fn len(&self) -> usize {
