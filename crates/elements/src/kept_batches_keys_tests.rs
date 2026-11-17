@@ -1,4 +1,4 @@
-use vapors_scene::{Batched, ImageId, Item, Rect, batched};
+use vapors_scene::{Batched, Item, Rect, batched};
 
 use super::KeptBatched;
 use crate::frames::PAGE;
@@ -11,14 +11,18 @@ const VIEW: Rect = Rect {
     bottom: 100.0,
 };
 
-/// An image `id` at `top`. An image, as its batches split at each clip
-/// change, which these tests use to make batches; quads and text join
-/// across clips (vapors-scene `Run::clipped_by_table`).
+/// A mesh shape, entry `id`, at `top`. A mesh, as its batches still
+/// split at each clip change (the last kind the scissor clips), which
+/// these tests use to make batches; every other kind joins across clips
+/// (vapors-scene `Run::clipped_by_table`).
 pub(super) fn split_item(top: f32, id: u8) -> Item {
-    Item::Image {
-        image: ImageId(u32::from(id)),
-        rect: Rect::new(10.0, top, 20.0, top + 10.0),
-    }
+    Item::Shape(vapors_scene::Shape::new(
+        vapors_scene::ShapeRef::Table(u32::from(id)),
+        vapors_scene::ShapeKind::Mesh,
+        [1.0, 0.0, 0.0, 1.0, 10.0, top],
+        vapors_scene::Color::from_rgba8(1, 2, 3, 255),
+        Rect::new(10.0, top, 20.0, top + 10.0),
+    ))
 }
 
 /// A quad at `top`.

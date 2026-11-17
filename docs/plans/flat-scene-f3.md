@@ -375,3 +375,23 @@ Each check is proven by a break.
 - **Pixels.** `gpu_text_clip_edge.rs`: text through a clip edge at 1x
   and 2x draws inside the clip as it draws unclipped and nothing
   outside, the scissor's pixels at a whole-pixel edge.
+
+## As built: F3.1b, images and surfaces on the clip table (2 of 3)
+
+- **Images.** The image pipeline's view uniform carries the quad's clip
+  entry beside its frame and row (32 bytes, was 16), and `image.wgsl`,
+  concatenated with `clip.wgsl` (the table at group 1, binding 2, beside
+  the view and the transform table), multiplies its alpha by the clip's
+  coverage. A kept draw refuses a second clip table; the pipeline's own
+  draws (the canvas) bind a table of no clips. `clip_source` now takes
+  the group too.
+- **Surfaces** composite through the same pipeline, so they follow.
+- **Joins.** `Run::clipped_by_table` now holds every kind but meshes;
+  image and surface runs join across clips, though each item is still a
+  draw of its own (its own texture), so no draw count moves. Their kept
+  quads name no entry (the uniform does), so a clip change does not
+  rebuild them.
+- **Pixels.** `gpu_image_clip_edge.rs`: an image twice its box's size at
+  1x and 2x draws inside as unclipped and nothing outside; the surface
+  and lane-row image clip tests pass unchanged and fail with the
+  coverage dropped.

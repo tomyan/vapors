@@ -11,7 +11,9 @@ use crate::image_binding::{Sampling, TextureBinding};
 use crate::image_setup::{bind_group_layout, render_pipeline, samplers};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::uniform_slots::UniformSlots;
-use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Target, TransformTable, WorkCounter};
+use crate::{
+    ArenaFull, ClipTable, FrameEncoder, GpuWork, Retained, Target, TransformTable, WorkCounter,
+};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 
@@ -28,17 +30,20 @@ pub struct ImagePipeline {
     smooth: wgpu::Sampler,
     vertices: FrameArena,
     kept: Retained,
-    /// The viewport and scroll frame shift each quad is drawn at.
-    views: UniformSlots,
+    /// The viewport, and each quad's frame, row and clip entries.
+    views: UniformSlots<VIEW_SIZE>,
     view_layout: wgpu::BindGroupLayout,
     /// The identity alone, for draws of this frame's quads, which are on
     /// the page (`transform_table.rs`).
     identity: TransformTable,
-    own_group: KeptBindGroup,
-    table_group: KeptBindGroup,
-    /// The id of the table kept draws bind: one table a pipeline, as
-    /// `instanced.rs` holds.
+    /// A clip table of no clips, for those draws.
+    no_clips: ClipTable,
+    own_group: KeptBindGroup<[u64; 3]>,
+    table_group: KeptBindGroup<[u64; 3]>,
+    /// The ids of the transform and clip tables kept draws bind: one of
+    /// each a pipeline, as `instanced.rs` holds.
     table_id: Option<u64>,
+    clips_id: Option<u64>,
     work: WorkCounter,
 }
 
@@ -52,11 +57,11 @@ impl ImagePipeline {
             device,
             wgpu::ShaderModuleDescriptor {
                 label: Some("image"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(image_source().into()),
             },
         );
         let layout = bind_group_layout(device);
-        let view_layout = crate::quads_setup::table_layout(device);
+        let view_layout = crate::quads_setup::tables_layout(device);
         let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, pass);
         let (nearest, smooth) = samplers(device);
         let vertices = FrameArena::new(
@@ -76,9 +81,11 @@ impl ImagePipeline {
             views: UniformSlots::new(device, "image views"),
             view_layout,
             identity: TransformTable::new(device, "image identity"),
+            no_clips: ClipTable::new(device, "image no clips"),
             own_group: KeptBindGroup::NONE,
             table_group: KeptBindGroup::NONE,
             table_id: None,
+            clips_id: None,
             work: WorkCounter::default(),
         }
     }
@@ -159,10 +166,11 @@ impl ImagePipeline {
         else {
             return;
         };
-        let Some(view) = self.view_slot(target, (0, 0)) else {
+        let Some(view) = self.view_slot(target, (0, 0, 0)) else {
             return;
         };
         self.identity.prepare_counted(target.queue, &self.work);
+        self.no_clips.prepare_counted(target.queue, &self.work);
         let from = (Quads::Placed(&vertices), 0..VERTEX_COUNT);
         self.record(target, bound, from, (None, view));
     }
@@ -193,8 +201,20 @@ impl ImagePipeline {
     }
 }
 
+/// Bytes of the view uniform: the viewport's size, then the quad's
+/// frame, row and clip entries, padded to 32.
+const VIEW_SIZE: usize = 32;
+
+/// The image shader with the clip shader after it, the clip table at
+/// group 1, binding 2, beside the view and the transform table
+/// (`clip_source`).
+pub(crate) fn image_source() -> String {
+    format!("{}{}", include_str!("image.wgsl"), crate::clip_source(1, 2))
+}
+
 #[path = "image_kept.rs"]
 mod kept;
+pub use kept::ImagePlace;
 #[path = "image_record.rs"]
 mod record;
 use record::Quads;

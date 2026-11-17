@@ -57,6 +57,7 @@ mod gpu_frame_counts_surface_work;
 mod gpu_frame_times;
 mod gpu_frame_timing;
 mod gpu_icons;
+mod gpu_image_clip_edge;
 mod gpu_image_side;
 mod gpu_kept_batches;
 mod gpu_kept_scroll;

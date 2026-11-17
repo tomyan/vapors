@@ -12,12 +12,10 @@ fn each_run_is_cut_by_its_clip_entry_or_its_scissor_never_both_nor_neither() {
         Run::Shapes(Vec::new()),
         Run::Texts(Vec::new()),
         Run::Icons(Vec::new()),
-    ];
-    let scissored = [
         Run::Images(Vec::new()),
         Run::Surfaces(Vec::new()),
-        Run::Meshes(Vec::new()),
     ];
+    let scissored = [Run::Meshes(Vec::new())];
 
     // Then: quads, shadows, shapes, text and icons take a clip entry and
     // the frame's scissor only; the rest take entry 0 and the batch's
@@ -43,5 +41,5 @@ fn each_run_is_cut_by_its_clip_entry_or_its_scissor_never_both_nor_neither() {
 fn a_scissored_batch_under_several_clips_is_refused() {
     let mut clips = Clips::one(None);
     clips.push(1, Some(Rect::new(0.0, 0.0, 10.0, 10.0)));
-    let _ = scissor_clip(&Run::Images(Vec::new()), &clips);
+    let _ = scissor_clip(&Run::Meshes(Vec::new()), &clips);
 }

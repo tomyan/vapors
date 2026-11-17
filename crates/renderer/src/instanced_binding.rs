@@ -2,13 +2,13 @@
 //! (`instanced.rs`); its bind group is `table_binding.rs`'s.
 
 /// An instanced pipeline's shader source: the transform table, the clip
-/// shader with the table at binding 2 (`clip_source`), then the
+/// shader with the table at group 0, binding 2 (`clip_source`), then the
 /// pipeline's own.
 pub(crate) fn instanced_source(own: &str) -> String {
     format!(
         "{}{}{own}",
         include_str!("transform_table.wgsl"),
-        crate::clip_source(2)
+        crate::clip_source(0, 2)
     )
 }
 

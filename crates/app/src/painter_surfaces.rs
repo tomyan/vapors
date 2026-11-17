@@ -146,20 +146,15 @@ impl Surfaces {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, moved, at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
+        (items, kept, moved, mut at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
     ) -> Result<(), PaintError> {
         for (place, (name, size, _)) in (0..).zip(surfaces(painted, items)) {
-            let row = at.row_entry(moved.item_row(place as usize));
+            let row = moved.item_row(place as usize);
             let mounted = unmounted_refused(&mut self.mounted, name)?;
             let turn = turn(&self.waker);
             let bound = mounted.prepare(target, pipeline, size, turn, &self.work);
             let bound = bound.map_err(|r| r.named(name))?;
-            pipeline.draw_kept(
-                target,
-                bound,
-                (kept, place),
-                (&mut *at.table, at.frame, row),
-            );
+            pipeline.draw_kept(target, bound, (kept, place), at.image_place((place, row)));
         }
         Ok(())
     }

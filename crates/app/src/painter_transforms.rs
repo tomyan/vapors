@@ -27,6 +27,10 @@ pub(super) struct ItemPlace<'a> {
     pub(super) table: &'a mut TransformTable,
     pub(super) frame: u32,
     pub(super) rows_base: u32,
+    /// The clip table, and the batch's items' entries in it as runs
+    /// `(first item, entry)` (flat-scene F3.1b).
+    pub(super) clips: &'a mut vapors_renderer::ClipTable,
+    pub(super) clip_runs: &'a [(u32, u32)],
 }
 
 impl ItemPlace<'_> {
@@ -34,6 +38,20 @@ impl ItemPlace<'_> {
     /// the batch's range, or 0, the identity, for an item in no row.
     pub(super) fn row_entry(&self, row: Option<u32>) -> u32 {
         row.map_or(0, |row| self.rows_base + row)
+    }
+
+    /// Where the `at`th item is drawn, for the image pipeline: its frame
+    /// and row entries, and its clip's entry.
+    pub(super) fn image_place(
+        &mut self,
+        (at, row): (u32, Option<u32>),
+    ) -> vapors_renderer::ImagePlace<'_> {
+        let clip = vapors_renderer::clip_of(self.clip_runs, at as usize);
+        let row = self.row_entry(row);
+        (
+            (&mut *self.table, self.frame, row),
+            (&mut *self.clips, clip),
+        )
     }
 }
 

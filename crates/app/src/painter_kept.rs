@@ -18,7 +18,7 @@
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{
     ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
-    Target, TransformTable,
+    Target,
 };
 use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
@@ -36,7 +36,10 @@ mod bytes;
 
 #[path = "painter_kept_entries.rs"]
 mod entries;
+#[path = "painter_kept_items.rs"]
+mod items;
 pub(super) use bytes::{Kind, RunBytes, rows_fit, rows_in_range, rows_needed, run_bytes};
+use items::{ItemParts, draw_items, draw_meshes, item_place};
 
 /// The painter's [`Pipelines`], each borrowed from its own field, so the
 /// painter's other fields stay free to borrow beside them.
@@ -108,15 +111,15 @@ impl ScenePainter {
         let rows = moved.rows.items();
         // image and surface bytes name no entry: their draw's uniform does
         let named = if matches!(run, Run::Images(_) | Run::Surfaces(_)) {
-            0
+            (0, &[][..])
         } else {
-            frame
+            (frame, clips)
         };
         let pipelines = pipelines!(self);
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, ((named, clips), rows, moved.offsets.len()), key, at),
+            (run, (named, rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
@@ -137,17 +140,18 @@ impl ScenePainter {
                     (range, kept.meshes, (transforms, rows_base)),
                 )?;
             }
-            Run::Images(items) => {
-                let images = &mut self.images;
-                let place = item_place(&mut self.transforms, (frame, rows_base));
-                self.textures
-                    .draw_kept(images, target, painted, (items, range, moved, place));
-            }
-            Run::Surfaces(items) => {
-                let images = &mut self.images;
-                let place = item_place(&mut self.transforms, (frame, rows_base));
-                self.surfaces
-                    .draw_kept(images, target, painted, (items, range, moved, place))?;
+            Run::Images(_) | Run::Surfaces(_) => {
+                let parts = ItemParts {
+                    images: &mut self.images,
+                    textures: &mut self.textures,
+                    surfaces: &mut self.surfaces,
+                    place: item_place(
+                        (&mut self.transforms, &mut self.clips.table),
+                        (frame, rows_base),
+                        clips,
+                    ),
+                };
+                draw_items(parts, (target, painted), (run, range, moved))?;
             }
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
@@ -255,35 +259,6 @@ fn blend(run: &Run) -> BlendParams {
         Run::Icons(_) => ICON_BLEND,
         _ => BlendParams::default(),
     }
-}
-
-/// Where an image or surface batch's items are drawn: `transforms`'
-/// table, with their frame's entry and their rows' first.
-fn item_place(
-    transforms: &mut super::transforms::Transforms,
-    (frame, rows_base): (u32, u32),
-) -> super::transforms::ItemPlace<'_> {
-    super::transforms::ItemPlace {
-        table: &mut transforms.table,
-        frame,
-        rows_base,
-    }
-}
-
-/// Draws a mesh batch's instances `range` holds, its items' entries
-/// `items` from `shapes`, placed through `table` from its rows' first.
-///
-/// # Errors
-/// An item whose entry the store has not uploaded.
-fn draw_meshes(
-    meshes: &mut MeshPipeline,
-    (shapes, entries): (&ShapeStore, &mut vapors_renderer::MeshEntries),
-    target: &Target<'_>,
-    (range, items, table): (&KeptRange, &[usize], (&mut TransformTable, u32)),
-) -> Result<(), PaintError> {
-    let drawn = shapes.uploaded(items).map_err(PaintError::Shape)?;
-    meshes.draw_kept(target, range, table, (entries, drawn.as_slice()));
-    Ok(())
 }
 
 #[cfg(test)]
