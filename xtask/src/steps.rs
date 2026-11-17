@@ -8,7 +8,7 @@ use crate::steps_checks::{builds, files, imports, layers, nightly, nightly_issue
 
 #[path = "steps_tiers.rs"]
 mod tiers;
-use tiers::{gpu, unit};
+use tiers::{gpu, pmu, unit};
 
 fn tools() -> Step {
     Step::new(
@@ -167,6 +167,11 @@ pub fn unit_tests() -> Vec<Step> {
 /// The GPU tier.
 pub fn gpu_tests() -> Vec<Step> {
     vec![gpu()]
+}
+
+/// The hardware-counter tier: never part of `ci`.
+pub fn pmu_tests() -> Vec<Step> {
+    vec![pmu()]
 }
 
 #[cfg(test)]

@@ -2,13 +2,15 @@
 //! between the GPU clock's marks, the pipeline check, the wait for the
 //! GPU, and the phases it recorded.
 
+use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use vapors_platform::{Frame, Next};
 use vapors_renderer::WRITE_PHASE;
 
 use super::start::BuiltSince;
-use super::{FRAME_DEADLINE, INTERVAL, Measured, PhaseTakes, Sampler};
+use super::{FRAME_DEADLINE, INTERVAL, Measured, Sampler};
+use crate::frame_counts::{self, Counted, Rise, Start};
 use crate::gpu_time::{GpuClock, wait};
 use crate::run::Workload;
 
@@ -36,12 +38,12 @@ impl Sampler<'_> {
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;
-        let (phases, instructions) = self.taken_phases()?;
+        let (phases, counted) = self.taken_phases(counted)?;
         Ok(Measured {
             took,
             idle,
             phases,
-            instructions: counted.zip(instructions),
+            counted,
         })
     }
 
@@ -59,20 +61,19 @@ impl Sampler<'_> {
             .map_err(|error| format!("frame {index}: {error}"))?;
         self.now += INTERVAL;
         let _ = self.clock.take();
-        let _ = self.clock.take_instructions()?;
+        let _ = frame_counts::take(&self.clock)?;
         Ok(since)
     }
 
     /// The frame's phase times and counts, `write` recorded as 0 when
     /// the frame entered none.
-    fn taken_phases(&mut self) -> Result<PhaseTakes, String> {
+    fn taken_phases(
+        &mut self,
+        rise: Rise,
+    ) -> Result<(BTreeMap<String, Duration>, Counted), String> {
         let mut phases = self.clock.take();
-        let mut instructions = self.clock.take_instructions()?;
         phases.entry(WRITE_PHASE.into()).or_default();
-        if let Some(counts) = &mut instructions {
-            counts.entry(WRITE_PHASE.into()).or_default();
-        }
-        Ok((phases, instructions))
+        Ok((phases, rise.with_phases(frame_counts::take(&self.clock)?)))
     }
 
     /// The app's frame, when it started and its wall time, between the
@@ -83,18 +84,16 @@ impl Sampler<'_> {
         texture: &wgpu::Texture,
         index: usize,
         mut gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<(Next, Instant, Duration, Option<u64>), String> {
+    ) -> Result<(Next, Instant, Duration, Rise), String> {
         let (device, queue) = (&self.gpu.device, &self.gpu.queue);
         if let Some(clock) = gpu_clock.as_deref_mut() {
             clock.mark(device, queue);
         }
-        let before = self.clock.instructions_now()?;
+        let start = Start::now(&self.clock)?;
         let started = Instant::now();
         let next = workload.app().frame(&self.frame_of(texture, index));
         let took = started.elapsed();
-        let counted = before
-            .zip(self.clock.instructions_now()?)
-            .map(|(a, b)| b - a);
+        let counted = start.since(&self.clock)?;
         if let Some(clock) = gpu_clock {
             clock.mark(device, queue);
         }

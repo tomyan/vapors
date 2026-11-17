@@ -7,10 +7,13 @@
 //! baseline in docs/perf.
 
 pub mod args;
+pub mod args_measure;
 pub mod args_off_path;
 pub mod build_profile;
 pub mod child_deadline;
 pub mod circuit;
+pub mod counter_samples;
+pub mod counters_report;
 pub mod driver;
 pub mod element_memory;
 pub mod element_memory_add;
@@ -19,9 +22,11 @@ pub mod element_memory_run;
 pub mod element_memory_sizes;
 pub mod first_frame_report;
 pub mod first_frame_run;
+pub mod frame_counts;
 pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
+pub mod hardware_counters;
 pub mod heap_phases;
 pub mod idle;
 pub mod idle_run;
@@ -60,7 +65,7 @@ pub mod scene_report;
 pub mod scene_run;
 pub mod select;
 pub mod shader_cache;
-mod span_instructions;
+mod span_meter;
 pub mod spans;
 pub mod splice_tally;
 pub mod stats;

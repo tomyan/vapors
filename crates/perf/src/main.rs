@@ -1,15 +1,16 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--off-path] [--scaling all|<change>] [--mount]
+//! [--only <substring>] [--instructions|--counters] [--off-path] [--scaling all|<change>] [--mount]
 //! [--mount-memory <rows>] [--first-frame <rows>] [--scene-run [racer|one-scene]]`, 200 and 20 by default
 //! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
-use vapors_perf::args::{Options, WorkloadSet, options};
+use vapors_perf::args::{Measure, Options, WorkloadSet, options};
 use vapors_perf::build_profile;
 use vapors_perf::first_frame_run;
 use vapors_perf::frame_kinds::sections;
 use vapors_perf::gpu_time::FEATURES;
+use vapors_perf::hardware_counters::HardwareCounters;
 use vapors_perf::instructions_check::checked_counter;
 use vapors_perf::mount_memory;
 use vapors_perf::mount_run;
@@ -44,7 +45,7 @@ fn run() -> Result<(), String> {
     let Options {
         settings,
         only,
-        instructions,
+        measure,
         set,
         scaling,
         mount,
@@ -86,10 +87,10 @@ fn run() -> Result<(), String> {
         WorkloadSet::OffPath => off_path_workloads(),
     };
     let chosen = matching(all, only.as_deref())?;
-    let clock = if instructions {
-        PhaseClock::with_instructions(checked_counter()?)
-    } else {
-        PhaseClock::default()
+    let clock = match measure {
+        Measure::Times => PhaseClock::default(),
+        Measure::Instructions => PhaseClock::with_instructions(checked_counter()?),
+        Measure::Counters => PhaseClock::with_counters(HardwareCounters::open()?),
     };
     let gpu = gpu_with(FEATURES);
     print_setup(&gpu, settings);
@@ -110,7 +111,7 @@ fn run() -> Result<(), String> {
             format!("{name}: {e}; reproduce: vapors-perf {runs} {warmup}{set} --only \"{name}\"")
         })?;
         let kinds = workload.frame_kinds();
-        for report in sections(&name, &samples, kinds, instructions)? {
+        for report in sections(&name, &samples, kinds, measure)? {
             println!("{report}");
         }
     }

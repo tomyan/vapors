@@ -7,9 +7,9 @@ use vapors_gpu_harness::Gpu;
 use vapors_renderer::clear;
 use vapors_scene::Color;
 
+use crate::frame_counts::Counted;
 use crate::gpu_reading::frame_gpu_time;
 use crate::gpu_time::GpuClock;
-use crate::instruction_samples::InstructionSamples;
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
@@ -22,13 +22,13 @@ pub(crate) const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 
 /// One frame's measurements: wall time, the time from the start of the
 /// app's frame to the return of the GPU wait after it (frame-to-idle),
-/// per-phase times, and, with a counter, the frame's instructions and
-/// each phase's.
+/// per-phase times, and, with counters, the frame's counts and each
+/// phase's.
 struct Measured {
     took: Duration,
     idle: Duration,
     phases: BTreeMap<String, Duration>,
-    instructions: Option<(u64, BTreeMap<String, u64>)>,
+    counted: Counted,
 }
 
 /// A GPU and the phase clock frames are timed by.
@@ -116,12 +116,7 @@ impl<'g> Sampler<'g> {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
-                if let Some((count, phases)) = measured.instructions {
-                    let kept = samples
-                        .instructions
-                        .get_or_insert_with(InstructionSamples::default);
-                    kept.push(count, phases);
-                }
+                samples.push_counts(measured.counted);
                 samples.push(measured.took, measured.phases);
                 samples.counts = workload.counts();
             }
@@ -134,9 +129,6 @@ impl<'g> Sampler<'g> {
         clear(device, queue, width, height, Color::default())
     }
 }
-
-/// A frame's phase times, and its phase counts with a counter.
-type PhaseTakes = (BTreeMap<String, Duration>, Option<BTreeMap<String, u64>>);
 
 #[path = "sampler_start.rs"]
 mod start;

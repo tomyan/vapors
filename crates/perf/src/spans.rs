@@ -14,8 +14,9 @@ use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Metadata, Subscriber};
 
+use crate::hardware_counters::{HardwareCounters, Reading};
 use crate::instructions::InstructionCounter;
-use crate::span_instructions::InstructionMeter;
+use crate::span_meter::Meter;
 
 /// The spans it times, by name.
 const TIMED: [&str; 3] = ["frame phase", "update phase", "draw step"];
@@ -30,7 +31,8 @@ struct Spans {
     phases: HashMap<u64, String>,
     entered: HashMap<u64, Instant>,
     totals: BTreeMap<String, Duration>,
-    meter: Option<InstructionMeter>,
+    meter: Option<Meter<InstructionCounter, 1>>,
+    counters: Option<Meter<HardwareCounters, 5>>,
 }
 
 impl PhaseClock {
@@ -38,7 +40,7 @@ impl PhaseClock {
     #[must_use]
     pub fn with_instructions(counter: InstructionCounter) -> Self {
         let spans = Spans {
-            meter: Some(InstructionMeter::new(counter)),
+            meter: Some(Meter::new(counter)),
             ..Spans::default()
         };
         Self(Arc::new(Mutex::new(spans)))
@@ -50,11 +52,8 @@ impl PhaseClock {
     /// # Errors
     /// A counter read that failed since the last take.
     pub fn take_instructions(&self) -> Result<Option<BTreeMap<String, u64>>, String> {
-        self.spans()
-            .meter
-            .as_mut()
-            .map(InstructionMeter::take)
-            .transpose()
+        let taken = self.spans().meter.as_mut().map(Meter::take).transpose()?;
+        Ok(taken.map(|phases| phases.into_iter().map(|(p, [count])| (p, count)).collect()))
     }
 
     /// The counter now; `None` when the clock has no counter.
@@ -62,10 +61,44 @@ impl PhaseClock {
     /// # Errors
     /// The read's failure.
     pub fn instructions_now(&self) -> Result<Option<u64>, String> {
-        self.spans()
+        let now = self
+            .spans()
             .meter
             .as_mut()
-            .map(InstructionMeter::reading)
+            .map(Meter::reading)
+            .transpose()?;
+        Ok(now.map(|[count]| count))
+    }
+
+    /// A clock that also reads the hardware counters per phase
+    /// (`--counters`).
+    #[must_use]
+    pub fn with_counters(counters: HardwareCounters) -> Self {
+        let spans = Spans {
+            counters: Some(Meter::new(counters)),
+            ..Spans::default()
+        };
+        Self(Arc::new(Mutex::new(spans)))
+    }
+
+    /// Each phase's hardware counts since the last take; `None` when the
+    /// clock has no hardware counters.
+    ///
+    /// # Errors
+    /// A counter read that failed since the last take.
+    pub fn take_counters(&self) -> Result<Option<BTreeMap<String, Reading>>, String> {
+        self.spans().counters.as_mut().map(Meter::take).transpose()
+    }
+
+    /// The hardware counters now; `None` when the clock has none.
+    ///
+    /// # Errors
+    /// The read's failure.
+    pub fn counters_now(&self) -> Result<Option<Reading>, String> {
+        self.spans()
+            .counters
+            .as_mut()
+            .map(Meter::reading)
             .transpose()
     }
 
@@ -118,6 +151,9 @@ impl Subscriber for PhaseClock {
         if let Some(meter) = spans.meter.as_mut() {
             meter.enter(span.into_u64());
         }
+        if let Some(counters) = spans.counters.as_mut() {
+            counters.enter(span.into_u64());
+        }
         spans.entered.insert(span.into_u64(), Instant::now());
     }
 
@@ -126,8 +162,13 @@ impl Subscriber for PhaseClock {
         let mut guard = self.spans();
         let spans = &mut *guard;
         let id = span.into_u64();
-        if let (Some(meter), Some(phase)) = (spans.meter.as_mut(), spans.phases.get(&id)) {
-            meter.exit(id, phase);
+        if let Some(phase) = spans.phases.get(&id) {
+            if let Some(meter) = spans.meter.as_mut() {
+                meter.exit(id, phase);
+            }
+            if let Some(counters) = spans.counters.as_mut() {
+                counters.exit(id, phase);
+            }
         }
         let (Some(entered), Some(phase)) = (spans.entered.remove(&id), spans.phases.get(&id))
         else {
