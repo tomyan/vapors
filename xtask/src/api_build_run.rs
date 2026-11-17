@@ -108,8 +108,22 @@ const DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(90);
 /// #476-#478, L6); any still in flight then are reported by the summary.
 fn drained(proxy: &Proxy) {
     proxy.budget.close("the session has ended");
-    let started = std::time::Instant::now();
-    while proxy.in_flight() > 0 && started.elapsed() < DRAIN_DEADLINE {
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
+    waited(&|| proxy.in_flight(), DRAIN_DEADLINE);
 }
+
+/// Until `in_flight` says none, or `deadline` passes; whether none were
+/// left.
+fn waited(in_flight: &dyn Fn() -> usize, deadline: std::time::Duration) -> bool {
+    let started = std::time::Instant::now();
+    while in_flight() > 0 {
+        if started.elapsed() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    true
+}
+
+#[cfg(test)]
+#[path = "api_build_run_tests.rs"]
+mod tests;

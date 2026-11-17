@@ -96,13 +96,20 @@ pub fn run(
 /// line at a time with every control character escaped, so none of it
 /// reaches the terminal raw (review of #476-#478, M4).
 fn escaped_lines(stderr: std::process::ChildStderr) {
+    escaped_to(stderr, &mut std::io::stderr());
+}
+
+/// Each line of `from` written to `to` as `session: <line>`, escaped.
+fn escaped_to(from: impl std::io::Read, to: &mut impl std::io::Write) {
     use std::io::BufRead;
-    for line in std::io::BufReader::new(stderr)
+    for line in std::io::BufReader::new(from)
         .split(b'\n')
         .map_while(Result::ok)
     {
         let line = String::from_utf8_lossy(&line);
-        eprintln!("session: {}", crate::api_refusals::escaped(&line));
+        if writeln!(to, "session: {}", crate::api_refusals::escaped(&line)).is_err() {
+            return; // the terminal is gone; nothing is left to protect
+        }
     }
 }
 
@@ -114,3 +121,7 @@ fn stop_reason(started: Instant, budget: &Budget) -> Option<String> {
     }
     budget.stopped()
 }
+
+#[cfg(test)]
+#[path = "api_session_tests.rs"]
+mod tests;
