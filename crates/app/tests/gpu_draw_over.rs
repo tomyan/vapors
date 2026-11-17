@@ -55,6 +55,7 @@ fn painted(css: &str, over: bool) -> Result<Vec<u8>, DrawOverError> {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: SIZE,
             height: SIZE,

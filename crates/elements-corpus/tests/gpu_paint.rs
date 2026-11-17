@@ -45,6 +45,7 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: size,
         scissor: None,
     };

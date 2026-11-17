@@ -21,12 +21,13 @@ pub struct MeshPipeline {
 }
 
 impl MeshPipeline {
-    /// Build the pipeline for targets of `format`.
+    /// Build the pipeline for passes of `pass` (a format alone is one
+    /// sample).
     #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
         let binding = TableBinding::new(device, "meshes");
         Self {
-            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), format),
+            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), pass.into()),
             binding,
             kept: Retained::new(device, "meshes", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),

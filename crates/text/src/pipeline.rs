@@ -62,10 +62,14 @@ pub struct TextPipeline {
 }
 
 impl TextPipeline {
-    /// A pipeline for targets of `format`, with an atlas texture matching
+    /// A pipeline for passes of `pass` (a format alone is one sample), with an atlas texture matching
     /// `atlas`'s coverage page.
     #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat, atlas: &GlyphAtlas) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        pass: impl Into<vapors_renderer::PassFormat>,
+        atlas: &GlyphAtlas,
+    ) -> Self {
         let shader = vapors_renderer::pipelines::shader_module(
             device,
             wgpu::ShaderModuleDescriptor {
@@ -80,7 +84,7 @@ impl TextPipeline {
             immediate_size: 0,
         });
         Self {
-            pipeline: render_pipeline(device, &pipeline_layout, &shader, format),
+            pipeline: render_pipeline(device, &pipeline_layout, &shader, pass.into()),
             layout,
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("text nearest"),

@@ -42,6 +42,7 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: size,
         scissor: None,
     };

@@ -127,6 +127,7 @@ impl ElementsApp {
             queue: frame.queue,
             encoder,
             view: &view,
+            multisampled: None,
             viewport: size_of(frame),
             scissor: None,
         };

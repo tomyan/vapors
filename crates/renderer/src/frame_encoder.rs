@@ -12,6 +12,7 @@ use crate::command_encoder::{Open, encoder, submit_timed};
 use crate::encoder_budget::Spent;
 use crate::frame_clock::FrameClock;
 use crate::open_pass::OpenPass;
+use crate::target::PassViews;
 use crate::{ArenaFull, EncoderBudget, Target};
 
 /// Each encoder's number, so a pipeline's [`FrameArena`](crate::FrameArena)
@@ -112,30 +113,31 @@ impl FrameEncoder {
             self.flush(target.queue);
         }
         self.spent.draw();
-        let mut open = self.pass_on(target.queue, target.view);
+        let mut open = self.pass_on(target.queue, target.views());
         draw(open.scissored(target.scissor, target.viewport));
     }
 
     /// The pass open on `view`, begun if the open pass is on another
     /// view or none is open.
-    fn pass_on(&self, queue: &wgpu::Queue, view: &wgpu::TextureView) -> RefMut<'_, OpenPass> {
+    fn pass_on(&self, queue: &wgpu::Queue, views: PassViews<'_>) -> RefMut<'_, OpenPass> {
         let is_open = self
             .pass
             .borrow()
             .as_ref()
-            .is_some_and(|pass| pass.is_on(view));
+            .is_some_and(|pass| pass.is_on(views));
         if !is_open {
-            self.begin(queue, view, wgpu::LoadOp::Load);
+            self.begin(queue, views, wgpu::LoadOp::Load);
         }
         RefMut::map(self.pass.borrow_mut(), |open| {
             open.as_mut().expect("begun above")
         })
     }
 
-    /// Clears `view` to `color` in a render pass left open for the draws
-    /// on `view` that follow.
-    pub(crate) fn clear(&self, queue: &wgpu::Queue, view: &wgpu::TextureView, color: wgpu::Color) {
-        self.begin(queue, view, wgpu::LoadOp::Clear(color));
+    /// Clears `views` (at 4 samples the multisampled view, resolved into
+    /// the target's) to `color` in a render pass left open for the draws
+    /// on them that follow.
+    pub(crate) fn clear(&self, queue: &wgpu::Queue, views: PassViews<'_>, color: wgpu::Color) {
+        self.begin(queue, views, wgpu::LoadOp::Clear(color));
     }
 
     /// Submits what is recorded so far and goes on recording into a new
@@ -167,14 +169,9 @@ impl FrameEncoder {
         self.refusal.into_inner().map_or(Ok(()), Err)
     }
 
-    /// Ends the open pass and begins one on `view`, flushing first when
+    /// Ends the open pass and begins one on `views`, flushing first when
     /// another pass would pass the budget.
-    fn begin(
-        &self,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-        load: wgpu::LoadOp<wgpu::Color>,
-    ) {
+    fn begin(&self, queue: &wgpu::Queue, views: PassViews<'_>, load: wgpu::LoadOp<wgpu::Color>) {
         self.end_pass();
         if self.spent.passes_full() {
             self.flush(queue);
@@ -182,7 +179,7 @@ impl FrameEncoder {
         self.passes.set(self.passes.get() + 1);
         self.spent.pass();
         let writes = self.clock.as_ref().and_then(FrameClock::pass_writes);
-        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), view, load, writes);
+        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), views, load, writes);
         *self.pass.borrow_mut() = Some(pass);
     }
 

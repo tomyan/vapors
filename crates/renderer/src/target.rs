@@ -20,6 +20,10 @@ pub struct Target<'a> {
     pub encoder: &'a FrameEncoder,
     /// The view drawn into; pixels under no quad keep what was there.
     pub view: &'a wgpu::TextureView,
+    /// At 4 samples, the multisampled colour view the pass draws into,
+    /// resolved into `view` at the end of each pass
+    /// (`docs/plans/flat-scene-f7.md`); `None` at one sample.
+    pub multisampled: Option<&'a wgpu::TextureView>,
     /// Size of the view in pixels.
     pub viewport: Size,
     /// Where drawing may change pixels; `None` for the whole view.
@@ -27,10 +31,29 @@ pub struct Target<'a> {
 }
 
 impl Target<'_> {
+    /// The views a pass on this target attaches.
+    #[must_use]
+    pub fn views(&self) -> PassViews<'_> {
+        PassViews {
+            view: self.view,
+            multisampled: self.multisampled,
+        }
+    }
+
     /// Runs `draw` in the encoder's render pass on the view, which loads
     /// and stores it, under the scissor. Consecutive draws on one view
     /// share the pass.
     pub fn draw_pass(&self, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
         self.encoder.draw(self, |pass| draw(pass));
     }
+}
+
+/// The views of a pass: the target's, and at 4 samples the multisampled
+/// one drawn into and resolved into it.
+#[derive(Clone, Copy)]
+pub struct PassViews<'a> {
+    /// The target's view: the attachment, or the resolve target.
+    pub view: &'a wgpu::TextureView,
+    /// The multisampled attachment, at 4 samples.
+    pub multisampled: Option<&'a wgpu::TextureView>,
 }

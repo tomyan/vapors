@@ -41,6 +41,7 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: size,
         scissor: None,
     };

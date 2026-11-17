@@ -137,6 +137,7 @@ fn gpu_an_entrys_triangles_are_counted_when_written() {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: vapors_scene::Size {
             width: 4,
             height: 4,

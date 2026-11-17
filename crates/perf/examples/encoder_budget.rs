@@ -93,6 +93,7 @@ fn target<'a>(gpu: &'a Gpu, encoder: &'a FrameEncoder, view: &'a wgpu::TextureVi
         queue: &gpu.queue,
         encoder,
         view,
+        multisampled: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

@@ -32,7 +32,7 @@ pub(crate) type Table<'a> = (&'a mut TransformTable, u32);
 impl Instanced {
     pub(crate) fn new(
         device: &wgpu::Device,
-        format: wgpu::TextureFormat,
+        pass: crate::PassFormat,
         label: &'static str,
         source: &str,
         vec4s: u32,
@@ -54,7 +54,7 @@ impl Instanced {
         };
         Self {
             label,
-            pipeline: render_pipeline(device, binding.layout(), &shader, format, instance),
+            pipeline: render_pipeline(device, binding.layout(), &shader, pass, instance),
             binding,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             kept: Retained::new(device, label, wgpu::BufferUsages::VERTEX),

@@ -40,6 +40,7 @@ fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {
             queue: &gpu.queue,
             encoder: &encoder,
             view: &view,
+            multisampled: None,
             viewport,
             scissor: None,
         },
