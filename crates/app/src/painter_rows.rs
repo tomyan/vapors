@@ -1,69 +1,24 @@
 //! Batches over the rows of a lane (`docs/plans/splice-layout.md`
-//! section 11.2, 4f): each item drawn at its batch's shift and its row's
-//! offset. A batch's table of row offsets ([`RowOffsets`]) is kept with
-//! its key and made again only when its rows' offsets change (a row
-//! above them grown or put in): each draw still reads the rows' offsets
-//! and compares them with the kept ones, but builds no table and hashes
-//! none for the uniform slots.
-
-use std::collections::HashMap;
+//! section 11.2, 4f): each item drawn at its batch's frame entry and its
+//! row's entry in the batch's range of the transform table
+//! (`painter_transforms.rs`, `docs/plans/flat-scene-f2.md`), the range
+//! keyed by the lane part's first batch, so a part's batches share one.
 
 use vapors_elements::{BatchKey, BatchRows};
-use vapors_renderer::{RowOffsets, Shift};
+use vapors_renderer::Shift;
 
-/// Each batch's table of row offsets, by key, and the frame it was last
-/// drawn in.
-#[derive(Default)]
-pub(super) struct RowTables {
-    tables: HashMap<BatchKey, Table>,
-    frame: u64,
-}
-
-struct Table {
-    offsets: Vec<[f32; 2]>,
-    rows: RowOffsets,
-    drawn: u64,
-}
-
-impl RowTables {
-    /// A new frame: tables not drawn in it are dropped at its end.
-    pub(super) fn begin(&mut self) {
-        self.frame += 1;
-    }
-
-    /// The table of batch `key`'s rows at `offsets`: the one kept when
-    /// its offsets are these, else made again.
-    pub(super) fn table(&mut self, key: BatchKey, offsets: &[[f32; 2]]) -> RowOffsets {
-        let frame = self.frame;
-        let table = self.tables.entry(key).or_insert_with(|| Table {
-            offsets: offsets.to_vec(),
-            rows: RowOffsets::whole(offsets),
-            drawn: frame,
-        });
-        if table.offsets != offsets {
-            (table.offsets, table.rows) = (offsets.to_vec(), RowOffsets::whole(offsets));
-        }
-        table.drawn = frame;
-        table.rows
-    }
-
-    /// Drops the tables of the batches this frame did not draw.
-    pub(super) fn release_undrawn(&mut self) {
-        let frame = self.frame;
-        self.tables.retain(|_, table| table.drawn == frame);
-    }
-}
-
-/// Where one batch's items are drawn: its frame's shift, the table of its
-/// rows' offsets, those offsets, and each item's row (all empty for a
-/// batch in one frame).
+/// Where one batch's items are drawn: its frame and that frame's shift,
+/// its rows' offsets and the key their range is held by, and each item's
+/// row (all empty for a batch in one frame).
 pub(super) struct Moved<'a> {
     /// The frame the batch is in, whose entry in the transform table its
-    /// shadow, quad and shape items name.
+    /// items name.
     pub(super) frame: vapors_elements::BatchFrame,
     pub(super) shift: Shift,
-    pub(super) table: &'a RowOffsets,
     pub(super) offsets: &'a [[f32; 2]],
+    /// The key the rows' range is held by: the lane part's first batch's,
+    /// or the batch's own.
+    pub(super) rows_key: BatchKey,
     pub(super) rows: BatchRows<'a>,
     /// The batch's clip in its frame, device pixels: the clip entry its
     /// shadow, quad and shape items name (`painter_clips.rs`).
@@ -74,24 +29,24 @@ pub(super) struct Moved<'a> {
 }
 
 impl Moved<'_> {
-    /// Where the `at`th item is drawn, for the pipelines that draw an
-    /// item at a time (images and surfaces): the shift for a batch in one
-    /// frame (no rows); else the shift and its row's offset.
+    /// The row of the `at`th item, for the pipelines that draw an item
+    /// at a time (images and surfaces): `None` for a batch in one frame
+    /// (no rows).
     ///
     /// # Panics
     ///
     /// When the batch has rows and the item has none, or its row no
-    /// offset: drawn at the shift alone, it would land in the lane's
-    /// first row.
-    pub(super) fn item_shift(&self, at: usize) -> Shift {
+    /// offset: drawn in no row, it would land in the lane's first.
+    pub(super) fn item_row(&self, at: usize) -> Option<u32> {
         let items = self.rows.items();
         if items.is_empty() {
-            return self.shift;
+            return None;
         }
-        let offset = items
+        let row = items
             .get(at)
-            .and_then(|&row| self.offsets.get(row as usize));
-        let [dx, dy] = *offset.unwrap_or_else(|| {
+            .copied()
+            .filter(|&row| (row as usize) < self.offsets.len());
+        Some(row.unwrap_or_else(|| {
             panic!(
                 "item {at} of a lane batch has no row with an offset ({} items' rows, {} \
                  offsets): each item of a batch over a lane's rows names its row, culled \
@@ -100,9 +55,7 @@ impl Moved<'_> {
                 items.len(),
                 self.offsets.len()
             )
-        });
-        let [x, y] = self.shift.pixels();
-        Shift::whole([x + dx, y + dy])
+        }))
     }
 }
 

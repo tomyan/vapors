@@ -13,6 +13,7 @@ use crate::changed_slots::ChangedSlots;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, paint};
 use crate::paint_partial::paint_partial;
+use crate::paint_refusals::NotPlaced;
 use crate::painted::Painted;
 use crate::placement::Placement;
 
@@ -95,34 +96,45 @@ pub(crate) fn paint_all(
 /// painted again can differ; a difference panics naming both lists.
 fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let cache = input.cache.clone();
-    let partial = std::mem::take(&mut input.unresolvable);
-    let partial_chains = std::mem::take(&mut input.long_chains);
+    let unresolvable = std::mem::take(&mut input.unresolvable);
+    let long_chains = std::mem::take(&mut input.long_chains);
     let painted = paint(boxes, rects, input);
-    let mut chains = std::mem::replace(&mut input.long_chains, partial_chains);
-    chains.sort_unstable();
-    let mut kept_chains = input.long_chains.clone();
-    kept_chains.sort_unstable();
-    assert_eq!(
-        chains, kept_chains,
-        "the boxes whose clip chain a fresh paint finds past MAX_CLIP_CHAIN differ from the \
-         update's (fresh first): a kept box's chain changed unseen (clip_chain.rs, \
-         kept_paint.rs); reproduce with `cargo xtask test`"
+    let found = (
+        std::mem::replace(&mut input.unresolvable, unresolvable),
+        std::mem::replace(&mut input.long_chains, long_chains),
     );
-    let slots = |list: &[crate::paint_refusals::NotPlaced]| {
-        let mut slots: Vec<usize> = list.iter().map(|n| n.slot).collect();
-        slots.sort_unstable();
-        slots.dedup();
-        slots
-    };
+    assert_same_refusals(found, (&input.unresolvable, &input.long_chains));
+    *input.cache = cache;
+    painted
+}
+
+/// Panics, naming both lists, when the boxes a fresh paint could not
+/// place or found past `MAX_CLIP_CHAIN` differ from the update's.
+fn assert_same_refusals(
+    (unplaced, chains): (Vec<NotPlaced>, Vec<(usize, usize)>),
+    (update_unplaced, update_chains): (&[NotPlaced], &[(usize, usize)]),
+) {
     assert_eq!(
-        slots(&input.unresolvable),
-        slots(&partial),
+        sorted(chains),
+        sorted(update_chains.to_vec()),
+        "the boxes whose clip chain a fresh paint finds past MAX_CLIP_CHAIN differ from the \
+         update's (fresh first): a kept box's chain changed unseen (clip_chain_frames.rs); \
+         reproduce with `cargo xtask test`"
+    );
+    let slots = |list: &[NotPlaced]| sorted(list.iter().map(|n| n.slot).collect());
+    assert_eq!(
+        slots(&unplaced),
+        slots(update_unplaced),
         "the boxes a fresh paint could not place differ from the update's (fresh first): a \
          kept or shifted box carries a coordinate that is not finite (kept_paint.rs, \
          paint_refusals.rs); reproduce with `cargo xtask test`"
     );
-    (*input.cache, input.unresolvable) = (cache, partial);
-    painted
+}
+
+fn sorted<T: Ord>(mut list: Vec<T>) -> Vec<T> {
+    list.sort_unstable();
+    list.dedup();
+    list
 }
 
 #[cfg(test)]

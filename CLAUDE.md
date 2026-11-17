@@ -101,6 +101,17 @@ its PR merges, empty it and keep the directory:
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.
+- A test costs no more time, memory or GPU than the value it pins
+  needs: the unit tier runs on every push (the pre-push hook), every
+  tier runs in `cargo xtask ci` and the gate, and the suite only grows.
+  A test of counts does not run the timing sampler; a test of one
+  frame's state sets that state directly rather than stepping to it; a
+  page is no larger than the behaviour needs. A test that takes more
+  than 5 s in a debug build states its measured time in the PR. An
+  override in `.config/nextest.toml` that raises a test's deadline needs
+  its measured time and the reason it cannot be cheaper, in the comment
+  beside it. Review checks this (`docs/review.md`); no tool does yet. A
+  per-test deadline set from a timing report will replace the 5 s.
 - Files about 200 lines, functions 10 to 15 lines, no `unsafe`. The
   checks sit at the tail (`cargo xtask lint`: `[files] max_lines` in
   `.config/factory.toml`, clippy's `too_many_lines` and

@@ -20,6 +20,23 @@ pub(super) struct Transforms {
     frame: u64,
 }
 
+/// Where the items of a batch drawn an item at a time (images and
+/// surfaces) are: `table`, their frame's entry, and the first of their
+/// rows' entries.
+pub(super) struct ItemPlace<'a> {
+    pub(super) table: &'a mut TransformTable,
+    pub(super) frame: u32,
+    pub(super) rows_base: u32,
+}
+
+impl ItemPlace<'_> {
+    /// The entry of an item in `row` (`Moved::item_row`): its row's in
+    /// the batch's range, or 0, the identity, for an item in no row.
+    pub(super) fn row_entry(&self, row: Option<u32>) -> u32 {
+        row.map_or(0, |row| self.rows_base + row)
+    }
+}
+
 /// Entries held: the first, how many, and the frame that last drew them.
 struct Entry {
     at: u32,

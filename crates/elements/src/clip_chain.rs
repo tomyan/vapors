@@ -11,12 +11,29 @@ use crate::kept_order::KeptOrder;
 
 pub use vapors_scene::MAX_CLIP_CHAIN;
 
-/// The links of the clip chain box `slot` paints under.
+/// The longest clip chain in the corpus, measured (`MAX_CLIP_CHAIN`).
+#[doc(hidden)]
+pub const MEASURED_CORPUS_CLIP_CHAIN: usize = 2;
+
+/// The longest clip chain in the demos, measured (`MAX_CLIP_CHAIN`).
+#[doc(hidden)]
+pub const MEASURED_DEMOS_CLIP_CHAIN: usize = 2;
+
+/// The links of the clip chain box `slot` paints under: its own clip
+/// and its frame's links.
 pub(crate) fn links(order: &KeptOrder, frames: &Frames, slot: usize) -> usize {
     let own = usize::from(order.clips.own(slot).is_some());
-    let mut links = own;
-    let mut frame = order.clips.frame(slot);
+    own + frame_links(order, frames, order.clips.frame(slot))
+}
+
+/// The links of the frame boundaries from `frame` out to the page. Each
+/// step goes to an enclosing frame, so the walk takes at most one step
+/// a slot; a walk past that panics, naming the frames that loop.
+pub(crate) fn frame_links(order: &KeptOrder, frames: &Frames, mut frame: usize) -> usize {
+    let (mut links, mut steps) = (0, 0);
     while frame != PAGE {
+        steps += 1;
+        assert!(steps <= order.clips.len(), "{}", looped(frame));
         let (link, outer) = boundary(order, frames, frame);
         links += usize::from(link);
         frame = outer;
@@ -24,25 +41,43 @@ pub(crate) fn links(order: &KeptOrder, frames: &Frames, slot: usize) -> usize {
     links
 }
 
+fn looped(frame: usize) -> String {
+    format!(
+        "the clip chain through frame {frame} never reaches the page: each box's frame \
+         (kept_clips.rs) must be a box enclosing it, and frame {frame}'s chain comes back to \
+         it; fix the frames kept_clips.rs keeps; reproduce with `cargo xtask test`"
+    )
+}
+
 /// Whether the boundary of `frame` (its container's slot) is under a
 /// clip, and the frame outside it. A scroll container clips its content
 /// and sits in the frame outside; a lane frame's row is its own frame
-/// (`kept_clips.rs`), under its parent's content clip, in the frame its
-/// parent's content is in.
+/// (`kept_clips.rs`), under its parent's content clip.
 fn boundary(order: &KeptOrder, frames: &Frames, frame: usize) -> (bool, usize) {
     let clips = &order.clips;
     if clips.frame(frame) != frame {
         return (clips.inner(frame).is_some(), clips.frame(frame));
     }
-    let Some(parent) = order.tree.parent(frame) else {
-        return (false, PAGE);
-    };
-    let outer = if frames.get(parent).is_some() {
-        parent
+    let parent = order.tree.parent(frame).unwrap_or_else(|| {
+        panic!(
+            "lane frame {frame} has no parent box: a lane row is a child of its lane's \
+             container (kept_clips.rs, frames_lane.rs); fix the frame kept for slot {frame}; \
+             reproduce with `cargo xtask test`"
+        )
+    });
+    under(order, frames, parent)
+}
+
+/// Whether a framed lane's rows under `container` are under its content
+/// clip, and the frame its content is in.
+pub(crate) fn under(order: &KeptOrder, frames: &Frames, container: usize) -> (bool, usize) {
+    let clips = &order.clips;
+    let outer = if frames.get(container).is_some() {
+        container
     } else {
-        clips.frame(parent)
+        clips.frame(container)
     };
-    (clips.inner(parent).is_some(), outer)
+    (clips.inner(container).is_some(), outer)
 }
 
 impl crate::painted::Painted {
@@ -59,3 +94,7 @@ impl crate::painted::Painted {
             .unwrap_or(0)
     }
 }
+
+#[cfg(test)]
+#[path = "clip_chain_tests.rs"]
+mod tests;

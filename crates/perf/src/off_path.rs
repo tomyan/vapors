@@ -61,7 +61,7 @@ pub struct OffPath {
 
 impl OffPath {
     /// `count` units of `kind`, updated once, in an app that has drawn
-    /// no frame and times its frames on the GPU.
+    /// no frame and does not time its frames.
     ///
     /// # Panics
     /// The page is refused (a CSS property vapors does not honour, which
@@ -80,9 +80,19 @@ impl OffPath {
             )
         });
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
-        app.time_frames(true);
         app.mirror_a11y(true).expect("one mirror per document");
         Self { page, app, change }
+    }
+
+    /// As [`OffPath::new`], its frames timed on the GPU.
+    ///
+    /// # Panics
+    /// As [`OffPath::new`].
+    #[must_use]
+    pub fn timed(kind: Kind, count: usize, change: OffPathChange) -> Self {
+        let mut workload = Self::new(kind, count, change);
+        workload.app.time_frames(true);
+        workload
     }
 }
 

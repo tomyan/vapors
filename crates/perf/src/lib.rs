@@ -12,6 +12,7 @@ pub mod args_off_path;
 pub mod build_profile;
 pub mod child_deadline;
 pub mod circuit;
+pub mod counted_frames;
 pub mod counter_samples;
 pub mod counters_report;
 pub mod driver;

@@ -116,3 +116,28 @@ pub(crate) fn rows_in_range(key: vapors_elements::BatchKey, rows: &[u32], range:
         );
     }
 }
+
+/// How many rows a batch's range must hold for its item rows `rows`:
+/// the highest row and one; 0 for a batch in one frame.
+pub(crate) fn rows_needed(rows: &[u32]) -> usize {
+    rows.iter().max().map_or(0, |&row| row as usize + 1)
+}
+
+/// Refuses, naming batch `key`, kept bytes needing `needed` rows drawn
+/// with a range of `range`. O(1), so every draw of kept bytes runs it:
+/// a batch keeps its key and bytes while its rows' offsets change
+/// (vapors-elements `kept_batches_keys.rs` `same` compares the items'
+/// rows, not the rows' offsets), so the check when the bytes were built
+/// does not cover a range that shrank since.
+///
+/// # Panics
+///
+/// As said: the bytes' last rows would read the table's next entries.
+pub(crate) fn rows_fit(key: vapors_elements::BatchKey, needed: usize, range: usize) {
+    assert!(
+        needed <= range,
+        "batch {key:?}'s kept bytes name {needed} rows, and its range holds {range}: the rows' \
+         offsets shrank while the batch kept its key (vapors-elements kept_batches_keys.rs); \
+         reproduce with `cargo xtask test`"
+    );
+}

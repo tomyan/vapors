@@ -11,7 +11,7 @@ const VIEWPORT: Viewport = Viewport {
 };
 
 #[test]
-fn no_demo_s_clip_chain_is_past_the_limit() {
+fn the_demos_longest_clip_chain_is_the_measured_one_and_none_is_past_the_limit() {
     // When
     let chains: Vec<(&str, usize)> = vapors_demos::all()
         .into_iter()
@@ -30,6 +30,15 @@ fn no_demo_s_clip_chain_is_past_the_limit() {
         .iter()
         .max_by_key(|(_, links)| *links)
         .expect("demos");
+    assert_eq!(
+        longest.1,
+        vapors_elements::MEASURED_DEMOS_CLIP_CHAIN,
+        "the longest clip chain is {} links ({}), not the measurement MAX_CLIP_CHAIN \
+         cites: set the constant in crates/elements/src/clip_chain.rs and say so at \
+         MAX_CLIP_CHAIN",
+        longest.1,
+        longest.0
+    );
     eprintln!(
         "longest clip chain in the demos: {} links ({})",
         longest.1, longest.0

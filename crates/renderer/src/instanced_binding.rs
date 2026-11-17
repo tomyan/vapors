@@ -44,21 +44,6 @@ pub(crate) fn group(
     )
 }
 
-/// One generation for a bind group over three buffers, each counted from
-/// 1 as it is replaced: 21 bits each, two million replacements of one.
-///
-/// # Panics
-///
-/// When one is past 21 bits, where two bind groups would share one.
-pub(crate) fn joined(generations: [u64; 3]) -> u64 {
-    assert!(
-        generations.iter().all(|&g| g < 1 << 21),
-        "a bind group's buffer replaced more than 2^21 times ({generations:?}): its generation \
-         would collide (instanced.rs `joined`); reproduce with `cargo xtask test`"
-    );
-    (generations[0] << 42) | (generations[1] << 21) | generations[2]
-}
-
 /// The instance attributes: `vec4s` four-float ones, then the row's
 /// index, the frame's entry and the clip's entry, three `u32`s.
 pub(crate) fn attributes(vec4s: u32) -> Vec<wgpu::VertexAttribute> {

@@ -10,28 +10,46 @@ mod painter;
 use std::cell::RefCell;
 
 use painter::Painter;
-use vapors_renderer::{KeptRange, RowOffsets, Shift};
+use vapors_renderer::{KeptRange, TransformTable, translation};
 use vapors_text::{
     AtlasConfig, AtlasPins, BlendParams, Family, Layout, LayoutOptions, Style, TextDraw,
     TextPipeline,
 };
 
 const PAGE: u32 = 128;
-/// No scroll frame's shift.
-const NONE: Shift = Shift::NONE;
+/// A frame entry of `table` moved by `shift` and a range of `rows` row
+/// entries, each moved by its offset, for one frame of `target`: the
+/// frame's entry and the rows' first (0, the identity, for none).
+fn entries(
+    table: &mut TransformTable,
+    target: &vapors_text::RenderTarget<'_>,
+    (shift, rows): ([f32; 2], &[[f32; 2]]),
+) -> (u32, u32) {
+    let frame = table.take(target.encoder, 1).expect("room");
+    table.set(target.encoder, target.queue, frame, &[translation(shift)]);
+    if rows.is_empty() {
+        return (frame, 0);
+    }
+    let count = u32::try_from(rows.len()).expect("a few rows");
+    let base = table.take(target.encoder, count).expect("room");
+    let values: Vec<_> = rows.iter().map(|&row| translation(row)).collect();
+    table.set(target.encoder, target.queue, base, &values);
+    (frame, base)
+}
 
 /// The first frame: `text`'s bytes built, pinned, kept and drawn.
 fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, AtlasPins) {
     let layout = painter.layout(text);
     let kept = RefCell::new(None);
-    let drawn = painter.frame(|pipeline, atlas, target| {
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
         let draw = TextDraw {
             layout: &layout,
             origin: [2.0, 4.0],
         };
         let (bytes, pins) = TextPipeline::text_bytes(atlas, &[draw])?;
         let range = pipeline.keep(target, &bytes).expect("kept");
-        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default(), NONE);
+        let params = (BlendParams::default(), table, 0);
+        pipeline.draw_kept(target, atlas, (&range, &pins), params);
         *kept.borrow_mut() = Some((range, pins));
         Ok(())
     });
@@ -43,8 +61,8 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
 /// bytes it wrote.
 fn draw_again(painter: &mut Painter, kept: (&KeptRange, &AtlasPins)) -> (Vec<u8>, u64) {
     let written = RefCell::new(0);
-    let drawn = painter.frame(|pipeline, atlas, target| {
-        pipeline.draw_kept(target, atlas, kept, BlendParams::default(), NONE);
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
+        pipeline.draw_kept(target, atlas, kept, (BlendParams::default(), table, 0));
         *written.borrow_mut() = pipeline.take_work().buffer_bytes;
         Ok(())
     });
@@ -91,72 +109,83 @@ fn gpu_kept_text_drawn_after_the_atlas_grew_and_repacked_panics() {
 
     // When: large glyphs grow the page, which repacks it, then "Hello"
     // is drawn from its bytes
-    painter.frame(|pipeline, atlas, target| {
+    painter.frame_with_table(|pipeline, atlas, target, table| {
         pipeline.draw(target, atlas, &large, [0.0, 60.0], BlendParams::default())?;
-        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default(), NONE);
+        let params = (BlendParams::default(), table, 0);
+        pipeline.draw_kept(target, atlas, (&range, &pins), params);
         Ok(())
     });
 }
 
+/// `texts` at 2, 4 kept in a frame entry moved by `shift`, each text in
+/// its row of `rows` (offsets `offsets`), and drawn: the pixels.
+fn kept_in(
+    painter: &mut Painter,
+    texts: &[&str],
+    (shift, rows, offsets): ([f32; 2], &[u32], &[[f32; 2]]),
+) -> Vec<u8> {
+    let layouts: Vec<_> = texts.iter().map(|text| painter.layout(text)).collect();
+    let kept = RefCell::new(None);
+    let drawn = painter.frame_with_table(|pipeline, atlas, target, table| {
+        let (frame, rows_base) = entries(table, target, (shift, offsets));
+        let draws: Vec<_> = layouts
+            .iter()
+            .map(|layout| TextDraw {
+                layout,
+                origin: [2.0, 4.0],
+            })
+            .collect();
+        let (bytes, pins) = TextPipeline::text_bytes_in(atlas, &draws, (frame, rows))?;
+        let range = pipeline.keep(target, &bytes).expect("kept");
+        let params = (BlendParams::default(), table, rows_base);
+        pipeline.draw_kept(target, atlas, (&range, &pins), params);
+        *kept.borrow_mut() = Some((range, pins));
+        Ok(())
+    });
+    let (range, pins) = kept.into_inner().expect("kept in the frame");
+    painter.atlas.unpin(pins);
+    painter.pipeline.release(range);
+    drawn.pixels
+}
+
 #[test]
-fn gpu_kept_text_drawn_with_a_shift_matches_the_text_drawn_at_the_moved_origin() {
+fn gpu_kept_text_in_a_moved_frame_matches_the_text_drawn_at_the_moved_origin() {
     // Given: "Hello" drawn at 5, 9
     let mut immediate = Painter::new(PAGE);
     let layout = immediate.layout("Hello");
     let moved = immediate.frame(|pipeline, atlas, target| {
         pipeline.draw(target, atlas, &layout, [5.0, 9.0], BlendParams::default())
     });
-    let mut painter = Painter::new(PAGE);
-    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
 
-    // When: its bytes kept at 2, 4 drawn shifted by 3, 5
-    let shifted = painter.frame(|pipeline, atlas, target| {
-        let params = BlendParams::default();
-        pipeline.draw_kept(
-            target,
-            atlas,
-            (&range, &pins),
-            params,
-            Shift::whole([3.0, 5.0]),
-        );
-        Ok(())
-    });
+    // When: kept at 2, 4 in a frame entry moved by 3, 5
+    let shifted = kept_in(&mut Painter::new(PAGE), &["Hello"], ([3.0, 5.0], &[], &[]));
 
     // Then
-    assert!(shifted.pixels == moved.pixels, "shifted kept text differs");
-    painter.atlas.unpin(pins);
-    painter.pipeline.release(range);
+    assert!(
+        shifted == moved.pixels,
+        "kept text in a moved frame differs"
+    );
 }
 
 #[test]
-fn gpu_kept_text_drawn_in_a_row_matches_the_text_drawn_at_the_rows_offset() {
+fn gpu_kept_text_in_a_row_matches_the_text_drawn_at_the_rows_offset() {
     // Given: "Hello" drawn at 5, 19
     let mut immediate = Painter::new(PAGE);
     let layout = immediate.layout("Hello");
     let moved = immediate.frame(|pipeline, atlas, target| {
         pipeline.draw(target, atlas, &layout, [5.0, 19.0], BlendParams::default())
     });
-    let mut painter = Painter::new(PAGE);
-    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
 
-    // When: its bytes kept at 2, 4 drawn shifted by 3, 5, in row 0 of a
-    // lane, ten pixels down
-    let rowed = painter.frame(|pipeline, atlas, target| {
-        let rows = RowOffsets::whole(&[[0.0, 10.0]]);
-        let moved = (Shift::whole([3.0, 5.0]), &rows);
-        pipeline.draw_kept_in_rows(
-            target,
-            atlas,
-            (&range, &pins),
-            (BlendParams::default(), moved),
-        );
-        Ok(())
-    });
+    // When: kept at 2, 4 in a frame moved by 3, 5, in row 0 of a lane,
+    // ten pixels down
+    let rowed = kept_in(
+        &mut Painter::new(PAGE),
+        &["Hello"],
+        ([3.0, 5.0], &[0], &[[0.0, 10.0]]),
+    );
 
     // Then
-    assert!(rowed.pixels == moved.pixels, "kept text in a row differs");
-    painter.atlas.unpin(pins);
-    painter.pipeline.release(range);
+    assert!(rowed == moved.pixels, "kept text in a row differs");
 }
 
 #[test]
@@ -170,26 +199,26 @@ fn gpu_texts_built_in_two_rows_draw_each_at_its_rows_offset() {
     });
 
     // When: both built at 2, 4, "Yo" in row 1, thirty pixels down
-    let mut painter = Painter::new(PAGE);
-    let (hi, yo) = (painter.layout("Hi"), painter.layout("Yo"));
-    let kept = RefCell::new(None);
-    let rowed = painter.frame(|pipeline, atlas, target| {
-        let at = |layout| TextDraw {
-            layout,
-            origin: [2.0, 4.0],
-        };
-        let (bytes, pins) = TextPipeline::text_bytes_in_rows(atlas, &[at(&hi), at(&yo)], &[0, 1])?;
-        let range = pipeline.keep(target, &bytes).expect("kept");
-        let rows = RowOffsets::whole(&[[0.0, 0.0], [0.0, 30.0]]);
-        let moved = (BlendParams::default(), (NONE, &rows));
-        pipeline.draw_kept_in_rows(target, atlas, (&range, &pins), moved);
-        *kept.borrow_mut() = Some((range, pins));
-        Ok(())
-    });
+    let offsets = [[0.0, 0.0], [0.0, 30.0]];
+    let rowed = kept_in(
+        &mut Painter::new(PAGE),
+        &["Hi", "Yo"],
+        ([0.0, 0.0], &[0, 1], &offsets),
+    );
 
     // Then
-    assert!(rowed.pixels == apart.pixels, "texts in two rows differ");
-    let (range, pins) = kept.into_inner().expect("kept in the frame");
-    painter.atlas.unpin(pins);
-    painter.pipeline.release(range);
+    assert!(rowed == apart.pixels, "texts in two rows differ");
+}
+
+#[test]
+#[should_panic(expected = "a pipeline draws from one table")]
+fn gpu_a_text_pipeline_given_a_second_transform_table_refuses_it() {
+    let mut painter = Painter::new(PAGE);
+    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
+    painter.frame(|pipeline, atlas, target| {
+        let mut second = TransformTable::new(target.device, "second");
+        let params = (BlendParams::default(), &mut second, 0);
+        pipeline.draw_kept(target, atlas, (&range, &pins), params);
+        Ok(())
+    });
 }

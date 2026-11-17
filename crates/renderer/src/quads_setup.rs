@@ -9,13 +9,35 @@ pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout 
     })
 }
 
-/// The instanced pipelines' layout (`instanced.rs`): the view uniform,
-/// and the transform table read in the vertex stage
-/// (`transform_table.rs`).
+/// The layout of a pipeline over the view uniform and the transform
+/// table, read in the vertex stage (`table.rs`): the image pipeline's
+/// view group (`image.rs`).
 pub(crate) fn table_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    // the fragment stage reads the table too: a clip's frame
-    // (clip.wgsl)
-    let table = wgpu::BindGroupLayoutEntry {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("on the transform table"),
+        entries: &[uniform_entry(), table_entry()],
+    })
+}
+
+/// The instanced pipelines' layout (`instanced.rs`): the view uniform,
+/// the transform table, and the clip table, read in the fragment stage
+/// (`clip.wgsl`).
+pub(crate) fn tables_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let clips = wgpu::BindGroupLayoutEntry {
+        binding: 2,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ..table_entry()
+    };
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("instanced on the tables"),
+        entries: &[uniform_entry(), table_entry(), clips],
+    })
+}
+
+/// The transform table: read in the vertex stage, and in the fragment
+/// stage for a clip's frame (`clip.wgsl`).
+fn table_entry() -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
         binding: 1,
         visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
         ty: wgpu::BindingType::Buffer {
@@ -24,16 +46,7 @@ pub(crate) fn table_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             min_binding_size: None,
         },
         count: None,
-    };
-    let clips = wgpu::BindGroupLayoutEntry {
-        binding: 2,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ..table
-    };
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("instanced on the tables"),
-        entries: &[uniform_entry(), table, clips],
-    })
+    }
 }
 
 fn uniform_entry() -> wgpu::BindGroupLayoutEntry {

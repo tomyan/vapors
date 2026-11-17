@@ -44,7 +44,7 @@ fn made(doc: &Document, places: &mut BatchPlaces) {
     places.reset((painted, VIEW), &kept);
     for at in 0..kept.frames.len() {
         places.frame(at, painted, &kept);
-        places.rows(at, (painted, &kept), &mut RowTables::default());
+        places.rows(at, (painted, &kept));
     }
 }
 

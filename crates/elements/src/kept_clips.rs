@@ -107,6 +107,12 @@ impl Clips {
         self.frame[slot]
     }
 
+    /// Sets box `slot`'s frame, for tests of a broken frame chain.
+    #[cfg(test)]
+    pub(crate) fn set_frame(&mut self, slot: usize, frame: usize) {
+        self.frame[slot] = frame;
+    }
+
     /// Redoes the clips of the `changed` slots and below them where an
     /// inner clip changed; the slots that redid.
     pub(crate) fn redo_under(

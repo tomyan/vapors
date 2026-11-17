@@ -61,6 +61,9 @@ struct Gpu {
     /// naming others are built again.
     frame: u32,
     clip: u32,
+    /// The rows its bytes name: its range must hold this many
+    /// (`rows_fit`).
+    rows_needed: usize,
     drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -101,6 +104,7 @@ impl KeptGpu {
         }
         match self.entries.get(&key) {
             Some(gpu) => {
+                super::rows_fit(key, gpu.rows_needed, range);
                 #[cfg(debug_assertions)]
                 super::rows_in_range(key, rows, range);
                 gpu.check((run, (frame, clip), rows), at, pipelines.shapes);
@@ -152,6 +156,7 @@ impl KeptGpu {
             meshes,
             frame,
             clip,
+            rows_needed: super::rows_needed(rows),
             drawn: self.frame,
             #[cfg(debug_assertions)]
             bytes,

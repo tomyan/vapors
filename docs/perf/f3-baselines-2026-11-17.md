@@ -1,27 +1,39 @@
 # F3 baselines: batch counts before clips as data (2026-11-17)
 
 The counts `docs/plans/flat-scene-f3.md`'s acceptance compares F3.1
-against, taken on main at the start of F3.1, before anything in the
-painter changes. They come from the off-path pages that stand for W1
+against, taken at main e703e267 (after #457), before anything in the
+painter changes; the working tree held #461's elements changes, which
+draw nothing differently. They come from the off-path pages that stand for W1
 and W4 today: "nested scrollers" (a scroller of scrollers, W1's shape)
 and "code blocks" (blocks that each scroll, in a page scroller, W4's
 shape). Command: `vapors-perf 20 5 --off-path --only "<page>"`,
 release, Intel UHD 630; the outputs are in `f3-baselines-2026-11-17/`.
-The counts are of the last frame of each case.
+The counts are of the last frame of each case. Load average at the
+start was 10 to 12; counts do not depend on load, only times do.
 
-| page | case | draw calls | batches written | batches kept |
-|---|---|---|---|---|
-| nested scrollers (1,000 to 10,000) | Edit | 35 | 0 | 35 |
-| | Scroll | 35 | 2 | 33 |
-| | ScrollInner | 35 | 1 | 34 |
-| | Insert | 35 | 0 | 35 |
-| code blocks (1,000 to 10,000) | Edit | 14 | 0 | 14 |
-| | Scroll | 17 | 3 | 14 |
-| | ScrollInner | 14 | 1 | 13 |
-| | Insert | 14 | 0 | 14 |
+`crates/perf/tests/gpu_f3_baselines.rs` pins every count in the table
+at 1,000 units, one GPU-tier test per page and change. The command
+counts frame 24 of a sampled run, after 25 changes; the tests reach the
+same frame counted alone (`crates/perf/src/counted_frames.rs`): 24
+changes with no frame between them, a priming frame, the 25th change
+and the measured frame, with no timing. Their counts equal the sampled
+run's (checked when they were switched). The scroll changes' counts
+depend on how far they have scrolled, so a different number of changes
+or page size gives other numbers. A change to the painter that moves a
+count fails there, and this table changes with it.
 
-Every count is the same at 1,000, 3,000 and 10,000: the draws are of
-what shows, not of the page.
+## A page where clip changes split runs
+
+The rows page (`crates/perf/src/rows.rs`) has a clip change inside a
+frame on every row: each row is a lane frame, and its value's text is
+under the value's own clip, between the label's and the button's
+unclipped texts. Its idle frame at 300 rows draws 52 calls: 35 text
+draws (18 unclipped runs, one per row boundary in view plus the first
+and last, and one per value for the 17 rows in view) and 17 quad
+draws, one per button. `crates/perf/tests/gpu_rows_draws.rs` pins them.
+This is the page F3.1's join of batches across clips within a frame
+(step 2) is measured on: its text draws should fall when the values'
+runs join their row's unclipped ones.
 
 ## The prediction for F3.1
 

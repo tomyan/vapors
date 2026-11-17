@@ -5,6 +5,7 @@
 //! does not.
 
 mod clip_chain;
+mod clip_chain_updates;
 mod compiled_mount_order;
 mod compiled_sharing;
 mod compiled_sheet_once;

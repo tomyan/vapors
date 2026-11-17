@@ -12,7 +12,7 @@
 use crate::frame_arena::{FrameArena, Placed};
 use crate::instanced_bytes::view_bytes;
 use crate::kept_bind_group::KeptBindGroup;
-use crate::quads_setup::{render_pipeline, table_layout};
+use crate::quads_setup::{render_pipeline, tables_layout};
 use crate::uniform_slots::UniformSlots;
 use crate::{ClipTable, KeptRange, Retained, Target, TransformTable, WorkCounter};
 
@@ -28,8 +28,8 @@ pub(crate) struct Instanced {
     identity: TransformTable,
     /// The clip table of no clips its own draws bind.
     no_clips: ClipTable,
-    own_group: KeptBindGroup,
-    table_group: KeptBindGroup,
+    own_group: KeptBindGroup<[u64; 3]>,
+    table_group: KeptBindGroup<[u64; 3]>,
     /// The id of the table kept draws bind: one table a pipeline, as one
     /// bind group is kept for it, keyed by its generation alone.
     table_id: Option<u64>,
@@ -61,7 +61,7 @@ impl Instanced {
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             },
         );
-        let layout = table_layout(device);
+        let layout = tables_layout(device);
         let stride = instance_bytes(vec4s) as u64;
         let attributes = attributes(vec4s);
         let instance = wgpu::VertexBufferLayout {
@@ -251,7 +251,7 @@ impl Instanced {
         let (label, layout, work) = (self.label, &self.layout, &self.work);
         let viewports = &self.viewports;
         kept_group
-            .of(joined(generations), || {
+            .of(generations, || {
                 group(device, (label, layout, work), (viewports, table, clips))
             })
             .clone()
@@ -266,7 +266,7 @@ enum Instances<'a> {
 }
 
 pub(crate) use crate::instanced_binding::instanced_source;
-use crate::instanced_binding::{attributes, group, joined};
+use crate::instanced_binding::{attributes, group};
 pub(crate) use crate::instanced_bytes::{
     VIEW_SIZE, float_bytes, instance_bytes, rowed_instances, viewport_bytes,
 };

@@ -111,6 +111,11 @@ impl Frames {
         Some(self.lanes.bases.get(&container)?.parent)
     }
 
+    /// The framed lanes' containers.
+    pub(super) fn lane_containers(&self) -> Vec<usize> {
+        self.lanes.bases.keys().copied().collect()
+    }
+
     /// How many lane frames a fold of their lane worked out since the
     /// lanes were set: those read and neither primed nor read before.
     #[cfg(test)]

@@ -1,28 +1,28 @@
 // Glyph quads from the coverage atlas. Positions arrive in device
-// pixels (origin top-left, y down), are moved by the scroll frame's
-// shift and go to clip space by the viewport.
+// pixels (origin top-left, y down) in their frame and row, are placed by
+// their entries in the transform table (vapors-renderer
+// transform_table.rs) and go to clip space by the viewport.
 // The fragment turns coverage into an alpha the way Skia's mask gamma
 // does: blend text and an assumed background in linear light, with a
 // contrast boost that fades as the text gets lighter, then find the
 // alpha that gives that result when the hardware blends in encoded
 // space. Two parameters: gamma (the encoding exponent) and contrast.
 
-// The blend parameters, the viewport, the shift of the frame the
-// glyphs are in, and the offsets of the rows of a lane they are in, two
-// to each vec4 (vapors-renderer's row_offsets.rs).
+// The blend parameters, the viewport, and the first entry of the draw's
+// row range in the transform table.
 struct Params {
     gamma: f32,
     contrast: f32,
     viewport: vec2<f32>,
-    shift: vec2<f32>,
-    rows: array<vec4<f32>, ROW_PAIRS>,
+    rows_base: u32,
 }
 
 struct VertexIn {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) color: vec4<f32>,
-    @location(3) row: u32,                 // the row's index in params.rows
+    @location(3) row: u32,                 // the row's index in its draw's range
+    @location(4) frame: u32,               // the frame's entry in the transform table
 }
 
 struct VertexOut {
@@ -34,13 +34,13 @@ struct VertexOut {
 @group(0) @binding(0) var atlas: texture_2d<f32>;
 @group(0) @binding(1) var atlas_sampler: sampler;
 @group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(3) var<storage, read> transforms: array<mat4x4<f32>>;
 
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     var out: VertexOut;
-    let pair = params.rows[in.row / 2u];
-    let row = select(pair.xy, pair.zw, in.row % 2u == 1u);
-    let pixel = in.position + params.shift + row;
+    let m = transforms[in.frame] * transforms[params.rows_base + in.row];
+    let pixel = (m * vec4(in.position, 0.0, 1.0)).xy;
     let clip = vec2<f32>(
         pixel.x / params.viewport.x * 2.0 - 1.0,
         1.0 - pixel.y / params.viewport.y * 2.0,

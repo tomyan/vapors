@@ -4,10 +4,19 @@
 
 use vapors_scene::{Item, Rect};
 
-use super::{FrameAt, Frames};
+use super::{FrameAt, Frames, PAGE};
 use crate::layout::BoxRect;
 
 impl Frames {
+    /// The slots of the scroll containers whose frames these are, and of
+    /// the framed lanes' containers, for the clip chains
+    /// (`clip_chain_frames.rs`).
+    pub(crate) fn containers(&self) -> (Vec<usize>, Vec<usize>) {
+        let scrolling = self.by_frame.keys().filter(|&&frame| frame != PAGE);
+        let scrolling = scrolling.chain(self.relative.keys()).copied().collect();
+        (scrolling, self.lane_containers())
+    }
+
     /// `rect`, CSS pixels in frame `frame`, on the page.
     pub(crate) fn rect(&self, frame: usize, rect: BoxRect) -> BoxRect {
         let [dx, dy] = self.shift_of(frame).map(|v| v / self.scale);

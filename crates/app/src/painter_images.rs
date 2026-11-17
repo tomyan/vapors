@@ -14,6 +14,7 @@ use vapors_renderer::{
 use vapors_scene::{Item, RgbaImage};
 
 use super::rows::Moved;
+use super::transforms::ItemPlace;
 
 /// The images uploaded so far, by the image they hold (compared by
 /// identity: one registration is one upload).
@@ -49,19 +50,25 @@ impl Textures {
     }
 
     /// Draws each image item of `items` with `pipeline`, over the quad
-    /// at its place in `kept`, moved by `shift`.
+    /// at its place in `kept`, at its frame's and row's entries of `at`'s
+    /// table.
     pub(super) fn draw_kept(
         &mut self,
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, moved): (&[Item], &KeptRange, &Moved<'_>),
+        (items, kept, moved, at): (&[Item], &KeptRange, &Moved<'_>, ItemPlace<'_>),
     ) {
         for (place, item) in (0..).zip(items) {
             if let Item::Image { image, .. } = item {
                 let bound = self.bound(pipeline, target, painted.image(*image));
-                let shift = moved.item_shift(place as usize);
-                pipeline.draw_kept(target, bound, (kept, place), shift);
+                let row = at.row_entry(moved.item_row(place as usize));
+                pipeline.draw_kept(
+                    target,
+                    bound,
+                    (kept, place),
+                    (&mut *at.table, at.frame, row),
+                );
             }
         }
     }

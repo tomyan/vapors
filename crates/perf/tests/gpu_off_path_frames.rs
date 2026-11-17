@@ -18,7 +18,7 @@ fn runs_each_change(kind: Kind) {
     let gpu = gpu_with(FEATURES);
     let mut timer = Sampler::new(&gpu);
     for &change in kind.changes() {
-        let mut workload = OffPath::new(kind, UNITS, change);
+        let mut workload = OffPath::timed(kind, UNITS, change);
 
         // When
         let samples = timer.sample(&mut workload, FEW);
@@ -75,7 +75,7 @@ fn every_kind_has_a_gpu_test_here() {
 fn gpu_the_samples_record_the_warmup_the_sampler_ran() {
     // Given: an odd warmup; `of_kind`'s tests pin how it names the kinds
     let gpu = gpu_with(FEATURES);
-    let mut workload = OffPath::new(
+    let mut workload = OffPath::timed(
         Kind::CodeBlocks,
         UNITS,
         vapors_perf::off_path::OffPathChange::Insert,

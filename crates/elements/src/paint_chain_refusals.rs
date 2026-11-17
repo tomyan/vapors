@@ -20,11 +20,7 @@ impl Document {
         if long.is_empty() {
             return Ok(());
         }
-        let order = crate::paint_cause::tree_order(placed);
-        let &(slot, links) = order
-            .iter()
-            .find_map(|&slot| long.iter().find(|(at, _)| *at == slot))
-            .unwrap_or(&long[0]);
+        let &(slot, links) = first_in_tree_order(long, placed);
         let element = placed.slots.key(slot).map_or_else(
             || "a box with no element".to_owned(),
             |key| crate::check::describe(&self.arena, key.node()),
@@ -38,9 +34,27 @@ impl Document {
     }
 }
 
+/// The entry of `long` whose slot comes first in tree order, or a panic:
+/// every slot measured is a box placed this update.
+fn first_in_tree_order<'a>(long: &'a [(usize, usize)], placed: &Placed) -> &'a (usize, usize) {
+    let order = crate::paint_cause::tree_order(placed);
+    let first = order
+        .iter()
+        .find_map(|&slot| long.iter().find(|(at, _)| *at == slot));
+    first.unwrap_or_else(|| {
+        panic!(
+            "no box past MAX_CLIP_CHAIN is in the tree's order ({long:?}): the boxes measured \
+             (clip_chain_frames.rs) must be boxes placed this update (paint_cause.rs); fix \
+             the slots measured; reproduce with `cargo test -p vapors-elements --test tests \
+             clip_chain`"
+        )
+    })
+}
+
 fn message(element: &str, (slot, links): (usize, usize), others: usize) -> String {
     let also = match others {
         0 => String::new(),
+        1 => "; 1 other box is past it too".to_owned(),
         n => format!("; {n} other boxes are past it too"),
     };
     format!(

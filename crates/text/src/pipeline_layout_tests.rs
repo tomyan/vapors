@@ -1,38 +1,44 @@
 //! The params uniform's layout in `text.wgsl` agrees with the bytes
-//! `draw.rs` writes: the table starts where the head ends, and holds
-//! `RowOffsets::CAPACITY` rows.
+//! `draw.rs` writes (`params_bytes`): gamma, contrast, the viewport, then
+//! the draw's first row entry at 16, within `PARAMS_SIZE`; and the
+//! transform table is the storage buffer at binding 3.
 
-use vapors_renderer::RowOffsets;
-
-use super::PARAMS_HEAD;
+use super::PARAMS_SIZE;
 
 #[test]
-fn the_text_shaders_table_starts_after_the_head_and_holds_the_capacity() {
+fn the_text_shader_reads_the_params_and_the_table_as_written() {
     // Given
-    let source = RowOffsets::shader(include_str!("text.wgsl"));
-    let module = naga::front::wgsl::parse_str(&source).expect("parses");
+    let module = naga::front::wgsl::parse_str(include_str!("text.wgsl")).expect("parses");
+    let named = |name: &str| {
+        module
+            .global_variables
+            .iter()
+            .map(|(_, global)| global)
+            .find(|global| global.name.as_deref() == Some(name))
+    };
 
     // When
-    let mut global = module.global_variables.iter().map(|(_, global)| global);
-    let params = global.find(|global| global.name.as_deref() == Some("params"));
-    let naga::TypeInner::Struct { members, .. } = &module.types[params.expect("params").ty].inner
-    else {
+    let params = &module.types[named("params").expect("params").ty].inner;
+    let naga::TypeInner::Struct { members, span } = params else {
         panic!("params is not a struct");
     };
-    let rows = members
+    let offsets: Vec<_> = members
         .iter()
-        .find(|member| member.name.as_deref() == Some("rows"));
-    let rows = rows.expect("a rows member");
-    let naga::TypeInner::Array {
-        size: naga::ArraySize::Constant(len),
-        ..
-    } = module.types[rows.ty].inner
-    else {
-        panic!("rows has no constant length");
-    };
+        .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
+        .collect();
+    let table = named("transforms")
+        .and_then(|t| t.binding.as_ref())
+        .map(|b| b.binding);
 
     // Then
-    let pairs = u32::try_from(RowOffsets::CAPACITY / 2).expect("small");
-    let head = u32::try_from(PARAMS_HEAD).expect("small");
-    assert_eq!((rows.offset, len.get()), (head, pairs));
+    let expected = [
+        ("gamma", 0),
+        ("contrast", 4),
+        ("viewport", 8),
+        ("rows_base", 16),
+    ]
+    .map(|(name, at)| (name.to_owned(), at));
+    assert_eq!(offsets, expected);
+    assert!(*span as usize <= PARAMS_SIZE, "params of {span} bytes");
+    assert_eq!(table, Some(3));
 }

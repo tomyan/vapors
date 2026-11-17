@@ -78,6 +78,9 @@ pub struct Painted {
     pub(crate) parts_visited_kept: usize,
     /// Scroll frames this update worked out (`paint_frames.rs`).
     pub(crate) frames_worked: usize,
+    /// Each frame's clip chain links when this paint was measured
+    /// (`clip_chain_frames.rs`).
+    pub(crate) frame_chains: crate::clip_chain_frames::FrameChains,
     /// Scene items this update built, for `UpdateCounts`.
     pub(crate) items_built: usize,
     /// Elements whose `rects` and `paddings` entries this update put or
@@ -132,6 +135,7 @@ impl Painted {
             parts_visited_kept: 0,
             items_built: 0,
             frames_worked: 0,
+            frame_chains: Vec::new(),
             maps_patched: 0,
             index_counts: crate::blocks::IndexCounts::default(),
             stackings: crate::paint_order::Stackings::default(),
