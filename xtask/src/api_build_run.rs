@@ -29,9 +29,13 @@ pub struct Order<'a> {
 /// Runs `order`; fails unless the session ends with status 0.
 pub fn run(order: &Order<'_>) -> ExitCode {
     match ran(order) {
-        Ok((lines, ended)) => {
+        Ok((lines, ended, agreed)) => {
             for line in lines {
                 println!("{line}");
+            }
+            if let Err(why) = agreed {
+                println!("FAIL api-build: {why}");
+                return ExitCode::FAILURE;
             }
             if ended == Ended::Exited(Some(0)) {
                 return ExitCode::SUCCESS;
@@ -46,11 +50,15 @@ pub fn run(order: &Order<'_>) -> ExitCode {
     }
 }
 
-fn ran(order: &Order<'_>) -> Result<(Vec<String>, Ended), String> {
+/// A run's lines, how its session ended, and whether its counts agree.
+type Ran = (Vec<String>, Ended, Result<(), String>);
+
+fn ran(order: &Order<'_>) -> Result<Ran, String> {
     crate::api_fds::refuse_inherited()?;
+    crate::api_limits::no_core_dumps()?;
     let config = crate::config::Config::load().map_err(|e| e.to_string())?;
-    let budget = Budget::new(order.budget, crate::api_prices::prices(&config)?);
-    budget.admit(order.model)?;
+    let budget = Budget::new(order.budget, crate::api_prices::prices(&config)?)?;
+    budget.price(order.model)?;
     let builder = Builder::new(order.name, &crate::api_host::home()?)?;
     let secret = crate::api_build_setup::key(&builder.home.join(KEY_FILE))?;
     let (main, objects) = crate::api_clone::main_repository()?;
@@ -64,9 +72,9 @@ fn ran(order: &Order<'_>) -> Result<(Vec<String>, Ended), String> {
     crate::api_server::serve(&builder.socket(), Arc::clone(&routes))?;
     let host = crate::api_host::host(objects)?;
     let mut lines = proven(&builder, &host)?;
-    let (said, ended) = session(order, (&builder, &host), &routes)?;
+    let (said, ended, agreed) = session(order, (&builder, &host), &routes)?;
     lines.extend(said);
-    Ok((lines, ended))
+    Ok((lines, ended, agreed))
 }
 
 /// The session run, and the lines that say how it ended.
@@ -74,7 +82,7 @@ fn session(
     order: &Order<'_>,
     (builder, host): (&Builder, &Host),
     routes: &Routes,
-) -> Result<(Vec<String>, Ended), String> {
+) -> Result<Ran, String> {
     let claude = Path::new(BIN).join("claude").display().to_string();
     let mut command = vec![claude];
     command.extend(crate::api_session::arguments(order.model, order.budget));
@@ -83,6 +91,25 @@ fn session(
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     let session = sandboxed(builder, host, &words)?;
     let ended = crate::api_session::run(session, (order.brief, &result), &proxy.budget)?;
-    let lines = crate::api_build_report::summary(&ended, (&result, builder), routes, proxy)?;
-    Ok((lines, ended))
+    drained(proxy);
+    let (lines, agreed) =
+        crate::api_build_report::summary(&ended, (&result, builder), routes, proxy);
+    Ok((lines, ended, agreed))
+}
+
+/// How long the requests still in flight when the session ends may take
+/// to settle: each one's writes to the session, now gone, fail at once or
+/// within the server's 60 s write bound, and it settles then; 90 s covers
+/// that.
+const DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(90);
+
+/// No more requests admitted, and those in flight given until
+/// [`DRAIN_DEADLINE`] to settle, so the summary counts them (review of
+/// #476-#478, L6); any still in flight then are reported by the summary.
+fn drained(proxy: &Proxy) {
+    proxy.budget.close("the session has ended");
+    let started = std::time::Instant::now();
+    while proxy.in_flight() > 0 && started.elapsed() < DRAIN_DEADLINE {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 }

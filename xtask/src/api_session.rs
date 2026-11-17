@@ -69,8 +69,12 @@ pub fn run(
     let mut child = session
         .stdin(Stdio::from(stdin))
         .stdout(Stdio::from(stdout))
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("starting the session under bwrap: {e}"))?;
+    if let Some(stderr) = child.stderr.take() {
+        thread::spawn(move || escaped_lines(stderr));
+    }
     let started = Instant::now();
     loop {
         if let Some(status) = child
@@ -85,6 +89,20 @@ pub fn run(
             return Ok(Ended::Stopped(why));
         }
         thread::sleep(POLL);
+    }
+}
+
+/// The session's stderr, which any process inside can write, printed a
+/// line at a time with every control character escaped, so none of it
+/// reaches the terminal raw (review of #476-#478, M4).
+fn escaped_lines(stderr: std::process::ChildStderr) {
+    use std::io::BufRead;
+    for line in std::io::BufReader::new(stderr)
+        .split(b'\n')
+        .map_while(Result::ok)
+    {
+        let line = String::from_utf8_lossy(&line);
+        eprintln!("session: {}", crate::api_refusals::escaped(&line));
     }
 }
 

@@ -19,6 +19,7 @@ mod api_limits;
 mod api_paths;
 mod api_prices;
 mod api_refusals;
+mod api_request_policy;
 mod api_sandbox;
 mod api_server;
 mod api_server_proxy;
@@ -203,6 +204,7 @@ fn main() -> ExitCode {
             };
             return api_build_run::run(&order);
         }
+        Command::ApiScoped { command } => return api_limits::scoped(&command),
         Command::ApiRelayInner {
             port,
             socket,

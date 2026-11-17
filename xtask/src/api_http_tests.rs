@@ -72,3 +72,37 @@ fn a_header_line_past_the_limit_is_refused() {
         "{refused}"
     );
 }
+
+#[test]
+fn a_bare_carriage_return_in_a_header_value_is_refused() {
+    let refused =
+        parsed("POST / HTTP/1.1\r\nx-a: a\rHost: evil.example\r\n\r\n").expect_err("refused");
+    assert!(
+        refused.starts_with("a header with a name that is not a token"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn a_version_other_than_http_1_1_and_extra_words_are_refused() {
+    for line in [
+        "POST /v1/messages anything",
+        "POST /v1/messages HTTP/1.1 more",
+        "POST /v1/messages HTTP/1.0",
+    ] {
+        let refused = parsed(&format!("{line}\r\n\r\n")).expect_err("refused");
+        assert!(
+            refused.starts_with("a request line that is not"),
+            "{line}: {refused}"
+        );
+    }
+}
+
+#[test]
+fn a_header_name_that_is_not_a_token_is_refused() {
+    let refused = parsed("GET / HTTP/1.1\r\nx a: b\r\n\r\n").expect_err("refused");
+    assert!(
+        refused.starts_with("a header with a name that is not a token"),
+        "{refused}"
+    );
+}

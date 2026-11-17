@@ -44,6 +44,13 @@ pub enum Command {
         #[arg(long, default_value = "claude-sonnet-5-5")]
         model: String,
     },
+    /// Inside an API builder's scope, before its sandbox: run the command
+    /// if the scope's limits are in force.
+    #[command(hide = true)]
+    ApiScoped {
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
     /// Inside an API builder's sandbox: relay loopback `port` to the
     /// harness socket and run the command.
     #[command(hide = true)]

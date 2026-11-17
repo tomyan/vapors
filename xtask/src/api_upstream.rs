@@ -8,13 +8,12 @@
 
 use std::fmt::Write as _;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use crate::api_http::Request;
-use crate::api_prices::Usage;
-use crate::api_usage::Scan;
+use crate::api_usage::{Counted, Scan};
 use crate::ux_secret::Secret;
 
 /// Where requests go.
@@ -42,42 +41,93 @@ const DROPPED: [&str; 8] = [
 /// How a forwarded request ended.
 pub struct Forwarded {
     pub status: u16,
-    /// The usage, for a response that holds one.
-    pub usage: Option<Usage>,
+    /// What the response counted, judged by curl's exit too (review of
+    /// #476-#478, M3).
+    pub counted: Counted,
 }
 
-/// `request` sent to the API with `secret`, its body staged at `staged`,
-/// the response written to `client`.
+/// A staged body, removed when it is dropped, on every path (review of
+/// #476-#478, M7). At most one per request in flight, each at most
+/// `api_http::BODY_LIMIT`: the proxy's in-flight cap bounds both their
+/// count and their bytes.
+pub struct Staged(PathBuf);
+
+impl Staged {
+    /// `body` written to `path`.
+    ///
+    /// # Errors
+    ///
+    /// The write failing, naming the path.
+    pub fn new(path: PathBuf, body: &[u8]) -> Result<Self, String> {
+        std::fs::write(&path, body)
+            .map_err(|e| format!("staging the body at {}: {e}", path.display()))?;
+        Ok(Self(path))
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        if let Err(error) = std::fs::remove_file(&self.0) {
+            eprintln!(
+                "api-build: the staged body {} was not removed: {error}",
+                self.0.display()
+            );
+        }
+    }
+}
+
+/// `request` sent to the API with `secret`, its body at `staged`, the
+/// response written to `client`. If the client stops reading (its write
+/// deadline, set by the server) curl is killed, and the response counts as
+/// cut, as it does when curl exits other than 0 or the stream does not end
+/// whole.
 ///
 /// # Errors
 ///
 /// curl not starting or ending before a response head; each message has
-/// passed the key guard.
+/// passed the key guard and the escaping.
 pub fn forward(
     request: &Request,
     secret: &Secret,
-    staged: &Path,
+    staged: &Staged,
     client: &mut impl Write,
 ) -> Result<Forwarded, String> {
-    std::fs::write(staged, &request.body)
-        .map_err(|e| format!("staging the body at {}: {e}", staged.display()))?;
-    let mut curl = started(request, secret, staged)?;
+    forward_by("curl", request, (secret, staged), client)
+}
+
+/// [`forward`] with `program` as curl, for the tests' stand-ins.
+fn forward_by(
+    program: &str,
+    request: &Request,
+    (secret, staged): (&Secret, &Staged),
+    client: &mut impl Write,
+) -> Result<Forwarded, String> {
+    let mut curl = started(program, request, (secret, &staged.0))?;
     let stdout = curl.stdout.take().ok_or("curl's stdout was not opened")?;
     let mut response = BufReader::new(stdout);
     let status =
         passed_head(&mut response, client).map_err(|why| ended(&mut curl, secret, &why))?;
     let mut scan = Scan::default();
-    streamed(&mut response, client, &mut scan);
-    let _ = curl.wait(); // the head arrived; the body's end is what was streamed
-    let _ = std::fs::remove_file(staged);
-    Ok(Forwarded {
-        status,
-        usage: scan.usage(),
-    })
+    let client_gone = !streamed(&mut response, client, &mut scan);
+    if client_gone {
+        let _ = curl.kill(); // the session stopped reading; curl's output goes nowhere
+    }
+    drop(response);
+    let exit = curl.wait().map_err(|e| format!("waiting for curl: {e}"))?;
+    let counted = match (client_gone, exit.success()) {
+        (true, _) => Counted::Cut("the session stopped reading the response".into()),
+        (false, false) => Counted::Cut(format!("curl ended with {exit} after the response head")),
+        (false, true) => scan.counted(),
+    };
+    Ok(Forwarded { status, counted })
 }
 
-fn started(request: &Request, secret: &Secret, staged: &Path) -> Result<Child, String> {
-    let mut command = Command::new("curl");
+fn started(
+    program: &str,
+    request: &Request,
+    (secret, staged): (&Secret, &Path),
+) -> Result<Child, String> {
+    let mut command = Command::new(program);
     command.args(arguments(&request.method, &request.target, staged));
     let mut child = command
         .stdin(Stdio::piped())
@@ -104,9 +154,21 @@ fn started(request: &Request, secret: &Secret, staged: &Path) -> Result<Child, S
 /// curl's arguments: never a header, never the key.
 pub fn arguments(method: &str, target: &str, staged: &Path) -> Vec<String> {
     let deadline = REQUEST_DEADLINE.as_secs().to_string();
-    let mut args: Vec<String> = ["-q", "--silent", "--show-error", "--no-buffer", "--http1.1"]
-        .map(str::to_owned)
-        .to_vec();
+    // --globoff: the target is one request, never a pattern curl expands
+    // (review of #476-#478, H1); --noproxy: the key goes to the API alone,
+    // whatever proxy the environment names (L3)
+    let mut args: Vec<String> = [
+        "-q",
+        "--silent",
+        "--show-error",
+        "--no-buffer",
+        "--http1.1",
+        "--globoff",
+        "--noproxy",
+        "*",
+    ]
+    .map(str::to_owned)
+    .to_vec();
     args.extend(["--include", "--connect-timeout", "20", "--max-time"].map(str::to_owned));
     args.extend([
         deadline,
@@ -166,28 +228,34 @@ fn passed_head(response: &mut impl BufRead, client: &mut impl Write) -> Result<u
     Ok(status)
 }
 
-fn streamed(response: &mut impl Read, client: &mut impl Write, scan: &mut Scan) {
+/// The response's body copied to `client` and read by `scan` until curl
+/// ends it; whether the client took all of it.
+fn streamed(response: &mut impl Read, client: &mut impl Write, scan: &mut Scan) -> bool {
     let mut buffer = [0; 16 * 1024];
     loop {
-        match response.read(&mut buffer) {
-            Ok(0) | Err(_) => return,
-            Ok(read) => {
-                scan.read(&buffer[..read]);
-                if client
-                    .write_all(&buffer[..read])
-                    .and_then(|()| client.flush())
-                    .is_err()
-                {
-                    return; // the session closed the connection; curl ends with it
-                }
+        let read = match response.read(&mut buffer) {
+            Ok(0) => return true,
+            Ok(read) => read,
+            Err(error) => {
+                eprintln!("api-build: reading curl's output failed: {error}");
+                return true; // curl's exit code judges the transfer
             }
+        };
+        scan.read(&buffer[..read]);
+        if client
+            .write_all(&buffer[..read])
+            .and_then(|()| client.flush())
+            .is_err()
+        {
+            return false;
         }
     }
 }
 
 /// curl's failure, after `why`, its output guarded.
 fn ended(curl: &mut Child, secret: &Secret, why: &str) -> String {
-    let _ = curl.kill();
+    let _ = curl.kill(); // it may have ended already
+    let _ = curl.wait(); // reaped; its stderr is read below
     let mut said = String::new();
     if let Some(mut stderr) = curl.stderr.take() {
         let _ = stderr.read_to_string(&mut said);
@@ -195,7 +263,8 @@ fn ended(curl: &mut Child, secret: &Secret, why: &str) -> String {
     let said = secret
         .guard("curl's error", said.trim())
         .unwrap_or("(withheld: it held part of the key)");
-    format!("{why}; curl said: {said}")
+    // curl's error echoes the target, which the session chose (M4)
+    crate::api_refusals::escaped(&format!("{why}; curl said: {said}"))
 }
 
 #[cfg(test)]
