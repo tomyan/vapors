@@ -253,7 +253,13 @@ kept as a second path).
   instanced pipelines' layout.
 - **Text and icons.**
   - Each vertex carries its row's index and its frame's entry (36 to 40
-    bytes).
+    bytes). That is 24 bytes more per glyph (six vertices), about 11%
+    more kept text memory and text upload on a rebuild; a 13-glyph run
+    keeps 3120 bytes where it kept 2816 (`gpu_frame_counts_kinds.rs`). Every vertex of an F2
+    batch has the same frame, so the frame could go in the params
+    uniform, which has 12 spare bytes. It stays per vertex because F3
+    joins batches across frames (`flat-scene.md`, the F3 row), and a
+    joined batch's glyphs are then in different frames.
   - The params uniform is gamma, contrast, the viewport and the draw's
     first row entry (32 bytes, where it was 32 plus a 1 KiB row table).
   - The table is at binding 3.
@@ -279,4 +285,24 @@ kept as a second path).
   records the rows its bytes name (the highest row and one), and every
   draw from kept bytes, in every build, refuses a range that holds
   fewer (`rows_fit`, O(1)).
+
+### After the review of F2.2 (issuecomment-6939479919)
+
+- **Kept text in rows is tested on the kept path.** The lane text test
+  inserted a row, which gives every visible batch new item rows and so
+  rebuilds them. It now grows the first row instead: the rows below
+  move, their batches keep their bytes, and the test asserts the text
+  was drawn with nothing written. A second test compares the first two
+  rows with a page of those two alone (no lane), because a break in the
+  shared draw also breaks the fresh painter the first test compares
+  with.
+- **Both `rows_fit` call sites have a test.** GPU tests call
+  `KeptGpu::range` and `text_range` with a range that fits, then with
+  one row fewer, and expect the refusal.
+- **`TextGpu::new` takes `rows_needed`**, as `Gpu` is built with it.
+- **Bind groups are keyed by both generations** (`Generations`, a
+  pair), not two counters packed into a `u64`.
+- **One range per lane part is tested:** rows with a shadow and a
+  background (two batches a part) rewrite one range's rows after an
+  insert.
 

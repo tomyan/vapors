@@ -104,8 +104,8 @@ impl KeptGpu {
             return Ok(());
         };
         let built = (bytes, frame, self.frame);
-        let mut gpu = TextGpu::new((range.range(), pins), (run, painted), built);
-        gpu.rows_needed = crate::painter::kept::rows_needed(rows);
+        let needed = crate::painter::kept::rows_needed(rows);
+        let gpu = TextGpu::new((range.range(), pins, needed), (run, painted), built);
         self.texts.insert(key, gpu);
         self.written += 1;
         Ok(())
@@ -140,10 +140,10 @@ fn kept_range(text: &mut TextPipeline, target: &Target<'_>, bytes: &[u8]) -> Opt
 
 impl TextGpu {
     /// The bytes built for `run` as `painted` resolves it, kept at
-    /// `range` with `pins`, naming the transform table's entry `frame`,
-    /// drawn in painter frame `drawn`.
+    /// `range` with `pins`, naming `rows_needed` rows and the transform
+    /// table's entry `frame`, drawn in painter frame `drawn`.
     fn new(
-        (range, pins): (Option<KeptRange>, AtlasPins),
+        (range, pins, rows_needed): (Option<KeptRange>, AtlasPins, usize),
         (run, painted): (&Run, &Painted),
         (bytes, frame, drawn): (Vec<u8>, u32, u64),
     ) -> Self {
@@ -153,7 +153,7 @@ impl TextGpu {
             resolved: Resolved::of(run, painted),
             len: bytes.len() as u64,
             frame,
-            rows_needed: 0,
+            rows_needed,
             drawn,
             #[cfg(debug_assertions)]
             bytes,

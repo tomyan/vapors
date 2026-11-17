@@ -87,7 +87,7 @@ fn view_group<'a>(
     (layout, views, table): (&wgpu::BindGroupLayout, &UniformSlots, &TransformTable),
     (target, work): (&Target<'_>, &WorkCounter),
 ) -> &'a wgpu::BindGroup {
-    kept.of((views.generation() << 32) | table.generation(), || {
+    kept.of((views.generation(), table.generation()), || {
         let entries = [
             wgpu::BindGroupEntry {
                 binding: 0,

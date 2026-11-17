@@ -295,3 +295,7 @@ fn draw_meshes(
     meshes.draw_kept(target, range, shift, (entries, drawn.as_slice()));
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "painter_kept_rows_fit_tests.rs"]
+mod rows_fit_tests;

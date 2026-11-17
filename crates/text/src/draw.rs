@@ -147,7 +147,7 @@ impl TextPipeline {
         };
         let own = table.is_none();
         let table = table.unwrap_or(identity);
-        let generation = (slots.generation() << 32) | table.generation();
+        let generation = (slots.generation(), table.generation());
         let bind_group = atlas_texture.bind_group((own, generation), |view| {
             pipeline::bind_group(target.device, work, layout, view, sampler, (slots, table))
         });

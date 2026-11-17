@@ -44,7 +44,7 @@ impl AtlasTexture {
     /// painter's: the kept one, or one `make` makes over the view.
     pub(crate) fn bind_group(
         &mut self,
-        (own, generation): (bool, u64),
+        (own, generation): (bool, vapors_renderer::Generations),
         make: impl FnOnce(&wgpu::TextureView) -> wgpu::BindGroup,
     ) -> &wgpu::BindGroup {
         let Self {
