@@ -67,8 +67,9 @@ fn gpu_a_scroll_writes_only_the_batches_entering_the_view() {
     // Then: rows 0 to 3 showed, row 3 touching the list's bottom edge;
     // scrolled, row 0 touches its top edge and row 4 comes in at the
     // bottom. Row 4's shadow (112 bytes) and quad (128) are written,
-    // with the new shift's uniform value for each pipeline (16 each);
-    // the white quad on the page, rows 0 to 3 and the thumb are drawn as
+    // and the new shift into the list's frame entry in the transform
+    // table (one entry, 64 bytes); the white quad on the page, rows 0 to 3
+    // and the thumb are drawn as
     // kept. Row 1 (blue) is now at the list's top (y 2) and row 2 (red)
     // below it (y 10), which only a shift of 8 device pixels gives; below
     // the list (y 28) the rows are clipped away
@@ -84,7 +85,26 @@ fn gpu_a_scroll_writes_only_the_batches_entering_the_view() {
     );
     assert_eq!((counts.batches_written, counts.batches_kept), (2, 10));
     let bytes = (counts.shadows.buffer_bytes, counts.quads.buffer_bytes);
-    // each batch's instance with its row index (16 more) and its view
-    // uniform with the rows' offsets (16 + 1024)
-    assert_eq!(bytes, (112 + 16 + 1040, 128 + 16 + 1040), "{counts:?}");
+    // each batch's instance with its row index and frame entry (16
+    // more); no view uniform, as the viewport and rows are as before
+    assert_eq!(bytes, (112 + 16, 128 + 16), "{counts:?}");
+    let table = (counts.transform_writes, counts.transform_bytes);
+    assert_eq!(table, (1, 64), "{counts:?}");
+}
+
+#[test]
+fn gpu_a_frame_with_nothing_scrolled_writes_no_transform_entry() {
+    // Given: drawn once, then scrolled and drawn
+    let mut doc = list();
+    let mut rig = Rig::new();
+    drawn(&mut rig, &doc);
+    scrolled(&mut doc, 4.0);
+    drawn(&mut rig, &doc);
+
+    // When: drawn again with nothing changed
+    let (_, counts) = drawn(&mut rig, &doc);
+
+    // Then: every frame entry and row range holds what it held
+    let table = (counts.transform_writes, counts.transform_bytes);
+    assert_eq!(table, (0, 0), "{counts:?}");
 }

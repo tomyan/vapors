@@ -7,6 +7,16 @@ use super::*;
 
 /// A key the page made for its one batch.
 fn a_key() -> BatchKey {
+    one_batch().0
+}
+
+/// The frame of the page's one batch.
+fn a_frame() -> vapors_elements::BatchFrame {
+    one_batch().1
+}
+
+/// The key and the frame of the one batch of a page of one red div.
+fn one_batch() -> (BatchKey, vapors_elements::BatchFrame) {
     let mut doc = Document::new(FontSystem::bundle_only());
     doc.add_stylesheet("app.css", "div { height: 2px; background-color: #f00; }")
         .expect("parses");
@@ -18,7 +28,8 @@ fn a_key() -> BatchKey {
         scale: 1.0,
     };
     let painted = doc.update(view).expect("updates");
-    painted.kept_batches(Rect::new(0.0, 0.0, 10.0, 10.0)).keys[0]
+    let kept = painted.kept_batches(Rect::new(0.0, 0.0, 10.0, 10.0));
+    (kept.keys[0], kept.frames[0])
 }
 
 #[test]
@@ -116,6 +127,7 @@ fn lane_rows(rows: &RowsOfBatches) -> BatchRows<'_> {
 /// A batch at a shift of 3, 5 with `rows` at `offsets`.
 fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
     Moved {
+        frame: a_frame(),
         shift: Shift::whole([3.0, 5.0]),
         table: &RowOffsets::NONE,
         offsets,

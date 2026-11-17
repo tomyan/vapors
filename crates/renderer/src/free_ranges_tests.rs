@@ -112,3 +112,17 @@ fn a_range_overlapping_the_free_range_before_it_panics() {
     // When
     free.give(16..48);
 }
+
+#[test]
+fn growing_frees_the_tail_joined_to_a_free_end() {
+    // Given: 8 of 10 taken, the last 2 free
+    let mut ranges = FreeRanges::new(10);
+    assert_eq!(ranges.take(8), Some(0));
+
+    // When
+    ranges.grow(16);
+
+    // Then: one range of 8 from 8 to 16
+    assert_eq!(ranges.free_bytes(), 8);
+    assert_eq!(ranges.take(8), Some(8));
+}

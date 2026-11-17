@@ -51,14 +51,16 @@ fn two_quads() -> [vapors_scene::Quad; 2] {
 
 #[test]
 fn every_item_given_a_row_inside_the_table_is_written() {
-    let bytes = crate::QuadPipeline::bytes_in_rows(&two_quads(), &[0, 127]);
+    let bytes = crate::QuadPipeline::bytes_in(&two_quads(), 9, &[0, 127]);
     assert_eq!(bytes[144 + 128..144 + 132], 127u32.to_le_bytes());
+    // and the frame's entry after it
+    assert_eq!(bytes[144 + 132..144 + 136], 9u32.to_le_bytes());
 }
 
 #[test]
 #[should_panic(expected = "quads: item 1 names row 128, past the 128 rows a batch's table holds")]
 fn a_row_past_the_table_is_refused_naming_the_item_and_the_row() {
-    let _ = crate::QuadPipeline::bytes_in_rows(&two_quads(), &[0, 128]);
+    let _ = crate::QuadPipeline::bytes_in(&two_quads(), 0, &[0, 128]);
 }
 
 #[test]
@@ -72,7 +74,7 @@ fn fewer_rows_than_items_are_refused() {
         caster: vapors_scene::Rect::new(0.0, 0.0, 2.0, 2.0),
         caster_radii: [0.0; 4],
     };
-    let _ = crate::ShadowPipeline::bytes_in_rows(&[shadow, shadow], &[0]);
+    let _ = crate::ShadowPipeline::bytes_in(&[shadow, shadow], 0, &[0]);
 }
 
 #[test]

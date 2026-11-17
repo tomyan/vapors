@@ -65,7 +65,8 @@ pub fn gpu_with(wanted: wgpu::Features) -> Gpu {
         Ok(adapter) => adapter,
         Err(error) => panic!("{error}"),
     };
-    let required_limits = match vapors_gpu::raised_limits(&adapter.limits()) {
+    let downlevel = adapter.get_downlevel_capabilities().flags;
+    let required_limits = match vapors_gpu::raised_limits(&adapter.limits(), downlevel) {
         Ok(limits) => limits,
         Err(error) => panic!("{error}"),
     };

@@ -165,3 +165,36 @@ kept as a second path).
    the tailnet (`cargo xtask serve`), and someone with the phone has to
    open it and report. Who does it, and at which slice: F2a, the first
    to read the table?
+
+## As built: F2a
+
+- **Scope.** F2a moved the closed-form pipeline onto the table along
+  with quads and shadows, because all three share `Instanced`
+  (`renderer/src/instanced.rs`), and one pipeline cannot take both the
+  old and the new path. F2c keeps the mesh pipeline, the shape batch
+  cut, and the retirement of `Shift` and `RowOffsets`, which the image
+  and text pipelines read until F2b.
+- **Renderer.**
+  - `TransformTable` (`transform_table.rs`) holds the entries on the
+    CPU (`transform_entries.rs`): entry 0 is the identity, values are
+    written only when they change, and an entry changed twice for one
+    encoder is refused.
+  - The table owns its work counter, so its writes are counted once,
+    by `take_written`.
+  - The instanced pipelines bind the view uniform (size and `rows_base`,
+    16 bytes) and the table. Their immediate draws use an identity table
+    of their own.
+- **App.** `painter_transforms.rs` keeps a frame entry per
+  `BatchFrame` and a row range per lane batch's key, each given back
+  after a frame that does not draw it, as kept bytes are. `KeptGpu`
+  builds a batch's bytes again when its frame's entry changes.
+  `FrameCounts::transform_writes` and `transform_bytes` count the
+  writes.
+- **Refusal.** `vapors_gpu::raised_limits` takes the adapter's
+  downlevel flags. It refuses `max_storage_buffers_per_shader_stage`
+  below the default, and a device without `VERTEX_STORAGE`, naming
+  each.
+- **Page contract.** Unchanged. Every demo's screenshot pixel checks
+  draw quads and shadows, which now read the table, under headless
+  Chromium on SwiftShader. All thirteen cases hold.
+

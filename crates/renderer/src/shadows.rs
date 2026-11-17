@@ -6,7 +6,7 @@ use vapors_scene::Shadow;
 
 use crate::instanced::{Instanced, instance_bytes, rowed_instances};
 use crate::quads::rgba;
-use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
+use crate::{GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -26,7 +26,10 @@ impl ShadowPipeline {
             device,
             format,
             "shadows",
-            &RowOffsets::shader(include_str!("shadows.wgsl")),
+            concat!(
+                include_str!("transform_table.wgsl"),
+                include_str!("shadows.wgsl")
+            ),
             Self::VEC4S,
         ))
     }
@@ -39,19 +42,24 @@ impl ShadowPipeline {
     /// The instance bytes of `shadows`, as a draw writes them.
     #[must_use]
     pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
-        Self::bytes_in_rows(shadows, &[])
+        Self::bytes_in(shadows, 0, &[])
     }
 
-    /// The instance bytes of `shadows`, item `i` in row `rows[i]` of the
-    /// batch's [`RowOffsets`], or every item in row 0 for an empty `rows`.
+    /// The instance bytes of `shadows`, each in frame `frame` (its entry
+    /// in the transform table), item `i` in row `rows[i]` of its batch's
+    /// range, or every item in row 0 for an empty `rows`.
     ///
     /// # Panics
     ///
     /// When `rows` is neither empty nor one index an item, or names a row
-    /// past the table ([`RowOffsets::CAPACITY`]).
+    /// past a batch's range ([`RowOffsets::CAPACITY`](crate::RowOffsets::CAPACITY)).
     #[must_use]
-    pub fn bytes_in_rows(shadows: &[Shadow], rows: &[u32]) -> Vec<u8> {
-        rowed_instances(("shadows", Self::VEC4S as usize), (shadows, rows), instance)
+    pub fn bytes_in(shadows: &[Shadow], frame: u32, rows: &[u32]) -> Vec<u8> {
+        rowed_instances(
+            ("shadows", Self::VEC4S as usize),
+            (shadows, frame, rows),
+            instance,
+        )
     }
 
     /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,
@@ -62,29 +70,20 @@ impl ShadowPipeline {
         self.0.keep(target, bytes)
     }
 
-    /// Draws the shadows `kept` holds into `target`, moved by `shift`
-    /// (device pixels: a scroll frame's), in one draw call.
+    /// Draws the shadows `kept` holds into `target`, each at its frame's
+    /// entry in `table` and its row's in its batch's range from
+    /// `rows_base`, in one draw call.
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline.
-    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
-    }
-
-    /// As [`Self::draw_kept`], each instance moved by its row's offset in
-    /// `rows` as well.
-    ///
-    /// # Panics
-    ///
-    /// If `kept` was kept by another pipeline.
-    pub fn draw_kept_in_rows(
+    pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        (shift, rows): (Shift, &RowOffsets),
+        table: (&mut TransformTable, u32),
     ) {
-        self.0.draw_kept(target, kept, (shift, rows));
+        self.0.draw_kept(target, kept, table);
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

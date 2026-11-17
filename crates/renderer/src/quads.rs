@@ -5,7 +5,7 @@
 use vapors_scene::{Color, Quad};
 
 use crate::instanced::{Instanced, instance_bytes, rowed_instances};
-use crate::{GpuWork, KeptRange, RowOffsets, Shift, Target};
+use crate::{GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws quads. Create once per target format.
 pub struct QuadPipeline(Instanced);
@@ -25,7 +25,10 @@ impl QuadPipeline {
             device,
             format,
             "quads",
-            &RowOffsets::shader(include_str!("quads.wgsl")),
+            concat!(
+                include_str!("transform_table.wgsl"),
+                include_str!("quads.wgsl")
+            ),
             Self::VEC4S,
         ))
     }
@@ -39,19 +42,24 @@ impl QuadPipeline {
     /// The instance bytes of `quads`, as a draw writes them.
     #[must_use]
     pub fn bytes(quads: &[Quad]) -> Vec<u8> {
-        Self::bytes_in_rows(quads, &[])
+        Self::bytes_in(quads, 0, &[])
     }
 
-    /// The instance bytes of `quads`, item `i` in row `rows[i]` of the
-    /// batch's [`RowOffsets`], or every item in row 0 for an empty `rows`.
+    /// The instance bytes of `quads`, each in frame `frame` (its entry
+    /// in the transform table), item `i` in row `rows[i]` of its batch's
+    /// range, or every item in row 0 for an empty `rows`.
     ///
     /// # Panics
     ///
     /// When `rows` is neither empty nor one index an item, or names a row
-    /// past the table ([`RowOffsets::CAPACITY`]).
+    /// past a batch's range ([`RowOffsets::CAPACITY`](crate::RowOffsets::CAPACITY)).
     #[must_use]
-    pub fn bytes_in_rows(quads: &[Quad], rows: &[u32]) -> Vec<u8> {
-        rowed_instances(("quads", Self::VEC4S as usize), (quads, rows), instance)
+    pub fn bytes_in(quads: &[Quad], frame: u32, rows: &[u32]) -> Vec<u8> {
+        rowed_instances(
+            ("quads", Self::VEC4S as usize),
+            (quads, frame, rows),
+            instance,
+        )
     }
 
     /// Writes `bytes` ([`QuadPipeline::bytes`] of a run) into the kept buffer,
@@ -62,29 +70,20 @@ impl QuadPipeline {
         self.0.keep(target, bytes)
     }
 
-    /// Draws the quads `kept` holds into `target`, moved by `shift`
-    /// (device pixels: a scroll frame's), in one draw call.
+    /// Draws the quads `kept` holds into `target`, each at its frame's
+    /// entry in `table` and its row's in its batch's range from
+    /// `rows_base`, in one draw call.
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline.
-    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
-        self.0.draw_kept(target, kept, (shift, &RowOffsets::NONE));
-    }
-
-    /// As [`Self::draw_kept`], each instance moved by its row's offset in
-    /// `rows` as well.
-    ///
-    /// # Panics
-    ///
-    /// If `kept` was kept by another pipeline.
-    pub fn draw_kept_in_rows(
+    pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        (shift, rows): (Shift, &RowOffsets),
+        table: (&mut TransformTable, u32),
     ) {
-        self.0.draw_kept(target, kept, (shift, rows));
+        self.0.draw_kept(target, kept, table);
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

@@ -63,6 +63,10 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
+        let rows = moved.rows.items();
+        let Some((frame, rows_base)) = self.table_entries(target, (run, key), moved) else {
+            return Ok(());
+        };
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
@@ -73,17 +77,18 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let rows = moved.rows.items();
-        let Some(kept) = self.kept.range(pipelines, target, (run, rows, key, at))? else {
+        let Some(kept) = self
+            .kept
+            .range(pipelines, target, (run, frame, rows, key, at))?
+        else {
             return Ok(());
         };
-        let (range, shift, rowed) = (kept.range, moved.shift, (moved.shift, moved.table));
+        let (range, shift) = (kept.range, moved.shift);
+        let table = (&mut self.transforms.table, rows_base);
         match run {
-            Run::Shadows(_) => self.shadows.draw_kept_in_rows(target, range, rowed),
-            Run::Quads(_) => self.quads.draw_kept_in_rows(target, range, rowed),
-            Run::Shapes(_) => self
-                .closed_forms
-                .draw_kept(target, range, unrowed(shift, rows)),
+            Run::Shadows(_) => self.shadows.draw_kept(target, range, table),
+            Run::Quads(_) => self.quads.draw_kept(target, range, table),
+            Run::Shapes(_) => self.closed_forms.draw_kept(target, range, table),
             Run::Meshes(_) => {
                 let shift = unrowed(shift, rows);
                 let drawn = self
@@ -106,6 +111,31 @@ impl ScenePainter {
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
         Ok(())
+    }
+
+    /// For the runs whose items name entries of the transform table
+    /// (shadows, quads, shapes): their frame's entry, set to its shift,
+    /// and the first of batch `key`'s rows' entries (0 for a batch in one
+    /// frame); `(0, 0)` for the others. `None` when the table could not
+    /// grow (the refusal is on the target's encoder).
+    fn table_entries(
+        &mut self,
+        target: &Target<'_>,
+        (run, key): (&Run, BatchKey),
+        moved: &Moved<'_>,
+    ) -> Option<(u32, u32)> {
+        match Kind::of_run(run) {
+            Some(Kind::Shadows | Kind::Quads | Kind::ClosedForms) => {
+                let frame = self
+                    .transforms
+                    .frame_entry(target, moved.frame, moved.shift)?;
+                Some((
+                    frame,
+                    self.transforms.rows_base(target, key, moved.offsets)?,
+                ))
+            }
+            _ => Some((0, 0)),
+        }
     }
 
     /// Draws `run`, a text or icon batch keyed `key`, from its kept
@@ -150,6 +180,7 @@ impl ScenePainter {
         };
         self.kept.release_undrawn(&mut pipelines);
         self.row_tables.release_undrawn();
+        self.transforms.release_undrawn();
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
             held, retained,
@@ -198,18 +229,19 @@ impl Pipelines<'_> {
     }
 }
 
-/// `shift`, for a shape or mesh batch, which is batched in one frame
+/// `shift`, for a mesh batch, which is batched in one frame
 /// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
-/// frame's shift, with no rows.
+/// frame's shift, with no rows (meshes move to the transform table in
+/// flat-scene F2c).
 ///
 /// # Panics
 ///
-/// When the batch has rows: its pipeline has no table of row offsets, so
-/// every row would draw at the first's place.
+/// When the batch has rows: the mesh pipeline has no table of row
+/// offsets, so every row would draw at the first's place.
 fn unrowed(shift: vapors_renderer::Shift, rows: &[u32]) -> vapors_renderer::Shift {
     assert!(
         rows.is_empty(),
-        "a shape or mesh batch spans {} items' rows, and its pipeline takes no table of row \
+        "a mesh batch spans {} items' rows, and its pipeline takes no table of row \
          offsets: shapes and meshes in a lane row are batched in the row's frame \
          (vapors-elements framed_batches.rs `resolved`); reproduce with `cargo xtask test`",
         rows.len()

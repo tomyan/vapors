@@ -33,6 +33,9 @@ pub struct ScenePainter {
     kept: KeptGpu,
     /// Each lane batch's table of row offsets (`painter_rows.rs`).
     row_tables: RowTables,
+    /// The frames' and lane batches' entries in the transform table that
+    /// the shadow, quad and shape pipelines read.
+    transforms: transforms::Transforms,
     /// Where each batch was drawn last frame (`painter_places.rs`).
     places: places::BatchPlaces,
     counts: FrameCounts,
@@ -91,6 +94,7 @@ impl ScenePainter {
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
             row_tables: RowTables::default(),
+            transforms: transforms::Transforms::new(device),
             places: places::BatchPlaces::default(),
             counts: FrameCounts::default(),
         })
@@ -147,6 +151,7 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
+        self.transforms.begin_frame();
         let taken = self.shapes.take_from(painted, &mut self.mesh_entries);
         let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
         self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
@@ -176,6 +181,8 @@ mod region;
 mod rows;
 #[path = "painter_runs.rs"]
 mod runs;
+#[path = "painter_transforms.rs"]
+mod transforms;
 use kept::KeptGpu;
 use rows::RowTables;
 #[cfg(debug_assertions)]

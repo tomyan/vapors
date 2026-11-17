@@ -58,6 +58,9 @@ impl RowTables {
 /// rows' offsets, those offsets, and each item's row (all empty for a
 /// batch in one frame).
 pub(super) struct Moved<'a> {
+    /// The frame the batch is in, whose entry in the transform table its
+    /// shadow, quad and shape items name.
+    pub(super) frame: vapors_elements::BatchFrame,
     pub(super) shift: Shift,
     pub(super) table: &'a RowOffsets,
     pub(super) offsets: &'a [[f32; 2]],

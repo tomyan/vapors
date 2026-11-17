@@ -46,6 +46,9 @@ struct Gpu {
     /// A mesh run's items' entries, by the store's index, beside their
     /// instances in `range`: built once with the bytes.
     meshes: Vec<usize>,
+    /// The frame's entry in the transform table its items name (0 for
+    /// the runs that name none): bytes naming another are built again.
+    frame: u32,
     drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -65,8 +68,9 @@ impl KeptGpu {
     }
 
     /// The kept bytes of `run`, batch `at` of the frame, keyed `key` on
-    /// `target`, written first when none are kept; `None` when the
-    /// write is refused (on the target's encoder).
+    /// `target`, its items in the transform table's entry `frame`;
+    /// written first when none are kept, or the kept ones name another
+    /// entry. `None` when the write is refused (on the target's encoder).
     ///
     /// # Errors
     /// A run whose bytes cannot be built ([`run_bytes`]).
@@ -74,16 +78,23 @@ impl KeptGpu {
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
-        (run, rows, key, at): (&Run, &[u32], BatchKey, usize),
+        (run, frame, rows, key, at): (&Run, u32, &[u32], BatchKey, usize),
     ) -> Result<Option<Kept<'_>>, PaintError> {
+        if let Some(stale) = self
+            .entries
+            .extract_if(|k, gpu| *k == key && gpu.frame != frame)
+            .next()
+        {
+            pipelines.release(stale.1.kind, stale.1.range);
+        }
         match self.entries.get(&key) {
             Some(gpu) => {
-                gpu.check((run, rows), at, pipelines.shapes);
+                gpu.check((run, frame, rows), at, pipelines.shapes);
                 self.kept += 1;
             }
             _ => {
                 if self
-                    .write(&mut pipelines, target, (run, rows, key))?
+                    .write(&mut pipelines, target, (run, frame, rows, key))?
                     .is_none()
                 {
                     return Ok(None);
@@ -104,9 +115,12 @@ impl KeptGpu {
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
-        (run, rows, key): (&Run, &[u32], BatchKey),
+        (run, frame, rows, key): (&Run, u32, &[u32], BatchKey),
     ) -> Result<Option<()>, PaintError> {
-        let (kind, built) = (Kind::of(run), run_bytes((run, rows), pipelines.shapes)?);
+        let (kind, built) = (
+            Kind::of(run),
+            run_bytes((run, frame, rows), pipelines.shapes)?,
+        );
         let RunBytes { bytes, meshes } = built;
         let Some(range) = pipelines.keep(kind, target, &bytes) else {
             return Ok(None);
@@ -117,6 +131,7 @@ impl KeptGpu {
             kind,
             len: bytes.len() as u64,
             meshes,
+            frame,
             drawn: self.frame,
             #[cfg(debug_assertions)]
             bytes,
@@ -153,14 +168,14 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, (run, rows): (&Run, &[u32]), at: usize, shapes: &ShapeStore) {
+    fn check(&self, (run, frame, rows): (&Run, u32, &[u32]), at: usize, shapes: &ShapeStore) {
         #[cfg(debug_assertions)]
         {
-            let fresh = run_bytes((run, rows), shapes)
+            let fresh = run_bytes((run, frame, rows), shapes)
                 .expect("built when these bytes were kept; the store only grows");
             super::super::kept_check::assert_kept(&self.bytes, &fresh.bytes, (run, at));
         }
         #[cfg(not(debug_assertions))]
-        let _ = (run, rows, at, shapes); // only the debug build's compare uses them
+        let _ = (run, frame, rows, at, shapes); // only the debug build's compare uses them
     }
 }

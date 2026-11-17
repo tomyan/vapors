@@ -64,6 +64,25 @@ impl FreeRanges {
         self.insert(at, range, (before, after));
     }
 
+    /// The buffer grown to `size`, the new tail free and joined to a free
+    /// range that ends where the old buffer did.
+    ///
+    /// # Panics
+    ///
+    /// If `size` is smaller than the buffer.
+    pub(crate) fn grow(&mut self, size: u64) {
+        assert!(
+            size >= self.size,
+            "free ranges grown from {} to {size}",
+            self.size
+        );
+        if size > self.size {
+            let tail = self.size..size;
+            self.size = size;
+            self.give(tail);
+        }
+    }
+
     /// Bytes free in all, for the tests' view of the merges.
     #[cfg(test)]
     pub(crate) fn free_bytes(&self) -> u64 {

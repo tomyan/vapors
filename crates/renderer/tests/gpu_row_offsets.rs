@@ -1,15 +1,19 @@
 //! GPU tier: kept quads and shadows in the rows of a lane
-//! (`docs/plans/splice-layout.md` section 11.2, 4f; `row_offsets.rs`):
-//! each instance moved by the frame's shift and its own row's offset
-//! lands where the same item drawn at the moved place does, so items of
-//! several rows draw in one draw.
+//! (`docs/plans/splice-layout.md` section 11.2, 4f), placed through the
+//! transform table (`docs/plans/flat-scene-f2.md`): each instance moved by
+//! its frame's entry and its own row's entry lands where the same item
+//! drawn at the moved place does, so items of several rows draw in one
+//! draw.
 
 #[path = "support/frame.rs"]
 mod frame;
+#[path = "support/table.rs"]
+mod table;
 
 use frame::{quad, rgba, square, target};
+use table::table;
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, QuadPipeline, RowOffsets, ShadowPipeline, Shift};
+use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline};
 use vapors_scene::{Rect, Shadow};
 
 const SIDE: u32 = 24;
@@ -42,10 +46,11 @@ fn gpu_kept_quads_in_two_rows_land_each_at_its_rows_offset() {
     // below row 0, the frame shifted by 3, 2
     let rowed = drawn(|device, format, target| {
         let mut pipeline = QuadPipeline::new(device, format);
-        let bytes = QuadPipeline::bytes_in_rows(&[at(2.0, 1.0), at(2.0, 1.0)], &[0, 1]);
+        let mut table = table(target, [3.0, 2.0], &[[0.0, 0.0], [0.0, 10.0]]);
+        let items = [at(2.0, 1.0), at(2.0, 1.0)];
+        let bytes = QuadPipeline::bytes_in(&items, table.frame, &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
-        let rows = RowOffsets::whole(&[[0.0, 0.0], [0.0, 10.0]]);
-        pipeline.draw_kept_in_rows(target, &range, (Shift::whole([3.0, 2.0]), &rows));
+        pipeline.draw_kept(target, &range, (&mut table.transforms, table.rows_base));
         pipeline.release(range);
     });
 
@@ -80,10 +85,11 @@ fn gpu_kept_shadows_in_two_rows_land_each_at_its_rows_offset() {
     // When: kept at the origin, rows 2 and 14 below it
     let rowed = drawn(|device, format, target| {
         let mut pipeline = ShadowPipeline::new(device, format);
-        let bytes = ShadowPipeline::bytes_in_rows(&[shadow(0.0, 0.0), shadow(0.0, 0.0)], &[0, 1]);
+        let mut table = table(target, [4.0, 0.0], &[[0.0, 2.0], [0.0, 14.0]]);
+        let items = [shadow(0.0, 0.0), shadow(0.0, 0.0)];
+        let bytes = ShadowPipeline::bytes_in(&items, table.frame, &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
-        let rows = RowOffsets::whole(&[[0.0, 2.0], [0.0, 14.0]]);
-        pipeline.draw_kept_in_rows(target, &range, (Shift::whole([4.0, 0.0]), &rows));
+        pipeline.draw_kept(target, &range, (&mut table.transforms, table.rows_base));
         pipeline.release(range);
     });
 

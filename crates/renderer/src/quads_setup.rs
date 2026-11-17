@@ -1,19 +1,45 @@
 //! The quad pipeline's fixed wgpu objects: its layout and pipeline.
 
+/// The layout of a pipeline that reads one uniform at a dynamic offset:
+/// the viewport (and, for meshes, a shift).
 pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("instanced"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: true,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
+        entries: &[uniform_entry()],
     })
+}
+
+/// The instanced pipelines' layout (`instanced.rs`): the view uniform,
+/// and the transform table read in the vertex stage
+/// (`transform_table.rs`).
+pub(crate) fn table_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let table = wgpu::BindGroupLayoutEntry {
+        binding: 1,
+        visibility: wgpu::ShaderStages::VERTEX,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    };
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("instanced on the table"),
+        entries: &[uniform_entry(), table],
+    })
+}
+
+fn uniform_entry() -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStages::VERTEX,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: true,
+            min_binding_size: None,
+        },
+        count: None,
+    }
 }
 
 pub(crate) fn render_pipeline(
