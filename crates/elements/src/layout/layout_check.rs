@@ -90,6 +90,21 @@ pub(super) fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
     TOLERANCE + terms as f32 * f32::EPSILON / 2.0 * a.abs().max(b.abs())
 }
 
+/// Whether `a` and `b` agree: the same value (equal infinities match,
+/// which a difference cannot say, `inf - inf` being NaN), or both
+/// finite and within [`tolerance`]. An infinity against a finite value
+/// disagrees: its tolerance is infinite, so a difference alone would
+/// pass it. Paint refuses a box an infinity places (issue #449).
+///
+/// Relaxed: equal infinities agree, so a layout holding a length past
+/// f32's range reaches paint's refusal instead of panicking here. It is
+/// retired when layout refuses such a length before laying out, which
+/// no slice does yet.
+#[allow(clippy::float_cmp, reason = "exact: the same value on both sides")]
+pub(super) fn within(a: f32, b: f32, terms: usize) -> bool {
+    a == b || (a.is_finite() && b.is_finite() && (a - b).abs() <= tolerance(a, b, terms))
+}
+
 fn walk(fresh: &Placed, placed: &Placed) {
     match (fresh.boxes.is_empty(), placed.boxes.is_empty()) {
         (true, true) => return,
@@ -103,7 +118,7 @@ fn walk(fresh: &Placed, placed: &Placed) {
         ),
     }
     let terms = fresh.boxes.len();
-    let apart = |a: f32, b: f32| (a - b).abs() > tolerance(a, b, terms);
+    let apart = |a: f32, b: f32| !within(a, b, terms);
     let lanes = placed.lanes.borrow();
     let mut stack = vec![(0, 0)];
     while let Some((index, slot)) = stack.pop() {
@@ -134,3 +149,7 @@ fn stale(placed: &Placed, slot: usize, (new, kept): (&Layout, &Layout)) -> ! {
         new.size,
     )
 }
+
+#[cfg(test)]
+#[path = "layout_check_within_tests.rs"]
+mod within_tests;
