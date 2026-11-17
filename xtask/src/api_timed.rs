@@ -2,9 +2,14 @@
 //! kept apart (review of slice 4, M3): `deadline::run_with_deadline`
 //! joins the two, which a git or gh call whose stdout is its answer
 //! cannot use. Each stream keeps at most [`KEPT_BYTES`], so a hostile
-//! branch's output cannot grow the host's memory.
+//! branch's output cannot grow the host's memory. The child leads a
+//! process group of its own, and at the deadline the whole group is
+//! killed, so what it started (`git-remote-https`, a credential helper)
+//! cannot finish its work after the caller was told it failed (verify of
+//! slice 4, V3).
 
 use std::io::Read;
+use std::os::unix::process::CommandExt;
 use std::process::{Command, ExitStatus, Stdio};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -30,6 +35,7 @@ pub fn within(mut command: Command, deadline: Duration) -> Result<Ended, String>
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .process_group(0)
         .spawn()
         .map_err(|e| format!("could not start {program}: {e}"))?;
     let stdout = child.stdout.take().map(kept);
@@ -37,8 +43,10 @@ pub fn within(mut command: Command, deadline: Duration) -> Result<Ended, String>
     let started = Instant::now();
     while child.try_wait().map_err(|e| e.to_string())?.is_none() {
         if started.elapsed() >= deadline {
-            let _ = child.kill(); // past its deadline; the error says so
+            let killed = crate::command::kill_group_id(child.id());
+            let _ = child.kill(); // the leader, if the group kill failed
             let _ = child.wait();
+            killed.map_err(|why| format!("{program} passed its deadline of {deadline:?}, and killing its group failed: {why}"))?;
             return Err(format!(
                 "{program} passed its deadline of {deadline:?} and was killed"
             ));
@@ -51,6 +59,30 @@ pub fn within(mut command: Command, deadline: Duration) -> Result<Ended, String>
         stdout: joined(stdout),
         stderr: joined(stderr),
     })
+}
+
+/// git `args` in `dir` as `queue_git::git` runs it (the hook variables
+/// stripped, the user's config), within `deadline`; stdout trimmed: for
+/// the trusted main repository.
+///
+/// # Errors
+///
+/// git not starting, passing `deadline`, or not exiting 0, with its
+/// stderr.
+pub fn git_within(
+    dir: &std::path::Path,
+    args: &[&str],
+    deadline: Duration,
+) -> Result<String, String> {
+    let ended = within(crate::queue_git::command(dir, args), deadline)?;
+    if !ended.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&ended.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&ended.stdout).trim().to_owned())
 }
 
 fn kept(stream: impl Read + Send + 'static) -> JoinHandle<Vec<u8>> {
