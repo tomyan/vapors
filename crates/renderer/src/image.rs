@@ -19,6 +19,8 @@ use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 /// target format; draw many times.
 pub struct ImagePipeline {
     pipeline: wgpu::RenderPipeline,
+    /// The samples it was made for.
+    pub(crate) samples: crate::Samples,
     layout: wgpu::BindGroupLayout,
     /// Nearest sampling, for the canvas: one image pixel per pixel.
     nearest: wgpu::Sampler,
@@ -41,9 +43,11 @@ pub struct ImagePipeline {
 }
 
 impl ImagePipeline {
-    /// Build the pipeline for targets of `format`.
+    /// Build the pipeline for passes of `pass` (a format alone is one
+    /// sample).
     #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
+        let pass = pass.into();
         let shader = crate::pipelines::shader_module(
             device,
             wgpu::ShaderModuleDescriptor {
@@ -53,7 +57,7 @@ impl ImagePipeline {
         );
         let layout = bind_group_layout(device);
         let view_layout = crate::quads_setup::table_layout(device);
-        let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, format);
+        let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, pass);
         let (nearest, smooth) = samplers(device);
         let vertices = FrameArena::new(
             device,
@@ -63,6 +67,7 @@ impl ImagePipeline {
         );
         Self {
             pipeline,
+            samples: pass.samples,
             layout,
             nearest,
             smooth,
@@ -105,6 +110,7 @@ impl ImagePipeline {
             queue,
             encoder: &encoder,
             view: target,
+            multisampled: None,
             viewport,
             scissor: None,
         };

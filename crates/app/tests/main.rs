@@ -70,6 +70,7 @@ mod gpu_one_submit;
 mod gpu_paint_arena_full;
 mod gpu_painter_atlas;
 mod gpu_runtime_shapes;
+mod gpu_samples;
 mod gpu_selectionchange;
 mod gpu_shape_meshes;
 mod gpu_shapes;

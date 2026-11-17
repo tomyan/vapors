@@ -5,28 +5,35 @@
 
 use vapors_scene::{Scissor, Size};
 
+use crate::target::PassViews;
+
 /// A render pass on `view`, open until it is dropped. While it is open
 /// its encoder refuses every other command.
 pub(crate) struct OpenPass {
     view: wgpu::TextureView,
+    /// The multisampled view drawn into, at 4 samples.
+    multisampled: Option<wgpu::TextureView>,
     pass: wgpu::RenderPass<'static>,
 }
 
 impl OpenPass {
-    /// Begins a pass on `view` that first loads it as `load` says, and
-    /// writes `timestamps` at its start and end.
+    /// Begins a pass on `views` that first loads its attachment as `load`
+    /// says, and writes `timestamps` at its start and end. At 4 samples
+    /// the attachment is the multisampled view, stored (a later pass on
+    /// the view in the frame loads it) and resolved into the target's
+    /// view at the pass's end (`docs/plans/flat-scene-f7.md`, Q3).
     pub(crate) fn begin(
         encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        views: PassViews<'_>,
         load: wgpu::LoadOp<wgpu::Color>,
         timestamps: Option<wgpu::RenderPassTimestampWrites<'_>>,
     ) -> Self {
         let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("frame"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
+                view: views.multisampled.unwrap_or(views.view),
                 depth_slice: None,
-                resolve_target: None,
+                resolve_target: views.multisampled.map(|_| views.view),
                 ops: wgpu::Operations {
                     load,
                     store: wgpu::StoreOp::Store,
@@ -38,14 +45,16 @@ impl OpenPass {
             multiview_mask: None,
         });
         Self {
-            view: view.clone(),
+            view: views.view.clone(),
+            multisampled: views.multisampled.cloned(),
             pass: pass.forget_lifetime(),
         }
     }
 
-    /// Whether this pass draws into `view`.
-    pub(crate) fn is_on(&self, view: &wgpu::TextureView) -> bool {
-        self.view == *view
+    /// Whether this pass draws into `views`: the same target view, and
+    /// the same multisampled view or none.
+    pub(crate) fn is_on(&self, views: PassViews<'_>) -> bool {
+        self.view == *views.view && self.multisampled.as_ref() == views.multisampled
     }
 
     /// The pass, its scissor set to `scissor` or, for `None`, the whole

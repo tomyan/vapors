@@ -34,6 +34,7 @@ fn draw(rect: Rect, scissor: Option<Scissor>) -> Vec<u8> {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: 16,
             height: 8,

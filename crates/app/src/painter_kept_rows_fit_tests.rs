@@ -69,6 +69,7 @@ fn on_target(draw: impl FnOnce(&mut ScenePainter, &Target<'_>)) {
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: SIDE,
             height: SIDE,

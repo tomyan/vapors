@@ -3,7 +3,7 @@
 
 use vapors_scene::{Scissor, Size};
 
-use crate::FrameEncoder;
+use crate::{FrameEncoder, Samples};
 
 /// Where a draw goes: the target view and its size in pixels, and the
 /// frame's encoder the draw is recorded into. Nothing reaches the view
@@ -18,8 +18,16 @@ pub struct Target<'a> {
     pub queue: &'a wgpu::Queue,
     /// The frame's encoder: draws are recorded into it.
     pub encoder: &'a FrameEncoder,
-    /// The view drawn into; pixels under no quad keep what was there.
+    /// The view drawn into. At one sample, pixels under no quad keep
+    /// what was there; at 4, each pass's resolve writes every pixel of it
+    /// from `multisampled`.
     pub view: &'a wgpu::TextureView,
+    /// At 4 samples, the multisampled colour view the pass draws into,
+    /// resolved into `view` at the end of each pass
+    /// (`docs/plans/flat-scene-f7.md`); `None` at one sample. It must be
+    /// cleared in this frame's encoder (`clear_target`) before a pass on
+    /// it loads: what it held before is not what `view` holds.
+    pub multisampled: Option<&'a wgpu::TextureView>,
     /// Size of the view in pixels.
     pub viewport: Size,
     /// Where drawing may change pixels; `None` for the whole view.
@@ -27,10 +35,58 @@ pub struct Target<'a> {
 }
 
 impl Target<'_> {
-    /// Runs `draw` in the encoder's render pass on the view, which loads
-    /// and stores it, under the scissor. Consecutive draws on one view
-    /// share the pass.
-    pub fn draw_pass(&self, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
+    /// The views a pass on this target attaches.
+    #[must_use]
+    pub fn views(&self) -> PassViews<'_> {
+        PassViews {
+            view: self.view,
+            multisampled: self.multisampled,
+        }
+    }
+
+    /// Runs `draw`, a draw by the pipeline `made` names (its label and
+    /// the samples it was made for), in the encoder's render pass on the
+    /// view, which loads and stores it, under the scissor. Consecutive
+    /// draws on one view share the pass.
+    ///
+    /// # Panics
+    ///
+    /// When the pipeline's samples are not the target's (4 with a
+    /// multisampled view, else 1): the pass would refuse it, after
+    /// submit and without naming the pipeline.
+    pub fn draw_pass(&self, made: (&str, Samples), draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
+        self.assert_samples(made);
         self.encoder.draw(self, |pass| draw(pass));
     }
+
+    /// The samples a pass on this target has.
+    #[must_use]
+    pub fn samples(&self) -> Samples {
+        if self.multisampled.is_some() {
+            Samples::Four
+        } else {
+            Samples::One
+        }
+    }
+
+    fn assert_samples(&self, (pipeline, samples): (&str, Samples)) {
+        let target = self.samples();
+        assert!(
+            samples == target,
+            "{pipeline}: a pipeline made for {} samples drawn into a target of {} (target.rs); \
+             make the pipeline with the target's PassFormat; reproduce with `cargo xtask test`",
+            samples.count(),
+            target.count()
+        );
+    }
+}
+
+/// The views of a pass: the target's, and at 4 samples the multisampled
+/// one drawn into and resolved into it.
+#[derive(Clone, Copy)]
+pub struct PassViews<'a> {
+    /// The target's view: the attachment, or the resolve target.
+    pub view: &'a wgpu::TextureView,
+    /// The multisampled attachment, at 4 samples.
+    pub multisampled: Option<&'a wgpu::TextureView>,
 }

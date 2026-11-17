@@ -93,6 +93,17 @@ impl Rig {
         Self { gpu, painter }
     }
 
+    /// A painter at `samples` on the default test device.
+    pub fn with_samples(samples: vapors_renderer::Samples) -> Self {
+        let gpu = gpu();
+        let pass = vapors_renderer::PassFormat {
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            samples,
+        };
+        let painter = ScenePainter::new(&gpu.device, pass).expect("Rgba8Unorm");
+        Self { gpu, painter }
+    }
+
     /// A painter whose atlas is `atlas`, on the default test device.
     pub fn with_atlas(atlas: vapors_text::AtlasConfig) -> Self {
         let gpu = gpu();
@@ -177,6 +188,7 @@ fn target<'a>(
         queue: &gpu.queue,
         encoder,
         view,
+        multisampled: None,
         viewport: size,
         scissor: None,
     }

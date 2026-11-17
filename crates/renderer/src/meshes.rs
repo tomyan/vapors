@@ -15,18 +15,22 @@ use crate::{GpuWork, KeptRange, MeshShape, Retained, Target, TransformTable, Wor
 /// A pipeline that draws mesh items. Create once per target format.
 pub struct MeshPipeline {
     pipeline: wgpu::RenderPipeline,
+    /// The samples it was made for.
+    samples: crate::Samples,
     binding: TableBinding,
     kept: Retained,
     work: WorkCounter,
 }
 
 impl MeshPipeline {
-    /// Build the pipeline for targets of `format`.
+    /// Build the pipeline for passes of `pass` (a format alone is one
+    /// sample).
     #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let binding = TableBinding::new(device, "meshes", false);
+    pub fn new(device: &wgpu::Device, pass: impl Into<crate::PassFormat>) -> Self {
+        let (binding, pass) = (TableBinding::new(device, "meshes", false), pass.into());
         Self {
-            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), format),
+            pipeline: crate::meshes_setup::render_pipeline(device, binding.layout(), pass),
+            samples: pass.samples,
             binding,
             kept: Retained::new(device, "meshes", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),
@@ -95,7 +99,7 @@ impl MeshPipeline {
             return;
         };
         let run = Draws {
-            pipeline: &self.pipeline,
+            pipeline: (&self.pipeline, self.samples),
             bind_group: self
                 .binding
                 .group(target, table.map(|table| (table, None)), &self.work),
@@ -145,7 +149,8 @@ fn assert_entries(count: u64, entries: usize) {
 /// One run's draws: the pipeline, its bind group at `viewport`, the
 /// run's items and each item's entry's triangles.
 struct Draws<'a> {
-    pipeline: &'a wgpu::RenderPipeline,
+    /// The pipeline and the samples it was made for.
+    pipeline: (&'a wgpu::RenderPipeline, crate::Samples),
     bind_group: &'a wgpu::BindGroup,
     viewport: u32,
     items: wgpu::BufferSlice<'a>,
@@ -156,8 +161,8 @@ impl Draws<'_> {
     /// Records one draw per item into `target`'s pass, the `i`th of
     /// item `i` over `drawn[i]`'s triangles, one instance each.
     fn record(self, target: &Target<'_>, work: &WorkCounter, drawn: &[&MeshEntry]) {
-        target.draw_pass(|pass| {
-            pass.set_pipeline(self.pipeline);
+        target.draw_pass(("meshes", self.pipeline.1), |pass| {
+            pass.set_pipeline(self.pipeline.0);
             pass.set_bind_group(0, self.bind_group, &[self.viewport]);
             for (at, (slice, entry)) in (0u64..).zip(self.triangles.into_iter().zip(drawn)) {
                 pass.set_vertex_buffer(0, slice);

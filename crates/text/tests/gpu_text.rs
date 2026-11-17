@@ -64,6 +64,7 @@ fn render_under(
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport,
         scissor,
     };

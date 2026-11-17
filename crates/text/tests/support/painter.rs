@@ -162,6 +162,7 @@ fn target<'a>(
         queue: &gpu.queue,
         encoder,
         view,
+        multisampled: None,
         viewport: Size {
             width: WIDTH,
             height: HEIGHT,

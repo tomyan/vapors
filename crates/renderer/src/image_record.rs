@@ -58,7 +58,7 @@ impl ImagePipeline {
             (&self.view_layout, views, table),
             (target, &self.work),
         );
-        target.draw_pass(|pass| {
+        target.draw_pass(("images", self.samples), |pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, bound.bind_group(), &[]);
             pass.set_bind_group(1, view_group, &[view]);

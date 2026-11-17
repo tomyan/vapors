@@ -49,6 +49,7 @@ pub fn render_page(
             queue,
             encoder: &encoder,
             view: &view,
+            multisampled: None,
             viewport,
             scissor: None,
         };
@@ -92,6 +93,7 @@ pub fn render_labels(
         queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport,
         scissor: None,
     };

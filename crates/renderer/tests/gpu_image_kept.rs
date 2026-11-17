@@ -74,6 +74,7 @@ impl Scene {
             queue: &queue,
             encoder: &encoder,
             view: &view,
+            multisampled: None,
             viewport,
             scissor: None,
         };

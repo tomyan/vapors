@@ -25,6 +25,23 @@ pub enum Command {
     },
     /// Run everything CI runs, in CI's order, stopping at the first failure.
     Ci,
+    /// Make API builder `<name>`'s clone and prove its sandbox's fences
+    /// (docs/plans/api-builder.md); the builder is removed afterwards.
+    ApiFences {
+        /// The builder's name: ASCII letters, digits and `-`.
+        name: String,
+    },
+    /// Inside an API builder's sandbox: relay loopback `port` to the
+    /// harness socket and run the command.
+    #[command(hide = true)]
+    ApiRelayInner {
+        #[arg(long)]
+        port: u16,
+        #[arg(long)]
+        socket: PathBuf,
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
     /// Check every pinned tool is installed at its pinned version.
     #[command(hide = true)]
     CheckTools,

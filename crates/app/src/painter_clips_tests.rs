@@ -56,6 +56,7 @@ fn with_target(
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: 8,
             height: 8,

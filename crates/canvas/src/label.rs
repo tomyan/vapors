@@ -99,6 +99,7 @@ impl LabelDraw {
             queue: frame.queue,
             encoder: &encoder,
             view: &view,
+            multisampled: None,
             viewport,
             scissor: None,
         };

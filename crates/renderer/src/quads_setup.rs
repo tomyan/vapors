@@ -58,7 +58,7 @@ pub(crate) fn render_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     shader: &wgpu::ShaderModule,
-    format: wgpu::TextureFormat,
+    pass: crate::PassFormat,
     instance: wgpu::VertexBufferLayout<'_>,
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -82,14 +82,14 @@ pub(crate) fn render_pipeline(
                 entry_point: Some("fs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format,
+                    format: pass.format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
+            multisample: pass.samples.state(),
             multiview_mask: None,
             cache: None,
         },

@@ -174,6 +174,7 @@ fn draw_on(rig: &mut Rig, doc: &Document, (side, scissor): (u32, Option<Scissor>
         queue: &gpu.queue,
         encoder: &encoder,
         view: &view,
+        multisampled: None,
         viewport: Size {
             width: side,
             height: side,

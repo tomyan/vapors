@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use super::FrameEncoder;
+use crate::target::PassViews;
 use crate::{ArenaFull, EncoderBudget, FrameClock};
 
 impl FrameEncoder {
@@ -55,6 +56,28 @@ impl FrameEncoder {
     /// The first draw refused since the last take, if any.
     pub fn take_refusal(&self) -> Option<ArenaFull> {
         self.refusal.borrow_mut().take()
+    }
+
+    /// Refuses a pass that would load a multisampled view this encoder
+    /// has not cleared: its resolve would write every pixel of the target
+    /// view from what the multisampled view held before, which is not
+    /// what the target holds (`docs/plans/flat-scene-f7.md`, Q4).
+    ///
+    /// # Panics
+    ///
+    /// As said, naming the target's view and the fix.
+    pub(crate) fn assert_cleared(&self, views: PassViews<'_>) {
+        let Some(multisampled) = views.multisampled else {
+            return;
+        };
+        assert!(
+            self.cleared.borrow().contains(multisampled),
+            "a 4-sample pass on target view {:?} would load multisampled view {multisampled:?}, \
+             which this frame's encoder has not cleared: its resolve would replace the target \
+             with what the multisampled view held before; clear_target first \
+             (frame_encoder_parts.rs); reproduce with `cargo xtask test`",
+            views.view
+        );
     }
 
     /// Records that a draw was refused; the first refusal is kept.
