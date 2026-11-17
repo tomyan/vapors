@@ -4,8 +4,8 @@
 
 use vapors_scene::{Color, Quad};
 
-use crate::instanced::{Instanced, instance_bytes, rowed_instances};
-use crate::{GpuWork, KeptRange, Target, TransformTable};
+use crate::instanced::{Instanced, instance_bytes, instanced_source, rowed_instances};
+use crate::{ClipTable, GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws quads. Create once per target format.
 pub struct QuadPipeline(Instanced);
@@ -25,10 +25,7 @@ impl QuadPipeline {
             device,
             format,
             "quads",
-            concat!(
-                include_str!("transform_table.wgsl"),
-                include_str!("quads.wgsl")
-            ),
+            &instanced_source(include_str!("quads.wgsl")),
             Self::VEC4S,
         ))
     }
@@ -42,11 +39,12 @@ impl QuadPipeline {
     /// The instance bytes of `quads`, as a draw writes them.
     #[must_use]
     pub fn bytes(quads: &[Quad]) -> Vec<u8> {
-        Self::bytes_in(quads, 0, &[])
+        Self::bytes_in(quads, (0, 0), &[])
     }
 
     /// The instance bytes of `quads`, each in frame `frame` (its entry
-    /// in the transform table), item `i` in row `rows[i]` of its batch's
+    /// in the transform table) under clip `clip` (its entry in the clip
+    /// table, 0 for none), item `i` in row `rows[i]` of its batch's
     /// range, or every item in row 0 for an empty `rows`.
     ///
     /// # Panics
@@ -54,10 +52,10 @@ impl QuadPipeline {
     /// When `rows` is neither empty nor one index an item, or names a row
     /// past a batch's range ([`RowOffsets::CAPACITY`](crate::RowOffsets::CAPACITY)).
     #[must_use]
-    pub fn bytes_in(quads: &[Quad], frame: u32, rows: &[u32]) -> Vec<u8> {
+    pub fn bytes_in(quads: &[Quad], (frame, clip): (u32, u32), rows: &[u32]) -> Vec<u8> {
         rowed_instances(
             ("quads", Self::VEC4S as usize),
-            (quads, frame, rows),
+            (quads, (frame, clip), rows),
             instance,
         )
     }
@@ -81,7 +79,7 @@ impl QuadPipeline {
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        table: (&mut TransformTable, u32),
+        table: (&mut TransformTable, &mut ClipTable, u32),
     ) {
         self.0.draw_kept(target, kept, table);
     }

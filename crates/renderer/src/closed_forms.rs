@@ -5,8 +5,8 @@
 //! Chromium draws an edge), so each instance's quad is grown by a
 //! device pixel past the shape for the outer half's fragments.
 
-use crate::instanced::{Instanced, instance_bytes, rowed_instances};
-use crate::{ClosedFormShape, GpuWork, KeptRange, Target, TransformTable};
+use crate::instanced::{Instanced, instance_bytes, instanced_source, rowed_instances};
+use crate::{ClipTable, ClosedFormShape, GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws closed-form shapes. Create once per target
 /// format.
@@ -27,11 +27,10 @@ impl ClosedFormPipeline {
             device,
             format,
             "closed forms",
-            concat!(
-                include_str!("transform_table.wgsl"),
+            &instanced_source(concat!(
                 include_str!("closed_forms_2d.wgsl"),
                 include_str!("closed_forms_shared.wgsl")
-            ),
+            )),
             Self::VEC4S,
         ))
     }
@@ -46,7 +45,7 @@ impl ClosedFormPipeline {
     /// the page.
     #[must_use]
     pub fn bytes(shapes: &[ClosedFormShape]) -> Vec<u8> {
-        Self::bytes_in(shapes, 0, &[])
+        Self::bytes_in(shapes, (0, 0), &[])
     }
 
     /// The instance bytes of `shapes`, each in frame `frame` (its entry
@@ -57,10 +56,14 @@ impl ClosedFormPipeline {
     ///
     /// As [`QuadPipeline::bytes_in`](crate::QuadPipeline::bytes_in).
     #[must_use]
-    pub fn bytes_in(shapes: &[ClosedFormShape], frame: u32, rows: &[u32]) -> Vec<u8> {
+    pub fn bytes_in(
+        shapes: &[ClosedFormShape],
+        (frame, clip): (u32, u32),
+        rows: &[u32],
+    ) -> Vec<u8> {
         rowed_instances(
             ("closed forms", Self::VEC4S as usize),
-            (shapes, frame, rows),
+            (shapes, (frame, clip), rows),
             |shape| shape.instance().to_vec(),
         )
     }
@@ -85,7 +88,7 @@ impl ClosedFormPipeline {
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        table: (&mut TransformTable, u32),
+        table: (&mut TransformTable, &mut ClipTable, u32),
     ) {
         self.0.draw_kept(target, kept, table);
     }

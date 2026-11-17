@@ -13,7 +13,9 @@ mod table;
 use frame::{quad, rgba, square, target};
 use table::table;
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline, TransformTable, translation};
+use vapors_renderer::{
+    ClipTable, FrameEncoder, QuadPipeline, ShadowPipeline, TransformTable, translation,
+};
 use vapors_scene::{Rect, Shadow};
 
 const SIDE: u32 = 24;
@@ -48,9 +50,13 @@ fn gpu_kept_quads_in_two_rows_land_each_at_its_rows_offset() {
         let mut pipeline = QuadPipeline::new(device, format);
         let mut table = table(target, [3.0, 2.0], &[[0.0, 0.0], [0.0, 10.0]]);
         let items = [at(2.0, 1.0), at(2.0, 1.0)];
-        let bytes = QuadPipeline::bytes_in(&items, table.frame, &[0, 1]);
+        let bytes = QuadPipeline::bytes_in(&items, (table.frame, 0), &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
-        pipeline.draw_kept(target, &range, (&mut table.transforms, table.rows_base));
+        pipeline.draw_kept(
+            target,
+            &range,
+            (&mut table.transforms, &mut table.clips, table.rows_base),
+        );
         pipeline.release(range);
     });
 
@@ -87,9 +93,13 @@ fn gpu_kept_shadows_in_two_rows_land_each_at_its_rows_offset() {
         let mut pipeline = ShadowPipeline::new(device, format);
         let mut table = table(target, [4.0, 0.0], &[[0.0, 2.0], [0.0, 14.0]]);
         let items = [shadow(0.0, 0.0), shadow(0.0, 0.0)];
-        let bytes = ShadowPipeline::bytes_in(&items, table.frame, &[0, 1]);
+        let bytes = ShadowPipeline::bytes_in(&items, (table.frame, 0), &[0, 1]);
         let range = pipeline.keep(target, &bytes).expect("room");
-        pipeline.draw_kept(target, &range, (&mut table.transforms, table.rows_base));
+        pipeline.draw_kept(
+            target,
+            &range,
+            (&mut table.transforms, &mut table.clips, table.rows_base),
+        );
         pipeline.release(range);
     });
 
@@ -118,14 +128,18 @@ fn gpu_a_kept_quad_drawn_after_the_table_grows_lands_at_its_rows_offset() {
     let (first_texture, first_view) = square(&gpu, SIDE);
     let mut pipeline = QuadPipeline::new(&gpu.device, first_texture.format());
     let mut table = TransformTable::new(&gpu.device, "growing transforms");
+    let mut clips = ClipTable::new(&gpu.device, "test clips");
     let first = FrameEncoder::new(&gpu.device);
     let at = target(&gpu, &first, &first_view, SIDE);
     let frame = table.take(&first, 1).expect("room");
     table.set(&first, &gpu.queue, frame, &[translation([3.0, 2.0])]);
     let early = pipeline
-        .keep(&at, &QuadPipeline::bytes_in(&[red(0.0, 0.0)], frame, &[]))
+        .keep(
+            &at,
+            &QuadPipeline::bytes_in(&[red(0.0, 0.0)], (frame, 0), &[]),
+        )
         .expect("room");
-    pipeline.draw_kept(&at, &early, (&mut table, 0));
+    pipeline.draw_kept(&at, &early, (&mut table, &mut clips, 0));
     first.submit(&gpu.queue).expect("no refusal");
 
     // When: the next frame takes 70 more entries, past the first buffer's
@@ -138,9 +152,12 @@ fn gpu_a_kept_quad_drawn_after_the_table_grows_lands_at_its_rows_offset() {
     rows[69] = translation([0.0, 10.0]);
     table.set(&second, &gpu.queue, base, &rows);
     let late = pipeline
-        .keep(&at, &QuadPipeline::bytes_in(&[red(2.0, 1.0)], frame, &[69]))
+        .keep(
+            &at,
+            &QuadPipeline::bytes_in(&[red(2.0, 1.0)], (frame, 0), &[69]),
+        )
         .expect("room");
-    pipeline.draw_kept(&at, &late, (&mut table, base));
+    pipeline.draw_kept(&at, &late, (&mut table, &mut clips, base));
     second.submit(&gpu.queue).expect("no refusal");
 
     // Then
@@ -168,6 +185,7 @@ fn gpu_a_pipeline_given_a_second_transform_table_refuses_it() {
         .expect("room");
     let mut first = TransformTable::new(&gpu.device, "first");
     let mut second = TransformTable::new(&gpu.device, "second");
-    pipeline.draw_kept(&at, &range, (&mut first, 0));
-    pipeline.draw_kept(&at, &range, (&mut second, 0));
+    let mut clips = ClipTable::new(&gpu.device, "test clips");
+    pipeline.draw_kept(&at, &range, (&mut first, &mut clips, 0));
+    pipeline.draw_kept(&at, &range, (&mut second, &mut clips, 0));
 }

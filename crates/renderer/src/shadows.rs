@@ -4,9 +4,9 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, instance_bytes, rowed_instances};
+use crate::instanced::{Instanced, instance_bytes, instanced_source, rowed_instances};
 use crate::quads::rgba;
-use crate::{GpuWork, KeptRange, Target, TransformTable};
+use crate::{ClipTable, GpuWork, KeptRange, Target, TransformTable};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -26,10 +26,7 @@ impl ShadowPipeline {
             device,
             format,
             "shadows",
-            concat!(
-                include_str!("transform_table.wgsl"),
-                include_str!("shadows.wgsl")
-            ),
+            &instanced_source(include_str!("shadows.wgsl")),
             Self::VEC4S,
         ))
     }
@@ -42,7 +39,7 @@ impl ShadowPipeline {
     /// The instance bytes of `shadows`, as a draw writes them.
     #[must_use]
     pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
-        Self::bytes_in(shadows, 0, &[])
+        Self::bytes_in(shadows, (0, 0), &[])
     }
 
     /// The instance bytes of `shadows`, each in frame `frame` (its entry
@@ -54,10 +51,10 @@ impl ShadowPipeline {
     /// When `rows` is neither empty nor one index an item, or names a row
     /// past a batch's range ([`RowOffsets::CAPACITY`](crate::RowOffsets::CAPACITY)).
     #[must_use]
-    pub fn bytes_in(shadows: &[Shadow], frame: u32, rows: &[u32]) -> Vec<u8> {
+    pub fn bytes_in(shadows: &[Shadow], (frame, clip): (u32, u32), rows: &[u32]) -> Vec<u8> {
         rowed_instances(
             ("shadows", Self::VEC4S as usize),
-            (shadows, frame, rows),
+            (shadows, (frame, clip), rows),
             instance,
         )
     }
@@ -81,7 +78,7 @@ impl ShadowPipeline {
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        table: (&mut TransformTable, u32),
+        table: (&mut TransformTable, &mut ClipTable, u32),
     ) {
         self.0.draw_kept(target, kept, table);
     }

@@ -65,6 +65,9 @@ pub(super) struct Moved<'a> {
     pub(super) table: &'a RowOffsets,
     pub(super) offsets: &'a [[f32; 2]],
     pub(super) rows: BatchRows<'a>,
+    /// The batch's clip in its frame, device pixels: the clip entry its
+    /// shadow, quad and shape items name (`painter_clips.rs`).
+    pub(super) clip: Option<vapors_scene::Rect>,
 }
 
 impl Moved<'_> {

@@ -41,6 +41,7 @@ mod gpu_app_surface_states;
 mod gpu_app_surfaces;
 mod gpu_app_two_panels;
 mod gpu_app_two_panels_resize;
+mod gpu_clip_entries;
 mod gpu_cull;
 mod gpu_demos;
 mod gpu_draw_over;

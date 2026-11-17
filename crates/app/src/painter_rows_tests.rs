@@ -132,6 +132,7 @@ fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
         table: &RowOffsets::NONE,
         offsets,
         rows,
+        clip: None,
     }
 }
 

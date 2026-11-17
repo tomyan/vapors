@@ -64,7 +64,7 @@ impl ScenePainter {
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let rows = moved.rows.items();
-        let Some((frame, rows_base)) = self.table_entries(target, (run, key), moved) else {
+        let Some((frame, clip, rows_base)) = self.table_entries(target, (run, key), moved) else {
             return Ok(());
         };
         let pipelines = Pipelines {
@@ -80,13 +80,13 @@ impl ScenePainter {
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, (frame, rows, moved.offsets.len()), key, at),
+            (run, ((frame, clip), rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
         };
         let (range, shift) = (kept.range, moved.shift);
-        let table = (&mut self.transforms.table, rows_base);
+        let table = (&mut self.transforms.table, &mut self.clips.table, rows_base);
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, table),
             Run::Quads(_) => self.quads.draw_kept(target, range, table),
@@ -115,28 +115,31 @@ impl ScenePainter {
         Ok(())
     }
 
-    /// For the runs whose items name entries of the transform table
-    /// (shadows, quads, shapes): their frame's entry, set to its shift,
-    /// and the first of batch `key`'s rows' entries (0 for a batch in one
-    /// frame); `(0, 0)` for the others. `None` when the table could not
-    /// grow (the refusal is on the target's encoder).
+    /// For the runs whose items name entries of the transform and clip
+    /// tables (shadows, quads, shapes): their frame's entry, set to its
+    /// shift, their clip's entry (0 for none, `painter_clips.rs`), and the
+    /// first of batch `key`'s rows' entries (0 for a batch in one frame);
+    /// zeros for the others. `None` when a table could not grow (the
+    /// refusal is on the target's encoder).
     fn table_entries(
         &mut self,
         target: &Target<'_>,
         (run, key): (&Run, BatchKey),
         moved: &Moved<'_>,
-    ) -> Option<(u32, u32)> {
+    ) -> Option<(u32, u32, u32)> {
         match Kind::of_run(run) {
             Some(Kind::Shadows | Kind::Quads | Kind::ClosedForms) => {
                 let frame = self
                     .transforms
                     .frame_entry(target, moved.frame, moved.shift)?;
-                Some((
-                    frame,
-                    self.transforms.rows_base(target, key, moved.offsets)?,
-                ))
+                let clip = match moved.clip {
+                    Some(clip) => self.clips.entry(target, (moved.frame, frame), clip)?,
+                    None => 0,
+                };
+                let rows_base = self.transforms.rows_base(target, key, moved.offsets)?;
+                Some((frame, clip, rows_base))
             }
-            _ => Some((0, 0)),
+            _ => Some((0, 0, 0)),
         }
     }
 
@@ -169,7 +172,7 @@ impl ScenePainter {
     ///
     /// When the pipelines' kept buffers then hold other than the bytes
     /// of the batches kept: a kept range was dropped unreleased.
-    pub(super) fn release_undrawn(&mut self) {
+    pub(super) fn release_undrawn(&mut self, queue: &wgpu::Queue) {
         let mut pipelines = Pipelines {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
@@ -182,7 +185,11 @@ impl ScenePainter {
         };
         self.kept.release_undrawn(&mut pipelines);
         self.row_tables.release_undrawn();
-        self.transforms.release_undrawn();
+        // clips first, then frames (flat-scene-f3.md item 4)
+        let clips = self.clips.release_undrawn(queue);
+        self.kept.assert_none_names_clip(&clips);
+        let frames = self.transforms.release_undrawn();
+        self.clips.assert_none_names(&frames);
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
             held, retained,

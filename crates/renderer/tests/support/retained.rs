@@ -5,7 +5,9 @@
 #![allow(dead_code)]
 
 use vapors_gpu_harness::{Gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline, TransformTable, translation};
+use vapors_renderer::{
+    ClipTable, FrameEncoder, KeptRange, QuadPipeline, TransformTable, translation,
+};
 
 use super::frame::{pixel, quad, square, target};
 
@@ -30,6 +32,7 @@ pub struct Frame {
     pub view: wgpu::TextureView,
     pub pipeline: QuadPipeline,
     pub table: TransformTable,
+    pub clips: ClipTable,
     entry: Option<u32>,
 }
 
@@ -38,12 +41,14 @@ impl Frame {
         let (texture, view) = square(&gpu, SIDE);
         let pipeline = QuadPipeline::new(&gpu.device, texture.format());
         let table = TransformTable::new(&gpu.device, "test transforms");
+        let clips = ClipTable::new(&gpu.device, "test clips");
         Self {
             gpu,
             texture,
             view,
             pipeline,
             table,
+            clips,
             entry: None,
         }
     }
@@ -60,7 +65,7 @@ impl Frame {
             .get_or_insert_with(|| self.table.take(encoder, 1).expect("room"));
         let at = target(&self.gpu, encoder, &self.view, SIDE);
         self.pipeline
-            .keep(&at, &QuadPipeline::bytes_in(&quads, frame, &[]))
+            .keep(&at, &QuadPipeline::bytes_in(&quads, (frame, 0), &[]))
     }
 
     pub fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {
@@ -74,7 +79,8 @@ impl Frame {
         let queue = &self.gpu.queue;
         self.table.set(encoder, queue, frame, &[translation(shift)]);
         let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.draw_kept(&at, kept, (&mut self.table, 0));
+        self.pipeline
+            .draw_kept(&at, kept, (&mut self.table, &mut self.clips, 0));
     }
 
     /// The colours of the top row's first three pixels.

@@ -60,7 +60,7 @@ pub(crate) struct RunBytes {
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
 pub(crate) fn run_bytes(
-    (run, frame, rows): (&Run, u32, &[u32]),
+    (run, frame, rows): (&Run, (u32, u32), &[u32]),
     shapes: &ShapeStore,
 ) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {

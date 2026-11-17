@@ -19,6 +19,7 @@ fn vs_main(
     instance: Instance,
     @location(5) row: u32,   // the row's index in its batch's range
     @location(6) frame: u32, // the frame's entry in the transform table
+    @location(7) clip: u32,  // the innermost clip's entry in the clip table
 ) -> Out {
     let box = local_box(instance);
     let pad = padding(instance.linear);
@@ -26,10 +27,14 @@ fn vs_main(
     let m = instance.linear;
     let pixel = vec2(m.x * local.x + m.z * local.y, m.y * local.x + m.w * local.y) + instance.shift.xy;
     let position = clip_position(placed(pixel, frame, row));
-    return vertex_out(instance, local, position);
+    var out = vertex_out(instance, local, position);
+    out.clip = clip;
+    out.row = row;
+    return out;
 }
 
 @fragment
 fn fs_main(in: Out) -> @location(0) vec4<f32> {
-    return covered(in, dpdx(in.local), dpdy(in.local));
+    let colour = covered(in, dpdx(in.local), dpdy(in.local));
+    return vec4(colour.rgb, colour.a * clip_coverage(in.position.xy, in.clip, in.row));
 }

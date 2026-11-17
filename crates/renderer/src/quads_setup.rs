@@ -13,9 +13,11 @@ pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout 
 /// and the transform table read in the vertex stage
 /// (`transform_table.rs`).
 pub(crate) fn table_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    // the fragment stage reads the table too: a clip's frame
+    // (clip.wgsl)
     let table = wgpu::BindGroupLayoutEntry {
         binding: 1,
-        visibility: wgpu::ShaderStages::VERTEX,
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
         ty: wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Storage { read_only: true },
             has_dynamic_offset: false,
@@ -23,16 +25,22 @@ pub(crate) fn table_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         },
         count: None,
     };
+    let clips = wgpu::BindGroupLayoutEntry {
+        binding: 2,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ..table
+    };
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("instanced on the table"),
-        entries: &[uniform_entry(), table],
+        label: Some("instanced on the tables"),
+        entries: &[uniform_entry(), table, clips],
     })
 }
 
 fn uniform_entry() -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding: 0,
-        visibility: wgpu::ShaderStages::VERTEX,
+        // the fragment stage reads the batch's rows_base (clip.wgsl)
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
         ty: wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Uniform,
             has_dynamic_offset: true,

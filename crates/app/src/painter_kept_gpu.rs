@@ -16,6 +16,16 @@ use crate::shape_store::ShapeStore;
 mod text;
 use text::TextGpu;
 
+/// The transform and clip entries a run's items name.
+type Named = (u32, u32);
+
+/// A batch's rows' indices, and how many rows its range holds.
+type RowsIn<'a> = (&'a [u32], usize);
+
+/// A run to draw, batch `at` of the frame, keyed `key`: what its items
+/// name and its rows.
+type Drawn<'a> = (&'a Run, (Named, &'a [u32], usize), BatchKey, usize);
+
 /// The kept bytes of each batch drawn, by key.
 #[derive(Default)]
 pub(crate) struct KeptGpu {
@@ -46,9 +56,11 @@ struct Gpu {
     /// A mesh run's items' entries, by the store's index, beside their
     /// instances in `range`: built once with the bytes.
     meshes: Vec<usize>,
-    /// The frame's entry in the transform table its items name (0 for
-    /// the runs that name none): bytes naming another are built again.
+    /// The frame's entry in the transform table and the clip's in the
+    /// clip table its items name (0 for the runs that name none): bytes
+    /// naming others are built again.
     frame: u32,
+    clip: u32,
     drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -78,11 +90,11 @@ impl KeptGpu {
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
-        (run, (frame, rows, range), key, at): (&Run, (u32, &[u32], usize), BatchKey, usize),
+        (run, ((frame, clip), rows, range), key, at): Drawn<'_>,
     ) -> Result<Option<Kept<'_>>, PaintError> {
         if let Some(stale) = self
             .entries
-            .extract_if(|k, gpu| *k == key && gpu.frame != frame)
+            .extract_if(|k, gpu| *k == key && (gpu.frame, gpu.clip) != (frame, clip))
             .next()
         {
             pipelines.release(stale.1.kind, stale.1.range);
@@ -91,12 +103,16 @@ impl KeptGpu {
             Some(gpu) => {
                 #[cfg(debug_assertions)]
                 super::rows_in_range(key, rows, range);
-                gpu.check((run, frame, rows), at, pipelines.shapes);
+                gpu.check((run, (frame, clip), rows), at, pipelines.shapes);
                 self.kept += 1;
             }
             _ => {
                 if self
-                    .write(&mut pipelines, target, (run, frame, (rows, range), key))?
+                    .write(
+                        &mut pipelines,
+                        target,
+                        (run, (frame, clip), (rows, range), key),
+                    )?
                     .is_none()
                 {
                     return Ok(None);
@@ -117,12 +133,12 @@ impl KeptGpu {
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
-        (run, frame, (rows, range), key): (&Run, u32, (&[u32], usize), BatchKey),
+        (run, (frame, clip), (rows, range), key): (&Run, Named, RowsIn<'_>, BatchKey),
     ) -> Result<Option<()>, PaintError> {
         super::rows_in_range(key, rows, range);
         let (kind, built) = (
             Kind::of(run),
-            run_bytes((run, frame, rows), pipelines.shapes)?,
+            run_bytes((run, (frame, clip), rows), pipelines.shapes)?,
         );
         let RunBytes { bytes, meshes } = built;
         let Some(range) = pipelines.keep(kind, target, &bytes) else {
@@ -135,6 +151,7 @@ impl KeptGpu {
             len: bytes.len() as u64,
             meshes,
             frame,
+            clip,
             drawn: self.frame,
             #[cfg(debug_assertions)]
             bytes,
@@ -160,6 +177,25 @@ impl KeptGpu {
         }
     }
 
+    /// Panics, naming the batch, when a kept batch names one of the clip
+    /// entries `freed`: the CPU check behind the poison a freed entry is
+    /// written with (flat-scene-f3.md item 11). Undrawn batches are
+    /// released first, and a drawn one holds its entries, so none does.
+    pub(super) fn assert_none_names_clip(&self, freed: &[u32]) {
+        let named = self
+            .entries
+            .iter()
+            .find(|(_, gpu)| freed.contains(&gpu.clip));
+        if let Some((key, gpu)) = named {
+            panic!(
+                "kept batch {key:?} names clip entry {}, given back: its bytes would read the \
+                 poison or another clip (painter_kept_gpu.rs, painter_clips.rs); reproduce with \
+                 `cargo xtask test`",
+                gpu.clip
+            );
+        }
+    }
+
     /// The bytes the kept batches hold.
     pub(super) fn held_bytes(&self) -> u64 {
         let texts: u64 = self.texts.values().map(TextGpu::len).sum();
@@ -171,7 +207,12 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, (run, frame, rows): (&Run, u32, &[u32]), at: usize, shapes: &ShapeStore) {
+    fn check(
+        &self,
+        (run, frame, rows): (&Run, (u32, u32), &[u32]),
+        at: usize,
+        shapes: &ShapeStore,
+    ) {
         #[cfg(debug_assertions)]
         {
             let fresh = run_bytes((run, frame, rows), shapes)

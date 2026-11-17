@@ -38,6 +38,10 @@ struct Out {
     @location(3) @interpolate(flat) colour: vec4<f32>,
     // the rect's corner radii, rx and ry
     @location(4) @interpolate(flat) radii: vec2<f32>,
+    // the page's clip and row (closed_forms_2d.wgsl); 0, no clip, in a
+    // scene, whose vertex_out leaves them as WGSL zeroes a var
+    @location(5) @interpolate(flat) clip: u32,
+    @location(6) @interpolate(flat) row: u32,
 }
 
 // How far past the shape the quad reaches, device pixels: the ramp's

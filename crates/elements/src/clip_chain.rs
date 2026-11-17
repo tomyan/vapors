@@ -9,13 +9,7 @@
 use crate::frames::{Frames, PAGE};
 use crate::kept_order::KeptOrder;
 
-/// The most links a box's clip chain may have. Measured 2026-11-17: the
-/// longest chain in the corpus is 2 links (`scrolling`, its tests'
-/// `clip_chains.rs`) and in the demos 2 (`scroll`); 8 leaves room for
-/// scroll containers nested a few deep and for F3.2's rounded clips,
-/// each a link of its own. The clip shader's loop bound is this number
-/// (F3.1's GPU side).
-pub const MAX_CLIP_CHAIN: usize = 8;
+pub use vapors_scene::MAX_CLIP_CHAIN;
 
 /// The links of the clip chain box `slot` paints under.
 pub(crate) fn links(order: &KeptOrder, frames: &Frames, slot: usize) -> usize {
