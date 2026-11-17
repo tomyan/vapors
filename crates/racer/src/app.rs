@@ -6,11 +6,11 @@ use crate::{
 };
 use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
-use surface::TrackSurface;
 use vapors_app::{ElementsApp, Failure, FrameCounts, FrameTiming};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, Start, report_error};
 use vapors_text::FontSystem;
+use world::TrackWorld;
 
 /// The racer as a platform app: the HUD's document and the track's
 /// surface, paused until Space. Public for drivers outside a window
@@ -19,7 +19,7 @@ pub struct Racer {
     pub(super) document: Rc<RefCell<Document>>,
     pub(super) hud: Hud,
     pub(super) app: ElementsApp,
-    pub(super) track: TrackSurface,
+    pub(super) track: TrackWorld,
     pub(super) run: Run,
     pub(super) pacing: Pacing,
     pub(super) faults: Faults,
@@ -39,19 +39,30 @@ impl Default for Racer {
     }
 }
 impl Racer {
-    /// A paused racer whose HUD is mounted and not yet drawn.
+    /// A paused racer whose HUD is mounted and not yet drawn, its HUD
+    /// and its world drawn at 4 samples. One-scene decided 4 samples for
+    /// a page with a scene (flat-scene D2); F10's paint uses will set it
+    /// from the page, and retire this explicit count.
     #[must_use]
     pub fn new() -> Self {
+        Self::with_samples(vapors_renderer::Samples::Four)
+    }
+
+    /// [`Racer::new`], its HUD and its world drawn at `samples`.
+    #[must_use]
+    pub fn with_samples(samples: vapors_renderer::Samples) -> Self {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let body = document.borrow().body();
         let hud = Hud::mount(&document, body, HudProps {});
-        let (app, track) = TrackSurface::mount(ElementsApp::new(Rc::clone(&document)));
+        let mut app = ElementsApp::new(Rc::clone(&document)).with_samples(samples);
+        let run = Run::default();
+        let track = TrackWorld::mount(&mut app, &document, (samples, &run.race, &run.camera));
         Self {
             document,
             hud,
             app,
             track,
-            run: Run::default(),
+            run,
             pacing: Pacing::default(),
             faults: Faults::default(),
             framed: false,
@@ -83,11 +94,6 @@ impl Racer {
     /// ([`ElementsApp::time_frames`]); off by default.
     pub fn time_frames(&mut self, on: bool) {
         self.app.time_frames(on);
-    }
-    /// Makes the HUD's painter draw at `samples`
-    /// ([`ElementsApp::set_samples`]), before the first frame.
-    pub fn set_samples(&mut self, samples: vapors_renderer::Samples) {
-        self.app.set_samples(samples);
     }
     /// Writes the HUD's GPU time to the status line once a second
     /// ([`ElementsApp::show_gpu_time`]).
@@ -178,7 +184,12 @@ impl App for Racer {
         if self.faults.error.is_some() {
             return Next::Wait;
         }
-        if let Err(error) = self.prepare(frame) {
+        // the world's signals written here are drawn by this frame, so
+        // their invalidations wake no loop (`ElementsApp::preparing`)
+        let preparing = self.app.preparing();
+        let prepared = self.prepare(frame);
+        drop(preparing);
+        if let Err(error) = prepared {
             self.fail(error);
             return Next::Wait;
         }
@@ -189,9 +200,14 @@ impl App for Racer {
             return Next::Exit;
         }
         self.framed = true;
-        if let Err(error) = self.after_frame(frame.index) {
+        if let Err(error) = self.report_frame(frame.index) {
             self.fail(error);
             return Next::Wait;
+        }
+        // the race or the camera moving draws the next frame: the world's
+        // signals change in it, and the scene draws again
+        if !self.run.paused || self.run.camera.moving {
+            return Next::Continue;
         }
         next
     }
@@ -213,7 +229,7 @@ mod input;
 #[cfg(test)]
 mod input_tests;
 mod state;
-mod surface;
+pub(crate) mod world;
 
 mod inspection;
 #[cfg(test)]

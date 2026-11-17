@@ -186,3 +186,30 @@ fn invalidating_after_an_app_that_never_ran_is_dropped_is_refused() {
         Err(InvalidateError::LoopClosed("track".into()))
     );
 }
+
+#[test]
+fn an_invalidation_while_the_next_frame_is_prepared_wakes_no_loop() {
+    // Given: the loop runs
+    let mut app = app();
+    let handle = app.mount("track", Box::new(Blank)).expect("mounts");
+    let platform = Platform::detached();
+    app.event(Event::PointerLeft, &platform);
+    let _ = platform.take_redraw_request();
+
+    // When: one while preparing, one after
+    let preparing = app.preparing();
+    let prepared = handle.clone().invalidate();
+    drop(preparing);
+    let woke_during = platform.take_redraw_request();
+    let after = handle.clone().invalidate();
+
+    // Then: the first is for the next frame and woke nothing; the second
+    // wakes the loop as before
+    assert_eq!(prepared, Ok(Invalidated::ForTheNextFrame));
+    assert!(
+        !woke_during,
+        "an invalidation while preparing woke the loop"
+    );
+    assert_eq!(after, Ok(Invalidated::Woke));
+    assert!(platform.take_redraw_request());
+}

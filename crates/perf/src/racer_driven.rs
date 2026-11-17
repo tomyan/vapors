@@ -33,11 +33,10 @@ impl DrivenRacer {
         Self::at(vapors_renderer::Samples::One)
     }
 
-    /// As [`DrivenRacer::new`], the HUD drawn at `samples`.
+    /// As [`DrivenRacer::new`], its HUD and its world drawn at `samples`.
     #[must_use]
     pub fn at(samples: vapors_renderer::Samples) -> Self {
-        let mut racer = Racer::new();
-        racer.set_samples(samples);
+        let mut racer = Racer::with_samples(samples);
         racer.time_frames(true);
         key(&mut racer, "Space", true);
         key(&mut racer, "Space", false);

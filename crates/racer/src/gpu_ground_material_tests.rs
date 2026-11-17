@@ -4,8 +4,8 @@
 //! from above on an odd-sized target, sampled at the centre (the
 //! camera's ground point, the vignette 1) and at the middles of the
 //! left, top and bottom edges (the vignette darker). The colours are
-//! pinned as literals, taken from the Track renderer, which this test
-//! also draws until R3a2 deletes it.
+//! pinned as literals, taken from the Track renderer before R3a2
+//! deleted it, when the material drew within 1 a channel of it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,12 +15,12 @@ use vapors_scene3d::{CameraHandle, GeometryHandle, Meshes, NodeId, NodeKind, Pro
 use vapors_scene3d::{Quat, Scene, Transform, Vec3};
 use vapors_scene3d_gpu::SceneRenderer;
 
-use crate::gpu::{Scene as TrackScene, Track, TrackLog};
-use crate::model::{Camera, RADIUS, Race};
+use crate::model::RADIUS;
 
 use crate::gpu_ground_material_target::{Samples, drawn, mount, sampled};
 
-/// Device pixels a ground unit spans: the Track's `min(w, h) / 400 * zoom`.
+/// Device pixels a ground unit spans, as the Track's `min(w, h) / 400 *
+/// zoom` was.
 const ZOOM: f32 = 6.0;
 
 /// Points at distances from the bottom straight's centre line, `x` 60.5
@@ -29,8 +29,7 @@ const ZOOM: f32 = 6.0;
 /// which only the bottom straight has. Each is on a half unit, so the
 /// noise cells hold either side of it; the edge samples are about 33
 /// units away (a unit is 0.975 pixels). With their colours at the
-/// centre, left, top and bottom, as the Track drew them on 2026-11-17
-/// (`by_track`).
+/// centre, left, top and bottom, as the Track drew them on 2026-11-17.
 const POINTS: [(&str, [f32; 2], [Pin; 4]); 5] = [
     ("road", [60.5, -RADIUS + 15.5], ROAD),
     ("kerb", [60.5, -RADIUS - 37.5], KERB),
@@ -100,34 +99,6 @@ fn above([x, y]: [f32; 2]) -> Transform {
     Transform::new(Vec3::new(x, 500.0, y), turned, Vec3::ONE).unwrap()
 }
 
-/// The Track renderer's ground at each point: looked at from straight
-/// above (tilt 1), the car parked far out of view; one Track, mounted
-/// once, its camera moved between points.
-fn by_track(gpu: &Gpu, points: &[[f32; 2]]) -> Vec<Samples> {
-    let parked = [5000.0, 5000.0];
-    let mut race = Race::default();
-    race.position = parked;
-    let camera = Camera {
-        zoom: ZOOM,
-        tilt: 1.0,
-        ..Camera::default()
-    };
-    let scene = TrackScene {
-        race,
-        camera,
-        brake: 0.0,
-    };
-    let scene = Rc::new(RefCell::new(scene));
-    let mut track = Track::new(Rc::clone(&scene), Rc::new(TrackLog::default()));
-    mount(&mut track, gpu);
-    let mut found = Vec::new();
-    for point in points {
-        scene.borrow_mut().camera.offset = [point[0] - parked[0], point[1] - parked[1]];
-        found.push(sampled(&drawn(&mut track, gpu)));
-    }
-    found
-}
-
 /// The material's ground at each point: a plane under the racer's world
 /// group, an orthographic camera above it spanning what the Track spans;
 /// one renderer, mounted once, its camera moved between points.
@@ -184,12 +155,6 @@ fn camera(scene: &mut Scene) -> NodeId {
     node
 }
 
-/// Whether every channel of `found` is within 1 of `other`'s.
-fn near(found: &Samples, other: &Samples) -> bool {
-    let pairs = found.as_flattened().iter().zip(other.as_flattened());
-    pairs.into_iter().all(|(a, b)| a.abs_diff(*b) <= 1)
-}
-
 /// Whether each sample is within its pin's tolerance.
 fn pinned(found: &Samples, pins: &[Pin; 4]) -> bool {
     let within =
@@ -198,28 +163,23 @@ fn pinned(found: &Samples, pins: &[Pin; 4]) -> bool {
 }
 
 #[test]
-fn gpu_the_ground_material_draws_the_tracks_colours_which_are_pinned() {
+fn gpu_the_ground_material_draws_the_pinned_colours() {
     // Given
     let gpu = gpu();
     let points: Vec<_> = POINTS.iter().map(|(_, point, _)| *point).collect();
 
     // When
-    let track = by_track(&gpu, &points);
     let material = by_material(&gpu, &points);
 
     // Then: five centre colours, so each point is on its own part of the
-    // ground; at all four samples the material within 1 a channel of the
-    // Track, and the Track within each pin's tolerance
-    let centres: std::collections::BTreeSet<_> = track.iter().map(|samples| samples[0]).collect();
-    assert_eq!(centres.len(), 5, "{track:?}");
-    for ((name, _, pins), (track, material)) in POINTS.iter().zip(track.iter().zip(&material)) {
+    // ground; at all four samples, each within its pin's tolerance
+    let centres: std::collections::BTreeSet<_> =
+        material.iter().map(|samples| samples[0]).collect();
+    assert_eq!(centres.len(), 5, "{material:?}");
+    for ((name, _, pins), material) in POINTS.iter().zip(&material) {
         assert!(
-            near(material, track),
-            "{name}: material {material:?}, Track {track:?}"
-        );
-        assert!(
-            pinned(track, pins),
-            "{name}: Track {track:?}, pinned {pins:?}"
+            pinned(material, pins),
+            "{name}: drew {material:?}, pinned {pins:?}"
         );
     }
 }

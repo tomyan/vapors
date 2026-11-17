@@ -205,6 +205,8 @@ mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_preparing.rs"]
+mod preparing;
 #[path = "elements_app_readout.rs"]
 mod readout;
 #[path = "elements_app_shown.rs"]
@@ -215,6 +217,7 @@ mod start;
 mod surface_handle;
 #[path = "elements_app_surfaces.rs"]
 mod surfaces;
+pub use preparing::Preparing;
 // For the root `gpu_` test module (the tier split needs a gpu_ id).
 #[cfg(test)]
 pub(crate) use surfaces::give_one_loop_waker_to;

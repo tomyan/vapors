@@ -1,11 +1,12 @@
 //! GPU tier: the window resized and its device scale changed mid-race.
-//! The track's renderer reallocates its depth texture once per size
-//! change and renders at the new size from that frame; the HUD lays out
-//! for the new size; at 2x the backing is rebuilt at twice the device
-//! size for the same CSS size, and the track shows the same colours
-//! (docs/gpu-surface.md, 3D slice 1c PR 6).
+//! The world renders at the new size from that frame, as it renders
+//! alone at that size; the HUD lays out for the new size; at 2x it
+//! renders on each frame with one composition draw, and the world shows
+//! the same colours (`gpu_track_scale_tests.rs`; docs/gpu-surface.md,
+//! 3D slice 1c PR 6). The scene renderer's own resize (its depth and 4x
+//! textures per size) is pinned in `vapors-scene3d-gpu`.
 use crate::app::Racer;
-use crate::gpu_frames::{WINDOW, frame_in, hold_button, idle, pixel_in, track_alone_in};
+use crate::gpu_frames::{WINDOW, drive, frame_in, hold_button, idle, pixel_in, world_alone_in};
 use vapors_app::SurfaceSize;
 use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{Instant, Next};
@@ -23,10 +24,10 @@ pub(crate) const DOUBLE: SurfaceSize = SurfaceSize {
     scale: 2.0,
 };
 
-/// A racer racing for two frames in the default window.
+/// A racer racing, the car moving, for two frames in the default window.
 pub(crate) fn racing(gpu: &Gpu) -> (Racer, Instant) {
     let mut racer = idle(gpu);
-    racer.command("toggle").expect("drives");
+    drive(&mut racer);
     let now = Instant::now();
     for _ in 0..2 {
         drawn_in(&mut racer, gpu, WINDOW, now);
@@ -48,31 +49,25 @@ pub(crate) fn drawn_in(racer: &mut Racer, gpu: &Gpu, window: SurfaceSize, now: I
 }
 
 #[test]
-fn gpu_a_window_resized_mid_race_reallocates_the_depth_texture_once_and_renders_at_the_new_size() {
+fn gpu_a_window_resized_mid_race_renders_the_world_once_at_the_new_size() {
     // Given
     let gpu = gpu();
     let (mut racer, now) = racing(&gpu);
-    let resizes = racer.track.log().resizes.get();
+    let before = racer.track.renders();
 
-    // When: three frames at the new size; each renders at it
+    // When: three frames at the new size, the clock held, so only the
+    // size changes
     let mut rgba = Vec::new();
     for _ in 0..3 {
         rgba = drawn_in(&mut racer, &gpu, NARROW, now);
-        assert_eq!(racer.track.log().rendered.get(), Some(NARROW));
     }
 
-    // Then
-    let log = racer.track.log();
-    assert_eq!(log.resizes.get() - resizes, 1, "one resize per size change");
-    // `log.depth` is the depth texture's own extent. A depth of the wrong
-    // size is refused by wgpu validation when the pass runs ("Attachments
-    // have differing sizes"), failing the frame. A right-sized depth with
-    // stale contents cannot occur: the world pass clears depth to 1.0 on
-    // every render (`depth_attachment`, gpu/setup.rs:78), so the centre
-    // pixel below checks the colour only.
-    assert_eq!(log.depth.get(), Some([NARROW.width, NARROW.height]));
+    // Then: the size change rendered, once; the frames after it show it,
+    // as the world alone renders at that size where no control covers it
+    // (a pass at the wrong size is refused by wgpu, failing the frame)
+    assert_eq!(racer.track.renders() - before, 1);
     let centre = [350.0, 300.0];
-    let alone = track_alone_in(&racer, &gpu, NARROW);
+    let alone = world_alone_in(&racer, &gpu, NARROW);
     assert_ne!(pixel_in(&alone, NARROW.width, centre), [255, 0, 255, 255]);
     assert_eq!(
         pixel_in(&rgba, NARROW.width, centre),
@@ -98,29 +93,22 @@ fn gpu_a_window_resized_mid_race_lays_the_hud_out_for_the_new_size() {
 }
 
 #[test]
-fn gpu_a_device_scale_change_mid_race_rebuilds_the_backing_at_the_new_device_size() {
+fn gpu_a_device_scale_change_mid_race_renders_on_each_frame_with_one_composition() {
     // Given: racing at 1x
     let gpu = gpu();
     let (mut racer, now) = racing(&gpu);
-    let resizes = racer.track.log().resizes.get();
+    let before = racer.track.renders();
 
     // When: 2x, then 1x again
     drawn_in(&mut racer, &gpu, DOUBLE, now);
-    let doubled = racer.track.log().rendered.get().expect("rendered");
     let surfaces_doubled = racer.app.frame_counts().surfaces.draw_calls;
     drawn_in(&mut racer, &gpu, WINDOW, now);
 
-    // Then
-    let log = racer.track.log();
-    assert_eq!(doubled, DOUBLE);
-    assert_eq!(doubled.logical(), WINDOW.logical());
+    // Then: the world rendered at each; the page composed it once at each
+    assert_eq!(racer.track.renders() - before, 2);
+    assert_eq!(DOUBLE.logical(), WINDOW.logical());
     assert_eq!(
-        log.resizes.get() - resizes,
-        2,
-        "one resize per scale change"
+        surfaces_doubled,
+        racer.app.frame_counts().surfaces.draw_calls
     );
-    assert_eq!(log.depth.get(), Some([WINDOW.width, WINDOW.height]));
-    assert_eq!(log.rendered.get(), Some(WINDOW));
-    assert_eq!(surfaces_doubled, 1, "one composition draw at 2x");
-    assert_eq!(racer.app.frame_counts().surfaces.draw_calls, 1);
 }

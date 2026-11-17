@@ -1,6 +1,5 @@
 //! Fixed-step simulation, and what the frame shows: the HUD's values and the track's scene.
 use super::Racer;
-use crate::gpu::Scene;
 use vapors_elements::Viewport;
 use vapors_platform::Frame;
 impl Racer {
@@ -69,17 +68,7 @@ impl Racer {
         let viewport = self.viewport(frame);
         self.sync_hud(viewport);
         self.hud_changed = self.document.borrow_mut().take_changed();
-        let moving = !self.run.paused || self.run.camera.moving;
-        self.track
-            .show(self.scene(), moving)
-            .map_err(|error| format!("the racer's track surface refused: {error}"))
-    }
-    pub(crate) fn scene(&self) -> Scene {
-        Scene {
-            race: self.run.race.clone(),
-            camera: self.run.camera,
-            brake: self.run.driving.controls().brake,
-        }
+        self.track.show(&self.run.race, &self.run.camera)
     }
     fn viewport(&mut self, frame: &Frame<'_>) -> Viewport {
         #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number

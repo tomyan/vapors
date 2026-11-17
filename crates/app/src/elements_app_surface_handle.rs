@@ -29,6 +29,9 @@ pub(super) struct Shared {
     pub(super) animating: BTreeSet<String>,
     /// Whether the app's loop has started, runs, or has ended.
     pub(super) run: Run,
+    /// Live `Preparing` guards: while any lives, an invalidation is for
+    /// the frame being prepared and wakes no loop.
+    pub(super) preparing: usize,
 }
 
 /// The app's loop, as its handles see it.
@@ -60,6 +63,9 @@ pub enum Invalidated {
     Woke,
     /// The loop has not started; its first frame renders the surface.
     AtFirstFrame,
+    /// The app is preparing its next frame (`ElementsApp::preparing`),
+    /// which renders the surface; no loop was woken.
+    ForTheNextFrame,
 }
 
 /// Why a [`SurfaceHandle`] call did nothing.
@@ -155,7 +161,11 @@ impl SurfaceHandle {
         };
         shared.stale.insert(self.name.clone());
         also(&mut shared);
+        let preparing = shared.preparing > 0;
         drop(shared);
+        if preparing && waker.is_some() {
+            return Ok(Invalidated::ForTheNextFrame);
+        }
         self.wake(waker)
     }
 

@@ -143,3 +143,29 @@ fn gpu_the_node_that_grows_the_slot_buffer_has_every_slot_written_again() {
     assert_eq!(grown.buffer_bytes, 17 * MESH_BYTES);
     assert_eq!(grown.draw_calls, 17);
 }
+
+#[test]
+fn gpu_each_render_that_draws_is_counted_in_the_log_and_a_refused_one_is_not() {
+    // Given: a scene with no camera yet
+    let gpu = vapors_gpu_harness::gpu();
+    let fixture = Fixture::new();
+    fixture.mesh(
+        fixture.root(),
+        &fixture.square(1.0),
+        RED,
+        Transform::IDENTITY,
+    );
+    let mut renderer = fixture.renderer(&gpu);
+    let log = renderer.log();
+
+    // When: one render refused for the missing camera, then two drawn
+    let refused = render_counted(&mut renderer, &gpu).is_err();
+    fixture.camera(
+        Projection::orthographic(4.0, 0.1, 100.0).unwrap(),
+        Vec3::new(0.0, 0.0, 5.0),
+    );
+    let drawn = [0, 1].map(|_| render_counted(&mut renderer, &gpu).is_ok());
+
+    // Then
+    assert_eq!((refused, drawn, log.renders()), (true, [true, true], 2));
+}

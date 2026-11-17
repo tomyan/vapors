@@ -1,25 +1,24 @@
 <script>
-use vapors_racer::world_geometry::Part;
-use vapors_racer::world::piece;
+// The racer's world in the scene (one-scene 2.2): drawn by the
+// SceneRenderer on the HUD's gpu-surface named "track". The parts'
+// colours are `world_geometry.rs`'s `Part::colour`, rounded to 8 bits.
+use crate::world_geometry::Part;
+use crate::world::piece;
 use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, MeshProps, Scene, SceneProps};
 
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
 #[prop] let eye: Option<vapors_scene3d::CameraHandle> = None;
 #[prop] let lens: Option<Signal<vapors_scene3d::Projection>> = None;
-#[prop] let portrait: bool = false;
 #[prop] let look: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let world: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let car: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let ground: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let ground_material: Option<vapors_scene3d::MaterialId> = None;
-#[prop] let parts: Vec<(vapors_racer::world_geometry::Part, vapors_scene3d::GeometryHandle)> = Vec::new();
+#[prop] let parts: Vec<(crate::world_geometry::Part, vapors_scene3d::GeometryHandle)> = Vec::new();
 </script>
 
 <style>
-:global(html), :global(body) { margin: 0; }
-.view { display: block; width: 320px; height: 240px; }
-.view.portrait { width: 240px; height: 320px; }
 .building { color: #c2ba96; }
 .roof { color: #4a6666; }
 .trunk { color: #573d26; }
@@ -31,7 +30,6 @@ use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, Me
 .stripes { color: #f2e0b8; }
 </style>
 
-<gpu-surface name="track" class="view" class:portrait={portrait}></gpu-surface>
 <Scene scene={scene} surface={surface} camera={eye}>
   <Camera handle={eye} projection={lens} transform={look} />
   <Group transform={world}>

@@ -22,10 +22,17 @@ pub struct RacerFrames {
 const SETTLING: usize = 10;
 
 impl RacerFrames {
-    /// A racer, racing when `racing`: Space pressed and released once.
+    /// A racer at 1 sample, racing when `racing`: Space pressed and
+    /// released once.
     #[must_use]
     pub fn new(racing: bool) -> Self {
-        let mut racer = Racer::new();
+        Self::at(racing, vapors_renderer::Samples::One)
+    }
+
+    /// As [`RacerFrames::new`], its HUD and its world drawn at `samples`.
+    #[must_use]
+    pub fn at(racing: bool, samples: vapors_renderer::Samples) -> Self {
+        let mut racer = Racer::with_samples(samples);
         racer.time_frames(true);
         if racing {
             key(&mut racer, "Space", true);
@@ -36,12 +43,6 @@ impl RacerFrames {
             racing,
             settled_after: SETTLING,
         }
-    }
-
-    /// Makes the racer's painter draw at `samples`, before the first
-    /// frame.
-    pub fn set_samples(&mut self, samples: vapors_renderer::Samples) {
-        self.racer.set_samples(samples);
     }
 }
 

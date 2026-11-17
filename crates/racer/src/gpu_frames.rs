@@ -1,10 +1,8 @@
 //! What the racer's GPU tests share: a frame into a fresh texture, the
 //! racer settled and idle, and the HUD's buttons and pixels.
 use crate::app::Racer;
-use crate::gpu::{Track, TrackLog};
 use std::num::NonZeroU32;
-use std::{cell::RefCell, rc::Rc};
-use vapors_app::{SurfaceFrame, SurfaceRenderer, SurfaceSize};
+use vapors_app::SurfaceSize;
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_platform::{App, Event, Frame, Instant, Modifiers, Next, Platform};
 use vapors_renderer::clear;
@@ -110,6 +108,16 @@ pub(crate) fn idle(gpu: &Gpu) -> Racer {
     racer
 }
 
+/// Starts the race with the gas held, so the car moves and the world
+/// changes on every frame: a race standing still, its camera settled,
+/// changes nothing and renders nothing.
+pub(crate) fn drive(racer: &mut Racer) {
+    if racer.run.paused {
+        racer.command("toggle").expect("drives");
+    }
+    racer.run.driving.key("KeyW", true);
+}
+
 pub(crate) fn space(pressed: bool) -> Event {
     Event::Key {
         key: " ".into(),
@@ -157,33 +165,17 @@ pub(crate) fn pixel_in(rgba: &[u8], width: u32, [x, y]: [f32; 2]) -> [u8; 4] {
     rgba[at..at + 4].try_into().expect("four bytes")
 }
 
-/// The track alone, as the racer's scene shows it now, rendered by a
-/// fresh `Track` at the window's size: what the HUD's frame shows where
-/// no control covers it.
-pub(crate) fn track_alone(racer: &Racer, gpu: &Gpu) -> Vec<u8> {
-    track_alone_in(racer, gpu, WINDOW)
+/// The world alone, as the racer shows it now, drawn as the racer
+/// draws it (at 4 samples, `Racer::new`) by a fresh `TrackWorld` at the
+/// window's size: what the HUD's frame shows where no control covers it.
+pub(crate) fn world_alone(racer: &Racer, gpu: &Gpu) -> Vec<u8> {
+    world_alone_in(racer, gpu, WINDOW)
 }
 
-/// As [`track_alone`], in a window of device size `size`.
-pub(crate) fn track_alone_in(racer: &Racer, gpu: &Gpu, size: SurfaceSize) -> Vec<u8> {
-    let scene = Rc::new(RefCell::new(racer.scene()));
-    let mut track = Track::new(scene, Rc::new(TrackLog::default()));
-    track.mount(&gpu.device).expect("mounts");
-    track.resize(&gpu.device, size).expect("resizes");
-    let texture = clear(&gpu.device, &gpu.queue, size.width, size.height, MAGENTA);
-    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-    let frame = SurfaceFrame {
-        device: &gpu.device,
-        queue: &gpu.queue,
-        encoder: &mut encoder,
-        view: &view,
-        size,
-        work: &vapors_app::WorkCounter::default(),
-    };
-    track.render(frame).expect("renders");
-    gpu.queue.submit([encoder.finish()]);
-    read_rgba8(&gpu.device, &gpu.queue, &texture)
+/// As [`world_alone`], in a window of device size `size`.
+pub(crate) fn world_alone_in(racer: &Racer, gpu: &Gpu, size: SurfaceSize) -> Vec<u8> {
+    let (race, camera) = (&racer.run.race, &racer.run.camera);
+    let mut rig =
+        crate::gpu_world_rig::Rig::window(race, camera, size, vapors_renderer::Samples::Four);
+    rig.frame(gpu).1
 }

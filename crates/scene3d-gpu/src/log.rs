@@ -42,6 +42,7 @@ impl Resource {
 #[derive(Debug, Default)]
 pub struct RendererLog {
     dropped: Cell<bool>,
+    renders: Cell<u64>,
     made: [Cell<u64>; 5],
     freed: [Cell<u64>; 5],
 }
@@ -53,6 +54,17 @@ impl RendererLog {
     #[must_use]
     pub fn dropped(&self) -> bool {
         self.dropped.get()
+    }
+
+    /// How many renders drew: each `SurfaceRenderer::render` that
+    /// recorded its pass.
+    #[must_use]
+    pub fn renders(&self) -> u64 {
+        self.renders.get()
+    }
+
+    pub(crate) fn rendered(&self) {
+        self.renders.set(self.renders.get() + 1);
     }
 
     /// How many resources of `kind` the renderer has made.
