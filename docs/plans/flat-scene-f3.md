@@ -290,7 +290,10 @@ Each check is proven by a break.
   coverage with the one-pixel ramp `quads.wgsl` takes for a box's edge,
   not `fwidth`: every frame is a whole translation before F4a, so the
   walk holds no derivative at all (item 7's finding stands, and does
-  not arise).
+  not arise). The fixed one-pixel edge is right only under
+  `WholeTranslate`; F4a owns replacing it with a scale-aware edge
+  (its row in `flat-scene.md`). Before F4a, F1's panic on paint under
+  any other class keeps it from being used where it is wrong.
 - **The poison.** A given-back entry carries flag bit 1, which the shader
   tests: a NaN rectangle alone is not enough, as `clamp` of NaN is not
   defined to give 0 and a shader compiler may assume no NaN (a test
