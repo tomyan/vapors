@@ -1,45 +1,54 @@
-//! The boxes paint could not place (issue #449): a border box with an
-//! edge that is not finite in device pixels, as a width past f32's range
-//! gives. Each is refused after paint, naming its element and slot, so
-//! no infinite quad is shown; a box is placed, refused, or has no rect
-//! and is not painted.
+//! The boxes paint could not place (issue #449): a border box, an item
+//! or a clip with a coordinate that is not finite in device pixels, as a
+//! length past f32's range gives. The update is refused once, after
+//! paint, naming the cause (`paint_cause.rs`) and counting the other
+//! boxes it reaches, so nothing infinite is shown.
 
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{BoxRect, Placed};
+use crate::layout::Placed;
+
+/// Which part of a box held the coordinate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PartKind {
+    /// Its border box.
+    BorderBox,
+    /// Its own step's items, of `kind` (`vapors_scene::NonFinite`).
+    Own(&'static str),
+    /// Its outline ring.
+    Outline,
+    /// Its scrollbar thumbs.
+    Thumb,
+}
+
+/// A box paint could not place: its slot and what held the coordinate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NotPlaced {
+    pub(crate) slot: usize,
+    pub(crate) part: PartKind,
+}
 
 impl Document {
-    /// One refusal per box in `unresolvable` (slot, CSS rect), at `scale`.
+    /// One refusal for `unplaced`, at `scale`, naming its cause.
     ///
     /// # Errors
-    /// Any box in `unresolvable`.
-    pub(crate) fn refuse_unresolvable(
+    /// Any box in `unplaced`.
+    pub(crate) fn refuse_unplaced(
         &self,
-        unresolvable: &[(usize, BoxRect)],
+        unplaced: &[NotPlaced],
         placed: &Placed,
         scale: f32,
     ) -> Result<(), Vec<ElementError>> {
-        if unresolvable.is_empty() {
+        let Some(cause) = crate::paint_cause::cause(unplaced, placed) else {
             return Ok(());
-        }
-        let refuse = |&(slot, rect): &(usize, BoxRect)| {
-            let element = placed.slots.key(slot).map_or_else(
-                || "a box with no element".to_owned(),
-                |key| crate::check::describe(&self.arena, key.node()),
-            );
-            ElementError::Refused(message(&element, slot, rect, scale))
         };
-        Err(unresolvable.iter().map(refuse).collect())
+        let element = placed.slots.key(cause.slot).map_or_else(
+            || "a box with no element".to_owned(),
+            |key| crate::check::describe(&self.arena, key.node()),
+        );
+        let others = unplaced.iter().filter(|n| n.slot != cause.slot).count();
+        Err(vec![ElementError::Refused(
+            cause.message(&element, scale, others),
+        )])
     }
-}
-
-fn message(element: &str, slot: usize, rect: BoxRect, scale: f32) -> String {
-    format!(
-        "{element} (box slot {slot}): its border box (x {}, y {}, width {}, height {} CSS px) \
-         has an edge that is not finite in device pixels at scale {scale}, so paint cannot place \
-         it and refuses it rather than draw an infinite quad; fix: keep its size and position \
-         within f32's range at that scale (about 3.4e38 device px; `width: 1e39px` is past it); \
-         reproduce with the update that refused",
-        rect.x, rect.y, rect.width, rect.height
-    )
 }

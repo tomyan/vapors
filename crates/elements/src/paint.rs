@@ -46,10 +46,10 @@ pub(crate) struct PaintInput<'a> {
     /// whether its edges are snapped (`input.snapped`); set by `Repaint`
     /// before each box (`frames.rs` `FrameAt::class`).
     pub(crate) class: Option<TransformClass>,
-    /// The slots whose border box has an edge that is not finite in
-    /// device pixels, with that box in CSS pixels: painted but refused
-    /// by the update after paint (`paint_refusals.rs`), never shown.
-    pub(crate) unresolvable: Vec<(usize, BoxRect)>,
+    /// The boxes whose border box, items or clips hold a coordinate that
+    /// is not finite in device pixels: painted, then refused by the
+    /// update after paint (`paint_refusals.rs`), never shown.
+    pub(crate) unresolvable: Vec<crate::paint_refusals::NotPlaced>,
 }
 
 impl<'a> PaintInput<'a> {

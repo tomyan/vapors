@@ -53,7 +53,7 @@ impl<K: LaneKind> Lane<K> {
                 )
             });
             assert!(
-                (lane - held).abs() <= tolerance(lane, held, terms),
+                same(lane, held) || (lane - held).abs() <= tolerance(lane, held, terms),
                 "lane child in slot {slot} of the container in slot {container} starts at \
                  {lane} in its lane but was written at {held}: a size query moved the lane's \
                  leaves on from its last write and the container's layout came from Taffy's \
@@ -61,4 +61,12 @@ impl<K: LaneKind> Lane<K> {
             );
         }
     }
+}
+
+/// Whether `lane` and `held` are the same value: equal infinities match,
+/// which the tolerance cannot say (`inf - inf` is NaN); paint then
+/// refuses the boxes they place (`paint_refusals.rs`, issue #449).
+#[allow(clippy::float_cmp, reason = "exact: the same value written and read")]
+fn same(lane: f32, held: f32) -> bool {
+    lane == held
 }

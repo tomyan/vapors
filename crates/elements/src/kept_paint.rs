@@ -76,19 +76,38 @@ pub(crate) fn paint_all(
     let painted = paint_partial(boxes, rects, input, last, changed);
     if cfg!(debug_assertions) {
         let fresh = fresh(boxes, rects, input);
-        crate::kept_paint_check::assert_same(&painted, &fresh);
+        // a paint the update refuses is not shown, and its NaN
+        // coordinates equal nothing, themselves included
+        if input.unresolvable.is_empty() {
+            crate::kept_paint_check::assert_same(&painted, &fresh);
+        }
     }
     painted
 }
 
-/// A paint of every box, for the debug build's check; the text cache
-/// and the boxes paint refused are left as they were, so the check keeps
-/// no layout and adds no refusal the update would not.
+/// A paint of every box, for the debug build's check; the text cache is
+/// left as it was, so the check keeps no layout the update would not.
+/// The boxes it could not place must be the update's: a box kept or
+/// shifted was placed by an update accepted before, so only the boxes
+/// painted again can differ; a difference panics naming both lists.
 fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let cache = input.cache.clone();
-    let refused = std::mem::take(&mut input.unresolvable);
+    let partial = std::mem::take(&mut input.unresolvable);
     let painted = paint(boxes, rects, input);
-    (*input.cache, input.unresolvable) = (cache, refused);
+    let slots = |list: &[crate::paint_refusals::NotPlaced]| {
+        let mut slots: Vec<usize> = list.iter().map(|n| n.slot).collect();
+        slots.sort_unstable();
+        slots.dedup();
+        slots
+    };
+    assert_eq!(
+        slots(&input.unresolvable),
+        slots(&partial),
+        "the boxes a fresh paint could not place differ from the update's (fresh first): a \
+         kept or shifted box carries a coordinate that is not finite (kept_paint.rs, \
+         paint_refusals.rs); reproduce with `cargo xtask test`"
+    );
+    (*input.cache, input.unresolvable) = (cache, partial);
     painted
 }
 

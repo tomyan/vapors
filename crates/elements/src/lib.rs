@@ -112,6 +112,7 @@ mod number_text;
 mod number_validity;
 mod order_splice;
 mod paint;
+mod paint_cause;
 mod paint_frames;
 mod paint_inline;
 mod paint_labels;
