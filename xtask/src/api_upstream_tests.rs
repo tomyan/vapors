@@ -59,11 +59,19 @@ fn a_response_that_is_not_http_is_refused() {
     );
 }
 
+/// A curl stand-in at `script`, run by `sh` rather than executed: a
+/// file executed just after it was written can fail with ETXTBSY while
+/// another thread's fork still holds the write descriptor.
+fn through_sh(script: &std::path::Path) -> Vec<String> {
+    vec!["/bin/sh".into(), script.display().to_string()]
+}
+
 mod forwarded {
     use std::io::Read;
     use std::os::unix::net::UnixStream;
 
-    use super::super::{Staged, forward_by};
+    use super::super::{Staged, forward};
+    use super::through_sh;
     use crate::api_http::Request;
     use crate::api_usage::Counted;
     use crate::ux_secret::Secret;
@@ -76,7 +84,7 @@ mod forwarded {
     /// holds on for `hold` seconds, and exits with `code`. It ignores
     /// SIGPIPE, so a reader that goes away does not end it: only a kill
     /// does.
-    fn fake_curl(dir: &std::path::Path, output: &str, (code, hold): (i32, u32)) -> String {
+    fn fake_curl(dir: &std::path::Path, output: &str, (code, hold): (i32, u32)) -> Vec<String> {
         let program = dir.join("curl");
         let printed = output
             .replace('\\', "\\\\")
@@ -90,12 +98,7 @@ mod forwarded {
             ),
         )
         .expect("written");
-        std::fs::set_permissions(
-            &program,
-            std::os::unix::fs::PermissionsExt::from_mode(0o755),
-        )
-        .expect("mode");
-        program.display().to_string()
+        through_sh(&program)
     }
 
     /// A request forwarded through a stand-in printing `output`, the
@@ -108,7 +111,7 @@ mod forwarded {
     }
 
     /// A request forwarded through `curl`, its body staged in `dir`.
-    fn through(curl: &str, dir: &std::path::Path, reads: bool) -> (Counted, bool) {
+    fn through(curl: &[String], dir: &std::path::Path, reads: bool) -> (Counted, bool) {
         let secret =
             Secret::new("sk-ant-a-key-long-enough-to-guard-0123456789".into()).expect("a key");
         let request = Request {
@@ -129,8 +132,7 @@ mod forwarded {
             }
         });
         let staged = Staged::new(staged_at.clone(), &request.body).expect("staged");
-        let forwarded =
-            forward_by(curl, &request, (&secret, &staged), &mut ours).expect("forwarded");
+        let forwarded = forward(curl, &request, (&secret, &staged), &mut ours).expect("forwarded");
         drop((staged, ours));
         reader.join().expect("the reader");
         (forwarded.counted, staged_at.exists())
@@ -148,11 +150,9 @@ mod forwarded {
             recorded.display()
         );
         std::fs::write(&curl, script).expect("written");
-        std::fs::set_permissions(&curl, std::os::unix::fs::PermissionsExt::from_mode(0o755))
-            .expect("mode");
 
         // When
-        let _ = through(&curl.display().to_string(), dir.path(), true);
+        let _ = through(&through_sh(&curl), dir.path(), true);
 
         // Then: PATH, and what sh sets itself, nothing else
         let env = std::fs::read_to_string(recorded).expect("recorded");
@@ -211,7 +211,7 @@ mod write_bound {
     use std::os::unix::net::UnixStream;
     use std::time::{Duration, Instant};
 
-    use super::super::{Staged, forward_by};
+    use super::super::{Staged, forward};
     use crate::api_http::Request;
     use crate::api_usage::Counted;
     use crate::ux_secret::Secret;
@@ -225,8 +225,6 @@ mod write_bound {
         let curl = dir.path().join("curl");
         let script = "#!/bin/sh\ntrap '' PIPE\ncat > /dev/null\nprintf 'HTTP/1.1 200 OK\\r\\n\\r\\n'\nhead -c 4000000 /dev/zero\n";
         std::fs::write(&curl, script).expect("written");
-        std::fs::set_permissions(&curl, std::os::unix::fs::PermissionsExt::from_mode(0o755))
-            .expect("mode");
         let (_session, mut ours) = UnixStream::pair().expect("a pair");
         ours.set_write_timeout(Some(Duration::from_millis(50)))
             .expect("bounded");
@@ -242,8 +240,8 @@ mod write_bound {
 
         // When
         let started = Instant::now();
-        let forwarded = forward_by(
-            &curl.display().to_string(),
+        let forwarded = forward(
+            &super::through_sh(&curl),
             &request,
             (&secret, &staged),
             &mut ours,
