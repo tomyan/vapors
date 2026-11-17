@@ -94,3 +94,25 @@ fn item_rect(item: &Item) -> Rect {
         other => unreachable!("an image or surface run holds {other:?}"),
     }
 }
+
+/// Refuses, naming batch `key` and the item, an item row of `rows` that
+/// is not in the batch's own range of `range` rows. An item whose row
+/// were past it would read the table's next entries: another batch's
+/// rows, or a frame's shift (`painter_transforms.rs`).
+///
+/// # Panics
+///
+/// As said; an empty range (a batch in one frame) holds no row, so any
+/// row index is past it.
+pub(crate) fn rows_in_range(key: vapors_elements::BatchKey, rows: &[u32], range: usize) {
+    let past = rows.iter().position(|&row| row as usize >= range);
+    if let Some(at) = past {
+        panic!(
+            "item {at} of batch {key:?} names row {}, past the {range} rows of the batch's range \
+             in the transform table: each item of a batch over a lane's rows names one of the \
+             rows the batch's offsets give (vapors-elements framed_batches_rows.rs); reproduce \
+             with `cargo xtask test`",
+            rows[at]
+        );
+    }
+}

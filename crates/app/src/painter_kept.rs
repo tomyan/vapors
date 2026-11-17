@@ -33,7 +33,7 @@ mod gpu;
 pub(super) use gpu::KeptGpu;
 #[path = "painter_kept_bytes.rs"]
 mod bytes;
-pub(super) use bytes::{Kind, RunBytes, run_bytes};
+pub(super) use bytes::{Kind, RunBytes, rows_in_range, run_bytes};
 
 /// The pipelines whose buffers hold kept bytes, the atlas the text
 /// pipeline's name, and the store shape items name entries in.
@@ -77,9 +77,11 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(kept) = self
-            .kept
-            .range(pipelines, target, (run, frame, rows, key, at))?
+        let Some(kept) = self.kept.range(
+            pipelines,
+            target,
+            (run, (frame, rows, moved.offsets.len()), key, at),
+        )?
         else {
             return Ok(());
         };

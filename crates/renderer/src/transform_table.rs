@@ -4,6 +4,8 @@
 //! Values are written only when they change; a frame that changes none
 //! writes nothing.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::transform_entries::{Entries, Matrix};
 use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
 
@@ -14,8 +16,13 @@ const FIRST_ENTRIES: u32 = 64;
 /// Bytes per entry: a `mat4x4<f32>`.
 const ENTRY_BYTES: u64 = 64;
 
+/// The next table's id: each table's is its own, for a pipeline to tell
+/// two tables apart (`instanced.rs`).
+static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
 /// The table and the buffer holding it.
 pub struct TransformTable {
+    id: u64,
     label: &'static str,
     entries: Entries,
     buffer: wgpu::Buffer,
@@ -34,6 +41,7 @@ impl TransformTable {
     #[must_use]
     pub fn new(device: &wgpu::Device, label: &'static str) -> Self {
         Self {
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             label,
             entries: Entries::new(FIRST_ENTRIES),
             buffer: buffer(device, label, FIRST_ENTRIES),
@@ -85,6 +93,23 @@ impl TransformTable {
         }
     }
 
+    /// As [`TransformTable::prepare`], the write counted in `work` as
+    /// well: for a pipeline's own identity table, whose writes no painter
+    /// takes (`instanced.rs`).
+    pub(crate) fn prepare_counted(&mut self, queue: &wgpu::Queue, work: &WorkCounter) {
+        if self.fresh {
+            self.prepare(queue);
+            let (_, bytes) = self.take_written();
+            work.count_buffer_bytes(bytes);
+        }
+    }
+
+    /// This table's own id, unlike any other table's.
+    #[must_use]
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     /// The whole buffer, for a bind group.
     #[must_use]
     pub fn binding(&self) -> wgpu::BindingResource<'_> {
@@ -115,10 +140,7 @@ impl TransformTable {
     /// group. Refused over `max_buffer_size` or
     /// `max_storage_buffer_binding_size`.
     fn grow(&mut self, frame: &FrameEncoder, count: u32) -> Option<()> {
-        let limits = frame.device().limits();
-        let limit = limits
-            .max_buffer_size
-            .min(limits.max_storage_buffer_binding_size);
+        let (limit, name) = applied_limit(&frame.device().limits());
         let capacity = (self.entries.capacity() * 2).max(self.entries.capacity() + count);
         let size = u64::from(capacity) * ENTRY_BYTES;
         if size > limit {
@@ -126,7 +148,7 @@ impl TransformTable {
                 pipeline: self.label,
                 size,
                 limit,
-                holding: Holding::OneFrame,
+                holding: Holding::TransformEntries { limit: name },
             });
             return None;
         }
@@ -134,6 +156,16 @@ impl TransformTable {
         self.buffer = buffer(frame.device(), self.label, capacity);
         (self.fresh, self.generation) = (true, self.generation + 1);
         Some(())
+    }
+}
+
+/// The lower of the two limits on the table's buffer, and its name.
+fn applied_limit(limits: &wgpu::Limits) -> (u64, &'static str) {
+    if limits.max_storage_buffer_binding_size < limits.max_buffer_size {
+        let size = limits.max_storage_buffer_binding_size;
+        (size, "max_storage_buffer_binding_size")
+    } else {
+        (limits.max_buffer_size, "max_buffer_size")
     }
 }
 
@@ -145,3 +177,7 @@ fn buffer(device: &wgpu::Device, label: &str, entries: u32) -> wgpu::Buffer {
         mapped_at_creation: false,
     })
 }
+
+#[cfg(test)]
+#[path = "transform_table_tests.rs"]
+mod tests;

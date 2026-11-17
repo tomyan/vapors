@@ -199,3 +199,49 @@ kept as a second path).
   draw quads and shadows, which now read the table, under headless
   Chromium on SwiftShader. All thirteen cases hold.
 
+### After the review of F2.1 (issuecomment-6937532551)
+
+- **Growth is pinned.** A GPU test takes 70 entries in a second frame
+  (past the first buffer's 64) and draws a quad kept in the last of
+  them; it lands where the same quad drawn directly does. Removing the
+  generation bump, or the rewrite of a fresh buffer, fails it.
+- **A row must be in its own batch's range.** An item's row is
+  checked against its batch's range when its bytes are built, and in
+  debug builds on every kept draw (`painter_kept_bytes.rs`
+  `rows_in_range`). A bad row is refused, naming the batch and the row.
+  Before, a row past the range read the table's next entries: another
+  batch's rows, or a frame's shift.
+- **The growth refusal** names the limit that applied
+  (`max_storage_buffer_binding_size` or `max_buffer_size`), with a fix
+  for entries held while drawn (`Holding::TransformEntries`).
+- **One table a pipeline.** Each table has its own id. A pipeline
+  refuses a kept draw from a second table, because it keeps one bind
+  group for its table, keyed by the generation alone.
+- **The identity table's first write** (4 KiB) is counted in the
+  pipeline's work.
+- **Lane writes are pinned.** An unchanged frame of a framed lane writes
+  nothing, and a row put in at the top writes the eight rows in view
+  (512 bytes), not the rows below it.
+- **Precision (known, not a defect).** The shader now adds a row's
+  offset to its frame's shift before adding either to the position:
+  `pixel + (offset + shift)`, where the old path did
+  `(pixel + shift) + offset`. Both shift and offset are whole, so
+  `offset + shift` is exact below 2^24, and the new order keeps a
+  fractional position exact where the old order rounded it at the
+  shift's magnitude. At a shift near 2 million device pixels (row
+  100,000 of 20 px rows) an f32's step is 0.125 px. Pixels are the same
+  in every tested case. Beyond the tested range, lane rows of shadows
+  and shapes can differ from before, more precisely, and text and
+  images keep the old order until F2.2, so a row's glyphs and its box
+  can round differently there. No test pins a large offset.
+- **Known term, owner F2.3 or later.** Row ranges are keyed by each
+  batch's own key, where the old row tables were keyed by a part's
+  first batch (`painter_places.rs`). A part split into several batches,
+  for example a shadow batch and a quad batch, holds one range for each
+  batch, and an insert that moves its rows writes each range. That is
+  correct but writes more than one table per part did. F2.3, which
+  retires the old row tables, keys the ranges by part.
+- **Scroll writes.** A scroll writes one frame entry whatever the
+  list's length, pinned on a ten-row list (`gpu_kept_scroll.rs`). The
+  plan's 3,000-row figure has no test of its own.
+

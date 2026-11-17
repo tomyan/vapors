@@ -28,6 +28,9 @@ pub(crate) struct Instanced {
     identity: TransformTable,
     own_group: KeptBindGroup,
     table_group: KeptBindGroup,
+    /// The id of the table kept draws bind: one table a pipeline, as one
+    /// bind group is kept for it, keyed by its generation alone.
+    table_id: Option<u64>,
     instances: FrameArena,
     kept: Retained,
     stride: u64,
@@ -68,6 +71,7 @@ impl Instanced {
             identity: TransformTable::new(device, label),
             own_group: KeptBindGroup::NONE,
             table_group: KeptBindGroup::NONE,
+            table_id: None,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             kept: Retained::new(device, label, wgpu::BufferUsages::VERTEX),
             stride,
@@ -90,7 +94,7 @@ impl Instanced {
         let Some(viewport) = self.viewport_slot(target, 0) else {
             return;
         };
-        self.identity.prepare(queue);
+        self.identity.prepare_counted(queue, &self.work);
         self.record(
             target,
             (count, Instances::Placed(&instances)),
@@ -131,6 +135,16 @@ impl Instanced {
         let Some(viewport) = self.viewport_slot(target, rows_base) else {
             return;
         };
+        let id = *self.table_id.get_or_insert(table.id());
+        assert_eq!(
+            id,
+            table.id(),
+            "{}: a kept draw binds transform table {}, after table {id}: a pipeline draws from one \
+             table, whose bind group it keeps (instanced.rs); give each painter its own pipelines; \
+             reproduce with `cargo xtask test`",
+            self.label,
+            table.id()
+        );
         table.prepare(target.queue);
         self.record(
             target,

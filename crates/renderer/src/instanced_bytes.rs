@@ -58,10 +58,10 @@ pub(crate) fn view_bytes(viewport: Size, rows_base: u32) -> [u8; VIEW_SIZE] {
 /// # Panics
 ///
 /// When `rows` is neither empty nor one index an item, when an index is
-/// past the [`RowOffsets`] table (the shader would read it clamped,
-/// silently), when an item's floats are not `vec4s` four-float
-/// attributes, or when the bytes built are not [`instance_bytes`] an
-/// item, the stride the pipeline reads them at.
+/// past the most rows a batch's range holds ([`assert_rows`]), when an
+/// item's floats are not `vec4s` four-float attributes, or when the bytes
+/// built are not [`instance_bytes`] an item, the stride the pipeline
+/// reads them at.
 pub(crate) fn rowed_instances<T>(
     (label, vec4s): (&str, usize),
     (items, frame, rows): (&[T], u32, &[u32]),
@@ -93,12 +93,15 @@ pub(crate) fn rowed_instances<T>(
 }
 
 /// Refuses, naming `label`, rows that are not empty or one index for
-/// each of `items` items, every one inside the [`RowOffsets`] table.
+/// each of `items` items, every one below the most rows a batch's range
+/// holds ([`RowOffsets::CAPACITY`]).
 ///
 /// # Panics
 ///
-/// As said: an index past the table would be read clamped, silently, and
-/// a short `rows` would put the rest in row 0.
+/// As said: a short `rows` would put the rest in row 0. An index past
+/// its own batch's range, though under the cap, would read the
+/// transform table's next entries; the painter refuses that where it
+/// knows the range (vapors-app `painter_kept_bytes.rs` `rows_in_range`).
 pub fn assert_rows(label: &str, items: usize, rows: &[u32]) {
     assert!(
         rows.is_empty() || rows.len() == items,

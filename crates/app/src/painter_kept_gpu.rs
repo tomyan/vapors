@@ -78,7 +78,7 @@ impl KeptGpu {
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
-        (run, frame, rows, key, at): (&Run, u32, &[u32], BatchKey, usize),
+        (run, (frame, rows, range), key, at): (&Run, (u32, &[u32], usize), BatchKey, usize),
     ) -> Result<Option<Kept<'_>>, PaintError> {
         if let Some(stale) = self
             .entries
@@ -89,12 +89,14 @@ impl KeptGpu {
         }
         match self.entries.get(&key) {
             Some(gpu) => {
+                #[cfg(debug_assertions)]
+                super::rows_in_range(key, rows, range);
                 gpu.check((run, frame, rows), at, pipelines.shapes);
                 self.kept += 1;
             }
             _ => {
                 if self
-                    .write(&mut pipelines, target, (run, frame, rows, key))?
+                    .write(&mut pipelines, target, (run, frame, (rows, range), key))?
                     .is_none()
                 {
                     return Ok(None);
@@ -115,8 +117,9 @@ impl KeptGpu {
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
-        (run, frame, rows, key): (&Run, u32, &[u32], BatchKey),
+        (run, frame, (rows, range), key): (&Run, u32, (&[u32], usize), BatchKey),
     ) -> Result<Option<()>, PaintError> {
+        super::rows_in_range(key, rows, range);
         let (kind, built) = (
             Kind::of(run),
             run_bytes((run, frame, rows), pipelines.shapes)?,

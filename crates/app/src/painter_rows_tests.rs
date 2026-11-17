@@ -174,3 +174,21 @@ fn an_item_past_a_lane_batchs_rows_is_refused() {
     let offsets = vec![[0.0, 2.0]; rows.items().len()];
     moved(rows, &offsets).item_shift(rows.items().len());
 }
+
+#[test]
+fn every_item_row_inside_its_batchs_range_is_taken() {
+    super::super::kept::rows_in_range(a_key(), &[0, 2, 1], 3);
+    super::super::kept::rows_in_range(a_key(), &[], 0);
+}
+
+#[test]
+#[should_panic(expected = "names row 3, past the 3 rows of the batch's range")]
+fn an_item_row_at_the_end_of_its_batchs_range_is_refused() {
+    super::super::kept::rows_in_range(a_key(), &[0, 3], 3);
+}
+
+#[test]
+#[should_panic(expected = "names row 0, past the 0 rows")]
+fn an_item_row_in_a_batch_with_no_range_is_refused() {
+    super::super::kept::rows_in_range(a_key(), &[0], 0);
+}
