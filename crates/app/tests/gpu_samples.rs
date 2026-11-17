@@ -4,7 +4,8 @@
 //! where a triangle's edge crosses it, so shapes off the pixel grid
 //! differ at their edges (the demos, identical, are in `gpu_demos.rs`);
 //! a tooltip at 4 samples draws as at 1; and a tooltip on a view after
-//! another view's frame is refused, not drawn over that view's.
+//! another view's frame is refused, not drawn over that view's: the two
+//! share the size's 4x texture, which holds the other's frame.
 
 use vapors_renderer::Samples;
 
@@ -137,31 +138,26 @@ fn gpu_a_tooltip_at_4_samples_draws_as_at_1() {
     assert_eq!(difference(&one, &four), (0, 0));
 }
 
-#[test]
-#[should_panic(expected = "which this frame's encoder has not cleared")]
-fn gpu_a_tooltip_on_a_view_after_another_views_frame_at_4_samples_is_refused() {
-    // Given: two views of one size, one encoder
+/// Draws into two views of one size at 4 samples, the first in encoder
+/// `encoders.0` and the second in `encoders.1` (0 or 1 of two), then a
+/// tooltip on view `tooltip_on` in encoder `encoders.2`.
+fn tooltip_after_two_draws(encoders: (usize, usize, usize), tooltip_on: usize) {
     let mut doc = tooltip_page();
     let tooltip = tip(&doc);
     let mut rig = Rig::with_samples(Samples::Four);
     let gpu = &rig.gpu;
     let made = || {
-        let texture = vapors_renderer::clear(
-            &gpu.device,
-            &gpu.queue,
-            SIZE,
-            SIZE,
-            vapors_scene::Color::default(),
-        );
+        let colour = vapors_scene::Color::default();
+        let texture = vapors_renderer::clear(&gpu.device, &gpu.queue, SIZE, SIZE, colour);
         texture.create_view(&wgpu::TextureViewDescriptor::default())
     };
-    let (first, second) = (made(), made());
-    let encoder = vapors_renderer::FrameEncoder::new(&gpu.device);
-    let on = |view| vapors_renderer::Target {
+    let views = [made(), made()];
+    let both = [0, 1].map(|_| vapors_renderer::FrameEncoder::new(&gpu.device));
+    let on = |view: usize, encoder: usize| vapors_renderer::Target {
         device: &gpu.device,
         queue: &gpu.queue,
-        encoder: &encoder,
-        view,
+        encoder: &both[encoder],
+        view: &views[view],
         multisampled: None,
         viewport: vapors_scene::Size {
             width: SIZE,
@@ -170,11 +166,33 @@ fn gpu_a_tooltip_on_a_view_after_another_views_frame_at_4_samples_is_refused() {
         scissor: None,
     };
     let painted = doc.painted().expect("updated");
-    rig.painter.draw(&on(&first), painted).expect("draws");
-    rig.painter.draw(&on(&second), painted).expect("draws");
-
-    // When: the tooltip on the first, whose frame the second replaced
+    rig.painter
+        .draw(&on(0, encoders.0), painted)
+        .expect("draws");
+    rig.painter
+        .draw(&on(1, encoders.1), painted)
+        .expect("draws");
+    let target = on(tooltip_on, encoders.2);
     let _ = rig
         .painter
-        .draw_tooltip(&on(&first), &mut doc, &tooltip, Some([2.0, 2.0]));
+        .draw_tooltip(&target, &mut doc, &tooltip, Some([2.0, 2.0]));
 }
+
+#[test]
+#[should_panic(expected = "its resolve would put that frame on this one")]
+fn gpu_a_tooltip_on_a_view_after_another_views_frame_at_4_samples_is_refused() {
+    // A and B in one encoder, then a tooltip on A, whose frame B replaced
+    tooltip_after_two_draws((0, 0, 0), 0);
+}
+
+#[test]
+#[should_panic(expected = "which this pipeline drew for, is still open")]
+fn gpu_a_draw_into_another_encoder_while_the_first_is_open_is_refused_before_any_tooltip() {
+    // A in one encoder, B in another while the first is open: the
+    // pipelines refuse B's draw (encoder_turn.rs), so a tooltip on B in
+    // A's encoder, which would resolve A's frame onto B, cannot follow
+    tooltip_after_two_draws((0, 1, 0), 1);
+}
+
+#[path = "samples/app_frames.rs"]
+mod app_frames;
