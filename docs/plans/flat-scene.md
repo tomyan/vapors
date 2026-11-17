@@ -1075,7 +1075,13 @@ FXAA over scene ranges later (`3d-engine-parity.md` Q1): blurs text and
 decals in the scene. Recommend (a), subject to F7's number on the UHD
 630; if 4x costs over a stated share of the frame there (a tenth of
 16.7 ms, say), (b) for desktop and (a) on tilers, chosen per adapter and
-reported.
+reported. **Answered by F7b (2026-11-17):** (a) stands. On the UHD 630,
+4 samples cost at most 1.34 ms of GPU time a frame, on the one-scene
+example with its page and its scene both at 4; the painter's pass alone
+cost 0.25 ms on 3000 rows and 0.74 ms on the racing racer. Each is
+under 1.67 ms, so (b) per adapter is not built
+(`docs/perf/f7b-msaa-2026-11-17.md`; the Pixel 9 Pro's numbers are in
+that report).
 
 **D3. Text under a scale animation.** (a) Chromium's rule: the glyphs
 rasterised at the start scale are resampled during the animation and

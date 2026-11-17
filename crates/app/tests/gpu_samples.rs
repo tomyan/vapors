@@ -30,7 +30,7 @@ fn difference(one: &[u8], four: &[u8]) -> (u8, usize) {
 
 /// An svg of a triangle (a mesh) and a circle (a closed form), neither
 /// edge on the pixel grid, updated.
-fn shapes() -> vapors_elements::Document {
+pub(crate) fn shapes() -> vapors_elements::Document {
     let mut doc = document("svg { display: block; }", &[]);
     let svg = doc.create_element("svg");
     let size = [

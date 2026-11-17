@@ -84,6 +84,12 @@ impl Rows {
             splices: std::cell::Cell::default(),
         }
     }
+
+    /// Makes the page's painter draw at `samples`, before the first
+    /// frame.
+    pub fn set_samples(&mut self, samples: vapors_renderer::Samples) {
+        self.app.set_samples(samples);
+    }
 }
 
 impl Rows {

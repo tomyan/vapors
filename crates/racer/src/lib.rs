@@ -12,13 +12,27 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 /// A platform/window/GPU failure, reported with its cause, or the HUD's
 /// failure (a refused update, a track render error) that ended the loop.
 pub fn run() -> Result<(), String> {
+    run_with(None)
+}
+
+/// As [`run`], with the HUD drawn at `samples` and its GPU time written
+/// to the status line once a second, when given (a run by hand,
+/// `docs/plans/flat-scene-f7.md`, F7b).
+///
+/// # Errors
+/// As [`run`].
+pub fn run_with(readout: Option<vapors_renderer::Samples>) -> Result<(), String> {
     vapors_platform::app_draws_open();
     vapors_platform::hide_status_line();
     vapors_dom::set_error_report(
         "vapors_platform::report_error",
         vapors_platform::report_error,
     );
-    let racer = app::Racer::new();
+    let mut racer = app::Racer::new();
+    if let Some(samples) = readout {
+        racer.set_samples(samples);
+        racer.show_gpu_time();
+    }
     let failure = racer.failure();
     vapors_platform::run(
         vapors_platform::WindowOptions {

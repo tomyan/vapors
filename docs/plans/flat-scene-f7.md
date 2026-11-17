@@ -113,7 +113,8 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    it would need a copy pass (Q4).
 4. **Timing.** A script runs each page at 1 and 4 samples and reads
    `GpuTimer`: the rows page, W10 and the racer page. W10 is added by
-   F3, which F7 follows; F7b stops and reports if it is not on main. For
+   F3; it was not on main when F7b ran, so the report measures the
+   other pages and marks W10's row pending F3.2 (lead, L28). For
    the racer, the painter's pass is timed at 4x. The racer's own 3D
    pass is a different renderer and stays at 1x, so 3D at 4x is
    measured on the one-scene example instead (Q5). The UHD 630 is run

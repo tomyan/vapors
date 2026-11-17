@@ -92,9 +92,19 @@ impl Fixture {
     }
 
     pub fn renderer(&self, gpu: &Gpu) -> SceneRenderer {
-        let mut renderer = SceneRenderer::new(Rc::clone(&self.scene), Rc::clone(&self.meshes));
+        self.renderer_at(gpu, (SIZE, vapors_renderer::Samples::One))
+    }
+
+    /// A renderer at `samples`, mounted and sized to `size`.
+    pub fn renderer_at(
+        &self,
+        gpu: &Gpu,
+        (size, samples): (SurfaceSize, vapors_renderer::Samples),
+    ) -> SceneRenderer {
+        let renderer = SceneRenderer::new(Rc::clone(&self.scene), Rc::clone(&self.meshes));
+        let mut renderer = renderer.with_samples(samples);
         renderer.mount(&gpu.device).expect("mounts");
-        renderer.resize(&gpu.device, SIZE).expect("resizes");
+        renderer.resize(&gpu.device, size).expect("resizes");
         renderer
     }
 }
@@ -110,11 +120,20 @@ pub fn render_counted(
     renderer: &mut SceneRenderer,
     gpu: &Gpu,
 ) -> Result<(Vec<u8>, GpuWork), SurfaceError> {
+    render_sized(renderer, gpu, SIZE)
+}
+
+/// As [`render_counted`], into a backing of `size` (the renderer's).
+pub fn render_sized(
+    renderer: &mut SceneRenderer,
+    gpu: &Gpu,
+    size: SurfaceSize,
+) -> Result<(Vec<u8>, GpuWork), SurfaceError> {
     let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("scene3d test backing"),
         size: wgpu::Extent3d {
-            width: SIZE.width,
-            height: SIZE.height,
+            width: size.width,
+            height: size.height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -134,7 +153,7 @@ pub fn render_counted(
         queue: &gpu.queue,
         encoder: &mut encoder,
         view: &view,
-        size: SIZE,
+        size,
         work: &work,
     })?;
     gpu.queue.submit([encoder.finish()]);

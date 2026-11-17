@@ -10,6 +10,7 @@
 mod apps;
 #[cfg(target_family = "wasm")]
 mod bar;
+mod samples;
 mod wake;
 
 use vapors_app::ElementsApp;
@@ -71,6 +72,10 @@ fn run_elements(name: &str, options: WindowOptions) -> Result<(), String> {
         None => shown.per_frame,
     };
     let mut app = ElementsApp::new(shown.document).with_per_frame(per_frame);
+    if let Some(samples) = apps::page_samples()? {
+        app.set_samples(samples);
+        app.show_gpu_time();
+    }
     // the page's hidden DOM mirror of the a11y tree (R6)
     app.mirror_a11y(true).map_err(|e| e.to_string())?;
     run(options, app).map_err(|e| e.to_string())

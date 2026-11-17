@@ -15,6 +15,10 @@ pub const ERROR_ID: &str = "error";
 /// The id the GPU's start-up line is written to when the page has such
 /// an element, so the status line stays the page's own.
 pub const ADAPTER_ID: &str = "adapter";
+/// The id a readout for a run by hand is written to when the page has
+/// such an element: the demo bar's line, above the canvas, so it covers
+/// no control of the app's.
+pub const READOUT_ID: &str = "demo-line";
 
 /// What kind of line is being reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +27,9 @@ pub enum Report {
     Error,
     /// A line that is not a failure, from `report_status`.
     Status,
+    /// A run by hand's readout, from `report_readout`: shown wherever it
+    /// is written.
+    Readout,
     /// The GPU's start-up line (adapter and limits), from `report_startup`.
     Startup,
 }
@@ -36,17 +43,19 @@ pub fn element_for(report: Report, page_has: impl Fn(&str) -> bool) -> &'static 
     match report {
         Report::Error if page_has(ERROR_ID) => ERROR_ID,
         Report::Startup if page_has(ADAPTER_ID) => ADAPTER_ID,
-        Report::Error | Report::Startup | Report::Status => STATUS_ID,
+        Report::Readout if page_has(READOUT_ID) => READOUT_ID,
+        Report::Error | Report::Startup | Report::Status | Report::Readout => STATUS_ID,
     }
 }
 
 /// Whether writing a `report` line shows the element it goes to. An
 /// error is always shown, so a hidden status line that an error falls
-/// back to (a page without [`ERROR_ID`]) cannot hide it; a status line
-/// leaves its element as it is.
+/// back to (a page without [`ERROR_ID`]) cannot hide it, and so is a
+/// readout, which is asked for to be read; a status line leaves its
+/// element as it is.
 #[must_use]
 pub fn shows_target(report: Report) -> bool {
-    report == Report::Error
+    matches!(report, Report::Error | Report::Readout)
 }
 
 /// The value of `name` in a query string such as `?demo=hello&x=1`:
@@ -100,6 +109,9 @@ mod tests {
             (Report::Startup, Some(ADAPTER_ID), "adapter"),
             (Report::Startup, Some(ERROR_ID), "status"),
             (Report::Startup, None, "status"),
+            (Report::Readout, Some(READOUT_ID), "demo-line"),
+            (Report::Readout, Some(ERROR_ID), "status"),
+            (Report::Readout, None, "status"),
         ];
 
         for (report, present, expected) in cases {
@@ -127,5 +139,16 @@ mod tests {
         assert!(error_shown);
         assert!(!status_shown);
         assert!(!startup_shown);
+    }
+
+    #[test]
+    fn a_readout_is_shown_wherever_it_is_written() {
+        // Given: no demo bar, so the readout falls back to #status, which
+        // the demos hide
+        let to = element_for(Report::Readout, |_| false);
+
+        // Then
+        assert_eq!(to, STATUS_ID);
+        assert!(shows_target(Report::Readout));
     }
 }
