@@ -1,4 +1,6 @@
 //! Top-down racing through Vapors platform, GPU rendering and compiled UI.
+mod ground_material;
+pub use ground_material::ground_material;
 mod app;
 mod driving;
 mod gpu;
@@ -40,6 +42,8 @@ mod app_tests;
 mod component_input_tests;
 
 // at the crate root, so each test's path starts `gpu_` as the gpu tier's filter needs
+#[cfg(test)]
+mod gpu_ground_material_tests;
 #[cfg(test)]
 mod gpu_track_idle_tests;
 #[cfg(test)]

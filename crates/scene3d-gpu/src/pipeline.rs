@@ -56,7 +56,7 @@ fn material_pipeline(
         include_str!("material.wgsl"),
     ]
     .concat();
-    let shader = shader(device, &material.label, source);
+    let shader = shader(device, material.label, source);
     render_pipeline(device, layout, &shader, ("vs_material", "fs_material"))
 }
 

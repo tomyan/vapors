@@ -28,7 +28,7 @@ fn mounted_with(
 fn a_mesh_given_a_material_is_drawn_with_it() {
     let (given, held) = mounted_with(|stage| {
         let material = Material {
-            label: "plain".into(),
+            label: "plain",
             wgsl: "fn material(at: MaterialInput) -> vec4<f32> { return at.colour; }".into(),
         };
         Some(stage.meshes.borrow_mut().material(material).expect("held"))

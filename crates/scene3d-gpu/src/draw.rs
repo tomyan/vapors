@@ -58,14 +58,10 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
     }))
 }
 
-/// Refuses a node naming a material `meshes` was given after the
-/// renderer built its `built` material pipelines at mount, naming the
-/// material's label.
-pub(crate) fn materials_built(
-    nodes: &[MeshNode],
-    meshes: &Meshes,
-    built: usize,
-) -> Result<(), FrameError> {
+/// Refuses a node naming a material its `Meshes` was given after the
+/// renderer built its `built` material pipelines at mount (the id names
+/// the material's label).
+pub(crate) fn materials_built(nodes: &[MeshNode], built: usize) -> Result<(), FrameError> {
     let late = nodes.iter().find_map(|mesh| {
         mesh.material
             .filter(|material| material.index() >= built)
@@ -75,7 +71,6 @@ pub(crate) fn materials_built(
         Some((mesh, material)) => Err(FrameError::MaterialMissing {
             node: mesh.node,
             material,
-            label: meshes.materials()[material.index()].label.clone(),
             built,
         }),
         None => Ok(()),

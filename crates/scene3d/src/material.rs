@@ -18,7 +18,10 @@ use crate::{MaterialError, Meshes, NodeId, NodeKind, Scene, StoreError};
 /// `fn material(at: MaterialInput) -> vec4<f32>`, the fragment's colour,
 /// sRGB-encoded as the mesh's colour is, and may define functions and
 /// constants of its own beside it. The renderer puts this struct before
-/// it.
+/// it. A renderer calls `material` once per fragment, in a fragment
+/// stage, in uniform control flow (no branch or discard before it), so a
+/// material may take derivatives (`dpdx`, `dpdy`, `fwidth`) of what it
+/// computes from its input.
 pub const MATERIAL_WGSL: &str = "
 // What a material is given for each fragment (vapors-scene3d `material.rs`).
 struct MaterialInput {
@@ -40,7 +43,7 @@ struct MaterialInput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Material {
     /// Names it in a renderer's refusals.
-    pub label: String,
+    pub label: &'static str,
     /// The functions, `material` among them ([`MATERIAL_WGSL`]).
     pub wgsl: String,
 }
@@ -52,6 +55,9 @@ pub struct Material {
 pub struct MaterialId {
     meshes: u64,
     index: usize,
+    /// Its material's label, so a refusal can name it wherever the id
+    /// goes, another `Meshes`' renderer included.
+    label: &'static str,
 }
 
 impl MaterialId {
@@ -64,7 +70,8 @@ impl MaterialId {
 
 impl fmt::Display for MaterialId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "material {} of meshes {}", self.index, self.meshes)
+        let (index, label, meshes) = (self.index, self.label, self.meshes);
+        write!(f, "material {index} (`{label}`) of meshes {meshes}")
     }
 }
 
@@ -80,10 +87,12 @@ impl Meshes {
     /// (`material_check.rs`).
     pub fn material(&mut self, material: Material) -> Result<MaterialId, MaterialError> {
         crate::material_check::check(&material)?;
+        let label = material.label;
         self.materials.push(material);
         Ok(MaterialId {
             meshes: self.id,
             index: self.materials.len() - 1,
+            label,
         })
     }
 

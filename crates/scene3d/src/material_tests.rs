@@ -5,7 +5,7 @@ use crate::{Material, Meshes, NodeKind, Scene, StoreError, Transform};
 
 fn checker() -> Material {
     Material {
-        label: "checker".into(),
+        label: "checker",
         wgsl: "fn material(at: MaterialInput) -> vec4<f32> { return at.colour; }".into(),
     }
 }

@@ -16,17 +16,18 @@ fn gpu_a_material_given_after_the_renderer_mounted_is_refused_naming_the_node_an
     // When
     let refused = render(&mut renderer, &gpu).expect_err("refused");
 
-    // Then
+    // Then: the id names the label
     assert_eq!(
         refused.to_string(),
         format!(
-            "{node} names {material} (`late`), and this renderer built 0 materials when it mounted: give every material to the Meshes before mounting the renderer"
+            "{node} names {material}, and this renderer built 0 materials when it mounted: give every material to the Meshes before mounting the renderer"
         )
     );
+    assert!(refused.to_string().contains("(`late`)"), "{refused}");
 }
 
 #[test]
-fn gpu_another_meshes_material_is_refused_naming_the_node() {
+fn gpu_another_meshes_material_is_refused_naming_the_node_and_label() {
     // Given
     let gpu = vapors_gpu_harness::gpu();
     let (fixture, node) = square_in_view(RED);
@@ -46,4 +47,5 @@ fn gpu_another_meshes_material_is_refused_naming_the_node() {
         )),
         "{refused}"
     );
+    assert!(refused.to_string().contains("(`foreign`)"), "{refused}");
 }
