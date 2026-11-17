@@ -80,8 +80,9 @@ impl Drop for Staged {
     }
 }
 
-/// `request` sent to the API with `secret`, its body at `staged`, the
-/// response written to `client`. If the client stops reading (its write
+/// `request` sent to the API by `program` (curl and any arguments before
+/// curl's own; the tests' stand-ins run through `sh`) with `secret`, its
+/// body at `staged`, the response written to `client`. If the client stops reading (its write
 /// deadline, set by the server) curl is killed, and the response counts as
 /// cut, as it does when curl exits other than 0 or the stream does not end
 /// whole.
@@ -91,17 +92,7 @@ impl Drop for Staged {
 /// curl not starting or ending before a response head; each message has
 /// passed the key guard and the escaping.
 pub fn forward(
-    request: &Request,
-    (secret, curls): (&Secret, &Curls),
-    staged: &Staged,
-    client: &mut impl Write,
-) -> Result<Forwarded, String> {
-    forward_by("curl", request, (secret, staged, curls), client)
-}
-
-/// [`forward`] with `program` as curl, for the tests' stand-ins.
-fn forward_by(
-    program: &str,
+    program: &[String],
     request: &Request,
     (secret, staged, curls): (&Secret, &Staged, &Curls),
     client: &mut impl Write,
@@ -130,11 +121,13 @@ fn forward_by(
 }
 
 fn started(
-    program: &str,
+    program: &[String],
     request: &Request,
     (secret, staged): (&Secret, &Path),
 ) -> Result<Child, String> {
-    let mut command = Command::new(program);
+    let (curl, leading) = program.split_first().ok_or("no curl program")?;
+    let mut command = Command::new(curl);
+    command.args(leading);
     // curl's environment is cleared (review of #476-#478, N5): no
     // SSLKEYLOGFILE to write the TLS secrets out, no proxy variable, no
     // CA bundle in place of the system's

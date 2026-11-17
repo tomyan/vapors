@@ -6,7 +6,7 @@
 //! (slice 4), which never runs anything in it (the plan's "The clone is
 //! untrusted").
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -56,6 +56,27 @@ type Ran = (Vec<String>, Ended, Result<(), String>);
 fn ran(order: &Order<'_>) -> Result<Ran, String> {
     crate::api_fds::refuse_inherited()?;
     crate::api_limits::no_core_dumps()?;
+    let (builder, routes, objects) = prepared(order)?;
+    crate::api_server::serve(&builder.socket(), Arc::clone(&routes))?;
+    let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
+    // every path from here drains, the session's failures included
+    let ((mut lines, ended), drained) =
+        crate::api_build_drain::drained_after(served(order, (&builder, objects), &routes), || {
+            crate::api_build_drain::drained(
+                &proxy.budget,
+                (&|| proxy.in_flight(), &proxy.curls),
+                crate::api_build_drain::DRAIN_DEADLINE,
+            )
+        })?;
+    let result = builder.root().join("result.json");
+    let (said, agreed) =
+        crate::api_build_report::summary(&ended, (&result, &builder), &routes, proxy);
+    lines.extend(said);
+    Ok((lines, ended, drained.and(agreed)))
+}
+
+/// The builder's clone made, and the routes with the key and budget.
+fn prepared(order: &Order<'_>) -> Result<(Builder, Arc<Routes>, PathBuf), String> {
     let config = crate::config::Config::load().map_err(|e| e.to_string())?;
     let budget = Budget::new(order.budget, crate::api_prices::prices(&config)?)?;
     budget.price(order.model)?;
@@ -69,20 +90,28 @@ fn ran(order: &Order<'_>) -> Result<Ran, String> {
         proxy: Some(Proxy::new(secret, budget, staging)),
         ..Routes::default()
     });
-    crate::api_server::serve(&builder.socket(), Arc::clone(&routes))?;
-    let host = crate::api_host::host(objects)?;
-    let mut lines = proven(&builder, &host)?;
-    let (said, ended, agreed) = session(order, (&builder, &host), &routes)?;
-    lines.extend(said);
-    Ok((lines, ended, agreed))
+    Ok((builder, routes, objects))
 }
 
-/// The session run, and the lines that say how it ended.
+/// The fences proven and the session run: the fences' lines, and how the
+/// session ended.
+fn served(
+    order: &Order<'_>,
+    (builder, objects): (&Builder, PathBuf),
+    routes: &Routes,
+) -> Result<(Vec<String>, Ended), String> {
+    let host = crate::api_host::host(objects)?;
+    let lines = proven(builder, &host)?;
+    let ended = session(order, (builder, &host), routes)?;
+    Ok((lines, ended))
+}
+
+/// The session run in the sandbox; how it ended.
 fn session(
     order: &Order<'_>,
     (builder, host): (&Builder, &Host),
     routes: &Routes,
-) -> Result<Ran, String> {
+) -> Result<Ended, String> {
     let claude = Path::new(BIN).join("claude").display().to_string();
     let mut command = vec![claude];
     command.extend(crate::api_session::arguments(order.model, order.budget));
@@ -90,13 +119,5 @@ fn session(
     let result = builder.root().join("result.json");
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
     let session = sandboxed(builder, host, &words)?;
-    let ended = crate::api_session::run(session, (order.brief, &result), &proxy.budget)?;
-    let drained = crate::api_build_drain::drained(
-        &proxy.budget,
-        (&|| proxy.in_flight(), &proxy.curls),
-        crate::api_build_drain::DRAIN_DEADLINE,
-    );
-    let (lines, agreed) =
-        crate::api_build_report::summary(&ended, (&result, builder), routes, proxy);
-    Ok((lines, ended, drained.and(agreed)))
+    crate::api_session::run(session, (order.brief, &result), &proxy.budget)
 }

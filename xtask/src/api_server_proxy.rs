@@ -28,6 +28,8 @@ pub struct Proxy {
     pub staging: PathBuf,
     /// The curls in flight, for the drain to end (`api_build_drain.rs`).
     pub curls: Curls,
+    /// curl, and any arguments before its own (`api_upstream::forward`).
+    curl: Vec<String>,
     staged: AtomicU64,
     in_flight: AtomicUsize,
 }
@@ -45,9 +47,20 @@ impl Proxy {
             budget,
             staging,
             curls: Curls::default(),
+            curl: vec!["curl".into()],
             staged: AtomicU64::new(0),
             in_flight: AtomicUsize::new(0),
         }
+    }
+}
+
+impl Proxy {
+    /// This route forwarding through `curl` in place of curl: the tests'
+    /// stand-ins.
+    #[cfg(test)]
+    pub fn through(mut self, curl: Vec<String>) -> Self {
+        self.curl = curl;
+        self
     }
 }
 
@@ -134,7 +147,12 @@ fn forwarded(
 ) -> (u16, Counted) {
     let number = proxy.staged.fetch_add(1, Ordering::Relaxed);
     let sent = Staged::new(proxy.staging.join(format!("{number}.json")), body).and_then(|staged| {
-        crate::api_upstream::forward(request, (&proxy.secret, &proxy.curls), &staged, stream)
+        crate::api_upstream::forward(
+            &proxy.curl,
+            request,
+            (&proxy.secret, &staged, &proxy.curls),
+            stream,
+        )
     });
     match sent {
         Ok(forwarded) => (forwarded.status, forwarded.counted),
@@ -153,3 +171,7 @@ fn forwarded(
 #[cfg(test)]
 #[path = "api_server_proxy_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "api_server_proxy_e2e_tests.rs"]
+mod e2e_tests;

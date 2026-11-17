@@ -49,6 +49,26 @@ pub fn drained(
     ))
 }
 
+/// `served`'s outcome, with `drain` run whatever it was (re-verify of
+/// #476-#478, issuecomment-6950599235: a session's failure returned
+/// before the drain): what was served and how the drain went, or the
+/// failure, with what the drain left if anything.
+///
+/// # Errors
+///
+/// `served`'s failure.
+pub fn drained_after<T>(
+    served: Result<T, String>,
+    drain: impl FnOnce() -> Result<(), String>,
+) -> Result<(T, Result<(), String>), String> {
+    let drained = drain();
+    match (served, drained) {
+        (Ok(served), drained) => Ok((served, drained)),
+        (Err(why), Ok(())) => Err(why),
+        (Err(why), Err(left)) => Err(format!("{why}; and {left}")),
+    }
+}
+
 /// Until `in_flight` says none, or `deadline` passes; whether none were
 /// left.
 fn waited(in_flight: &dyn Fn() -> usize, deadline: Duration) -> bool {
