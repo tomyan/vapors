@@ -7,7 +7,7 @@ use vapors_renderer::{ImagePipeline, Target, TextureBinding, WorkCounter};
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
 use super::scope::{Scopes, Turn};
-use super::texture::{Backing, fits, render_into};
+use super::texture::{Backing, fits, render_at_start, render_into};
 use crate::surface::{SurfaceRenderer, SurfaceSize};
 
 /// A renderer and its state on the painter.
@@ -144,7 +144,8 @@ impl Mounted {
     }
 
     /// At `App::start`: mounted, and a backing at `size` made, the
-    /// renderer resized, and the backing cleared on `queue`, so the
+    /// renderer resized and rendered into it once, and the backing
+    /// cleared on `queue` before that render, so the
     /// memory both live in is the GPU's before the first frame: on
     /// i915 the first submit using a new memory block zeroes all of it
     /// (one-scene F0).
@@ -167,6 +168,14 @@ impl Mounted {
         // and the timer made before it 0.2 to 0.4 ms (one-scene.md, F0).
         // Retired by the acceptance runs, or a GPU-time test of frame 0.
         backing.clear(device, queue);
+        // the first render too, so frame 0 composites it rather than
+        // paying for the renderer's uploads and first draws (R3a2: the
+        // racer's world made frame 0 18.7 ms at 4 samples without it)
+        let renderer = &mut self.renderer;
+        self.scopes.run(device, turn, || {
+            render_at_start(renderer, (device, queue), backing)
+        })?;
+        self.stale = false;
         Ok(())
     }
 

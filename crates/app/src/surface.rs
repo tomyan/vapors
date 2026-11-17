@@ -66,8 +66,10 @@ pub struct SurfaceFrame<'a> {
 /// the backing texture is allocated (on the first frame the surface is
 /// painted, on a change of device size or scale, and when it is painted
 /// again after a frame it was not); `render` after a `resize`, after
-/// [`ScenePainter::invalidate`](crate::ScenePainter::invalidate), and on
-/// every frame while the app animates the surface
+/// [`ScenePainter::invalidate`](crate::ScenePainter::invalidate), once at
+/// `App::start` after its `resize` (so frame 0 composites that render
+/// unless the surface was invalidated since), and on every frame while
+/// the app animates the surface
 /// ([`SurfaceHandle::request_animation`](crate::SurfaceHandle::request_animation)).
 /// The renderer does not ask for frames. Unmounting drops the renderer: teardown
 /// is `Drop`. A frame that does not need a render composites the last one.

@@ -1,7 +1,8 @@
 //! GPU tier: `App::start` on an `ElementsApp` does, before the first
 //! frame, the work that frame would otherwise do once (one-scene F0):
-//! it builds every pipeline, mounts the surface renderers and uploads
-//! the glyph atlas's new page (sizes: `gpu_app_start_sizes.rs`).
+//! it builds every pipeline, mounts the surface renderers and renders
+//! each once, so frame 0 composites that render, and uploads the glyph
+//! atlas's new page (sizes: `gpu_app_start_sizes.rs`).
 
 use crate::support_surface as support;
 
@@ -31,16 +32,20 @@ fn gpu_a_started_app_builds_no_pipeline_in_its_first_frame() {
 }
 
 #[test]
-fn gpu_start_mounts_each_surface_renderer_before_the_first_frame() {
+fn gpu_start_mounts_and_renders_each_surface_once_and_frame_0_composites_it() {
     // Given
     let (mut app, log, gpu) = rig();
 
     // When
     start(&mut app, &gpu).expect("starts");
+    let at_start = log.borrow().frames.len();
+    let (_, rgba) = app_frame(&mut app, &gpu);
 
-    // Then
+    // Then: one mount, one render at start and none in frame 0, which
+    // shows what start drew
     assert_eq!(log.borrow().mounts, 1);
-    assert!(log.borrow().frames.is_empty(), "start rendered a frame");
+    assert_eq!((at_start, log.borrow().frames.len()), (1, 1));
+    assert_eq!(pixel(&rgba, 4, 4), RED);
 }
 
 #[test]
