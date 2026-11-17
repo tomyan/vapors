@@ -104,6 +104,13 @@ impl Frames {
         changed
     }
 
+    /// The frame the content of the lane holding the child in `frame` is
+    /// in, when `frame` is a framed lane child; no fold.
+    pub(super) fn lane_parent(&self, frame: usize) -> Option<usize> {
+        let container = self.lanes.shared.as_ref()?.borrow().container_of(frame)?;
+        Some(self.lanes.bases.get(&container)?.parent)
+    }
+
     /// How many lane frames a fold of their lane worked out since the
     /// lanes were set: those read and neither primed nor read before.
     #[cfg(test)]

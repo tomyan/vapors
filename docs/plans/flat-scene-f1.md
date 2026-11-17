@@ -48,7 +48,10 @@ answered before it was built.
      `Affine` frame before F4a.
 3. **Paint reads the class.**
    - `Repaint::painted` and `Repaint::thumbs` set `PaintInput::class`
-     from `painted.frames.at(frame)` before painting a slot.
+     before painting a slot, and clear it after, so a site reached
+     without one panics. They set it from `Frames::class_of`, which
+     walks out to a frame held whole without composing a lane frame
+     (in release builds too; the review of #450, M1).
    - The paint sites call `input.snapped(rect)` in place of
      `snapped(rect, input.scale)`.
    - Under `Affine` or `Projective`, `input.snapped` panics naming F4a.
@@ -71,8 +74,13 @@ answered before it was built.
      painter quantises glyph positions (section 4.4, regime A).
    - Shapes are left out. Their geometry is in their transform,
      unsnapped, as Chromium paints SVG.
-   - Cost: debug builds only, one check per frame shift made and one
-     per item painted again.
+   - Cost of the checks: debug builds only, one per frame shift made
+     and one per item painted again.
+   - The outline ring is checked by the box it is grown from: the
+     border box whole, and the four reaches equal. The ring's own edges
+     are the box plus `(offset + width) * scale`, unsnapped (the review
+     of #450, H1). Whether Chromium snaps that reach at fractional
+     scales is unmeasured, as the corpus runs at whole scales.
 5. **Tests.**
    - Frames carry `WholeTranslate`: the page, a scroll frame, a framed
      lane's child, and a scroll frame under a lane frame (in

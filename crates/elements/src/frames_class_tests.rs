@@ -75,3 +75,54 @@ fn every_frame_is_a_whole_translation_as_the_page_is() {
         assert_eq!(at.class, TransformClass::WholeTranslate, "{at:?}");
     }
 }
+
+/// A framed list of 100 rows after a row is put in at the top: every
+/// later row moved, and no frame of theirs was read this update.
+fn rows_after_an_insert() -> Document {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let css = "body { margin: 0; } .row { height: 20px; }";
+    doc.add_stylesheet("p.css", css).expect("parses");
+    let body = doc.body();
+    let list = child(&mut doc, body, "list");
+    let first = (0..100)
+        .map(|_| child(&mut doc, list, "row"))
+        .collect::<Vec<_>>()[0];
+    doc.update(VIEWPORT).expect("updates");
+    let row = doc.create_element("div");
+    doc.set_attribute(row, "class", "row");
+    doc.insert_before(list, row, Some(first));
+    doc.update(VIEWPORT).expect("updates");
+    doc
+}
+
+#[test]
+fn a_lane_frames_class_is_read_without_folding_the_frame() {
+    // Given: the lane frames of rows nothing read this update
+    let doc = rows_after_an_insert();
+    let frames = &doc.painted.as_ref().expect("painted").frames;
+    let rows: Vec<usize> = (0..doc.painted.as_ref().expect("painted").kept_boxes.len())
+        .filter(|&slot| frames.lane_parent(slot).is_some())
+        .collect();
+    let before = frames.lane_folds();
+
+    // When
+    let classes: Vec<_> = rows.iter().map(|&row| frames.class_of(row)).collect();
+
+    // Then: each a whole translation, and no frame folded for it; a
+    // read of the frames themselves folds them
+    assert!(rows.len() >= 100, "{} lane frames", rows.len());
+    assert!(
+        classes
+            .iter()
+            .all(|&class| class == TransformClass::WholeTranslate)
+    );
+    assert_eq!(
+        frames.lane_folds(),
+        before,
+        "reading a class folds its frame"
+    );
+    for &row in &rows {
+        let _ = frames.at(row);
+    }
+    assert!(frames.lane_folds() > before, "the frames fold when read");
+}

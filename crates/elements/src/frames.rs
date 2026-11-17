@@ -148,6 +148,7 @@ impl Frames {
         for (&frame, at) in &mut self.by_frame {
             if frame != PAGE {
                 at.shift = [at.shift[0] + dx, at.shift[1] + dy];
+                assert_whole_shift(frame, at.class, at.shift);
             }
         }
     }
@@ -197,6 +198,9 @@ mod update;
 
 #[path = "frames_compare.rs"]
 mod compare;
+
+#[path = "frames_class.rs"]
+mod class;
 
 #[path = "frames_relative.rs"]
 mod relative;
