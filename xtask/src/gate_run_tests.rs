@@ -81,6 +81,9 @@ fn a_step_past_its_deadline_is_killed_with_what_it_started() {
     // As the gate runs it here: hidden where this machine has a /dev/dri
     let wrap = wrap_for_this_machine();
     let mut step = step_for(&planned(&script), &dir.join("out"), wrap);
+    let (_target, env) =
+        crate::scratch::target("a_step_past_its_deadline_is_killed_with_what_it_started");
+    step.env.push(env);
     step.deadline = Some(Duration::from_secs(1));
 
     // When
@@ -137,17 +140,15 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
         run_dir.display()
     );
     let output = base.join("out");
+    let mut step = planned(&script);
+    let (_target, env) =
+        crate::scratch::target("every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate");
+    step.env.extend([env]);
 
     // When
     let reporter = crate::report::Reporter::new(false);
     let ran = crate::run_tmp::around("gate", &base, |tmp| {
-        let code = run_in(
-            &[planned(&script)],
-            &output,
-            Wrap::SwitchedOff,
-            &reporter,
-            tmp,
-        );
+        let code = run_in(&[step], &output, Wrap::SwitchedOff, &reporter, tmp);
         assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
         code
     });

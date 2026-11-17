@@ -20,6 +20,14 @@ pub fn workspace_root(here: &Path) -> Result<PathBuf, String> {
         })
 }
 
+/// The build directory a step names: its own `CARGO_TARGET_DIR`, taken
+/// from `step_dir` (where the step runs) when relative, as cargo takes
+/// it there; `None` when it names none or an empty one.
+pub fn step_target_dir(env: &[(String, String)], step_dir: &Path) -> Option<PathBuf> {
+    let (_, value) = env.iter().rfind(|(name, _)| name == "CARGO_TARGET_DIR")?;
+    (!value.is_empty()).then(|| step_dir.join(value))
+}
+
 /// The directory cargo builds into: `cargo_target_dir` when set (taken
 /// from the current directory when relative, as cargo takes it), else
 /// `<root>/target`; `None` when it does not exist yet.

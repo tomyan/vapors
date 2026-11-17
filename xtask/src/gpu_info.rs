@@ -13,7 +13,7 @@ pub fn run() -> ExitCode {
         Ok(cargo) => cargo,
         Err(why) => return fail(&why),
     };
-    if let Err(why) = crate::sccache::apply(&mut cargo) {
+    if let Err(why) = crate::sccache::apply(&mut cargo, None) {
         return fail(&why);
     }
     let output = cargo

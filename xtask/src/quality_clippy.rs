@@ -46,7 +46,7 @@ pub fn collect_clippy(root: &Path) -> Result<ClippyCounts, String> {
     // as every build xtask starts: niced, the job cap, the cache and the
     // build directory's cap
     let mut cargo = crate::priority::command("cargo")?;
-    crate::sccache::apply(&mut cargo)?;
+    crate::sccache::apply(&mut cargo, None)?;
     let output = cargo
         .args([
             "clippy",

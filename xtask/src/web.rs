@@ -79,7 +79,7 @@ pub fn build_page(build: &Build) -> Result<String, String> {
         .map_err(|e| format!("no current directory: {e}"))?
         .join(build.dist);
     let mut command = crate::priority::command("trunk")?;
-    crate::sccache::apply(&mut command)?;
+    crate::sccache::apply(&mut command, None)?;
     command
         .args(build.trunk_args())
         .arg(&dist)

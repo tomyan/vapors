@@ -203,7 +203,7 @@ fn trunk_command(trunk: &Path, crate_dir: &Path, args: &[String]) -> Result<Comm
         .to_str()
         .ok_or_else(|| format!("{} is not UTF-8", trunk.display()))?;
     let mut command = crate::priority::command(program)?;
-    crate::sccache::apply(&mut command)?;
+    crate::sccache::apply(&mut command, None)?;
     command.args(args).current_dir(crate_dir);
     Ok(command)
 }
