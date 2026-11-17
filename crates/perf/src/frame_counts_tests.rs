@@ -7,8 +7,8 @@ use vapors_renderer::WRITE_PHASE;
 
 use super::*;
 
-fn style_only<T>(value: T) -> Option<BTreeMap<String, T>> {
-    Some(BTreeMap::from([("style".to_owned(), value)]))
+fn style_only<T>(value: T) -> BTreeMap<String, T> {
+    BTreeMap::from([("style".to_owned(), value)])
 }
 
 #[test]
@@ -20,7 +20,7 @@ fn a_frame_that_entered_no_write_phase_has_one_of_zero_for_each_counter() {
     };
 
     // When
-    let counted = rise.with_phases((style_only(40), style_only(Reading::default())));
+    let counted = rise.with_phases((Some(style_only(40)), Some(style_only(Reading::default()))));
 
     // Then
     let (frame, phases) = counted.instructions.expect("instructions");
