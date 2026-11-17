@@ -147,8 +147,8 @@ pub(crate) fn render_pipeline(
     )
 }
 
-/// An entry's triangles, then the item, at stride 0.
-/// The page's buffers: [`buffers`], the item with its row and frame.
+/// The page's buffers: [`buffers`]' triangles, then the item with its
+/// row and frame, at stride 0.
 fn page_buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     let [triangles, _] = buffers();
     [
@@ -161,6 +161,8 @@ fn page_buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     ]
 }
 
+/// An entry's triangles, then the item's floats alone, at stride 0: the
+/// scene pass's item (`meshes_3d.rs`).
 pub(crate) fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     [
         Some(wgpu::VertexBufferLayout {

@@ -34,8 +34,9 @@ impl ProjectiveMeshes {
         Self(shader.build(device, layouts, formats))
     }
 
-    /// An item's bytes, as [`ProjectiveMeshes::record`] reads them: the
-    /// page's.
+    /// An item's bytes, as [`ProjectiveMeshes::record`] reads them: its
+    /// 48 bytes of floats, without the row and frame the page's item
+    /// carries.
     #[must_use]
     pub fn item_bytes(item: &MeshShape) -> Vec<u8> {
         crate::instanced::float_bytes(item.instance())

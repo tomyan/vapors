@@ -75,12 +75,22 @@ impl Drawing {
 }
 
 /// The pixels of `shape` drawn at each of `places` from item bytes made
-/// by `bytes`, through the table `setup` makes.
-fn drawn(places: &[[f32; 2]], bytes: impl Fn(&[MeshShape]) -> Vec<u8>, setup: Setup) -> Vec<u8> {
+/// by `bytes` once the table `setup` makes is made, through that table.
+fn drawn(places: &[[f32; 2]], bytes: Bytes, setup: Setup) -> Vec<u8> {
     on_square(|at, pipeline, drawing| {
         let items: Vec<_> = places.iter().map(|&place| item(place)).collect();
-        drawing.kept((at, pipeline), &bytes(&items), &mut setup(at));
+        let mut table = setup(at);
+        let bytes = bytes(&items, &table);
+        drawing.kept((at, pipeline), &bytes, &mut table);
     })
+}
+
+/// Makes a draw's item bytes, which may name the table's entries.
+type Bytes = fn(&[MeshShape], &Table) -> Vec<u8>;
+
+/// The items' bytes on the page.
+fn on_page(items: &[MeshShape], _: &Table) -> Vec<u8> {
+    MeshPipeline::bytes(items)
 }
 
 /// Makes the table a draw reads.
@@ -88,14 +98,12 @@ type Setup = fn(&Target<'_>) -> Table;
 #[test]
 fn gpu_a_kept_mesh_in_a_frame_entry_matches_the_mesh_drawn_at_the_moved_place() {
     // Given
-    let moved = drawn(&[[7.0, 9.0]], MeshPipeline::bytes, |at| {
-        table(at, [0.0; 2], &[])
-    });
+    let moved = drawn(&[[7.0, 9.0]], on_page, |at| table(at, [0.0; 2], &[]));
 
     // When: kept at 4, 4 in a frame shifted by 3, 5
     let shifted = drawn(
         &[[4.0, 4.0]],
-        |items| MeshPipeline::bytes_in(items, 1, &[]),
+        |items, table| MeshPipeline::bytes_in(items, table.frame, &[]),
         |at| table(at, [3.0, 5.0], &[]),
     );
 
@@ -111,12 +119,12 @@ fn gpu_a_kept_mesh_in_a_frame_entry_matches_the_mesh_drawn_at_the_moved_place() 
 fn gpu_kept_meshes_in_a_lanes_rows_match_the_meshes_drawn_at_their_rows_places() {
     // Given
     let places = [[4.0, 3.0], [4.0, 13.0], [4.0, 23.0]];
-    let moved = drawn(&places, MeshPipeline::bytes, |at| table(at, [0.0; 2], &[]));
+    let moved = drawn(&places, on_page, |at| table(at, [0.0; 2], &[]));
 
     // When: each kept at 4, 3, in rows 0, 2 and 1 of rows 0, 20 and 10 down
     let rowed = drawn(
         &[[4.0, 3.0]; 3],
-        |items| MeshPipeline::bytes_in(items, 1, &[0, 2, 1]),
+        |items, table| MeshPipeline::bytes_in(items, table.frame, &[0, 2, 1]),
         |at| table(at, [0.0; 2], &[[0.0, 0.0], [0.0, 20.0], [0.0, 10.0]]),
     );
 

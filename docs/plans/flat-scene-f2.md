@@ -346,3 +346,19 @@ the shape cut (F2.3b); the 128-row cap stays; `Shift` becomes
   ranges to rewrite when a batch's rows change. It is a separate change
   and needs a measurement of draws and table writes on a long lane page
   first.
+
+### After the review of F2.3a (issuecomment-6940756756)
+
+- **Rows of items that draw nothing.** A shape or mesh item whose
+  transform has no area draws nothing, and its row now goes with it:
+  `ShapeStore::closed_forms_in` and `mesh_instances` return the rows of
+  the items drawn (`shape_store.rs` `drawn_in`). Before, the rows and
+  instances disagreed and the paint panicked, which F2.3b would have
+  made reachable.
+- **The 128-row cap is tested again** (`instanced_bytes_tests.rs`: row
+  127 written, row 128 refused with its message).
+- **One one-table rule.** `TableBinding` (`table_binding.rs`) holds the
+  view slots, the identity table, the two bind groups and the table's
+  id for the instanced and mesh pipelines, so the refusal has one
+  implementation and one message.
+- `meshes_bytes.rs` holds the mesh item layout, beside its tests.

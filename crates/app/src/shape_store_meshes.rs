@@ -9,6 +9,15 @@ use vapors_shapes::{Geometry, ShapeTable};
 
 use crate::shape_store::{Registered, ShapeError, ShapeStore, check_bounds, undrawable};
 
+/// A mesh run's drawn items ([`ShapeStore::mesh_instances`]).
+pub(crate) struct MeshRun {
+    pub(crate) instances: Vec<MeshShape>,
+    /// The store's index of each instance's entry.
+    pub(crate) entries: Vec<usize>,
+    /// Each instance's row, or none for a run in one frame.
+    pub(crate) rows: Vec<u32>,
+}
+
 impl ShapeStore {
     /// The entry buffer's bytes with `table`'s meshes added.
     ///
@@ -83,9 +92,11 @@ impl ShapeStore {
         }
     }
 
-    /// `shapes`' instances for the mesh pipeline, and beside each the
-    /// store's index of its entry: the one answer to which items draw
-    /// (an item whose transform has no area is left out of both).
+    /// `shapes`' instances for the mesh pipeline, beside each the
+    /// store's index of its entry, and, for items in a lane's rows (item
+    /// `i` in row `rows[i]`, or `rows` empty), the rows of the items
+    /// drawn: the one answer to which items draw (an item whose transform
+    /// has no area is left out of all three).
     ///
     /// # Errors
     /// As [`ShapeStore::closed_forms`], for a mesh run: an item whose
@@ -93,19 +104,27 @@ impl ShapeStore {
     pub(crate) fn mesh_instances(
         &self,
         shapes: &[Shape],
-    ) -> Result<(Vec<MeshShape>, Vec<usize>), ShapeError> {
-        let (mut instances, mut entries) = (Vec::new(), Vec::new());
-        for item in shapes {
-            let registered = self.of_kind(item, ShapeKind::Mesh)?;
-            let mesh = MeshShape::new(item.transform, item.colour)
-                .map_err(|reason| undrawable(item, registered, reason))?;
-            if let Some(mesh) = mesh {
-                check_bounds(registered, None, item)?;
-                instances.push(mesh);
-                entries.push(crate::shape_store::store_index(item.shape));
-            }
-        }
-        Ok((instances, entries))
+        rows: &[u32],
+    ) -> Result<MeshRun, ShapeError> {
+        let (drawn, rows) =
+            crate::shape_store::drawn_in(shapes, rows, |item| self.mesh_instance(item))?;
+        let (instances, entries) = drawn.into_iter().unzip();
+        Ok(MeshRun {
+            instances,
+            entries,
+            rows,
+        })
+    }
+
+    /// `item`'s instance and its entry's index; `None` when its
+    /// transform has no area.
+    fn mesh_instance(&self, item: &Shape) -> Result<Option<(MeshShape, usize)>, ShapeError> {
+        let registered = self.of_kind(item, ShapeKind::Mesh)?;
+        let mesh = MeshShape::new(item.transform, item.colour)
+            .map_err(|reason| undrawable(item, registered, reason))?;
+        let Some(mesh) = mesh else { return Ok(None) };
+        check_bounds(registered, None, item)?;
+        Ok(Some((mesh, crate::shape_store::store_index(item.shape))))
     }
 
     /// The uploaded entry at each of `indices` (from

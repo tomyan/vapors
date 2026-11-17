@@ -23,7 +23,7 @@ fn an_item_whose_kind_is_not_its_entrys_is_refused_naming_both() {
         .closed_forms(&[mesh_said_closed])
         .expect_err("refused");
     let as_mesh = store
-        .mesh_instances(&[closed_said_mesh])
+        .mesh_instances(&[closed_said_mesh], &[])
         .map(|_| ())
         .expect_err("refused");
 
@@ -46,7 +46,10 @@ fn a_mesh_item_drawn_before_its_upload_is_refused_naming_its_site() {
     let mesh = item_of(0, ShapeKind::Mesh, IDENTITY);
 
     // When
-    let (_, indices) = store.mesh_instances(&[mesh]).expect("drawable");
+    let indices = store
+        .mesh_instances(&[mesh], &[])
+        .expect("drawable")
+        .entries;
     let refused = store.uploaded(&indices).expect_err("refused");
 
     // Then
@@ -102,7 +105,7 @@ fn a_mesh_items_bounds_that_miss_its_triangles_are_refused() {
 
     // When
     let refused = store
-        .mesh_instances(&[short])
+        .mesh_instances(&[short], &[])
         .map(|_| ())
         .expect_err("refused");
 

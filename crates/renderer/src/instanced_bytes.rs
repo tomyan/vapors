@@ -103,3 +103,7 @@ pub fn assert_rows(label: &str, items: usize, rows: &[u32]) {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "instanced_bytes_tests.rs"]
+mod tests;

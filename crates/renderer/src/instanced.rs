@@ -10,10 +10,8 @@
 //! encoder.
 
 use crate::frame_arena::{FrameArena, Placed};
-use crate::instanced_bytes::view_bytes;
-use crate::kept_bind_group::KeptBindGroup;
-use crate::quads_setup::{render_pipeline, table_layout};
-use crate::uniform_slots::UniformSlots;
+use crate::quads_setup::render_pipeline;
+use crate::table_binding::TableBinding;
 use crate::{KeptRange, Retained, Target, TransformTable, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
@@ -21,16 +19,7 @@ const VERTICES_PER_QUAD: u32 = 6;
 pub(crate) struct Instanced {
     label: &'static str,
     pipeline: wgpu::RenderPipeline,
-    layout: wgpu::BindGroupLayout,
-    viewports: UniformSlots<VIEW_SIZE>,
-    /// The identity alone, for draws of this frame's instances, which are
-    /// on the page (entry 0, row 0).
-    identity: TransformTable,
-    own_group: KeptBindGroup,
-    table_group: KeptBindGroup,
-    /// The id of the table kept draws bind: one table a pipeline, as one
-    /// bind group is kept for it, keyed by its generation alone.
-    table_id: Option<u64>,
+    binding: TableBinding,
     instances: FrameArena,
     kept: Retained,
     stride: u64,
@@ -55,7 +44,7 @@ impl Instanced {
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             },
         );
-        let layout = table_layout(device);
+        let binding = TableBinding::new(device, label);
         let stride = instance_bytes(vec4s) as u64;
         let attributes = attributes(vec4s);
         let instance = wgpu::VertexBufferLayout {
@@ -65,13 +54,8 @@ impl Instanced {
         };
         Self {
             label,
-            pipeline: render_pipeline(device, &layout, &shader, format, instance),
-            layout,
-            viewports: UniformSlots::new(device, label),
-            identity: TransformTable::new(device, label),
-            own_group: KeptBindGroup::NONE,
-            table_group: KeptBindGroup::NONE,
-            table_id: None,
+            pipeline: render_pipeline(device, binding.layout(), &shader, format, instance),
+            binding,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             kept: Retained::new(device, label, wgpu::BufferUsages::VERTEX),
             stride,
@@ -91,10 +75,10 @@ impl Instanced {
         let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
             return;
         };
-        let Some(viewport) = self.viewport_slot(target, 0) else {
+        let Some(viewport) = self.binding.slot(target, 0, &self.work) else {
             return;
         };
-        self.identity.prepare_counted(queue, &self.work);
+        self.binding.prepare_identity(queue, &self.work);
         self.record(
             target,
             (count, Instances::Placed(&instances)),
@@ -132,20 +116,10 @@ impl Instanced {
         (table, rows_base): Table<'_>,
     ) {
         let count = self.count(self.kept.len(kept));
-        let Some(viewport) = self.viewport_slot(target, rows_base) else {
+        let Some(viewport) = self.binding.slot(target, rows_base, &self.work) else {
             return;
         };
-        let id = *self.table_id.get_or_insert(table.id());
-        assert_eq!(
-            id,
-            table.id(),
-            "{}: a kept draw binds transform table {}, after table {id}: a pipeline draws from one \
-             table, whose bind group it keeps (instanced.rs); give each painter its own pipelines; \
-             reproduce with `cargo xtask test`",
-            self.label,
-            table.id()
-        );
-        table.prepare(target.queue);
+        self.binding.adopt(table, target.queue);
         self.record(
             target,
             (count, Instances::Kept(kept)),
@@ -163,9 +137,9 @@ impl Instanced {
         self.kept.live_bytes()
     }
 
-    /// The bind groups kept: one once this pipeline has drawn.
+    /// The bind groups kept: for the identity table and a painter's.
     pub(crate) fn bind_groups_kept(&self) -> u64 {
-        self.own_group.kept() + self.table_group.kept()
+        self.binding.kept()
     }
 
     /// How many instances `bytes` bytes hold.
@@ -176,14 +150,6 @@ impl Instanced {
                 self.label
             )
         })
-    }
-
-    /// The dynamic offset of the target's viewport and `rows_base` in the
-    /// slots.
-    fn viewport_slot(&mut self, target: &Target<'_>, rows_base: u32) -> Option<u32> {
-        let value = view_bytes(target.viewport, rows_base);
-        let (frame, queue) = (target.encoder, target.queue);
-        self.viewports.slot(frame, queue, &self.work, value)
     }
 
     /// Records the draw of `count` instances from `from`, through the
@@ -201,16 +167,7 @@ impl Instanced {
             Instances::Placed(placed) => placed.slice(),
             Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
         };
-        let (kept_group, table) = match table {
-            Some(table) => (&mut self.table_group, table),
-            None => (&mut self.own_group, &self.identity),
-        };
-        let generation = (self.viewports.generation(), table.generation());
-        let (label, layout, work) = (self.label, &self.layout, &self.work);
-        let viewports = &self.viewports;
-        let group = kept_group.of(generation, || {
-            group(target.device, (label, layout, work), (viewports, table))
-        });
+        let group = self.binding.group(target, table, &self.work);
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, group, &[viewport]);
@@ -218,30 +175,6 @@ impl Instanced {
             self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
         });
     }
-}
-
-fn group(
-    device: &wgpu::Device,
-    (label, layout, work): (&str, &wgpu::BindGroupLayout, &WorkCounter),
-    (viewports, table): (&UniformSlots<VIEW_SIZE>, &TransformTable),
-) -> wgpu::BindGroup {
-    work.create_bind_group(
-        device,
-        &wgpu::BindGroupDescriptor {
-            label: Some(label),
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: viewports.binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: table.binding(),
-                },
-            ],
-        },
-    )
 }
 
 /// The instance attributes: `vec4s` four-float ones, then the row's index
@@ -270,7 +203,7 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
-pub(crate) use crate::instanced_bytes::{VIEW_SIZE, float_bytes, instance_bytes, rowed_instances};
+pub(crate) use crate::instanced_bytes::{float_bytes, instance_bytes, rowed_instances};
 
 #[cfg(test)]
 #[path = "instanced_layout_tests.rs"]
