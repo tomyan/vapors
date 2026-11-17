@@ -12,6 +12,7 @@ mod error;
 mod naming;
 mod scene_notes;
 mod sections;
+mod shape_table;
 mod source;
 mod style_check;
 pub mod styles;

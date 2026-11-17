@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
 use crate::ast::Component;
+use crate::shape_table;
 use crate::styles::CrateSheets;
 use crate::{
     CompileError, PropsIndex, generate_checked, parse_file_global_under, parse_file_under,
@@ -49,11 +50,15 @@ pub fn compile_dir_into_styled(
     let parsed = parse_all(&tree, (root, styles), &generated, &mut errors);
     let (index, indexed) = index_all(&parsed, &mut errors);
     let (mut outputs, unchecked) = generate_all(&indexed, &index, &mut errors);
+    let table = shape_all(&indexed, &mut errors);
     if !errors.is_empty() {
         errors.sort_by(|a, b| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         return Err(errors);
     }
-    outputs.push((out.join("wisp.rs"), modules::render(&tree, root)));
+    let shapes = table.render();
+    let modules = modules::render(&tree, root, shapes.is_some());
+    outputs.push((out.join("wisp.rs"), modules));
+    outputs.extend(shapes.map(|text| (out.join("shapes.rs"), text)));
     write_all(&outputs)?;
     Ok(Compiled {
         inputs: tree.inputs(),
@@ -131,6 +136,17 @@ fn generate_all(
         }
     }
     (outputs, unchecked)
+}
+
+/// The crate's shape table; a file with a bad shape adds its refusal.
+fn shape_all(indexed: &[&Parsed], errors: &mut Vec<CompileError>) -> shape_table::Table {
+    let mut table = shape_table::Table::default();
+    for file in indexed {
+        if let Err(refused) = table.add(&file.component) {
+            errors.push(refused);
+        }
+    }
+    table
 }
 
 /// Every file under `dir`, parsed, with the path its Rust goes to and
