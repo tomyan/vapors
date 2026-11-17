@@ -45,6 +45,10 @@ fn run(spec: &Run<'_>) -> String {
         .env("HOME", spec.home.map_or(dir.clone(), PathBuf::from))
         .env_remove("GITHUB_ACTIONS")
         .env_remove("XTASK_GATE")
+        // the API builder's sandbox sets it for cargo deny, and the gate
+        // refuses to start while it is set, before the wait these tests
+        // look for (failed in a sandboxed ci run, 2026-11-17)
+        .env_remove("VAPORS_DENY_OFFLINE")
         .env_remove("GIT_DIR")
         .env_remove("GIT_WORK_TREE")
         .env_remove("GIT_INDEX_FILE");
