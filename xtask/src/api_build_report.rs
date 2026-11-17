@@ -24,11 +24,8 @@ pub fn summary(
     proxy: &Proxy,
 ) -> Result<Vec<String>, String> {
     let (dollars, unknown) = proxy.budget.spent();
-    let refused = routes
-        .refused
-        .lock()
-        .map(|log| log.join("; "))
-        .unwrap_or_default();
+    let (kept, count) = routes.refused.kept();
+    let refused = format!("{count}: {}", kept.join("; "));
     let unknown = unknown
         .map(|why| format!(" (then unknown: {why})"))
         .unwrap_or_default();

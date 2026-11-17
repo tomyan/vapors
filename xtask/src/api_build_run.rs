@@ -81,7 +81,7 @@ fn session(
     let words: Vec<&str> = command.iter().map(String::as_str).collect();
     let result = builder.root().join("result.json");
     let proxy = routes.proxy.as_ref().ok_or("the run has no proxy")?;
-    let session = sandboxed(builder, host, &words);
+    let session = sandboxed(builder, host, &words)?;
     let ended = crate::api_session::run(session, (order.brief, &result), &proxy.budget)?;
     let lines = crate::api_build_report::summary(&ended, (&result, builder), routes, proxy)?;
     Ok((lines, ended))
