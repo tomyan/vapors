@@ -378,6 +378,14 @@ the shape cut (F2.3b); the 128-row cap stays; `Shift` becomes
   rect and a path still give a quad, a shape and a mesh batch a row,
   now each naming its row. Joining them across rows means reordering
   items, which is only sound where rows do not overlap; that is F13's
-  question, not F2's. L4 asked for one batch per pipeline "on a
-  shape-per-row lane page", which this meets; the mixed page is pinned
-  at its paint-order count.
+  question, not F2's. The lead's answer to Q2 (L4, 2026-11-17) let
+  F2.3 change elements' batching for the shape cut, pinned by one batch
+  per pipeline and pixels against a fresh painter. Pages whose rows each
+  hold one kind of shape meet that pin. The mixed page is pinned at its
+  paint-order count, which the lead accepted as F13's (L16,
+  2026-11-17: "Leaving the 3 batches a row with F13 is right"). Its
+  table writes per insert are unmeasured.
+- **The fresh painter is not an independent check here.** A page built
+  with the insert already made is lane-framed on its first layout, so
+  it draws through the same rows; the GPU test pins each rect at its
+  row's known place instead.

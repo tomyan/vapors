@@ -80,8 +80,8 @@ fn add_row(
     }
 }
 
-/// For each batch drawn at `view`: its run's kind, and how many rows of
-/// a lane its items name (0 for a batch in one frame).
+/// For each batch drawn at `view`: its run's kind, and how many
+/// distinct rows of a lane its items name (0 for a batch in one frame).
 fn batches(doc: &Rc<RefCell<Document>>, view: Viewport) -> Vec<(&'static str, usize)> {
     let mut doc = doc.borrow_mut();
     let painted = doc.update(view).expect("updates");
@@ -89,8 +89,8 @@ fn batches(doc: &Rc<RefCell<Document>>, view: Viewport) -> Vec<(&'static str, us
     let kept = painted.kept_batches(rect).clone();
     let kinds = kept.batched.batches.iter().map(|batch| kind(&batch.run));
     let rows = kept.rows.iter().map(|rows| {
-        let items = rows.items();
-        items.iter().max().map_or(0, |&most| most as usize + 1)
+        let named: std::collections::BTreeSet<_> = rows.items().iter().collect();
+        named.len()
     });
     kinds.zip(rows).collect()
 }

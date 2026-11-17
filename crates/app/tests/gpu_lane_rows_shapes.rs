@@ -3,12 +3,12 @@
 //! F2.3b): each item names its row, placed by its row's entry in the
 //! transform table, so after a row is put in at the top every row's rect
 //! (a closed form) and triangle (a mesh) are where the insert puts the
-//! row (scale 2); and rows each holding a rect are one shape draw, drawn
-//! as a fresh painter draws a page built with the insert already made.
+//! row (scale 2); and rows each holding a rect are one shape draw, each
+//! rect at its row's place.
 
 use crate::support_surface as support;
 
-use support::{BLUE, RED, Rig, document, pixel, update};
+use support::{BLUE, RED, Rig, WHITE, document, pixel, update};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 
@@ -110,7 +110,7 @@ fn gpu_shape_rows_put_after_an_insert_draw_each_at_its_rows_offset() {
 }
 
 #[test]
-fn gpu_a_rect_in_each_row_put_after_an_insert_is_one_shape_draw_as_a_fresh_painter_draws_it() {
+fn gpu_a_rect_in_each_row_put_after_an_insert_is_one_shape_draw_at_its_rows_place() {
     // Given: 40 rows, each a rect, drawn once
     let mut doc = rows_of(|at| (colours(at).0, None));
     let mut rig = Rig::new();
@@ -122,19 +122,18 @@ fn gpu_a_rect_in_each_row_put_after_an_insert_is_one_shape_draw_as_a_fresh_paint
     update(&mut doc, SCALE);
     let kept = rig.draw(&doc).expect("paints");
 
-    // Then: the rects of the rows in view are one draw, and the pixels
-    // are a fresh painter's of a page built with the row already first (a
-    // painter takes a document's shapes as they change, so a fresh one
-    // draws a fresh document)
+    // Then: the lane is framed and its rects are one draw; each row's rect
+    // fills device x 0 to 4 of its 8 px row (the new blue row, then red
+    // and blue in turn) and the page's white is right of it
+    let counts = doc.update_counts();
+    assert!(counts.lanes_framed > 0, "{counts:?}");
     let shapes = rig.painter.frame_counts().shapes;
     assert_eq!(shapes.draw_calls, 1, "{shapes:?}");
-    let mut built = document(CSS, &[]);
-    add_row(&mut built, ("blue", None), None);
-    for at in 0..40 {
-        add_row(&mut built, (colours(at).0, None), None);
-    }
-    update(&mut built, SCALE);
-    let fresh = Rig::new().draw(&built).expect("paints");
-    assert!(kept.contains(&255), "the rects drew nothing");
-    assert!(kept == fresh, "the rects differ from a fresh draw");
+    let drawn: Vec<_> = (0..4)
+        .map(|row| (pixel(&kept, 1, row * 8 + 4), pixel(&kept, 6, row * 8 + 4)))
+        .collect();
+    assert_eq!(
+        drawn,
+        [(BLUE, WHITE), (RED, WHITE), (BLUE, WHITE), (RED, WHITE)]
+    );
 }
