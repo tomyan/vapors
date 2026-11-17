@@ -621,8 +621,9 @@ The rule, one for every transform a frame's mapping is made from (CSS
   `Affine` if w is 1 over the extent, and `Projective` if not.
 - **What it is not applied to.** Shifts made by scrolling and by lane
   frames are not classified. They are made whole by construction
-  (`scroll::frame_shift`, `lane_child_at`), and F1's check asserts that
-  they are exactly whole (`frames.rs` `assert_whole_shift`). The
+  (`scroll::frame_shift`, `lane_child_at`, and from F2s the sticky
+  offset), and F1's check asserts that they are exactly whole
+  (`frames.rs` `assert_whole_shift`). The
   tolerance applies only to transforms an author or a scene gives.
 - **Scale factors.** The rule is in device pixels, so the class of a
   translation depends on the scale factor: `translate(10px, 0)` is
@@ -850,13 +851,13 @@ count that shows a miss:
 | W3 | `Grid` | a CSS grid of 50 x 60 cells (the `grid` feature) | one cell's text | grid is declined by the lane; the extents index with items whose paint order is row-major | `--scaling` over 1,000, 3,000, 10,000 cells: every phase flat for an edit | `lanes_declined` reason `Grid` |
 | W4 | `SmallScrollers` | 3,000 code blocks, each `overflow: auto`, in a page scroller | the page scrolled one block | `iu4.md` PR 5's open M2: every frame searched on every sort, O(frames · log steps) | `--scaling` over 300, 1,000, 3,000 blocks: `draw` flat | `frames_searched` per draw (should be the frames whose clip is a candidate) |
 | W5 | `MixedText` | a transcript: paragraphs of 20 to 400 words, three families, bold and code spans, 3,000 paragraphs | one paragraph's text | text runs of many sizes and ink extents: the tall-step list in the index; the atlas under many glyphs; the text cache by content (T1) | `--scaling`: `layout` and `draw` flat | `tall_steps_tested` per draw; `rasterisations` per frame after warmup (0) |
-| W6 | `Positioned` | the rows page with every 7th row `position: relative; z-index: 1`, an absolutely positioned box and a fixed footer (`sticky` is refused, so no sticky header) | a Class edit on a positioned row; a plain row inserted; a positioned row inserted | paint order that is not tree order: the splice declines (`InsertedStacked`, `FreedStacked`) and walks | `--scaling PositionedClass` judged every phase (flat); `PositionedInsert` reported until splice-layout 3b and `PositionedStackedInsert` until splice D, each then judged as Insert (`docs/perf/w6-positioned-2026-11-17.md`) | `splices_declined` reason; `order_walks` (the `scaling-splices` line) |
+| W6 | `Positioned` | the rows page with every 7th row `position: relative; z-index: 1`, an absolutely positioned box and a fixed footer (`sticky` is refused until F2s, which adds a sticky header and sticky section headers to this page) | a Class edit on a positioned row; a plain row inserted; a positioned row inserted | paint order that is not tree order: the splice declines (`InsertedStacked`, `FreedStacked`) and walks | `--scaling PositionedClass` judged every phase (flat); `PositionedInsert` reported until splice-layout 3b and `PositionedStackedInsert` until splice D, each then judged as Insert (`docs/perf/w6-positioned-2026-11-17.md`) | `splices_declined` reason; `order_walks` (the `scaling-splices` line) |
 | W7 | `Translate` | a card of text and a button under `transform: translate(x, 0)` | x advances 0.37 px per frame for 60 frames, rests 10, repeats | the transform class at run time, regime B, the settle, the table write | pinned: `parts_reclassed` 2 per cycle, `uniform_writes` or table writes 1 per moving frame, `batches_written` 0 while moving; the centroid rule (4.5) | `parts_reclassed`, `rasterisations` (0 while moving) |
 | W8 | `ScaleAnim` | the same card under `scale(s)` | s from 1.0 to 1.37 over 60 frames, rests, back | regime B under scale, re-raster at settle only | pinned: `rasterisations` 0 while moving, one set at each settle | `rasterisations`, `parts_reclassed` |
 | W9 | `Icons` | 1,000 of touche's ten icons in a grid | one icon's colour class | the shape table and the shapes pipeline (one-scene S3a1 onward); before them, the icon route | `--scaling` over 100, 1,000, 10,000 icons: an edit flat; mount time per icon reported | `shapes_tessellated` 0 per frame; `shape_bytes_uploaded` 0 idle |
 | W10 | `RoundedClips` | the rows page in a scroller with `border-radius: 12px; overflow: hidden`, nested in a rounded card | Scroll | clips as data (2.3): the chain walk, the scissor bound | Scroll's `draw` equal to the plain scroller's within noise; `GpuTimer` difference recorded | `clip_depth_max` |
 | W11 | `SceneWithHtml` | the one-scene racer page with 50 HTML labels | the racer's scripted driver | the one-pass design: 3D range, depth slice, HTML over it; later labels inside the scene (F9) | one-scene P0's judge: no frame over 16.7 ms | `passes` per frame (1), `scene_contexts`, `depth_slices` |
-| W12 | `MixedPage` | a documentation page: a sidebar scroller, a main scroller of mixed text with icons and images, a sticky header, a rounded modal with a shadow, one small scene | Scroll of the main scroller; a Class edit | everything at once: whether the batcher, the index and the tables hold together on an ordinary page | `--scaling` over 1x, 3x, 10x content: edit and scroll flat | the union of the counts above |
+| W12 | `MixedPage` | a documentation page: a sidebar scroller, a main scroller of mixed text with icons and images, a sticky header (so W12 follows F2s), a rounded modal with a shadow, one small scene | Scroll of the main scroller; a Class edit | everything at once: whether the batcher, the index and the tables hold together on an ordinary page | `--scaling` over 1x, 3x, 10x content: edit and scroll flat | the union of the counts above |
 
 Rules for the rows: each is one PR under 400 lines including its page,
 built from the elements tests' page builders as `rows_list.rs` is, so
@@ -992,6 +993,7 @@ content enters the list.
 |---|---|---|---|---|
 | F1 | Transform class on frames | `TransformClass` in `vapors-scene`; each frame (`frames.rs`) carries `WholeTranslate`; paint takes `snap` from its frame's class (always true at this head; another class panics naming F4a); debug assertions that a `WholeTranslate` frame's shift is whole and that every snapped item under one is whole (`whole_item`). Design: `flat-scene-f1.md` | Pixels unchanged on every fixture; the assertions proven by breaking (a fractional shift panics naming the frame) | none |
 | F2 | The transform table | A `Retained` storage buffer of 4x4 entries; a `u32` index per instance in the quad, shadow, text and image layouts; the shaders read the table; `Shift` and the dynamic-offset slots retired for the painter (touche's immediate path untouched); a page-contract case that reads the table on SwiftShader; the Pixel 9 Pro checked by hand and recorded in `docs/web.md` | Scroll at 3,000 rows: writes equal to 4c's (one entry per scrolled frame); Idle 0; `kept_bytes` debug compare extended to the index; pixels unchanged; a device without vertex-stage storage buffers refused naming the limit (unit test with a faked limit) | F1 |
+| F2s | `position: sticky` | The refusal in `style/position.rs` removed (here, not before). Its text says "a slice after F2c" today, meaning `docs/F2c.md`; until F2s removes it, it names flat-scene F2s instead, changed with `tests/positioned.rs`'s expected text in the first code PR that touches it. Its tests change with it: `tests/positioned.rs` `sticky_is_refused_naming_where_it_comes` becomes a test that sticky is accepted, and `tests/used_sharing.rs` takes another refused value as its example. A sticky box is laid out in flow, as `position: relative` with no offset, and is a frame of its own: a child of its nearest scroll container's frame, with its own transform entry. The entry is the scroll container's shift plus the sticky offset: the shift that keeps the box inside the scrollport less its `top`, `bottom`, `left` and `right` insets, clamped so the box never leaves its containing block, worked out in CSS px and rounded `half_up` in device pixels so the frame stays `WholeTranslate` (the working assumption, pending question 2's corpus case at 1.5x). F1's `assert_whole_shift` and section 4.3's list of shifts made whole by construction gain the sticky shift. Each scroll container keeps its sticky frames in an index by their containing block's extent along the scroll axis; a scroll visits the frames whose containing block meets the scrollport, O(log n) plus the frames that show, and writes their entries with the scroll frame's: no layout, no paint, no batch written. A layout change that moves a sticky box or its containing block, resizes the scrollport, or changes a bound inset rewrites the entries of the sticky frames under the containers it changed. A counter of sticky entries written, named in F2s's PR and added with the code that increments it, is what `--scaling` reads. Hit testing places the box at its stuck position (its frame's offset), and so do the a11y bounds. Like `fixed`, `sticky` makes a stacking context, which paint order takes (`paint_order`). W6's page gains a sticky header and sticky section headers; its numbers are taken again and `docs/perf/w6-positioned-2026-11-17.md`'s kept for comparison | Chromium corpus cases pass the paint rules: a sticky header in a scroll container; sticky headers in list sections, each pushed off by the next; `top`, `bottom`, `left` and `right` insets; a sticky box in a scroll container nested in another; a row inserted in a section whose header is stuck. A sticky box with `z-index: auto` paints over a later in-flow sibling (paint test). `--scaling` on W6's page with sticky added: a scroll writes table entries O(sticky frames that show), not O(rows), judged flat by the counter above; `batches_written` 0 on a scroll. The a11y bounds of a stuck box are its stuck position (`ax_oracle`). `elementFromPoint` on a stuck box hits it there (events oracle). Each check is proven by breaking it (a stuck offset not written on scroll fails the corpus case and the hit test) | flat-scene F2 (F2.1 to F2.3) |
 | F3 | Clips as data | The clip table (rect and rounded rect, parent index); a `u32` clip index per instance; `clip.wgsl` shared by every pipeline; the scissor as the batch's bound; batches joined across frames and clips; `overflow: hidden` with `border-radius` and a rounded clip on a `gpu-surface` ancestor no longer refused. Design: `flat-scene-f3.md` | A Chromium fixture of a rounded scroller holding text, an image and a shadow at 1x and 2x passes the paint rules; W10 added; W1 and W4 added with before/after batch counts; the `MAX_CLIP_CHAIN` refusal proven by breaking | F2 |
 | F4a | Boxes under an affine transform | CSS `transform: translate | scale` on elements accepted (the `Deferred` entry retired for those functions); a transformed element is a transform node with class from its matrix; items built unsnapped under `Affine`; `fwidth` scaling in `quads.wgsl` and `shadows.wgsl`; hit testing through the inverse; text under an `Affine` node refused naming F5; a static transform's class folded into the key (3.1 form 3) | Chromium fixtures at rest: a card at `translate(10.5px, 3.25px)` and at `scale(1.37)` pass the paint rules at 1x and 2x; `elementFromPoint` agrees on a click through the transform (events oracle); W7's page mounts (text replaced by boxes until F5). Snapping is kept wherever the frame's mapping is a whole translation within section 4.3's tolerance (Tom, 2026-11-17, through the lead, paraphrased): (1) the class comes from the actual matrix by 4.3's rule, at 1x, 1.5x and 2x: `transform_none_is_whole_translate`, `scale_one_is_whole_translate`, `translate_ten_px_is_whole_translate_at_each_scale` (10, 15 and 20 device px), and `translate_one_px_at_one_and_a_half_is_affine` (1.5 device px, unsnapped); (2) `a_transform_back_to_a_whole_translation_snaps_again`. Each check is proven by breaking it. The class change on the way back is F4b's to count (`parts_reclassed`), and the perspective panel is F11's | F3; build-time-styles B1 for the key's class |
 | F4b | Animating transforms | A bound custom property read by `transform` as the run-time source; the animating state (4.3): class held through the motion, `SETTLE_FRAMES` declared with its reason, `UpdateCounts::parts_reclassed` (added here, with the code that increments it) at start and settle only; the table entry rewritten per frame | W7 (boxes): `parts_reclassed` 2 per cycle, `batches_written` 0 while moving, table writes 1 per moving frame; the centroid rule against an exact-coverage reference; a snap mid-motion proven to fail it by breaking (class recomputed per frame); `crossing_the_whole_translation_boundary_reclasses_once`: a transform that crosses 4.3's tolerance repaints the frame's parts once, `parts_reclassed` 1 (the pop F4a's return to a whole translation and F11's panel show) | F4a |
@@ -1006,12 +1008,39 @@ content enters the list.
 | F13 | Opaque reordering | Order-as-depth for opaque 2D primitives (Graphite's and WebRender's rule) if W12's profile shows pipeline switches over a stated share of draw; opaque front to back with depth write, blended back to front | Only on that measurement; `draw` on W12 down by the predicted share; pixels unchanged | F8, W12 |
 | W1 to W12 | Workloads | As section 6; one PR each, placed with the slice that lets the page mount | Each with first numbers in `docs/perf/` | per row |
 
-Critical path: F1, F2, F3 (useful alone: fewer binds, rounded clips),
-then F4a, F4b, F5 (transforms on HTML with crisp text at rest), then
-F7 and F8 (one pass with the scene), then F6, F9, F10, F11, F12. F13
-only on a number. Workloads W6 (its own pull request after F1), W1, W4, W10 (F3), W7 (F4a), W8
-(F5), W9 (one-scene S3a1), W11 (F8), W2, W3, W5, W12 (any time after
+Critical path (Tom, 2026-11-17, reordered for property 9): F1, F2
+(F2.1 to F2.3), F3 (useful alone: fewer binds, rounded clips; F2s,
+sticky, any time after F2.1 to F2.3); then F7, F8 and F9, and property
+9's run (W11 and the 60 s scene); then F4a, F4b, F5 (transforms on HTML
+with crisp text at rest), F6, F10, F11 and F12. F13 only on a number.
+The reason: property 9's test scene has untransformed HTML on top, so
+it does not need F4a to F5. Workloads W6 (its own pull request after F1), W1, W4, W10 (F3), W7 (F4a), W8
+(F5), W9 (one-scene S3a1), W11 (F8), W12 (after F2s, for its sticky
+header), W2, W3, W5 (any time after
 F1) carry the measurements.
+
+Questions for F2s (open):
+
+- Does a sticky box whose nearest scroll container is the document
+  (no scrolling ancestor element) stick to the page's frame? vapors'
+  pages scroll inside elements today; whether the document itself
+  scrolls decides whether F2s needs a page-level scroll frame. Answered
+  by reading the platform shell's scrolling before F2s starts, and by
+  a corpus case if the document scrolls.
+- Does Chromium round the stuck offset to device pixels at a
+  fractional scale? If not, a stuck box at 1.5x is `Affine` and
+  unsnapped (F4a's path), which F2s does not build. A corpus case at
+  1.5x answers it before the slice starts.
+- A sticky section header inside a lane row (`splice-layout.md` 5.4):
+  is its frame a child of the row's frame or of the scroll frame? The
+  clamp reads the section's rect, which a lane row places; the answer
+  decides whether F2s touches the lane's frame shifts, which section 7
+  says not to polish before F2 retires them. Answered from the frame
+  tree F2.1 to F2.3 leave, in F2s's design note.
+- Does a sticky box whose containing block is a scroll container's
+  direct content, with `overflow: hidden` between them, follow
+  Chromium's rule (the nearest ancestor with a scrolling box, hidden
+  included)? The corpus records Chromium's answer.
 
 ## 9. Decisions for Tom
 
