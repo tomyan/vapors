@@ -350,9 +350,11 @@ Each check is proven by a break.
 
 ## As built: F3.1b, text and icons on the clip table (1 of 3)
 
-- **The split (F2 to the lead).** F3.1b in three PRs: text and icons;
-  images and surfaces; meshes, with the scissor path and
-  `assert_agrees` retired.
+- **The split (F2 to the lead; order, L63).** F3.1b in three PRs: text
+  and icons; images and surfaces; then meshes, with the scissor path
+  and `assert_agrees` retired. The third waits for lane3's F8b, which
+  reworks the mesh pipeline for scene meshes: two builders on it at
+  once would conflict.
 - **Text.** Each text vertex carries its clip's entry beside its row and
   frame (44 bytes, was 40). `text.wgsl` is concatenated with
   `clip.wgsl`, which now takes the table's binding and the draw's first
@@ -365,7 +367,9 @@ Each check is proven by a break.
   join across clips, and their scissor is the frame's clip only.
 - **Counts.** The rows page's idle frame: 35 text draws to 18 (each
   value's text joins its row's label and the button text before it),
-  52 draws to 35; its 17 button quads keep the text runs apart.
+  52 draws to 35; its 17 button quads keep the text runs apart. Joining
+  across those quads is a question of paint order, not of clips: it is
+  F3.3's and F13's (the lead, L66), not F3.1b's.
   The counter demo's kept bytes and the kept-text bytes grew by 4 a
   vertex.
 - **Pixels.** `gpu_text_clip_edge.rs`: text through a clip edge at 1x

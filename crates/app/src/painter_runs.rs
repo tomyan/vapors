@@ -56,10 +56,12 @@ impl ScenePainter {
         Ok(())
     }
 
-    /// The scissor batch `batch` is drawn under: for quads,
-    /// shadows and shapes, only the frame's clip, their own clip coming
-    /// from the clip table as coverage (flat-scene F3.1); for the rest,
-    /// `batch_scissor`, the batch's clip on the page, as before, until F3.1b.
+    /// The scissor batch `batch` is drawn under: for the runs on the
+    /// clip table (quads, shadows, shapes, text and icons), only the
+    /// frame's clip, their own clips coming from the table as coverage
+    /// (flat-scene F3.1, F3.1b); for images, surfaces and meshes,
+    /// `batch_scissor`, the batch's clip on the page, until the rest of
+    /// F3.1b moves them onto the table.
     fn scissor<'t>(
         (target, batch_scissor): (&Target<'t>, &Target<'t>),
         batch: &vapors_scene::Batch,

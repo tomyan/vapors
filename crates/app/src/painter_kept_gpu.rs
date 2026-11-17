@@ -188,10 +188,10 @@ impl KeptGpu {
     /// written with (flat-scene-f3.md item 11). Undrawn batches are
     /// released first, and a drawn one holds its entries, so none does.
     pub(super) fn assert_none_names_clip(&self, freed: &[u32]) {
-        let instanced = self.entries.iter().find_map(|(key, gpu)| {
-            let entry = gpu.clips.iter().find(|(_, entry)| freed.contains(entry))?;
-            Some((key, entry.1))
-        });
+        let instanced = self
+            .entries
+            .iter()
+            .find_map(|(key, gpu)| Some((key, freed_entry(&gpu.clips, freed)?)));
         let texts = || {
             self.texts
                 .iter()
@@ -214,6 +214,16 @@ impl KeptGpu {
     }
 }
 
+/// The first of the clip entries `clips` (runs `(first item, entry)`)
+/// names that is in `freed`: what a kept batch's bytes would read after
+/// the entry was given back.
+pub(super) fn freed_entry(clips: &[(u32, u32)], freed: &[u32]) -> Option<u32> {
+    clips
+        .iter()
+        .map(|&(_, entry)| entry)
+        .find(|entry| freed.contains(entry))
+}
+
 impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
@@ -229,3 +239,7 @@ impl Gpu {
         let _ = (run, frame, rows, at, shapes); // only the debug build's compare uses them
     }
 }
+
+#[cfg(test)]
+#[path = "painter_kept_gpu_tests.rs"]
+mod tests;

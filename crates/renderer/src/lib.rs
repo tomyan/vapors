@@ -72,7 +72,7 @@ pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
 pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
-pub use instanced_bytes::{ClipRuns, assert_rows, clip_of};
+pub use instanced_bytes::{ClipRuns, assert_clip_runs, assert_rows, clip_of};
 pub use kept_bind_group::{Generations, KeptBindGroup};
 pub use kept_range::KeptRange;
 pub use mesh_entries::{MeshEntries, MeshEntry, mesh_entry_bytes};

@@ -17,8 +17,8 @@ pub(super) type TableEntries = (u32, Vec<(u32, u32)>, u32);
 impl ScenePainter {
     /// A run's frame's entry in the transform table, set to its shift;
     /// its items' clip entries as runs `(first item, entry)` (entry 0 for
-    /// none, and for the runs still under the scissor until F3.1b:
-    /// `painter_clips.rs`); and the first of its lane part's rows'
+    /// none, and for images, surfaces and meshes, still under the
+    /// scissor: `painter_clips.rs`); and the first of its lane part's rows'
     /// entries (0 for a batch in one frame). `None` when a table could not
     /// grow (the refusal is on the target's encoder).
     pub(super) fn table_entries(

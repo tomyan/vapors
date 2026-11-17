@@ -1,8 +1,9 @@
 //! GPU tier: the draw calls of the rows page's idle frame, pinned. Each
 //! row paints its label's text, its value's text under the value's
 //! clip, its button's quad and its button's text; consecutive texts are
-//! one run and one draw, each naming its clip (flat-scene F3.1b). Only the rows in view are
-//! drawn: the rest are culled, so the draws do not grow with the rows.
+//! one run and one draw, each naming its clip (flat-scene F3.1b). Only
+//! the rows in view are drawn: the rest are culled, so the draws do not
+//! grow with the rows.
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::gpu_time::FEATURES;

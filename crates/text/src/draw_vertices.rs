@@ -24,8 +24,9 @@ pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
 /// # Panics
 ///
 /// When the floats are not whole vertices, the draws' vertices are not
-/// the floats', or `rows` is neither empty nor one row a draw inside the
-/// table (`vapors_renderer::assert_rows`).
+/// the floats', `rows` is neither empty nor one row a draw inside the
+/// table (`vapors_renderer::assert_rows`), or `clips` is not runs from
+/// draw 0 rising inside the draws (`vapors_renderer::assert_clip_runs`).
 pub(crate) fn rowed_vertex_bytes(
     floats: &[f32],
     (vertices, (frame, clips), rows): (&[usize], (u32, ClipRuns<'_>), &[u32]),
@@ -45,6 +46,7 @@ pub(crate) fn rowed_vertex_bytes(
          test`"
     );
     vapors_renderer::assert_rows("text", vertices.len(), rows);
+    vapors_renderer::assert_clip_runs("text", vertices.len(), clips);
     let mut chunks = floats.chunks(FLOATS_PER_VERTEX);
     let mut bytes = Vec::new();
     for (at, &count) in vertices.iter().enumerate() {

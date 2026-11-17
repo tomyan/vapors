@@ -24,3 +24,14 @@ fn each_vertex_carries_its_row_then_its_frames_entry_then_its_clips() {
     assert_eq!(bytes[floats + 4..floats + 8], 7u32.to_le_bytes());
     assert_eq!(bytes[floats + 8..floats + 12], 9u32.to_le_bytes());
 }
+
+#[test]
+#[should_panic(
+    expected = "text: clip runs [(1, 7)] for 2 items: the first run must start at item 0"
+)]
+fn clip_runs_that_leave_the_first_draw_out_are_refused() {
+    rowed_vertex_bytes(
+        &[0.0; 2 * FLOATS_PER_VERTEX],
+        (&[1, 1], (0, &[(1, 7)]), &[]),
+    );
+}

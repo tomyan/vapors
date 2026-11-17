@@ -6,8 +6,9 @@
 //! a frame entry that moved is followed (item 4); kept while drawn and
 //! given back after a frame that does not draw it, before the frame
 //! entries are (item 2's order). A batch joined across clips (step 2)
-//! names an entry for each run of its items under one clip; text and
-//! image batches keep the scissor until F3.1b moves them onto the table,
+//! names an entry for each run of its items under one clip. Text and
+//! icons are on the table too (F3.1b, part 1); image, surface and mesh
+//! batches keep the scissor until the rest of F3.1b moves them onto it,
 //! which retires the agreement check below. A clip's edges are whole
 //! device pixels until F4a (`assert_whole`).
 
@@ -155,7 +156,8 @@ pub(super) fn assert_whole(clip: Rect) {
 
 /// Panics when the clip shader (`shader_rect`) and the scissor path
 /// would put a clip in different places on the page: the scissor path
-/// (text and images until F3.1b) moves the batch's own `clip` by the
+/// (images, surfaces and meshes until F3.1b's last part) moves the
+/// batch's own `clip` by the
 /// frame's shift and cuts it to the frame's clip (`FrameDraw::on_page`).
 /// Every build: two table reads per clipped batch drawn. F3.1b retires
 /// it with the scissor path.

@@ -6,9 +6,7 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::{ClipTable, KeptRange, TransformTable};
-
-use vapors_renderer::ClipRuns;
+use vapors_renderer::{ClipRuns, ClipTable, KeptRange, TransformTable};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
@@ -138,8 +136,7 @@ impl TextPipeline {
     /// (their glyphs may have moved: build them again), if `kept` was
     /// kept by another pipeline, if `table` is not the table this
     /// pipeline's kept draws bind (one table a pipeline), likewise
-    /// `clips`, or as
-    /// [`TextPipeline::draw`] for the atlas.
+    /// `clips`, or as [`TextPipeline::draw`] for the atlas.
     pub fn draw_kept(
         &mut self,
         target: &RenderTarget<'_>,

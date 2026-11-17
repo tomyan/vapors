@@ -173,10 +173,7 @@ impl TextGpu {
 
     /// The clip entry the bytes name that is in `freed`, if any.
     pub(super) fn names_clip(&self, freed: &[u32]) -> Option<u32> {
-        self.clips
-            .iter()
-            .map(|&(_, entry)| entry)
-            .find(|entry| freed.contains(entry))
+        super::freed_entry(&self.clips, freed)
     }
 
     /// The bytes held in the kept buffer.
