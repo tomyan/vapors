@@ -19,7 +19,18 @@ pub fn host(objects: PathBuf) -> Result<Host, String> {
         claude: claude()?,
         objects,
         render_nodes: render_nodes(Path::new("/dev/dri"))?,
+        advisories: advisories()?,
     })
+}
+
+/// The advisory databases cargo deny has fetched on the host
+/// (`~/.cargo/advisory-dbs/advisory-db-*`), for the sandbox to bind.
+///
+/// # Errors
+///
+/// The directory there but not read.
+pub fn advisories() -> Result<Vec<PathBuf>, String> {
+    named(&home()?.join(".cargo/advisory-dbs"), "advisory-db-")
 }
 
 /// The render nodes in `dri`; none when it does not exist, as on a
@@ -29,22 +40,32 @@ pub fn host(objects: PathBuf) -> Result<Host, String> {
 ///
 /// `dri` there but not read.
 pub fn render_nodes(dri: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = match std::fs::read_dir(dri) {
+    named(dri, "renderD")
+}
+
+/// The entries of `dir` whose names start with `prefix`, sorted; none
+/// when `dir` does not exist.
+///
+/// # Errors
+///
+/// `dir` there but not read.
+pub fn named(dir: &Path, prefix: &str) -> Result<Vec<PathBuf>, String> {
+    let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(format!("reading {}: {e}", dri.display())),
+        Err(e) => return Err(format!("reading {}: {e}", dir.display())),
     };
-    let render = |path: &PathBuf| {
+    let wanted = |path: &PathBuf| {
         path.file_name()
-            .is_some_and(|name| name.to_string_lossy().starts_with("renderD"))
+            .is_some_and(|name| name.to_string_lossy().starts_with(prefix))
     };
-    let mut nodes: Vec<PathBuf> = entries
+    let mut found: Vec<PathBuf> = entries
         .flatten()
         .map(|entry| entry.path())
-        .filter(render)
+        .filter(wanted)
         .collect();
-    nodes.sort();
-    Ok(nodes)
+    found.sort();
+    Ok(found)
 }
 
 /// The CLI's binary, its symlinks resolved.

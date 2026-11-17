@@ -47,6 +47,12 @@ pub struct Host {
     /// The GPU render nodes (`/dev/dri/renderD*`), bound for the GPU
     /// tier; the card nodes, which can drive displays, are not.
     pub render_nodes: Vec<PathBuf>,
+    /// The advisory databases cargo deny fetched on the host, each bound
+    /// read-only into the sandbox's cargo home, where `cargo deny
+    /// --offline` reads them (`VAPORS_DENY_OFFLINE`): the sandbox has no
+    /// network to fetch them. Only the databases are read-only; their
+    /// lock file is the cargo home's.
+    pub advisories: Vec<PathBuf>,
 }
 
 /// bwrap's arguments for `builder` on `host`, the relay on `port`,
@@ -105,6 +111,11 @@ fn home(builder: &Builder, host: &Host) -> Vec<String> {
     }
     for writable in writable(builder) {
         args.extend(bind("--bind", &writable, &writable));
+    }
+    for database in &host.advisories {
+        let name = database.file_name().unwrap_or_default();
+        let inside = builder.cargo_home().join("advisory-dbs").join(name);
+        args.extend(bind("--ro-bind", database, &inside));
     }
     let registry = builder.cargo_home().join("registry");
     args.extend(bind(
@@ -188,6 +199,10 @@ fn environment(builder: &Builder, port: u16) -> Vec<String> {
         ("SCCACHE_DIR", text(&builder.sandbox_sccache())),
         ("ANTHROPIC_BASE_URL", format!("http://127.0.0.1:{port}")),
         ("ANTHROPIC_API_KEY", DUMMY_KEY.into()),
+        // steps.rs's DENY_OFFLINE (#486, on #481's stack): the ci inside
+        // runs main's xtask, which reads it; this names it literally until
+        // both stacks are on main, when it becomes that constant
+        ("VAPORS_DENY_OFFLINE", "1".into()),
         // ask_lead waits up to 31 minutes (api_mcp_inner.rs); the CLI's
         // MCP tool timeout must outlast it
         ("MCP_TOOL_TIMEOUT", (35 * 60 * 1000).to_string()),
