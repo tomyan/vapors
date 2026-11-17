@@ -39,11 +39,15 @@ pub enum RowChange {
     /// `Insert` on the positioned rows page: a plain row put in before
     /// the middle row, then removed.
     PositionedInsert,
+    /// A positioned row put in before the middle row of the positioned
+    /// rows page, then removed: the splice declines for its stacking
+    /// (`InsertedStacked`, then `FreedStacked`) and paint order is walked.
+    PositionedStackedInsert,
 }
 
 impl RowChange {
     /// Every change, in the order the harness lists them.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Idle,
         Self::Text,
         Self::FlexText,
@@ -56,6 +60,7 @@ impl RowChange {
         Self::ScrollSize,
         Self::PositionedClass,
         Self::PositionedInsert,
+        Self::PositionedStackedInsert,
     ];
 
     /// The change `name` spells, as `{:?}` prints it.
@@ -76,7 +81,10 @@ impl RowChange {
     #[must_use]
     pub fn frame_kinds(self) -> &'static [&'static str] {
         match self {
-            Self::Insert | Self::FlexInsert | Self::PositionedInsert => &["insert", "remove"],
+            Self::Insert
+            | Self::FlexInsert
+            | Self::PositionedInsert
+            | Self::PositionedStackedInsert => &["insert", "remove"],
             Self::Resize => &["taller", "shorter"],
             Self::ScrollSize => &["longer label", "shorter label"],
             Self::Class | Self::HoveredClass | Self::PositionedClass => &["add", "remove"],

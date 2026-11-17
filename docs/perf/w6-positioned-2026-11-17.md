@@ -1,76 +1,118 @@
 # W6, the positioned rows page: first numbers (2026-11-17)
 
 W6 is a workload from `docs/plans/flat-scene.md` section 6. It runs on
-the rows page with every seventh row
-`position: relative; z-index: 1` and a fixed footer, so paint order is
-not tree order. The page is the elements tests'
-`support/positioned_rows.rs`; `crates/elements/tests/positioned_rows.rs`
-checks its edits against a full update, and pins that its positioned
-rows are stacked. Two `--scaling` changes run on it:
+the rows page with these additions, so paint order is not tree order:
+
+- every seventh row `position: relative; z-index: 1`;
+- an absolutely positioned box;
+- a fixed footer.
+
+`position: sticky` is refused by vapors (`style/position.rs`), so the
+page has no sticky header.
+
+The page is the elements tests' `support/positioned_rows.rs`, and
+`crates/elements/tests/positioned_rows.rs` checks it. Three `--scaling`
+changes run on it:
 
 - `PositionedClass`: the `marked` class toggled on the positioned row
   at or before the middle row, as `Class` does on the plain page.
 - `PositionedInsert`: a plain row inserted before the middle row, then
   removed, as `Insert` does.
+- `PositionedStackedInsert`: a positioned row inserted before the
+  middle row, then removed. Its splice declines for the row's stacking
+  (`InsertedStacked`, then `FreedStacked`), and paint order is walked.
 
 Method: `cargo build --profile judged -p vapors-perf`, then
-`target/judged/vapors-perf 60 10 --scaling <change>`. The run used
-Intel UHD 630 (ANV), 640 x 400, scale 1, and took the median
-instructions per frame from one run. The tree was main at 9547e1a4
-with this change.
+`target/judged/vapors-perf 60 10 --scaling <change>`, three runs of
+each change. The tables give the median instructions per frame of the
+three runs; the spread is the largest minus the smallest 10,000-row
+count. The setup was Intel UHD 630 (ANV), 640 x 400, scale 1. Load
+averages at the start were 7 to 16; instruction counts do not move with
+load. The tree was main at 9547e1a4 with this change. Remove frames
+are within 2% of insert frames for every phase but `style`.
 
 ## PositionedClass: flat, judged as Class
 
-| phase | kind | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 |
-|---|---|---|---|---|---|
-| style | add | 422,178 | 417,537 | 404,365 | -1.9 |
-| layout | add | 78,041 | 79,908 | 81,413 | 0.2 |
-| paint | add | 82,896 | 82,847 | 83,714 | 0.1 |
-| accessibility | add | 19,255 | 18,802 | 18,819 | 0.0 |
-| draw | add | 975,932 | 975,388 | 975,505 | 0.0 |
-| frame (CPU) | add | 1,616,219 | 1,612,208 | 1,602,138 | -1.4 |
+| phase | kind | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 | spread |
+|---|---|---|---|---|---|---|
+| style | add | 416,933 | 400,071 | 400,869 | 0.1 | 882 |
+| layout | add | 80,582 | 81,993 | 81,777 | -0.0 | 439 |
+| paint | add | 82,896 | 83,009 | 83,787 | 0.1 | 40 |
+| accessibility | add | 18,766 | 18,814 | 18,820 | 0.0 | 14 |
+| draw | add | 975,791 | 975,627 | 974,401 | -0.2 | 482 |
 
-Remove frames are within 0.6% of these numbers. Every phase is within
-2% or 5000 instructions of its 1000-row count, so the change is judged
-`EveryPhase`, as `Class` is.
+The splice counts are zero: there are no splices, declines or walks. The
+change is judged `EveryPhase`.
 
-## PositionedInsert: not flat, reported with an owner
+## PositionedInsert: reported, owner splice-layout 3b
 
-| phase | kind | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 |
-|---|---|---|---|---|---|
-| style | insert | 387,317 | 372,588 | 357,543 | -2.1 |
-| layout | insert | 8,307,748 | 27,714,614 | 98,694,296 | 10,140.0 |
-| paint | insert | 12,028,265 | 37,400,390 | 129,494,170 | 13,156.3 |
-| accessibility | insert | 7,058,562 | 20,825,338 | 69,410,577 | 6,940.7 |
-| update | insert | 21,114,878 | 66,495,473 | 232,031,234 | 23,648.0 |
-| frame (CPU) | insert | 29,286,729 | 88,432,444 | 302,554,370 | 30,588.8 |
+| phase | kind | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 | spread |
+|---|---|---|---|---|---|---|
+| style | insert | 384,332 | 350,438 | 356,571 | 0.9 | 698 |
+| layout | insert | 8,312,266 | 27,724,256 | 98,788,481 | 10,152.0 | 39,948 |
+| paint | insert | 12,036,697 | 37,384,456 | 129,493,899 | 13,158.5 | 1,934 |
+| accessibility | insert | 7,022,189 | 20,660,961 | 68,881,447 | 6,888.6 | 129,226 |
 
-Remove frames are within 2% of these numbers. Every frame spliced its
-paint order (71 splices at each size). No splice was patched.
+Splice counts at each size: 71 splices, 0 patched, no declines, no
+order walks.
 
-The cause is the fixed footer. It is an out-of-flow child of the body,
-so the body's lane is declined (`LaneDecline::OutOfFlowChild`), and the
-insert falls back to the costs from before the lane: a per-row layout,
-paint and accessibility term. Running the same insert on the page
-without the footer gives these results:
+The cause is the out-of-flow boxes under the body (the footer and the
+absolutely positioned box), which decline the body's lane. Two elements
+tests pin this:
 
-- accessibility: 1220.2 and 1212.7 per extra row on insert frames,
-  1237.3 and 1227.4 on remove frames;
-- layout and paint: within 1.1 per row;
-- the change passes Insert's rule (style flat, accessibility under
-  1250).
+- `the_out_of_flow_boxes_cost_the_body_its_lane`: with the rows
+  positioned but no out-of-flow boxes, the body's lane frames its rows.
+  With the boxes, it frames none and one more container is declined.
+- `a_fixed_child_of_the_body_declines_its_lane_as_out_of_flow`: the same
+  fixed footer gives `LaneDecline::OutOfFlowChild`.
 
-The positioned rows themselves add no per-row term.
+Reproduce with
+`cargo test -p vapors-elements --test tests positioned_rows`.
 
-Judging is therefore off for `PositionedInsert`
-(`Judged::Reported`). Its owner is splice-layout slice 3b, which
-places a lane container's absolute and fixed children from the tree;
-3b judges this change as `Insert`
-(`crates/perf/src/scaling_judged.rs`, `POSITIONED_INSERT_OWNER`).
+Without the out-of-flow boxes, the same insert passes Insert's rule
+(three runs, medians):
+
+- accessibility: 1211.0 per extra row on insert frames, 1225.8 on remove
+  frames, from 3000 to 10,000 rows;
+- layout and paint: within 1.0 per row.
+
+That run is made by replacing `positioned_rows::make_positioned` with
+`positioned_rows::position_rows` in `Rows::new` (`crates/perf/src/rows.rs`)
+and running the same command. On that page the judge fails the run,
+because the change now passes its target rule ("now passes the rule it
+was reported for"). That is the ratchet in `scaling_reported.rs`.
+
+## PositionedStackedInsert: reported, owner splice slice D
+
+| phase | kind | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 | spread |
+|---|---|---|---|---|---|---|
+| style | insert | 396,326 | 391,070 | 356,326 | -5.0 | 858 |
+| layout | insert | 8,318,224 | 27,694,417 | 98,619,794 | 10,132.2 | 25,843 |
+| paint | insert | 21,033,779 | 64,849,163 | 222,883,151 | 22,576.3 | 7,567 |
+| accessibility | insert | 7,013,609 | 20,598,579 | 68,915,559 | 6,902.4 | 8,930 |
+
+Splice counts at each size and in each run: 0 splices; declined
+`FreedStacked` 35 and `InsertedStacked` 36; 71 order walks. Layout and
+accessibility are the same as `PositionedInsert`'s, from the same lane
+decline. Paint is about 9,400 per extra row higher: the walk of the
+whole paint order that each declined splice makes. No slice made a
+stacked box's splice flat, so `docs/plans/splice.md` now has slice D
+(stacked splice) as its owner. D judges this change as `Insert`
+together with splice-layout 3b.
+
+## The absolutely positioned box
+
+Adding the absolutely positioned box (review of #452, L1) left every
+figure within run-to-run noise. A first run without it measured layout
+10,140.0, paint 13,156.3 and accessibility 6,940.7 per extra row for
+`PositionedInsert`; with it, the figures are 10,152.0, 13,158.5 and
+6,888.6. The body's lane is already declined for the footer.
 
 ## Counts a later slice must move
 
-- 3b: `PositionedInsert`'s layout, paint and accessibility terms, down
-  to Insert's (accessibility under 1250 per row, the rest flat). The
-  body is then laid out by its lane with the footer in it.
-- F3 and later flat-scene slices: `PositionedClass` stays flat.
+- splice-layout 3b: the layout and accessibility terms of both insert
+  changes. `PositionedInsert` then passes Insert's rule, and the run
+  fails until it is judged by it.
+- splice D, after 3b: `PositionedStackedInsert`'s splice declines become
+  splices and its order walks go to 0, so it passes Insert's rule.
+- `PositionedClass` stays flat.

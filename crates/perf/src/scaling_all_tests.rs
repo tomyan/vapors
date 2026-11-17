@@ -47,6 +47,18 @@ fn each_change_ends_with_a_line_naming_it_and_its_result() {
     );
 }
 
+#[test]
+fn a_reported_change_that_did_not_fail_is_reported_not_passed() {
+    assert_eq!(
+        result_line(RowChange::PositionedInsert, true),
+        "scaling-result: PositionedInsert reported (docs/plans/splice-layout.md slice 3b)"
+    );
+    assert_eq!(
+        result_line(RowChange::PositionedInsert, false),
+        "scaling-result: PositionedInsert fail"
+    );
+}
+
 /// The log `scripts/nightly-scaling-issues-check.sh` parses: its lines must be
 /// the ones this harness prints, so a change of wording fails here.
 const FIXTURE: &str = include_str!("../../../scripts/fixtures/nightly-scaling.log");
@@ -58,6 +70,7 @@ fn the_nightly_fixture_holds_the_lines_the_harness_prints() {
         changes_line(&RowChange::ALL),
         result_line(RowChange::Idle, true),
         result_line(RowChange::Class, false),
+        result_line(RowChange::PositionedInsert, true),
         error_block(RowChange::Class, "scaling: Class, add frames does work"),
         error_block(RowChange::Text, "no instruction counter"),
     ];

@@ -2,7 +2,7 @@ scaling: revision 68371b9382ec643d57643d4b4ff31a2c2cd9cf38
 ok   build    117.3s
 Adapter: Intel(R) UHD Graphics 630 (CFL GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2)
 Profile: judged (release, codegen-units 1, no override the build could see); scale 1; warmup 10; runs 60
-scaling-changes: Idle Text FlexText Class HoveredClass Insert FlexInsert Resize Scroll ScrollSize PositionedClass PositionedInsert
+scaling-changes: Idle Text FlexText Class HoveredClass Insert FlexInsert Resize Scroll ScrollSize PositionedClass PositionedInsert PositionedStackedInsert
 ### Scaling, Idle (median instructions per frame)
 
 | phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
@@ -41,7 +41,8 @@ scaling-result: Resize pass
 scaling-result: Scroll pass
 scaling-result: ScrollSize pass
 scaling-result: PositionedClass pass
-scaling-result: PositionedInsert pass
-FAIL perf: scaling: 3 of 9 changes failed:
+scaling-result: PositionedInsert reported (docs/plans/splice-layout.md slice 3b)
+scaling-result: PositionedStackedInsert reported (docs/plans/splice.md slice D stacked splice)
+FAIL perf: scaling: 3 of 11 changes failed:
 FAIL judge    380.2s
 scaling: fail 68371b9382ec643d57643d4b4ff31a2c2cd9cf38

@@ -94,7 +94,7 @@ impl Scaling {
                 Ok(found)
             }
             Judged::EveryPhase => Ok(self.beyond_tolerances(|_| TOLERANCE_PERCENT)),
-            Judged::Reported { .. } => Ok(Vec::new()),
+            Judged::Reported { target, .. } => self.violations(*target),
             Judged::EveryPhaseRelaxed { phase, percent } => Ok(self.beyond_tolerances(|named| {
                 if named == phase {
                     percent

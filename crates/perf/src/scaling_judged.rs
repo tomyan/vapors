@@ -6,6 +6,7 @@
 
 use crate::rows::RowChange;
 use crate::scaling::PhaseSeries;
+use crate::scaling_reported::{Owner, SPLICE_D, SPLICE_LAYOUT_3B};
 
 /// The accessibility phase's ceiling for `Insert`, instructions per
 /// extra row from 1000 rows: recorded at 8859 (1000 to 10,000 rows,
@@ -80,15 +81,16 @@ pub const SCROLL_SIZE_A11Y_PER_ROW: u64 = 1;
 /// an allocator decision), then 2% again.
 pub const FLEX_TEXT_FRAME_PERCENT: u64 = 3;
 
-/// Who turns `PositionedInsert`'s judging on. Measured judged
-/// (2026-11-17): layout about 10,000, paint about 13,000 and
-/// accessibility about 6,900 instructions per extra row. The fixed footer
-/// is an out-of-flow child of the body, so the body's lane is declined
-/// (`LaneDecline::OutOfFlowChild`). Without the footer, the same insert
-/// passes Insert's rule (accessibility 1220 to 1237 per row).
-pub const POSITIONED_INSERT_OWNER: &str = "splice-layout.md slice 3b (a lane container's \
-     absolute and fixed children placed from the tree): the body's lane is declined for the \
-     fixed footer; 3b judges this change as Insert";
+/// What `PositionedInsert` waits for: Insert's rule. Measured judged
+/// (2026-11-17, `docs/perf/w6-positioned-2026-11-17.md`): layout about
+/// 10,100, paint about 13,200 and accessibility about 6,900 instructions
+/// per extra row. The fixed footer is an out-of-flow child of the body,
+/// so the body's lane is declined (`LaneDecline::OutOfFlowChild`, pinned
+/// by `crates/elements/tests/positioned_rows.rs`).
+const INSERT_RULE: Judged = Judged::AccessibilityPerRow {
+    ceiling: INSERT_A11Y_PER_ROW,
+    flat: &["style"],
+};
 
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,12 +117,14 @@ pub enum Judged {
         /// Phases whose cost may not grow with the rows.
         flat: &'static [&'static str],
     },
-    /// Nothing judged: the change's work grows with the page today, and
-    /// `owner` names the slice that makes it flat and then turns its
-    /// judging on. A change is never reported without one.
+    /// Nothing judged: the change's work grows with the page today.
+    /// `owner` is the plan slice that makes it pass `target`, and the run
+    /// fails once it does (`scaling_reported.rs`).
     Reported {
-        /// The slice, and what it changes, by its plan's name.
-        owner: &'static str,
+        /// The slice that turns its judging on.
+        owner: Owner,
+        /// The rule it is judged by from then.
+        target: &'static Judged,
     },
 }
 
@@ -140,12 +144,16 @@ impl Judged {
             | RowChange::PositionedClass => Self::EveryPhase,
             // style flat since docs/perf/insert-style-2026-11-13.md
             RowChange::PositionedInsert => Self::Reported {
-                owner: POSITIONED_INSERT_OWNER,
+                owner: SPLICE_LAYOUT_3B,
+                target: &INSERT_RULE,
             },
-            RowChange::Insert => Self::AccessibilityPerRow {
-                ceiling: INSERT_A11Y_PER_ROW,
-                flat: &["style"],
+            // after splice-layout 3b as well, which removes the same
+            // layout and accessibility terms as PositionedInsert's
+            RowChange::PositionedStackedInsert => Self::Reported {
+                owner: SPLICE_D,
+                target: &INSERT_RULE,
             },
+            RowChange::Insert => INSERT_RULE,
             RowChange::FlexInsert => Self::AccessibilityPerRow {
                 ceiling: FLEX_INSERT_A11Y_PER_ROW,
                 flat: &["style"],

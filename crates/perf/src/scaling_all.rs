@@ -6,6 +6,7 @@ use vapors_gpu_harness::Gpu;
 
 use crate::rows::RowChange;
 use crate::run::Settings;
+use crate::scaling_judged::Judged;
 use crate::scaling_run;
 
 /// Runs every change of `changes`, prints each table and verdict, and
@@ -30,7 +31,16 @@ pub fn run(gpu: &Gpu, changes: &[RowChange], settings: Settings) -> Result<(), S
             result.err()
         })
         .collect();
-    verdict(changes.len(), &failures)
+    let judged = changes
+        .iter()
+        .filter(|&&change| !is_reported(change))
+        .count();
+    verdict(judged, &failures)
+}
+
+/// Whether `change` is reported, not judged (`Judged::Reported`).
+fn is_reported(change: RowChange) -> bool {
+    matches!(Judged::of(change), Judged::Reported { .. })
 }
 
 /// `scaling-changes: <change> ...`: every change this run judges, so a
@@ -48,11 +58,17 @@ pub fn error_block(change: RowChange, error: &str) -> String {
     format!("scaling-error-begin: {change:?}\n{error}\nscaling-error-end: {change:?}")
 }
 
-/// `scaling-result: <change> pass|fail`, the line
-/// `scripts/nightly-scaling.sh` reads to tell which changes failed.
+/// `scaling-result: <change> pass|fail|reported (<owner>)`, the line
+/// `scripts/nightly-scaling.sh` reads to tell which changes failed. A
+/// reported change that did not fail is neither passed nor failed: it
+/// was not judged.
 #[must_use]
 pub fn result_line(change: RowChange, passed: bool) -> String {
-    let result = if passed { "pass" } else { "fail" };
+    let result = match (passed, Judged::of(change)) {
+        (false, _) => "fail".to_owned(),
+        (true, Judged::Reported { owner, .. }) => format!("reported ({owner})"),
+        (true, _) => "pass".to_owned(),
+    };
     format!("scaling-result: {change:?} {result}")
 }
 

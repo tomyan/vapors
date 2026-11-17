@@ -4,7 +4,10 @@
 # in a plain listing, not the search index, which lags a create.
 # - "Nightly scaling: <change>: <kind> <phase>, ...": one per failing
 #   change; retitled when its parts change, closed when it passes or when
-#   the harness no longer lists the change.
+#   the harness no longer lists the change. A change the harness reports
+#   without judging (`scaling-result: <change> reported (<owner>)`) is
+#   neither: its issue is left as it is, no pass is recorded, and the run
+#   lists it.
 # - $runner_title: a run that did not judge every change (the runner, the
 #   build, a deadline, a crash); closed when every change passes.
 # - $unreported_title: runs that ended without reporting; closed by hand.
@@ -122,6 +125,12 @@ $block
 Reproduce: \`cargo build --profile judged -p vapors-perf && target/judged/vapors-perf 60 10 --scaling $1\` in a clean checkout at $3. Log on the dev machine: $2"
 }
 
+# The changes reported, not judged, in log $1, each with its owner, one a
+# line: "<change> (<owner>)".
+reported_lines() {
+  { grep -oE 'scaling-result: [A-Za-z]+ reported \(.*\)' "$1" || true; } | cut -d' ' -f2,4-
+}
+
 # Change $1 passed at revision $2.
 report_change_pass() {
   echo "$2" >"$state/pass/$1"
@@ -164,7 +173,7 @@ $(cat "$state/UNREPORTED")"
 
 # Every report for log $1 at revision $2, the judge having exited $3.
 report_results() {
-  local change expected failing missing profile
+  local change expected failing missing profile reported
   profile=$(profile_of "$1")
   profile=${profile:-unknown}
   report_unreported
@@ -172,7 +181,9 @@ report_results() {
   for change in $(changes_that "$1" pass); do report_change_pass "$change" "$2"; done
   failing=$(changes_that "$1" fail)
   for change in $failing; do report_change_failure "$change" "$1" "$2"; done
-  missing=$(comm -23 <(echo "$expected") <(changes_that "$1" '(pass|fail)') | xargs)
+  reported=$(reported_lines "$1")
+  [ -z "$reported" ] || printf 'nightly: reported, not judged: %s\n' "$reported"
+  missing=$(comm -23 <(echo "$expected") <(changes_that "$1" '(pass|fail|reported)') | xargs)
   if [ -z "$expected" ]; then
     report_unjudged "$1" "$2" "no scaling-changes line, so the build failed, the judge did not start, or the lines vapors-perf prints changed"
   elif [ -n "$missing" ]; then
@@ -181,7 +192,7 @@ report_results() {
     report_unjudged "$1" "$2" "the judge exited $3 with every change judged and none failing"
   else
     report_retired "$expected" "$2"
-    [ "$3" -ne 0 ] || close_issue "$runner_title" "\`cargo xtask scaling\` passed at $2; closing."
+    [ "$3" -ne 0 ] || close_issue "$runner_title" "\`cargo xtask scaling\` passed at $2; closing.${reported:+ Reported, not judged: $reported.}"
   fi
   echo "$profile" >"$state/profile"
 }

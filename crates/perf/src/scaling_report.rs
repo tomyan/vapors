@@ -54,6 +54,9 @@ pub fn verdicts(change: RowChange, kinds: &[(String, Scaling)]) -> Result<String
              RowChange::frame_kinds names at least one (crates/perf/src/row_change.rs)"
         ));
     }
+    if let Judged::Reported { owner, target } = Judged::of(change) {
+        return crate::scaling_reported::reported_verdicts(change, (owner, *target), kinds);
+    }
     let judged: Vec<_> = kinds
         .iter()
         .map(|(title, scaling)| verdict(change, title, scaling))
@@ -77,7 +80,27 @@ pub fn verdicts(change: RowChange, kinds: &[(String, Scaling)]) -> Result<String
 /// extra row and the command that reproduces it), or the judged phase
 /// has no count.
 pub fn verdict(change: RowChange, title: &str, scaling: &Scaling) -> Result<String, String> {
-    let judged = Judged::of(change);
+    verdict_by(Judged::of(change), change, title, scaling)
+}
+
+/// [`verdict`] by the rule `judged` in place of `change`'s own.
+///
+/// # Errors
+/// As [`verdict`].
+///
+/// # Panics
+/// `judged` is [`Judged::Reported`], which [`verdicts`] judges across
+/// every kind of frame together (`scaling_reported.rs`).
+pub fn verdict_by(
+    judged: Judged,
+    change: RowChange,
+    title: &str,
+    scaling: &Scaling,
+) -> Result<String, String> {
+    assert!(
+        !matches!(judged, Judged::Reported { .. }),
+        "{change:?} is reported: `verdicts` judges it across its kinds (scaling_reported.rs)"
+    );
     let violations = scaling.violations(judged)?;
     if !violations.is_empty() {
         return Err(format!(
@@ -93,9 +116,7 @@ pub fn verdict(change: RowChange, title: &str, scaling: &Scaling) -> Result<Stri
              the other phases are reported, not judged: property 3 (the splice step) is not built",
             held_flat(flat)
         ),
-        Judged::Reported { owner } => {
-            format!("scaling: reported, not judged, {title}: its judging is turned on by {owner}")
-        }
+        Judged::Reported { .. } => unreachable!("refused above"),
         Judged::EveryPhase => format!(
             "scaling: pass, every {title} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),

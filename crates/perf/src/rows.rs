@@ -60,7 +60,9 @@ impl Rows {
             RowChange::HoveredClass => page.rows().edit(Edit::Hover),
             RowChange::Resize => page.rows().rows_resizable(),
             RowChange::Scroll | RowChange::ScrollSize => page.rows().body_scrolls(),
-            RowChange::PositionedClass | RowChange::PositionedInsert => {
+            RowChange::PositionedClass
+            | RowChange::PositionedInsert
+            | RowChange::PositionedStackedInsert => {
                 positioned_rows::make_positioned(page.rows());
             }
             RowChange::Idle
@@ -105,6 +107,19 @@ impl Rows {
         let body = doc.body();
         doc.insert_before(body, added, Some(middle));
         self.inserted = Some(added);
+    }
+}
+
+impl Rows {
+    /// Removes the inserted row, or inserts a positioned one before the
+    /// middle row.
+    fn toggle_inserted_positioned_row(&mut self) {
+        let page = self.page.rows();
+        if let Some(inserted) = self.inserted.take() {
+            page.doc.borrow_mut().remove(inserted);
+            return;
+        }
+        self.inserted = Some(positioned_rows::insert_positioned(page, page.rows.len()));
     }
 }
 
@@ -166,6 +181,7 @@ impl Workload for Rows {
             RowChange::PositionedClass => {
                 positioned_rows::toggle_positioned_marked(self.page.rows());
             }
+            RowChange::PositionedStackedInsert => self.toggle_inserted_positioned_row(),
             RowChange::FlexInsert => self.toggle_inserted_list_row(),
             RowChange::Resize => self.page.rows().toggle_tall(),
             RowChange::Scroll => self.scroll_body(),
