@@ -76,11 +76,19 @@ pub fn make(
 }
 
 /// A new repository whose objects are `objects`, read through
-/// alternates, holding one ref of the main repository's,
-/// `origin/main`: no other branch, pushed or not, is in it (review of
-/// #467, M2).
+/// alternates, holding one ref of the main repository's, `origin/main`:
+/// no other branch's ref is in it (review of #467, M2). Every object in
+/// `objects` is readable from it, though: every local branch's, stash
+/// and dangling objects of every worktree, which the session can name by
+/// SHA. Accepted (the lead, L56/L57, re-verify of slice 4, R2): the
+/// session's code already goes to the API, and what a push publishes is
+/// governed by the per-commit checks (`api_push.rs`), not by which
+/// objects are readable. Each git call has `LOCAL_GIT_DEADLINE`.
 fn cloned(builder: &Builder, (main, objects): (&Path, &Path), branch: &str) -> Result<(), String> {
     let clone = builder.clone_dir();
+    let git = |dir: &Path, args: &[&str]| {
+        crate::api_timed::git_within(dir, args, crate::api_push_fetch::LOCAL_GIT_DEADLINE)
+    };
     git(main, &["init", "--quiet", &clone.display().to_string()])?;
     let alternates = clone.join(".git/objects/info/alternates");
     fs::write(&alternates, format!("{}\n", objects.display()))

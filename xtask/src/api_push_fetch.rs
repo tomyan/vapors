@@ -76,7 +76,11 @@ pub fn fetched(
 
 /// The upload-pack the fetch runs: inside bwrap, seeing only the clone
 /// and the main repository's objects, read-only, with no network and
-/// nothing else of the host (verify of slice 4, V1). A link the session
+/// nothing else of the host (verify of slice 4, V1). The bind exposes
+/// every object in the main repository's store, the set the session can
+/// already read through its alternates (`api_clone.rs` `cloned`); what is
+/// pushed is governed by the per-commit checks (re-verify, R2, accepted
+/// by the lead, L56). A link the session
 /// planted anywhere in the clone's `.git` (a fan-out directory, a pack, a
 /// gitfile, alternates), even one swapped in after `clone_as_made`, names
 /// nothing inside, so no other repository's objects can be read. The
