@@ -1,9 +1,11 @@
 //! A pipeline that draws one quad per instance: the shared machinery of
 //! the box, shadow and closed-form pipelines. Each instance is `vec4s`
 //! four-float attributes, in device pixels where they are positions,
-//! then its row's index in its batch's range and its frame's entry in
-//! the transform table (`transform_table.rs`,
-//! `docs/plans/flat-scene-f2.md`), which the vertex stage reads. The
+//! then its row's index in its batch's range, its frame's entry in
+//! the transform table (`table.rs`, `docs/plans/flat-scene-f2.md`),
+//! which the vertex stage reads, and its clip's entry in the clip table
+//! (`clip_table.rs`, `docs/plans/flat-scene-f3.md`), which the fragment
+//! stage reads (`clip.wgsl`). The
 //! viewport size and the range's first entry are a uniform, kept per
 //! value seen and bound by its offset. Alpha blends over what the target
 //! holds, in instance order, in one draw recorded into the target's
@@ -11,8 +13,8 @@
 
 use crate::frame_arena::{FrameArena, Placed};
 use crate::quads_setup::render_pipeline;
-use crate::table_binding::TableBinding;
-use crate::{KeptRange, Retained, Target, TransformTable, WorkCounter};
+use crate::table_binding::{TableBinding, Tables};
+use crate::{ClipTable, KeptRange, Retained, Target, TransformTable, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
 
@@ -28,8 +30,9 @@ pub(crate) struct Instanced {
     pub(crate) work: WorkCounter,
 }
 
-/// A kept draw's transform table and its batch's first row entry.
-pub(crate) type Table<'a> = (&'a mut TransformTable, u32);
+/// A kept draw's transform table, clip table, and its batch's first row
+/// entry.
+pub(crate) type Table<'a> = (&'a mut TransformTable, &'a mut ClipTable, u32);
 
 impl Instanced {
     pub(crate) fn new(
@@ -46,7 +49,7 @@ impl Instanced {
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             },
         );
-        let binding = TableBinding::new(device, label);
+        let binding = TableBinding::new(device, label, true);
         let stride = instance_bytes(vec4s) as u64;
         let attributes = attributes(vec4s);
         let instance = wgpu::VertexBufferLayout {
@@ -116,17 +119,17 @@ impl Instanced {
         &mut self,
         target: &Target<'_>,
         kept: &KeptRange,
-        (table, rows_base): Table<'_>,
+        (table, clips, rows_base): Table<'_>,
     ) {
         let count = self.count(self.kept.len(kept));
         let Some(viewport) = self.binding.slot(target, rows_base, &self.work) else {
             return;
         };
-        self.binding.adopt(table, target.queue);
+        self.binding.adopt((table, Some(clips)), target.queue);
         self.record(
             target,
             (count, Instances::Kept(kept)),
-            (Some(table), viewport),
+            (Some((table, Some(clips))), viewport),
         );
     }
 
@@ -156,21 +159,22 @@ impl Instanced {
     }
 
     /// Records the draw of `count` instances from `from`, through the
-    /// bind group over the slots and `table` (the pipeline's identity
-    /// table for `None`), the viewport slot at `viewport`. Each bind group
+    /// bind group over the slots and `tables` (the pipeline's identity
+    /// table and clip table of no clips for `None`), the viewport slot at
+    /// `viewport`. Each bind group
     /// is made on first use and again when a buffer it names is replaced.
     fn record(
         &mut self,
         target: &Target<'_>,
         (count, from): (u32, Instances<'_>),
-        (table, viewport): (Option<&TransformTable>, u32),
+        (tables, viewport): (Option<Tables<'_>>, u32),
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let instances = match from {
             Instances::Placed(placed) => placed.slice(),
             Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
         };
-        let group = self.binding.group(target, table, &self.work);
+        let group = self.binding.group(target, tables, &self.work);
         target.draw_pass((self.label, self.samples), |pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, group, &[viewport]);
@@ -180,25 +184,6 @@ impl Instanced {
     }
 }
 
-/// The instance attributes: `vec4s` four-float ones, then the row's index
-/// and the frame's entry, two `u32`s.
-fn attributes(vec4s: u32) -> Vec<wgpu::VertexAttribute> {
-    let floats = u64::from(vec4s) * 16;
-    let index = |at: u32| wgpu::VertexAttribute {
-        format: wgpu::VertexFormat::Uint32,
-        offset: floats + u64::from(at) * 4,
-        shader_location: vec4s + at,
-    };
-    (0..vec4s)
-        .map(|i| wgpu::VertexAttribute {
-            format: wgpu::VertexFormat::Float32x4,
-            offset: u64::from(i) * 16,
-            shader_location: i,
-        })
-        .chain([index(0), index(1)])
-        .collect()
-}
-
 /// Where a draw's instances are: this frame's arena, or kept.
 #[derive(Clone, Copy)]
 enum Instances<'a> {
@@ -206,6 +191,8 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
+use crate::instanced_binding::attributes;
+pub(crate) use crate::instanced_binding::instanced_source;
 pub(crate) use crate::instanced_bytes::{float_bytes, instance_bytes, rowed_instances};
 
 #[cfg(test)]

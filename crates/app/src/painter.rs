@@ -34,6 +34,7 @@ pub struct ScenePainter {
     /// The frames' and lane parts' entries in the transform table that
     /// every pipeline but the mesh pipeline reads.
     transforms: transforms::Transforms,
+    clips: clips::Clips,
     /// Where each batch was drawn last frame (`painter_places.rs`).
     places: places::BatchPlaces,
     /// Its 4x colour textures, at 4 samples.
@@ -96,6 +97,7 @@ impl ScenePainter {
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
             transforms: transforms::Transforms::new(device),
+            clips: clips::Clips::new(device),
             places: places::BatchPlaces::default(),
             multisampled: Multisampled::new(pass),
             counts: FrameCounts::default(),
@@ -165,6 +167,7 @@ impl ScenePainter {
         self.surfaces.begin_frame();
         self.kept.begin_frame();
         self.transforms.begin_frame();
+        self.clips.begin_frame();
         let taken = self.shapes.take_from(painted, &mut self.mesh_entries);
         let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
         self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
@@ -176,13 +179,15 @@ impl ScenePainter {
         if runs.is_ok() {
             self.textures.end_frame();
         }
-        self.release_undrawn();
+        self.release_undrawn(target.queue);
         self.multisampled.release_undrawn();
         self.end_counts();
         runs
     }
 }
 
+#[path = "painter_clips.rs"]
+mod clips;
 #[path = "painter_counts.rs"]
 mod counts;
 #[path = "painter_kept.rs"]

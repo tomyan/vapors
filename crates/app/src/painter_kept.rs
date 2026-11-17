@@ -33,6 +33,9 @@ mod gpu;
 pub(super) use gpu::KeptGpu;
 #[path = "painter_kept_bytes.rs"]
 mod bytes;
+
+#[path = "painter_kept_entries.rs"]
+mod entries;
 pub(super) use bytes::{Kind, RunBytes, rows_fit, rows_in_range, rows_needed, run_bytes};
 
 /// The painter's [`Pipelines`], each borrowed from its own field, so the
@@ -81,7 +84,7 @@ impl ScenePainter {
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let rows = moved.rows.items();
-        let Some((frame, rows_base)) = self.table_entries(target, moved) else {
+        let Some((frame, clip, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
         // image and surface bytes name no entry: their draw's uniform does
@@ -94,24 +97,25 @@ impl ScenePainter {
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, (named, rows, moved.offsets.len()), key, at),
+            (run, ((named, clip), rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
         };
         let range = kept.range;
-        let table = (&mut self.transforms.table, rows_base);
+        let table = (&mut self.transforms.table, &mut self.clips.table, rows_base);
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, table),
             Run::Quads(_) => self.quads.draw_kept(target, range, table),
             Run::Shapes(_) => self.closed_forms.draw_kept(target, range, table),
             Run::Meshes(_) => {
                 let shapes = (&self.shapes, &mut self.mesh_entries);
+                let (transforms, _no_clips, rows_base) = table;
                 draw_meshes(
                     &mut self.meshes,
                     shapes,
                     target,
-                    (range, kept.meshes, table),
+                    (range, kept.meshes, (transforms, rows_base)),
                 )?;
             }
             Run::Images(items) => {
@@ -131,20 +135,6 @@ impl ScenePainter {
         Ok(())
     }
 
-    /// A run's frame's entry in the transform table, set to its shift,
-    /// and the first of its lane part's rows' entries (0 for a batch in
-    /// one frame). `None` when the table could not grow (the refusal is
-    /// on the target's encoder).
-    fn table_entries(&mut self, target: &Target<'_>, moved: &Moved<'_>) -> Option<(u32, u32)> {
-        let frame = self
-            .transforms
-            .frame_entry(target, moved.frame, moved.shift)?;
-        let rows_base = self
-            .transforms
-            .rows_base(target, moved.rows_key, moved.offsets)?;
-        Some((frame, rows_base))
-    }
-
     /// Draws `run`, a text or icon batch keyed `key`, from its kept
     /// bytes moved by `shift`, building and writing them first when none
     /// are current (`painter_kept_text.rs`). Nothing is drawn for a batch with no
@@ -157,7 +147,7 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
-        let Some((frame, rows_base)) = self.table_entries(target, moved) else {
+        let Some((frame, _no_clip, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
         let parts = (&mut self.text, &mut self.atlas);
@@ -178,10 +168,14 @@ impl ScenePainter {
     ///
     /// When the pipelines' kept buffers then hold other than the bytes
     /// of the batches kept: a kept range was dropped unreleased.
-    pub(super) fn release_undrawn(&mut self) {
+    pub(super) fn release_undrawn(&mut self, queue: &wgpu::Queue) {
         let mut pipelines = pipelines!(self);
         self.kept.release_undrawn(&mut pipelines);
-        self.transforms.release_undrawn();
+        // clips first, then frames (flat-scene-f3.md item 4)
+        let clips = self.clips.release_undrawn(queue);
+        self.kept.assert_none_names_clip(&clips);
+        let frames = self.transforms.release_undrawn();
+        self.clips.assert_none_names(&frames);
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
             held, retained,

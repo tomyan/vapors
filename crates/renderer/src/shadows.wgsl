@@ -15,6 +15,7 @@ struct Instance {
     @location(6) extra: vec4<f32>,         // sigma, unused
     @location(7) row: u32,                 // the row's index in its batch's range
     @location(8) frame: u32,               // the frame's entry in the transform table
+    @location(9) clip: u32,                // the innermost clip's entry in the clip table
 }
 
 struct Out {
@@ -26,6 +27,8 @@ struct Out {
     @location(4) @interpolate(flat) caster_radii: vec4<f32>,
     @location(5) @interpolate(flat) color: vec4<f32>,
     @location(6) @interpolate(flat) sigma: f32,
+    @location(7) @interpolate(flat) clip: u32,
+    @location(8) @interpolate(flat) row: u32,
 }
 
 @vertex
@@ -44,6 +47,8 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     out.caster_radii = instance.caster_radii;
     out.color = instance.color;
     out.sigma = instance.extra.x;
+    out.clip = instance.clip;
+    out.row = instance.row;
     return out;
 }
 
@@ -54,22 +59,7 @@ fn corner_radius(p: vec2<f32>, centre: vec2<f32>, radii: vec4<f32>) -> f32 {
     return select(radii.z, radii.y, p.y < centre.y);
 }
 
-fn corner_term(p: vec2<f32>, corner: vec2<f32>, inward: vec2<f32>, r: f32) -> f32 {
-    let centre = corner + inward * r;
-    let in_square = all((p - centre) * inward < vec2(0.0));
-    return select(-1e9, length(p - centre) - r, r > 0.0 && in_square);
-}
-
-// As in quads.wgsl: exact for radii fitted on the CPU, none clamped.
-fn rounded_distance(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>) -> f32 {
-    let q = max(rect.xy - p, p - rect.zw);
-    var d = max(q.x, q.y);
-    d = max(d, corner_term(p, rect.xy, vec2(1.0, 1.0), radii.x));
-    d = max(d, corner_term(p, vec2(rect.z, rect.y), vec2(-1.0, 1.0), radii.y));
-    d = max(d, corner_term(p, rect.zw, vec2(-1.0, -1.0), radii.z));
-    d = max(d, corner_term(p, vec2(rect.x, rect.w), vec2(1.0, -1.0), radii.w));
-    return d;
-}
+// rounded_distance: clip.wgsl's, shared with quads and clips
 
 fn gaussian(x: f32, sigma: f32) -> f32 {
     return exp(-(x * x) / (2.0 * sigma * sigma)) / (2.5066283 * sigma);
@@ -120,5 +110,6 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
         coverage = blurred(in.pixel, in.shape, in.radii, in.sigma);
     }
     let outside_caster = clamp(0.5 + rounded_distance(in.pixel, in.caster, in.caster_radii), 0.0, 1.0);
-    return vec4(in.color.rgb, in.color.a * coverage * outside_caster);
+    let clipped = clip_coverage(in.position.xy, in.clip, in.row);
+    return vec4(in.color.rgb, in.color.a * coverage * outside_caster * clipped);
 }
