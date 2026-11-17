@@ -17,11 +17,11 @@ use vapors_dom::Dom;
 /// The largest channel difference and the differing pixels of the
 /// shapes page at 4 samples against 1, as measured on 2026-11-17 on ANV
 /// (Intel UHD 630) and on llvmpipe: (29, 51) on both.
-const SHAPES_BOUND: (u8, usize) = (29, 51);
+pub(crate) const SHAPES_BOUND: (u8, usize) = (29, 51);
 
 /// The largest channel difference, and how many pixels differ at all,
 /// between `one` and `four`.
-fn difference(one: &[u8], four: &[u8]) -> (u8, usize) {
+pub(crate) fn difference(one: &[u8], four: &[u8]) -> (u8, usize) {
     let pixels = one.chunks(4).zip(four.chunks(4));
     let most = one.iter().zip(four).map(|(a, b)| a.abs_diff(*b)).max();
     let differ = pixels.filter(|(a, b)| a != b).count();

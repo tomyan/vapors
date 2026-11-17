@@ -2,7 +2,7 @@
 //! (`ElementsApp::with_samples`), which are set before the first frame
 //! and refused after it.
 
-use crate::gpu_samples::shapes;
+use crate::gpu_samples::{SHAPES_BOUND, difference, shapes};
 use crate::support_surface as support;
 
 use std::cell::RefCell;
@@ -23,8 +23,18 @@ fn first_frame(samples: Samples) -> Vec<u8> {
 }
 
 #[test]
-fn gpu_an_app_given_4_samples_draws_shapes_off_the_grid_unlike_one_at_1() {
-    assert_ne!(first_frame(Samples::Four), first_frame(Samples::One));
+fn gpu_an_app_given_4_samples_draws_shapes_off_the_grid_within_the_painters_bound() {
+    // When
+    let (one, four) = (first_frame(Samples::One), first_frame(Samples::Four));
+
+    // Then: they differ, and by no more than the painter's measured bound
+    // (`gpu_samples.rs`), so an app at 4x drawing nothing or garbage fails
+    let (most, differ) = difference(&one, &four);
+    assert!(differ > 0, "the app at 4 samples drew as it does at 1");
+    assert!(
+        most <= SHAPES_BOUND.0 && differ <= SHAPES_BOUND.1,
+        "({most}, {differ}) is past the painter's measured {SHAPES_BOUND:?}"
+    );
 }
 
 #[test]

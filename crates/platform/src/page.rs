@@ -65,12 +65,21 @@ pub fn shows_target(report: Report) -> bool {
 /// check rather than read wrongly here.
 #[must_use]
 pub fn query_value(search: &str, name: &str) -> Option<String> {
+    query_values(search, name).into_iter().next()
+}
+
+/// Every value of `name` in a query string, in order, as
+/// [`query_value`] reads the first: so a caller can refuse a name given
+/// twice.
+#[must_use]
+pub fn query_values(search: &str, name: &str) -> Vec<String> {
     search
         .trim_start_matches('?')
         .split('&')
         .map(|pair| pair.split_once('=').unwrap_or((pair, "")))
-        .find(|(key, _)| *key == name)
+        .filter(|(key, _)| *key == name)
         .map(|(_, value)| value.to_owned())
+        .collect()
 }
 
 #[cfg(test)]
@@ -93,6 +102,15 @@ mod tests {
         assert_eq!(demo.as_deref(), Some("hello"));
         assert_eq!(y.as_deref(), Some(""));
         assert_eq!(absent, None);
+    }
+
+    #[test]
+    fn every_value_of_a_name_given_twice_is_found_in_order() {
+        assert_eq!(
+            query_values("?samples=4&x=1&samples=1", "samples"),
+            ["4", "1"]
+        );
+        assert_eq!(query_values("?x=1", "samples"), Vec::<String>::new());
     }
 
     #[test]

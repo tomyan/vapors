@@ -35,32 +35,31 @@ pub const APPS: [(&str, AppDemo); 3] = [
 ];
 
 /// The app named `name`, if the page runs one by that name.
-/// The page's `?samples=`, when given (`samples.rs`).
-///
-/// # Errors
-/// As [`crate::samples::samples_of`].
-pub fn page_samples() -> Result<Option<vapors_renderer::Samples>, String> {
-    crate::samples::samples_of(query_parameter("samples").as_deref())
-}
-
 pub fn named(name: &str) -> Option<AppDemo> {
     APPS.iter()
         .find(|(each, _)| *each == name)
         .map(|(_, app)| *app)
 }
 
-/// Runs `app` in a window made from `options`.
+/// Runs `app` in a window made from `options`, at the page's `samples`
+/// (`samples.rs`) where it takes them.
 ///
 /// # Errors
-/// The app's own start or run failing, or a bad `ticks=`.
-pub fn run_app(app: AppDemo, options: WindowOptions) -> Result<(), String> {
+/// The app's own start or run failing, a bad `ticks=`, or `samples`
+/// given to the image app.
+pub fn run_app(
+    app: AppDemo,
+    options: WindowOptions,
+    samples: Option<vapors_renderer::Samples>,
+) -> Result<(), String> {
     match app {
-        AppDemo::Racer => vapors_racer::run_with(page_samples()?),
+        AppDemo::Racer => vapors_racer::run_with(samples),
         AppDemo::OneScene => {
             let ticks = vapors_demos::frame_limit(query_parameter("ticks").as_deref())?;
-            vapors_one_scene::run(ticks.map(|frames| frames as u64), page_samples()?)
+            vapors_one_scene::run(ticks.map(|frames| frames as u64), samples)
         }
         AppDemo::Image => {
+            crate::samples::none_for("image", samples)?;
             let image =
                 decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
             let app = ImageApp::showing("gradient.png", image, BACKGROUND);

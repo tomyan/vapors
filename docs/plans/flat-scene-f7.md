@@ -119,7 +119,8 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    pass is a different renderer and stays at 1x, so 3D at 4x is
    measured on the one-scene example instead (Q5). The UHD 630 is run
    by the script; the Pixel 9 Pro is run by hand from a served build
-   that has a sample-count switch, debug only.
+   with a sample-count switch, `?samples=1|4`, in every build: a debug
+   build would time debug code.
 5. **The cube edge.** A tilted cube drawn through the scene pass's mesh
    pipeline (`ProjectiveMeshes`) into an offscreen target, at 1 and 4
    samples, against a reference drawn at 8 times the size and averaged

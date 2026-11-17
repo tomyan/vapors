@@ -143,6 +143,20 @@ pub fn hide_status_line() {
     web::hide_status_line();
 }
 
+/// Every value of `name` in the page URL's query string, in order, so a
+/// caller can refuse it given twice. Natively there is no URL, so it is
+/// always empty.
+#[must_use]
+pub fn query_parameters(name: &str) -> Vec<String> {
+    #[cfg(target_family = "wasm")]
+    return page::query_values(&web::search(), name);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let _ = name;
+        Vec::new()
+    }
+}
+
 /// The value of `name` in the page URL's query string (`?demo=hello`).
 /// Natively there is no URL, so it is always `None`; a native app takes
 /// the same choice from its command line.

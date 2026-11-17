@@ -15,7 +15,8 @@ mod wake;
 
 use vapors_app::ElementsApp;
 use vapors_platform::{
-    WindowOptions, app_draws_open, hide_status_line, query_parameter, report_error, run,
+    WindowOptions, app_draws_open, hide_status_line, query_parameter, query_parameters,
+    report_error, run,
 };
 
 fn main() {
@@ -37,20 +38,28 @@ fn start() -> Result<(), String> {
     // the bar stepping through the listed demos; none for the index
     #[cfg(target_family = "wasm")]
     bar::show(&name)?;
+    // read once, here, so each run below takes it or refuses it
+    let samples = samples::samples_of(&query_parameters("samples"))?;
     if let Some(app) = apps::named(&name) {
-        return apps::run_app(app, options);
+        return apps::run_app(app, options, samples);
     }
     if name == "wake" {
+        samples::none_for("wake", samples)?;
         return run(options, wake::WakeApp).map_err(|e| e.to_string());
     }
-    run_elements(&name, options)
+    run_elements(&name, options, samples)
 }
 
-/// The elements demo `name`, or the index, in a window from `options`.
+/// The elements demo `name`, or the index, in a window from `options`,
+/// at `samples` with its GPU time shown when they are given.
 ///
 /// # Errors
 /// An unknown name, a bad `ticks=`, or the window failing.
-fn run_elements(name: &str, options: WindowOptions) -> Result<(), String> {
+fn run_elements(
+    name: &str,
+    options: WindowOptions,
+    samples: Option<vapors_renderer::Samples>,
+) -> Result<(), String> {
     // `own-open` is `hello` with the page's status line left as it is: the
     // page check's case for an app that draws its own Open and keeps `#status`.
     // A test hook for scripts/check-page-contract.sh only; like `wake`, it is
@@ -72,7 +81,7 @@ fn run_elements(name: &str, options: WindowOptions) -> Result<(), String> {
         None => shown.per_frame,
     };
     let mut app = ElementsApp::new(shown.document).with_per_frame(per_frame);
-    if let Some(samples) = apps::page_samples()? {
+    if let Some(samples) = samples {
         app.set_samples(samples);
         app.show_gpu_time();
     }
