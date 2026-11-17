@@ -110,3 +110,22 @@ fn gpu_of_two_meshes_at_one_depth_the_first_in_the_tree_wins_whatever_draws_them
     // Then: the first's, as drawn in tree order (depth `Less`)
     assert_eq!(at(&pixels, SIZE.width / 2, SIZE.height / 2), RED);
 }
+
+#[test]
+fn gpu_of_two_meshes_at_one_depth_the_first_in_the_tree_wins_when_it_is_the_colour_one() {
+    // Given: a square in its colour, then the same square on a material,
+    // at one depth
+    let gpu = vapors_gpu_harness::gpu();
+    let fixture = looking_down();
+    let square = fixture.square(1.0);
+    fixture.mesh(fixture.root(), &square, BLUE, Transform::IDENTITY);
+    let second = fixture.mesh(fixture.root(), &square, BLUE, Transform::IDENTITY);
+    with_material(&fixture, second, flat("second", RED));
+    let mut renderer = fixture.renderer(&gpu);
+
+    // When
+    let pixels = render(&mut renderer, &gpu).expect("renders");
+
+    // Then: the first's colour
+    assert_eq!(at(&pixels, SIZE.width / 2, SIZE.height / 2), BLUE);
+}

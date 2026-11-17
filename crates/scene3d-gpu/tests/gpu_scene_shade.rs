@@ -4,6 +4,8 @@
 
 #[path = "shade/materials.rs"]
 mod materials;
+#[path = "shade/mirrored.rs"]
+mod mirrored;
 mod support;
 
 use support::{Fixture, at, render};

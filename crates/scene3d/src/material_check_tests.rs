@@ -4,7 +4,7 @@ use crate::{Material, MaterialError, Meshes};
 
 fn given(wgsl: &str) -> Result<crate::MaterialId, MaterialError> {
     Meshes::new().material(Material {
-        label: "ground".into(),
+        label: "ground",
         wgsl: wgsl.into(),
     })
 }
@@ -63,7 +63,7 @@ fn a_binding_of_its_own_is_refused_naming_it() {
     assert_eq!(
         refused,
         MaterialError::Binding {
-            label: "ground".into(),
+            label: "ground",
             name: "tint".into()
         }
     );
@@ -76,7 +76,7 @@ fn a_name_the_renderer_uses_is_refused_naming_it() {
     assert_eq!(
         refused,
         MaterialError::Reserved {
-            label: "ground".into(),
+            label: "ground",
             name: "on_plane".into()
         }
     );
@@ -86,8 +86,27 @@ fn a_name_the_renderer_uses_is_refused_naming_it() {
 fn a_material_with_no_material_function_or_another_shape_is_refused() {
     let missing = given("fn shade(at: MaterialInput) -> vec4<f32> { return at.colour; }");
     let other = given("fn material(at: MaterialInput) -> vec3<f32> { return at.colour.rgb; }");
-    let signature = MaterialError::Signature {
-        label: "ground".into(),
-    };
+    let signature = MaterialError::Signature { label: "ground" };
     assert_eq!((missing, other), (Err(signature.clone()), Err(signature)));
+}
+
+#[test]
+fn an_entry_point_named_as_the_renderers_is_refused_naming_it() {
+    let refused = given("fn material(at: MaterialInput) -> vec4<f32> { return at.colour; }\n@fragment fn fs_material() -> @location(0) vec4<f32> { return vec4(1.0); }")
+        .expect_err("refused");
+    assert_eq!(
+        refused,
+        MaterialError::Reserved {
+            label: "ground",
+            name: "fs_material".into()
+        }
+    );
+}
+
+#[test]
+fn a_material_taking_derivatives_of_its_input_is_held() {
+    let ok = given(
+        "fn material(at: MaterialInput) -> vec4<f32> {\n    let ramp = fwidth(at.world.xz) + abs(dpdx(at.world.xz)) + abs(dpdy(at.world.xz));\n    return at.colour * min(ramp.x + ramp.y, 1.0);\n}",
+    );
+    assert!(ok.is_ok(), "{ok:?}");
 }

@@ -44,8 +44,6 @@ pub enum FrameError {
         node: NodeId,
         /// The material it names.
         material: MaterialId,
-        /// The material's label.
-        label: String,
         /// How many materials were built.
         built: usize,
     },
@@ -96,11 +94,10 @@ impl fmt::Display for FrameError {
             Self::MaterialMissing {
                 node,
                 material,
-                label,
                 built,
             } => write!(
                 f,
-                "{node} names {material} (`{label}`), and this renderer built {built} materials when it mounted: give every material to the Meshes before mounting the renderer"
+                "{node} names {material}, and this renderer built {built} materials when it mounted: give every material to the Meshes before mounting the renderer"
             ),
             Self::NotReady => write!(
                 f,

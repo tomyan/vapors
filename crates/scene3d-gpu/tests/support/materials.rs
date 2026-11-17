@@ -9,15 +9,15 @@ pub const RED: [u8; 4] = [255, 0, 0, 255];
 pub const BLUE: [u8; 4] = [0, 0, 255, 255];
 
 /// A material whose WGSL body is `body`, given `at`.
-pub fn returning(label: &str, body: &str) -> Material {
+pub fn returning(label: &'static str, body: &str) -> Material {
     Material {
-        label: label.into(),
+        label,
         wgsl: format!("fn material(at: MaterialInput) -> vec4<f32> {{ {body} }}"),
     }
 }
 
 /// A material drawing `rgba` everywhere.
-pub fn flat(label: &str, [r, g, b, _]: [u8; 4]) -> Material {
+pub fn flat(label: &'static str, [r, g, b, _]: [u8; 4]) -> Material {
     let [r, g, b] = [r, g, b].map(|c| f32::from(c) / 255.0);
     returning(label, &format!("return vec4({r:?}, {g:?}, {b:?}, 1.0);"))
 }

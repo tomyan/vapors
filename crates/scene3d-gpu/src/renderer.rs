@@ -85,7 +85,7 @@ impl SurfaceRenderer for SceneRenderer {
         let mut scene = self.scene.borrow_mut();
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
-        materials_built(&nodes, &meshes, mounted.pipeline.materials.len())?;
+        materials_built(&nodes, mounted.pipeline.materials.len())?;
         mounted.geometry.upload_missing(&frame, &nodes);
         mounted
             .camera
