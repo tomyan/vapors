@@ -165,11 +165,27 @@ The six recommendations of the first draft are taken:
     waits for W4's measurement of draws against fragment work (F3.3,
     the question below). Batches whose frame is scrolled out are still
     not drawn, as today.
-11. **Freed entries.** A freed entry is written with a NaN rectangle in
-    every build. A kept instance that still named it would cover
-    nothing, and the debug `kept_bytes` compare, extended to the clip
-    index, fails on it. Test:
-    `a_freed_clip_entry_named_by_kept_bytes_fails_the_compare`.
+11. **Freed entries.** The checks, in order:
+    - **The CPU invariant, in every build:** no kept batch names a
+      freed clip entry. When the painter gives an entry back, every
+      batch that names it is already marked to be built again (the
+      painter keeps, per entry, the batches naming it), asserted at the
+      free: O(batches naming it). When a batch's bytes are built, each
+      instance's clip index is looked up live as its bytes are written,
+      and a dead one panics naming the batch and the index: no work
+      beyond the per-instance write the rebuild already does. Test:
+      `a_batch_naming_a_freed_clip_entry_panics_at_its_rebuild`.
+    - **The debug compare:** `kept_bytes`, extended to the clip index,
+      fails on a kept instance naming a freed or reused entry. Test:
+      `a_freed_clip_entry_named_by_kept_bytes_fails_the_compare`.
+    - **The backstop, declared relaxed:** a freed entry is written with
+      a NaN rectangle in every build, so a stale reference the two
+      checks above missed covers nothing. In release that is missing
+      content with no error, since the GPU cannot report it; it stays
+      only as a backstop behind the CPU invariant, and is retired if
+      the GPU gains a way to report it (a debug readback in a test is
+      the nearest today).
+
     Removing one box's instances from a batch joined across its clips
     builds that batch's bytes again, as a changed item does today.
 12. **The device.** The fragment stage reads two storage buffers (the
@@ -178,9 +194,22 @@ The six recommendations of the first draft are taken:
     wgpu's default of 8 (`vapors_gpu::raised_limits`), so F3 adds no
     limit there. A table past `max_storage_buffer_binding_size` is
     refused by `ArenaFull`, as the transform table's is. The clip
-    shader's compile is checked under Chromium by the page-contract
-    case, whose demos draw clipped content, and on the Pixel 9 Pro by
-    hand at F3.1's end.
+    shader's compile is checked under Chromium by the page contract,
+    and on the Pixel 9 Pro by hand at F3.1's end. The contract compiles
+    every 2D pipeline, not only those its pages draw with: `Painter::new`
+    builds each of its pipelines (quads, shadows, closed forms, meshes,
+    text, images) when it is made (`app/src/painter.rs`), and one-scene
+    F0's rule that every pipeline is built before the first frame,
+    pinned by `gpu_app_start.rs`
+    `gpu_a_started_app_builds_no_pipeline_in_its_first_frame`, keeps it
+    so: a pipeline made lazily would be built in a frame and refused.
+    Every elements demo the contract opens therefore has Chromium's
+    compiler compile every 2D shader with `clip.wgsl` concatenated, and
+    a compile error stops the page through the uncaptured-error watch
+    (`platform/src/gpu_watch.rs`), which fails the case. The scene
+    pipelines (`closed_forms_3d.rs`, `meshes_3d.rs`, `projective.rs`)
+    are compiled only by the scene pages (one-scene, racer); F3 does not
+    change them.
 13. **Rounded radii (F3.2).** A clip's radii are its padding box's: the
     border radius less the border width, clamped at 0, after CSS's
     rule that scales all radii down when adjacent ones exceed a side.
