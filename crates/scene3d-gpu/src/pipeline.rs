@@ -21,7 +21,11 @@ pub(crate) struct Pipeline {
 }
 
 impl Pipeline {
-    pub(crate) fn new(device: &wgpu::Device, materials: &[Material]) -> Self {
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        materials: &[Material],
+        samples: vapors_renderer::Samples,
+    ) -> Self {
         let layouts = ProjectiveLayouts::new(device);
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene3d"),
@@ -32,21 +36,21 @@ impl Pipeline {
         let shader = shader(device, "scene3d", source);
         let materials = materials
             .iter()
-            .map(|material| material_pipeline(device, &layout, material))
+            .map(|material| material_pipeline(device, (&layout, material), samples))
             .collect();
         Self {
-            render: render_pipeline(device, &layout, &shader, ("vs_main", "fs_main")),
+            render: render_pipeline(device, (&layout, &shader), ("vs_main", "fs_main"), samples),
             materials,
             layouts,
         }
     }
 }
 
-/// The pipeline drawing meshes with `material`.
+/// The pipeline drawing meshes with `material`, at the pass's `samples`.
 fn material_pipeline(
     device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    material: &Material,
+    (layout, material): (&wgpu::PipelineLayout, &Material),
+    samples: vapors_renderer::Samples,
 ) -> wgpu::RenderPipeline {
     let own = material.wgsl.as_str();
     let source = [
@@ -57,7 +61,8 @@ fn material_pipeline(
     ]
     .concat();
     let shader = shader(device, material.label, source);
-    render_pipeline(device, layout, &shader, ("vs_material", "fs_material"))
+    let entries = ("vs_material", "fs_material");
+    render_pipeline(device, (layout, &shader), entries, samples)
 }
 
 fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderModule {
@@ -72,9 +77,9 @@ fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderMod
 
 fn render_pipeline(
     device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    shader: &wgpu::ShaderModule,
+    (layout, shader): (&wgpu::PipelineLayout, &wgpu::ShaderModule),
     (vertex, fragment_entry): (&str, &str),
+    samples: vapors_renderer::Samples,
 ) -> wgpu::RenderPipeline {
     let buffers = [Some(wgpu::VertexBufferLayout {
         array_stride: VERTEX_BYTES as u64,
@@ -95,7 +100,7 @@ fn render_pipeline(
             fragment: Some(fragment(shader, fragment_entry)),
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: Some(depth_test()),
-            multisample: wgpu::MultisampleState::default(),
+            multisample: samples.state(),
             multiview_mask: None,
             cache: None,
         },

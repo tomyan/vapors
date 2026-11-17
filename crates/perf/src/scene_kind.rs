@@ -48,14 +48,14 @@ impl SceneKind {
         }
     }
 
-    /// Its driven workload.
+    /// Its driven workload, its painters drawing at `samples`.
     ///
     /// # Errors
     /// It cannot be mounted.
-    pub fn workload(self) -> Result<Box<dyn Workload>, String> {
+    pub fn workload(self, samples: vapors_renderer::Samples) -> Result<Box<dyn Workload>, String> {
         Ok(match self {
-            Self::Racer => Box::new(DrivenRacer::new()),
-            Self::OneScene => Box::new(DrivenScene::new()?),
+            Self::Racer => Box::new(DrivenRacer::at(samples)),
+            Self::OneScene => Box::new(DrivenScene::at(samples)?),
         })
     }
 

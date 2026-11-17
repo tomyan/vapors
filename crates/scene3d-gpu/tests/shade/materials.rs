@@ -4,12 +4,13 @@
 //! viewport and the viewport's size, the mesh's colour and the vertex
 //! shade; meshes on two materials and on their colour each draw with
 //! their own; and draws keep the tree's order, so of two at one depth
-//! the first in the tree wins.
+//! the first in the tree wins. A material draws in a 4-sample pass too.
 
 use super::support::materials::{
     BLUE, RED, flat, looking_down, returning, square_in_view, with_material,
 };
-use super::support::{SIZE, at, render};
+use super::support::{SIZE, at, render, render_sized};
+use vapors_renderer::Samples;
 use vapors_scene3d::{Transform, Vec3};
 
 #[test]
@@ -108,6 +109,21 @@ fn gpu_of_two_meshes_at_one_depth_the_first_in_the_tree_wins_whatever_draws_them
     let pixels = render(&mut renderer, &gpu).expect("renders");
 
     // Then: the first's, as drawn in tree order (depth `Less`)
+    assert_eq!(at(&pixels, SIZE.width / 2, SIZE.height / 2), RED);
+}
+
+#[test]
+fn gpu_a_material_draws_in_a_4_sample_pass() {
+    // Given: a square on a material, its renderer at 4 samples
+    let gpu = vapors_gpu_harness::gpu();
+    let (fixture, node) = square_in_view(BLUE);
+    with_material(&fixture, node, flat("four", RED));
+    let mut renderer = fixture.renderer_at(&gpu, (SIZE, Samples::Four));
+
+    // When
+    let (pixels, ..) = render_sized(&mut renderer, &gpu, SIZE).expect("renders");
+
+    // Then: the material's colour
     assert_eq!(at(&pixels, SIZE.width / 2, SIZE.height / 2), RED);
 }
 

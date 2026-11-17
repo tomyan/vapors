@@ -1075,7 +1075,21 @@ FXAA over scene ranges later (`3d-engine-parity.md` Q1): blurs text and
 decals in the scene. Recommend (a), subject to F7's number on the UHD
 630; if 4x costs over a stated share of the frame there (a tenth of
 16.7 ms, say), (b) for desktop and (a) on tilers, chosen per adapter and
-reported.
+reported. **Answered by F7b (2026-11-17), at 1100 x 720:** (a) stands.
+On the UHD 630, 4 samples cost at most 1.34 ms of GPU time a frame (1.33
+to 1.35 over 3 runs), on the one-scene example at 1100 x 720 with its
+page and its scene both at 4; the painter's pass alone cost 0.25 ms on
+3000 rows (640 x 400) and 0.70 ms on the racing racer (1100 x 720). Each
+is under 1.67 ms, so (b) per adapter is not built
+(`docs/perf/f7b-msaa-2026-11-17.md`, measured at dad11c98, with #480).
+The cost is 1.69 ms a megapixel on one-scene, so the limit is reached at
+about 0.99 MP and a 1920 x 1080 window would cost about 3.5 ms: (a) is
+checked at 1100 x 720 only, and whether a larger window calls for (b)
+is open. The Pixel 9 Pro's numbers are
+pending (the report's "The Pixel 9 Pro"), and F7's acceptance stays open
+until they are in. They do not decide D2: its rule is the UHD 630's
+cost, and both (a) and (b) draw at 4x on tilers. They say whether 4x is
+affordable on a tiler at all.
 
 **D3. Text under a scale animation.** (a) Chromium's rule: the glyphs
 rasterised at the start scale are resampled during the animation and

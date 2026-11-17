@@ -83,7 +83,9 @@ pub(crate) struct Pass<'a> {
     pub(crate) pipelines: (&'a wgpu::RenderPipeline, &'a [wgpu::RenderPipeline]),
     pub(crate) camera: &'a wgpu::BindGroup,
     pub(crate) slots: &'a wgpu::BindGroup,
-    pub(crate) colour: &'a wgpu::TextureView,
+    /// The view drawn into: the multisampled one at 4 samples, resolved
+    /// into the backing's, else the backing's.
+    pub(crate) colour: (Option<&'a wgpu::TextureView>, &'a wgpu::TextureView),
     pub(crate) depth: &'a wgpu::TextureView,
     /// Counts each draw.
     pub(crate) work: &'a WorkCounter,
@@ -116,15 +118,7 @@ pub(crate) fn record(encoder: &mut wgpu::CommandEncoder, pass: &Pass<'_>, draws:
 fn begin<'e>(encoder: &'e mut wgpu::CommandEncoder, pass: &Pass<'_>) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("scene3d"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: pass.colour,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
+        color_attachments: &[Some(colour_attachment(pass.colour))],
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
             view: pass.depth,
             depth_ops: Some(wgpu::Operations {
@@ -137,4 +131,26 @@ fn begin<'e>(encoder: &'e mut wgpu::CommandEncoder, pass: &Pass<'_>) -> wgpu::Re
         occlusion_query_set: None,
         multiview_mask: None,
     })
+}
+
+/// The pass clears its colour to transparent each frame. At 4 samples
+/// it draws into the multisampled view and resolves into the backing's,
+/// discarding the samples: nothing loads them.
+fn colour_attachment<'a>(
+    (multisampled, backing): (Option<&'a wgpu::TextureView>, &'a wgpu::TextureView),
+) -> wgpu::RenderPassColorAttachment<'a> {
+    let store = if multisampled.is_some() {
+        wgpu::StoreOp::Discard
+    } else {
+        wgpu::StoreOp::Store
+    };
+    wgpu::RenderPassColorAttachment {
+        view: multisampled.unwrap_or(backing),
+        depth_slice: None,
+        resolve_target: multisampled.map(|_| backing),
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            store,
+        },
+    }
 }

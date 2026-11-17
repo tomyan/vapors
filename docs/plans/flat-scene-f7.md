@@ -113,12 +113,14 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    it would need a copy pass (Q4).
 4. **Timing.** A script runs each page at 1 and 4 samples and reads
    `GpuTimer`: the rows page, W10 and the racer page. W10 is added by
-   F3, which F7 follows; F7b stops and reports if it is not on main. For
+   F3; it was not on main when F7b ran, so the report measures the
+   other pages and marks W10's row pending F3.2 (lead, L28). For
    the racer, the painter's pass is timed at 4x. The racer's own 3D
    pass is a different renderer and stays at 1x, so 3D at 4x is
    measured on the one-scene example instead (Q5). The UHD 630 is run
    by the script; the Pixel 9 Pro is run by hand from a served build
-   that has a sample-count switch, debug only.
+   with a sample-count switch, `?samples=1|4`, in every build: a debug
+   build would time debug code.
 5. **The cube edge.** A tilted cube drawn through the scene pass's mesh
    pipeline (`ProjectiveMeshes`) into an offscreen target, at 1 and 4
    samples, against a reference drawn at 8 times the size and averaged

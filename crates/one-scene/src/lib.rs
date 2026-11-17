@@ -14,6 +14,7 @@ use std::time::Duration;
 use vapors_app::{ElementsApp, FrameCounts, FrameTiming, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, Start};
+use vapors_renderer::Samples;
 use vapors_scene3d::{CameraHandle, Meshes, Projection, Scene};
 use vapors_scene3d_gpu::SceneRenderer;
 use vapors_signals::Signal;
@@ -55,11 +56,20 @@ impl OneScene {
     /// # Errors
     /// The renderer cannot be mounted, or the geometry is refused.
     pub fn new(limit: Option<u64>) -> Result<Self, String> {
+        Self::at(limit, Samples::One)
+    }
+
+    /// As [`OneScene::new`], its page and its scene drawn at `samples`
+    /// (`docs/plans/flat-scene-f7.md`).
+    ///
+    /// # Errors
+    /// As [`OneScene::new`].
+    pub fn at(limit: Option<u64>, samples: Samples) -> Result<Self, String> {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
-        let mut app = ElementsApp::new(Rc::clone(&document));
+        let mut app = ElementsApp::new(Rc::clone(&document)).with_samples(samples);
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));
-        let surface = mount_renderer(&mut app, &scene, &meshes)?;
+        let surface = mount_renderer(&mut app, (&scene, &meshes), samples)?;
         let clock = Clock::new(surface.clone(), limit);
         let props = props(&scene, &meshes, surface, (clock.time, clock.frames))?;
         let body = document.borrow().body();
@@ -108,15 +118,21 @@ impl OneScene {
     pub fn time_frames(&mut self, on: bool) {
         self.app.time_frames(on);
     }
+
+    /// Writes its GPU time to the status line once a second
+    /// ([`ElementsApp::show_gpu_time`]).
+    pub fn show_gpu_time(&mut self) {
+        self.app.show_gpu_time();
+    }
 }
 
 /// A `SceneRenderer` of `scene` on the surface `view`, animating.
 fn mount_renderer(
     app: &mut ElementsApp,
-    scene: &Rc<RefCell<Scene>>,
-    meshes: &Rc<RefCell<Meshes>>,
+    (scene, meshes): (&Rc<RefCell<Scene>>, &Rc<RefCell<Meshes>>),
+    samples: Samples,
 ) -> Result<SurfaceHandle, String> {
-    let renderer = SceneRenderer::new(Rc::clone(scene), Rc::clone(meshes));
+    let renderer = SceneRenderer::new(Rc::clone(scene), Rc::clone(meshes)).with_samples(samples);
     let surface = app
         .mount("view", Box::new(renderer))
         .map_err(|e| e.to_string())?;
@@ -168,11 +184,13 @@ impl App for OneScene {
 }
 
 /// Runs the example in a window (natively) or the page (on the web),
-/// for `limit` frames or for ever.
+/// for `limit` frames or for ever; when `readout` is given, its page
+/// and scene drawn at those samples and its GPU time written to the
+/// status line once a second (a run by hand).
 ///
 /// # Errors
 /// It cannot be made, or the window's loop failed.
-pub fn run(limit: Option<u64>) -> Result<(), String> {
+pub fn run(limit: Option<u64>, readout: Option<Samples>) -> Result<(), String> {
     vapors_platform::app_draws_open();
     vapors_platform::hide_status_line();
     let options = vapors_platform::WindowOptions {
@@ -181,5 +199,9 @@ pub fn run(limit: Option<u64>) -> Result<(), String> {
         width: SIZE.0,
         height: SIZE.1,
     };
-    vapors_platform::run(options, OneScene::new(limit)?).map_err(|error| error.to_string())
+    let mut scene = OneScene::at(limit, readout.unwrap_or(Samples::One))?;
+    if readout.is_some() {
+        scene.show_gpu_time();
+    }
+    vapors_platform::run(options, scene).map_err(|error| error.to_string())
 }
