@@ -236,6 +236,7 @@ fn main() -> ExitCode {
             match tier {
                 Tier::Unit => steps::unit_tests(),
                 Tier::Gpu => steps::gpu_tests(),
+                Tier::Host => steps::host_tests(),
                 Tier::Pmu => steps::pmu_tests(),
             }
         }
