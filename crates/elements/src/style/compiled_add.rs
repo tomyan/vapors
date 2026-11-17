@@ -38,10 +38,10 @@ impl Sheets {
             SheetKind::Scope => self.add_scoped(sheet.name(), sheet.text()),
             SheetKind::Global => self.add_global(sheet.name(), sheet.text()),
         };
-        if let Some(held) = self.registered_mut(kind, sheet.name()) {
-            if held.text == sheet.text() {
-                held.claimed = sheet.hash();
-            }
+        if let Some(held) = self.registered_mut(kind, sheet.name())
+            && held.text == sheet.text()
+        {
+            held.claimed = sheet.hash();
         }
         added
     }
