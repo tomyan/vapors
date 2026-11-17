@@ -128,6 +128,18 @@ Each check is proven by a break.
 
 ## Questions for the lead
 
+Answered by the lead (2026-11-17): each recommendation below is taken.
+Two indices; the closed-form and mesh pipelines are included; the split
+is F2a, F2b, F2c; Tom checks the Pixel 9 Pro at F2a's end, from a build
+served on the tailnet.
+
+Decision (Tom, 2026-11-17, through the lead): a device without
+vertex-stage storage buffers is refused, naming the limit. There is no
+fallback path. What would retire this: a measurement of how many of
+the devices vapors targets lack them. If it is enough to matter, a
+fallback is designed then (for example, today's per-batch uniform
+kept as a second path).
+
 1. **Two indices, not one.** The instance carries `frame` (global,
    stable) and `row` (local to the batch's range, bound at a dynamic
    offset), for the reason in "The constraint". The cost is one more
