@@ -116,8 +116,8 @@ impl Pusher {
         let range = format!("{fork}..{tip}");
         let rev_list = bare_git(bare, &["rev-list", "--parents", &range])?;
         crate::api_push_history::linear(&rev_list, &fork)?;
-        let log = bare_git(bare, &["log", "--format=%an%n%cn%n%B", &range])?;
-        crate::api_push_text::published("the pushed commits' names and messages", &log)?;
+        let log = bare_git(bare, &["log", "--format=%an%n%ae%n%cn%n%ce%n%B", &range])?;
+        crate::api_push_text::published("the pushed commits' names, emails and messages", &log)?;
         for line in rev_list.lines() {
             let (commit, parent) = line.split_once(' ').unwrap_or((line, ""));
             self.diff_checked(bare, (parent, commit))

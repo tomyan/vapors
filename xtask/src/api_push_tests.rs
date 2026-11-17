@@ -100,9 +100,41 @@ mod history {
         let (pusher, tip) = repository(dir.path(), &[("crates/a.rs", Some("a\n"), "Fixes #7")]);
         let refused = pusher.checked(dir.path(), &tip).expect_err("refused");
         assert!(
-            refused.starts_with("the pushed commits' names and messages says"),
+            refused.starts_with("the pushed commits' names, emails and messages says"),
             "{refused}"
         );
+    }
+
+    #[test]
+    fn an_author_email_holding_a_control_byte_is_refused() {
+        // Given: an author email with an escape
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let (pusher, _) = repository(dir.path(), &[]);
+        std::fs::write(dir.path().join("crates.rs"), "x").expect("written");
+        git(dir.path(), &["add", "crates.rs"]).expect("added");
+        let author = "--author=t <t\u{1b}[2J@t>";
+        git(
+            dir.path(),
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "--quiet",
+                author,
+                "-m",
+                "m",
+            ],
+        )
+        .expect("committed");
+        let tip = git(dir.path(), &["rev-parse", "HEAD"]).expect("a tip");
+
+        // When
+        let refused = pusher.checked(dir.path(), &tip).expect_err("refused");
+
+        // Then
+        assert!(refused.contains("control character"), "{refused}");
     }
 
     #[test]

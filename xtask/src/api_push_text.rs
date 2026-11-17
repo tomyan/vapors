@@ -45,15 +45,17 @@ pub fn published(what: &str, text: &str) -> Result<(), String> {
     }
 }
 
-/// The first `@name` in `text`: an `@` not inside a word (an email
-/// address) and followed by a letter, digit or `-`.
+/// The first `@name` in `text`: an `@` not inside an email address
+/// (after an ASCII letter, digit, `_`, `.`, `+` or `-`) and followed by
+/// a letter, digit or `-`. ASCII only, as GitHub's mention filter reads a
+/// word boundary (`\W`): `é@name` is a mention there (re-verify, R1).
 fn mention(text: &str) -> Option<&str> {
     text.match_indices('@').find_map(|(at, _)| {
         let after = &text[at + 1..];
         let inside_word = text[..at]
             .chars()
             .next_back()
-            .is_some_and(char::is_alphanumeric);
+            .is_some_and(|c| c.is_ascii_alphanumeric() || "_.+-".contains(c));
         let named = after.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-');
         (named && !inside_word).then(|| &text[at..text.len().min(at + 20)])
     })

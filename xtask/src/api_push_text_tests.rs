@@ -8,7 +8,7 @@ fn plain_text_with_an_email_and_issue_talk_is_published() {
 
 #[test]
 fn every_mention_is_refused_not_only_the_first_at() {
-    for text in ["thanks @tomyan", "x@ @tomyan", "cc (@a-b)"] {
+    for text in ["thanks @tomyan", "x@ @tomyan", "cc (@a-b)", "é@tomyan"] {
         let refused = published("the PR body", text).expect_err(text);
         assert!(refused.contains("mentions"), "{text}: {refused}");
     }
