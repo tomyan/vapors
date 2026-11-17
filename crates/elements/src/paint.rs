@@ -50,6 +50,10 @@ pub(crate) struct PaintInput<'a> {
     /// is not finite in device pixels: painted, then refused by the
     /// update after paint (`paint_refusals.rs`), never shown.
     pub(crate) unresolvable: Vec<crate::paint_refusals::NotPlaced>,
+    /// The boxes whose clip chain has more links than
+    /// [`crate::MAX_CLIP_CHAIN`], with the count: refused by the update
+    /// after paint (`paint_refusals.rs`).
+    pub(crate) long_chains: Vec<(usize, usize)>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -83,6 +87,7 @@ impl<'a> PaintInput<'a> {
             lanes,
             class: None,
             unresolvable: Vec::new(),
+            long_chains: Vec::new(),
         }
     }
 

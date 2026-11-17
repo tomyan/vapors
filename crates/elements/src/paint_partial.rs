@@ -56,8 +56,11 @@ pub(crate) fn paint_partial(
     let shown_last = kept.then_some(painted.from.thumb_alpha);
     let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
     let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
+    let again_slots: Vec<usize> = again.iter().map(|(slot, _)| *slot).collect();
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
+    let long = crate::clip_chain_frames::long_chains(&order, &mut painted, &again_slots);
+    input.long_chains.extend(long);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
     crate::paint_lane_ink::note_painted(&mut painted, input, (walked(&order), &patched));

@@ -41,19 +41,25 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
-            let border_box = input.snapped(self.rects[slot]);
-            match not_placed(&kept, border_box) {
-                Some(part) => input.unresolvable.push(NotPlaced { slot, part }),
-                #[cfg(debug_assertions)]
-                None => crate::repaint_check::assert_painted_whole(&kept, border_box, slot, input),
-                #[cfg(not(debug_assertions))]
-                None => {}
-            }
+            self.check_placed(slot, &kept, input);
             input.class = None;
             kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
             painted.items_built += kept.items();
             painted.kept_boxes[slot] = Some(kept);
+        }
+    }
+
+    /// Records box `slot`'s part as not placed when a coordinate is not
+    /// finite; a debug build checks a placed one is painted whole.
+    fn check_placed(&self, slot: usize, kept: &KeptBox, input: &mut PaintInput<'_>) {
+        let border_box = input.snapped(self.rects[slot]);
+        match not_placed(kept, border_box) {
+            Some(part) => input.unresolvable.push(NotPlaced { slot, part }),
+            #[cfg(debug_assertions)]
+            None => crate::repaint_check::assert_painted_whole(kept, border_box, slot, input),
+            #[cfg(not(debug_assertions))]
+            None => {}
         }
     }
 

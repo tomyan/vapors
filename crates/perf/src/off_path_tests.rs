@@ -8,7 +8,7 @@ use crate::run::Workload;
 fn every_kind_and_change_makes_three_changes() {
     for kind in Kind::ALL {
         for &change in kind.changes() {
-            let mut workload = OffPath::new(kind, 200, change);
+            let mut workload = OffPath::timed(kind, 200, change);
             for sample in 0..3 {
                 workload.change(sample);
             }
@@ -19,7 +19,7 @@ fn every_kind_and_change_makes_three_changes() {
 #[test]
 fn an_edit_reaches_the_documents_middle_unit() {
     // Given
-    let mut workload = OffPath::new(Kind::NestedScrollers, 60, OffPathChange::Edit);
+    let mut workload = OffPath::timed(Kind::NestedScrollers, 60, OffPathChange::Edit);
     let value = workload.page.units[30].value;
 
     // When
@@ -31,8 +31,8 @@ fn an_edit_reaches_the_documents_middle_unit() {
 
 #[test]
 fn insert_alternates_insert_and_remove_frames_and_the_rest_one_kind() {
-    let insert = OffPath::new(Kind::CodeBlocks, 200, OffPathChange::Insert);
+    let insert = OffPath::timed(Kind::CodeBlocks, 200, OffPathChange::Insert);
     assert_eq!(insert.frame_kinds(), ["insert", "remove"]);
-    let edit = OffPath::new(Kind::CodeBlocks, 200, OffPathChange::Edit);
+    let edit = OffPath::timed(Kind::CodeBlocks, 200, OffPathChange::Edit);
     assert_eq!(edit.frame_kinds(), ["every"]);
 }

@@ -100,7 +100,7 @@ pub fn off_path_workloads() -> Vec<(String, (Option<usize>, Make))> {
     for kind in Kind::ALL {
         for count in SIZES {
             for &change in kind.changes() {
-                let make: Make = Box::new(move || Box::new(OffPath::new(kind, count, change)));
+                let make: Make = Box::new(move || Box::new(OffPath::timed(kind, count, change)));
                 let name = format!("{count} {}, {change:?}", kind.noun());
                 all.push((name, (Some(count), make)));
             }
