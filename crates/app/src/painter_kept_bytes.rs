@@ -52,10 +52,9 @@ pub(crate) struct RunBytes {
 /// `run`'s instance or vertex bytes, as its pipeline draws them, a
 /// shape run's entries from `shapes`; shadow, quad and shape items each
 /// in the transform table's entry `frame` and its row of `rows` (none for
-/// a batch in one frame). Images and surfaces, drawn an item at a time,
-/// carry their row in the shift; shapes and meshes are batched in their
-/// row's own frame (vapors-elements `framed_batches.rs` `resolved`), so
-/// their `rows` are empty.
+/// a batch in one frame); meshes too, their item bytes the same layout
+/// though each item is its own draw. Images and surfaces carry their
+/// frame and row in their draw's uniform.
 ///
 /// # Errors
 /// A shape run naming an entry `shapes` cannot draw.
@@ -64,16 +63,24 @@ pub(crate) fn run_bytes(
     shapes: &ShapeStore,
 ) -> Result<RunBytes, PaintError> {
     if let Run::Meshes(items) = run {
-        let (instances, meshes) = shapes.mesh_instances(items).map_err(PaintError::Shape)?;
-        let bytes = MeshPipeline::bytes(&instances);
-        return Ok(RunBytes { bytes, meshes });
+        let run = shapes
+            .mesh_instances(items, rows)
+            .map_err(PaintError::Shape)?;
+        // meshes take no clip entry: their clip is the scissor until F3.1b
+        let (frame, _no_clip) = frame;
+        let bytes = MeshPipeline::bytes_in(&run.instances, frame, &run.rows);
+        return Ok(RunBytes {
+            bytes,
+            meshes: run.entries,
+        });
     }
     let bytes = match run {
         Run::Shadows(shadows) => ShadowPipeline::bytes_in(shadows, frame, rows),
         Run::Quads(quads) => QuadPipeline::bytes_in(quads, frame, rows),
         Run::Shapes(items) => {
-            let forms = shapes.closed_forms(items).map_err(PaintError::Shape)?;
-            ClosedFormPipeline::bytes_in(&forms, frame, rows)
+            let drawn = shapes.closed_forms_in(items, rows);
+            let (forms, rows) = drawn.map_err(PaintError::Shape)?;
+            ClosedFormPipeline::bytes_in(&forms, frame, &rows)
         }
         Run::Images(items) | Run::Surfaces(items) => {
             ImagePipeline::rect_bytes(items.iter().map(item_rect))
@@ -141,3 +148,7 @@ pub(crate) fn rows_fit(key: vapors_elements::BatchKey, needed: usize, range: usi
          reproduce with `cargo xtask test`"
     );
 }
+
+#[cfg(test)]
+#[path = "painter_kept_bytes_tests.rs"]
+mod tests;

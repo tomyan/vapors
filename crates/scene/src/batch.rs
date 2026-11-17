@@ -77,9 +77,10 @@ pub fn batched<I: Borrow<Item>>(
     batched
 }
 
-/// The rows of a lane one batch may hold, each item naming its row: the
-/// painter's table of row offsets holds this many (vapors-renderer's
-/// `RowOffsets::CAPACITY`), and a longer run is split into batches.
+/// The rows of a lane one batch may hold, each item naming its row: a
+/// batch's range in the painter's transform table holds this many
+/// (vapors-renderer `instanced_bytes.rs` `assert_rows` refuses more),
+/// and a longer run is split into batches.
 pub const ROWS_PER_BATCH: usize = 128;
 
 /// True when nothing `item` paints falls inside `view` cut to `clip`:

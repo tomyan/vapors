@@ -1,9 +1,5 @@
-//! An instanced pipeline's shader source, its bind group over the view
-//! slots and the two tables, and its instance attributes (`instanced.rs`).
-
-use crate::instanced_bytes::VIEW_SIZE;
-use crate::uniform_slots::UniformSlots;
-use crate::{ClipTable, TransformTable, WorkCounter};
+//! An instanced pipeline's shader source and its instance attributes
+//! (`instanced.rs`); its bind group is `table_binding.rs`'s.
 
 /// An instanced pipeline's shader source: the transform table, the clip
 /// table's prelude and shader (`clip.wgsl`), then the pipeline's own.
@@ -13,34 +9,6 @@ pub(crate) fn instanced_source(own: &str) -> String {
         include_str!("transform_table.wgsl"),
         crate::clip_prelude(),
         include_str!("clip.wgsl")
-    )
-}
-
-pub(crate) fn group(
-    device: &wgpu::Device,
-    (label, layout, work): (&str, &wgpu::BindGroupLayout, &WorkCounter),
-    (viewports, table, clips): (&UniformSlots<VIEW_SIZE>, &TransformTable, &ClipTable),
-) -> wgpu::BindGroup {
-    work.create_bind_group(
-        device,
-        &wgpu::BindGroupDescriptor {
-            label: Some(label),
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: viewports.binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: table.binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: clips.binding(),
-                },
-            ],
-        },
     )
 }
 

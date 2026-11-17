@@ -49,7 +49,7 @@ impl ShadowPipeline {
     /// # Panics
     ///
     /// When `rows` is neither empty nor one index an item, or names a row
-    /// past a batch's range ([`RowOffsets::CAPACITY`](crate::RowOffsets::CAPACITY)).
+    /// past a batch's range ([`ROWS_PER_BATCH`](vapors_scene::ROWS_PER_BATCH)).
     #[must_use]
     pub fn bytes_in(shadows: &[Shadow], (frame, clip): (u32, u32), rows: &[u32]) -> Vec<u8> {
         rowed_instances(

@@ -18,7 +18,7 @@
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{
     ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
-    Target,
+    Target, TransformTable,
 };
 use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
@@ -102,7 +102,7 @@ impl ScenePainter {
         else {
             return Ok(());
         };
-        let (range, shift) = (kept.range, moved.shift);
+        let range = kept.range;
         let table = (&mut self.transforms.table, &mut self.clips.table, rows_base);
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, table),
@@ -110,11 +110,12 @@ impl ScenePainter {
             Run::Shapes(_) => self.closed_forms.draw_kept(target, range, table),
             Run::Meshes(_) => {
                 let shapes = (&self.shapes, &mut self.mesh_entries);
+                let (transforms, _no_clips, rows_base) = table;
                 draw_meshes(
                     &mut self.meshes,
                     shapes,
                     target,
-                    (range, kept.meshes, unrowed(shift, rows)),
+                    (range, kept.meshes, (transforms, rows_base)),
                 )?;
             }
             Run::Images(items) => {
@@ -223,26 +224,6 @@ impl Pipelines<'_> {
     }
 }
 
-/// `shift`, for a mesh batch, which is batched in one frame
-/// (vapors-elements `framed_batches.rs` `resolved`): drawn at that
-/// frame's shift, with no rows (meshes move to the transform table in
-/// flat-scene F2.3).
-///
-/// # Panics
-///
-/// When the batch has rows: the mesh pipeline has no table of row
-/// offsets, so every row would draw at the first's place.
-fn unrowed(shift: vapors_renderer::Shift, rows: &[u32]) -> vapors_renderer::Shift {
-    assert!(
-        rows.is_empty(),
-        "a mesh batch spans {} items' rows, and its pipeline takes no table of row \
-         offsets: shapes and meshes in a lane row are batched in the row's frame \
-         (vapors-elements framed_batches.rs `resolved`); reproduce with `cargo xtask test`",
-        rows.len()
-    );
-    shift
-}
-
 /// The blend a text or icon run draws with.
 fn blend(run: &Run) -> BlendParams {
     match run {
@@ -265,7 +246,7 @@ fn item_place(
 }
 
 /// Draws a mesh batch's instances `range` holds, its items' entries
-/// `items` from `shapes`, moved by `shift`.
+/// `items` from `shapes`, placed through `table` from its rows' first.
 ///
 /// # Errors
 /// An item whose entry the store has not uploaded.
@@ -273,10 +254,10 @@ fn draw_meshes(
     meshes: &mut MeshPipeline,
     (shapes, entries): (&ShapeStore, &mut vapors_renderer::MeshEntries),
     target: &Target<'_>,
-    (range, items, shift): (&KeptRange, &[usize], vapors_renderer::Shift),
+    (range, items, table): (&KeptRange, &[usize], (&mut TransformTable, u32)),
 ) -> Result<(), PaintError> {
     let drawn = shapes.uploaded(items).map_err(PaintError::Shape)?;
-    meshes.draw_kept(target, range, shift, (entries, drawn.as_slice()));
+    meshes.draw_kept(target, range, table, (entries, drawn.as_slice()));
     Ok(())
 }
 

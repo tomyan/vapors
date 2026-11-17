@@ -1,5 +1,4 @@
-//! The hash uniform values and row offset tables are found by
-//! (`uniform_slots.rs`, `row_offsets.rs`).
+//! The hash uniform values are found by (`uniform_slots.rs`).
 
 /// Hashes a uniform value eight bytes at a time (an `FxHash`-style
 /// multiply and rotate): a value is up to a kilobyte, looked up on every

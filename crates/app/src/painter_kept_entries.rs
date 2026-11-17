@@ -10,11 +10,10 @@ use crate::painter::ScenePainter;
 use crate::painter::rows::Moved;
 
 impl ScenePainter {
-    /// For the runs placed through the transform table (all but meshes):
-    /// their frame's entry, set to its shift, their clip's entry (0 for
-    /// none, and for the runs still under the scissor until F3.1b:
-    /// `painter_clips.rs`), and the first of their lane part's rows'
-    /// entries (0 for a batch in one frame); zeros for meshes. `None` when
+    /// A run's frame's entry in the transform table, set to its shift;
+    /// its clip's entry (0 for none, and for the runs still under the
+    /// scissor until F3.1b: `painter_clips.rs`); and the first of its
+    /// lane part's rows' entries (0 for a batch in one frame). `None` when
     /// a table could not grow (the refusal is on the target's encoder).
     pub(super) fn table_entries(
         &mut self,
@@ -22,9 +21,6 @@ impl ScenePainter {
         run: &Run,
         moved: &Moved<'_>,
     ) -> Option<(u32, u32, u32)> {
-        if matches!(run, Run::Meshes(_)) {
-            return Some((0, 0, 0));
-        }
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;

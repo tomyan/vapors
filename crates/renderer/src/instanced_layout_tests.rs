@@ -3,7 +3,8 @@
 //! size at 0, the rows' first entry at 8, within `VIEW_SIZE` bytes; and
 //! the table is the storage buffer at binding 1.
 
-use super::{VIEW_SIZE, instanced_source};
+use super::instanced_source;
+use crate::instanced_bytes::VIEW_SIZE;
 
 /// The view's members as (name, offset), its span, and the table's
 /// binding, in the shader `source` as naga lays the WGSL out.
