@@ -234,14 +234,75 @@ kept as a second path).
   and shapes can differ from before, more precisely, and text and
   images keep the old order until F2.2, so a row's glyphs and its box
   can round differently there. No test pins a large offset.
-- **Known term, owner F2.3 or later.** Row ranges are keyed by each
+- **Known term, retired in F2.2.** Row ranges were keyed by each
   batch's own key, where the old row tables were keyed by a part's
-  first batch (`painter_places.rs`). A part split into several batches,
-  for example a shadow batch and a quad batch, holds one range for each
-  batch, and an insert that moves its rows writes each range. That is
-  correct but writes more than one table per part did. F2.3, which
-  retires the old row tables, keys the ranges by part.
+  first batch (`painter_places.rs`), so a part split into several
+  batches held one range per batch and an insert wrote each. F2.2
+  retired the old row tables, and the ranges are keyed by the part's
+  first batch, one per part.
 - **Scroll writes.** A scroll writes one frame entry whatever the
   list's length, pinned on a ten-row list (`gpu_kept_scroll.rs`). The
   plan's 3,000-row figure has no test of its own.
+
+## As built: F2.2
+
+- **Images and surfaces** are drawn one item at a time, so their frame's
+  entry and their row's entry go in the draw's uniform: the size, the
+  frame entry and the row entry, 16 bytes. Their vertex bytes are
+  unchanged. The view group binds the table at binding 1, with the
+  instanced pipelines' layout.
+- **Text and icons.**
+  - Each vertex carries its row's index and its frame's entry (36 to 40
+    bytes). That is 24 bytes more per glyph (six vertices), about 11%
+    more kept text memory and text upload on a rebuild; a 13-glyph run
+    keeps 3120 bytes where it kept 2816 (`gpu_frame_counts_kinds.rs`). Every vertex of an F2
+    batch has the same frame, so the frame could go in the params
+    uniform, which has 12 spare bytes. It stays per vertex because F3
+    joins batches across frames (`flat-scene.md`, the F3 row), and a
+    joined batch's glyphs are then in different frames.
+  - The params uniform is gamma, contrast, the viewport and the draw's
+    first row entry (32 bytes, where it was 32 plus a 1 KiB row table).
+  - The table is at binding 3.
+  - Kept text is built again when its frame's entry changes, like the
+    other kept bytes, and its rows are held to their range
+    (`rows_in_range`).
+- **One table a pipeline.** The image and text pipelines refuse a
+  second table, as the instanced ones do. Each has its own identity
+  table for immediate draws, and counts that table's first write.
+- **Retired in the app.** Nothing reads the uniform row tables any
+  more. `RowTables`, the places' table of `RowOffsets`, `Moved::table`
+  and `Moved::item_shift` are gone. `Moved::item_row` gives an image or
+  surface item's row, keeping the refusal for an item with no row.
+- **Left for F2.3:** the mesh pipeline (still on `Shift`), the shape
+  batch cut, and the renderer's `Shift` and `RowOffsets` types
+  (`RowOffsets::CAPACITY` still caps a batch's range at 128 rows).
+- **Kept bytes and a range that changes.** A batch keeps its key, and
+  so its kept bytes, while its rows' offsets change: vapors-elements
+  matches keys on the items' rows, not on the rows' offsets
+  (`kept_batches_keys.rs` `same`). The range a batch's bytes are drawn
+  with can therefore shrink after the bytes were built, which the
+  build-time check (`rows_in_range`) does not see. Each kept batch
+  records the rows its bytes name (the highest row and one), and every
+  draw from kept bytes, in every build, refuses a range that holds
+  fewer (`rows_fit`, O(1)).
+
+### After the review of F2.2 (issuecomment-6939479919)
+
+- **Kept text in rows is tested on the kept path.** The lane text test
+  inserted a row, which gives every visible batch new item rows and so
+  rebuilds them. It now grows the first row instead: the rows below
+  move, their batches keep their bytes, and the test asserts the text
+  was drawn with nothing written. A second test compares the first two
+  rows with a page of those two alone (no lane), because a break in the
+  shared draw also breaks the fresh painter the first test compares
+  with.
+- **Both `rows_fit` call sites have a test.** GPU tests call
+  `KeptGpu::range` and `text_range` with a range that fits, then with
+  one row fewer, and expect the refusal.
+- **`TextGpu::new` takes `rows_needed`**, as `Gpu` is built with it.
+- **Bind groups are keyed by both generations** (`Generations`, a
+  pair), not two counters packed into a `u64`.
+- **One range per lane part is tested:** rows with a shadow and a
+  background (two batches a part) rewrite one range's rows after an
+  insert.
 

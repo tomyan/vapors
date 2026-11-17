@@ -2,7 +2,7 @@
 //! the new view.
 
 use vapors_gpu_harness::gpu;
-use vapors_renderer::{UniformSlots, WorkCounter};
+use vapors_renderer::{TransformTable, UniformSlots, WorkCounter};
 
 use crate::atlas_texture::AtlasTexture;
 use crate::pipeline::{PARAMS_SIZE, bind_group};
@@ -17,8 +17,9 @@ fn made_for_a_draw(
     let work = WorkCounter::default();
     let layout = bind_group_layout(device);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
-    atlas.bind_group(params.generation(), |view| {
-        bind_group(device, &work, &layout, view, &sampler, params)
+    let table = TransformTable::new(device, "test transforms");
+    atlas.bind_group((false, (params.generation(), table.generation())), |view| {
+        bind_group(device, &work, &layout, view, &sampler, (params, &table))
     });
     work.take().bind_groups_made
 }

@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, clear};
+use vapors_renderer::{FrameEncoder, TransformTable, clear};
 use vapors_scene::{Color, Size};
 use vapors_shapes::IconPath;
 use vapors_text::{
@@ -33,6 +33,8 @@ pub struct Painter {
     pub system: FontSystem,
     pub atlas: GlyphAtlas,
     pub pipeline: TextPipeline,
+    /// The transform table the pipeline's kept draws bind.
+    pub table: TransformTable,
 }
 
 /// What one draw produced: the target's pixels and the atlas bytes uploaded.
@@ -50,11 +52,13 @@ impl Painter {
         let gpu = gpu();
         let atlas = GlyphAtlas::new(config);
         let pipeline = TextPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm, &atlas);
+        let table = TransformTable::new(&gpu.device, "test transforms");
         Self {
             gpu,
             system: FontSystem::bundle_only(),
             atlas,
             pipeline,
+            table,
         }
     }
 
@@ -108,13 +112,32 @@ impl Painter {
             &RenderTarget<'_>,
         ) -> Result<(), AtlasError>,
     ) -> Drawn {
+        self.frame_with_table(|pipeline, atlas, target, _| paint(pipeline, atlas, target))
+    }
+
+    /// As [`Painter::frame`], `paint` given the transform table too.
+    pub fn frame_with_table(
+        &mut self,
+        paint: impl FnOnce(
+            &mut TextPipeline,
+            &mut GlyphAtlas,
+            &RenderTarget<'_>,
+            &mut TransformTable,
+        ) -> Result<(), AtlasError>,
+    ) -> Drawn {
         let gpu = &self.gpu;
         self.atlas.begin_frame();
         let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, WHITE);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let encoder = FrameEncoder::new(&gpu.device);
         let target = target(gpu, &encoder, &view);
-        paint(&mut self.pipeline, &mut self.atlas, &target).expect("draws");
+        paint(
+            &mut self.pipeline,
+            &mut self.atlas,
+            &target,
+            &mut self.table,
+        )
+        .expect("draws");
         encoder.submit(&gpu.queue).expect("no draw refused");
         Drawn {
             pixels: read_rgba8(&gpu.device, &gpu.queue, &texture),

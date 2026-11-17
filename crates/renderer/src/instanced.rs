@@ -205,7 +205,7 @@ impl Instanced {
             Some(table) => (&mut self.table_group, table),
             None => (&mut self.own_group, &self.identity),
         };
-        let generation = joined(self.viewports.generation(), table.generation());
+        let generation = (self.viewports.generation(), table.generation());
         let (label, layout, work) = (self.label, &self.layout, &self.work);
         let viewports = &self.viewports;
         let group = kept_group.of(generation, || {
@@ -242,12 +242,6 @@ fn group(
             ],
         },
     )
-}
-
-/// One generation for a bind group over two buffers, each counted from 1
-/// and far below 2^32.
-fn joined(slots: u64, table: u64) -> u64 {
-    (slots << 32) | table
 }
 
 /// The instance attributes: `vec4s` four-float ones, then the row's index

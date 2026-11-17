@@ -31,10 +31,8 @@ pub struct ScenePainter {
     textures: Textures,
     surfaces: Surfaces,
     kept: KeptGpu,
-    /// Each lane batch's table of row offsets (`painter_rows.rs`).
-    row_tables: RowTables,
-    /// The frames' and lane batches' entries in the transform table that
-    /// the shadow, quad and shape pipelines read.
+    /// The frames' and lane parts' entries in the transform table that
+    /// every pipeline but the mesh pipeline reads.
     transforms: transforms::Transforms,
     /// Where each batch was drawn last frame (`painter_places.rs`).
     places: places::BatchPlaces,
@@ -93,7 +91,6 @@ impl ScenePainter {
             textures: Textures::default(),
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
-            row_tables: RowTables::default(),
             transforms: transforms::Transforms::new(device),
             places: places::BatchPlaces::default(),
             counts: FrameCounts::default(),
@@ -184,7 +181,6 @@ mod runs;
 #[path = "painter_transforms.rs"]
 mod transforms;
 use kept::KeptGpu;
-use rows::RowTables;
 #[cfg(debug_assertions)]
 #[path = "painter_kept_check.rs"]
 mod kept_check;

@@ -16,14 +16,14 @@ use vapors_text::{AtlasError, AtlasPins, GlyphAtlas, IconDraw, TextDraw, TextPip
 pub(super) fn run_bytes(
     atlas: &mut GlyphAtlas,
     painted: &Painted,
-    (run, rows): (&Run, &[u32]),
+    (run, frame, rows): (&Run, u32, &[u32]),
 ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
     match run {
         Run::Texts(items) => {
-            TextPipeline::text_bytes_in_rows(atlas, &text_draws(painted, items), rows)
+            TextPipeline::text_bytes_in(atlas, &text_draws(painted, items), (frame, rows))
         }
         Run::Icons(items) => {
-            TextPipeline::icon_bytes_in_rows(atlas, &icon_draws(painted, items), rows)
+            TextPipeline::icon_bytes_in(atlas, &icon_draws(painted, items), (frame, rows))
         }
         other => unreachable!("{other:?} is not a text or icon run"),
     }
@@ -35,14 +35,14 @@ pub(super) fn run_bytes(
 pub(super) fn run_placed_bytes(
     atlas: &GlyphAtlas,
     painted: &Painted,
-    (run, rows): (&Run, &[u32]),
+    (run, frame, rows): (&Run, u32, &[u32]),
 ) -> Option<Vec<u8>> {
     match run {
         Run::Texts(items) => {
-            TextPipeline::placed_text_bytes_in_rows(atlas, &text_draws(painted, items), rows)
+            TextPipeline::placed_text_bytes_in(atlas, &text_draws(painted, items), (frame, rows))
         }
         Run::Icons(items) => {
-            TextPipeline::placed_icon_bytes_in_rows(atlas, &icon_draws(painted, items), rows)
+            TextPipeline::placed_icon_bytes_in(atlas, &icon_draws(painted, items), (frame, rows))
         }
         other => unreachable!("{other:?} is not a text or icon run"),
     }

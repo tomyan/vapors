@@ -44,23 +44,6 @@ pub(crate) fn samplers(device: &wgpu::Device) -> (wgpu::Sampler, wgpu::Sampler) 
     )
 }
 
-/// Group 1: the viewport and shift uniform, bound by a dynamic offset.
-pub(crate) fn view_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("image view"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: true,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
-    })
-}
-
 /// The pipeline over the texture group `layout` and the `view` group.
 pub(crate) fn render_pipeline(
     device: &wgpu::Device,

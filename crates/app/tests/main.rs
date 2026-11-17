@@ -62,6 +62,7 @@ mod gpu_kept_text_pressure;
 mod gpu_lane_rows;
 mod gpu_lane_rows_clipped;
 mod gpu_lane_rows_shapes;
+mod gpu_lane_rows_text;
 mod gpu_lane_rows_writes;
 mod gpu_one_pass;
 mod gpu_one_submit;

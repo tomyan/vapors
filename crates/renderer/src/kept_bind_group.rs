@@ -1,22 +1,27 @@
 //! A pipeline's bind group kept between frames while the uniform
 //! buffer it binds is the one the pipeline writes.
 
-/// The bind group made for one generation of a [`UniformSlots`](crate::UniformSlots)
-/// buffer, or none yet.
+/// The generations of the two buffers a bind group binds: a
+/// [`UniformSlots`](crate::UniformSlots) buffer's and a
+/// [`TransformTable`](crate::TransformTable)'s (0 for a bind group over
+/// the slots alone).
+pub type Generations = (u64, u64);
+
+/// The bind group made for one pair of buffer generations, or none yet.
 pub struct KeptBindGroup {
-    made: Option<(u64, wgpu::BindGroup)>,
+    made: Option<(Generations, wgpu::BindGroup)>,
 }
 
 impl KeptBindGroup {
     /// No bind group yet: made on the first draw.
     pub const NONE: Self = Self { made: None };
 
-    /// The bind group for the buffer of `generation`: the kept one, or
-    /// one `make` makes (counting it) when the kept one is for another
-    /// buffer or there is none.
+    /// The bind group for the buffers of `generation`: the kept one, or
+    /// one `make` makes (counting it) when the kept one is for other
+    /// buffers or there is none.
     pub fn of(
         &mut self,
-        generation: u64,
+        generation: Generations,
         make: impl FnOnce() -> wgpu::BindGroup,
     ) -> &wgpu::BindGroup {
         let stale = self

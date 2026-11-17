@@ -9,7 +9,7 @@ use vapors_scene::Rect;
 use super::{ImagePipeline, Quads};
 use crate::image_binding::TextureBinding;
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
-use crate::{KeptRange, Shift, Target};
+use crate::{KeptRange, Target, TransformTable};
 
 impl ImagePipeline {
     /// The vertex bytes of a quad over each of `rects` (device pixels),
@@ -33,26 +33,44 @@ impl ImagePipeline {
         self.kept.keep(frame, queue, &self.work, bytes)
     }
 
-    /// Draws `bound`'s texture over the `index`th quad `kept` holds,
-    /// moved by `shift` (device pixels: a scroll frame's), in `target`,
-    /// inside the target's scissor; not when the view slot is refused
-    /// (the refusal is on the encoder).
+    /// Draws `bound`'s texture over the `index`th quad `kept` holds, at
+    /// its frame's entry `frame` in `table` and its row's entry `row` (0,
+    /// the identity, for a quad in no lane row), in `target`, inside the
+    /// target's scissor; not when the view slot is refused (the refusal
+    /// is on the encoder).
     ///
     /// # Panics
     ///
-    /// If `kept` was kept by another pipeline or holds no `index`th quad.
+    /// If `kept` was kept by another pipeline or holds no `index`th quad,
+    /// or `table` is not the table this pipeline's kept draws bind
+    /// (one table a pipeline).
     pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         bound: &TextureBinding,
         (kept, index): (&KeptRange, u32),
-        shift: Shift,
+        (table, frame, row): (&mut TransformTable, u32, u32),
     ) {
         let vertices = self.vertices(kept, index);
-        let Some(view) = self.view_slot(target, shift) else {
+        let Some(view) = self.view_slot(target, (frame, row)) else {
             return;
         };
-        self.record(target, bound, (Quads::Kept(kept), vertices), view);
+        let id = *self.table_id.get_or_insert(table.id());
+        assert_eq!(
+            id,
+            table.id(),
+            "image quads: a kept draw binds transform table {}, after table {id}: a pipeline draws \
+             from one table (image_kept.rs); give each painter its own pipelines; reproduce \
+             with `cargo xtask test`",
+            table.id()
+        );
+        table.prepare(target.queue);
+        self.record(
+            target,
+            bound,
+            (Quads::Kept(kept), vertices),
+            (Some(table), view),
+        );
     }
 
     /// The vertices of the `index`th quad `kept` holds.

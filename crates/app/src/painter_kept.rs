@@ -33,7 +33,24 @@ mod gpu;
 pub(super) use gpu::KeptGpu;
 #[path = "painter_kept_bytes.rs"]
 mod bytes;
-pub(super) use bytes::{Kind, RunBytes, rows_in_range, run_bytes};
+pub(super) use bytes::{Kind, RunBytes, rows_fit, rows_in_range, rows_needed, run_bytes};
+
+/// The painter's [`Pipelines`], each borrowed from its own field, so the
+/// painter's other fields stay free to borrow beside them.
+macro_rules! pipelines {
+    ($painter:expr) => {
+        Pipelines {
+            shadows: &mut $painter.shadows,
+            quads: &mut $painter.quads,
+            closed_forms: &mut $painter.closed_forms,
+            meshes: &mut $painter.meshes,
+            shapes: &$painter.shapes,
+            images: &mut $painter.images,
+            text: &mut $painter.text,
+            atlas: &mut $painter.atlas,
+        }
+    };
+}
 
 /// The pipelines whose buffers hold kept bytes, the atlas the text
 /// pipeline's name, and the store shape items name entries in.
@@ -64,23 +81,20 @@ impl ScenePainter {
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
         let rows = moved.rows.items();
-        let Some((frame, rows_base)) = self.table_entries(target, (run, key), moved) else {
+        let Some((frame, rows_base)) = self.table_entries(target, run, moved) else {
             return Ok(());
         };
-        let pipelines = Pipelines {
-            shadows: &mut self.shadows,
-            quads: &mut self.quads,
-            closed_forms: &mut self.closed_forms,
-            meshes: &mut self.meshes,
-            shapes: &self.shapes,
-            images: &mut self.images,
-            text: &mut self.text,
-            atlas: &mut self.atlas,
+        // image and surface bytes name no entry: their draw's uniform does
+        let named = if matches!(run, Run::Images(_) | Run::Surfaces(_)) {
+            0
+        } else {
+            frame
         };
+        let pipelines = pipelines!(self);
         let Some(kept) = self.kept.range(
             pipelines,
             target,
-            (run, (frame, rows, moved.offsets.len()), key, at),
+            (run, (named, rows, moved.offsets.len()), key, at),
         )?
         else {
             return Ok(());
@@ -92,52 +106,52 @@ impl ScenePainter {
             Run::Quads(_) => self.quads.draw_kept(target, range, table),
             Run::Shapes(_) => self.closed_forms.draw_kept(target, range, table),
             Run::Meshes(_) => {
-                let shift = unrowed(shift, rows);
-                let drawn = self
-                    .shapes
-                    .uploaded(kept.meshes)
-                    .map_err(PaintError::Shape)?;
-                let entries = (&mut self.mesh_entries, drawn.as_slice());
-                self.meshes.draw_kept(target, range, shift, entries);
+                let shapes = (&self.shapes, &mut self.mesh_entries);
+                draw_meshes(
+                    &mut self.meshes,
+                    shapes,
+                    target,
+                    (range, kept.meshes, unrowed(shift, rows)),
+                )?;
             }
             Run::Images(items) => {
                 let images = &mut self.images;
+                let place = item_place(&mut self.transforms, (frame, rows_base));
                 self.textures
-                    .draw_kept(images, target, painted, (items, range, moved));
+                    .draw_kept(images, target, painted, (items, range, moved, place));
             }
             Run::Surfaces(items) => {
                 let images = &mut self.images;
+                let place = item_place(&mut self.transforms, (frame, rows_base));
                 self.surfaces
-                    .draw_kept(images, target, painted, (items, range, moved))?;
+                    .draw_kept(images, target, painted, (items, range, moved, place))?;
             }
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
         Ok(())
     }
 
-    /// For the runs whose items name entries of the transform table
-    /// (shadows, quads, shapes): their frame's entry, set to its shift,
-    /// and the first of batch `key`'s rows' entries (0 for a batch in one
-    /// frame); `(0, 0)` for the others. `None` when the table could not
-    /// grow (the refusal is on the target's encoder).
+    /// For the runs placed through the transform table (all but meshes):
+    /// their frame's entry, set to its shift, and the first of their lane
+    /// part's rows' entries (0 for a batch in one frame); `(0, 0)` for
+    /// meshes. `None` when the table could not grow (the refusal is on
+    /// the target's encoder).
     fn table_entries(
         &mut self,
         target: &Target<'_>,
-        (run, key): (&Run, BatchKey),
+        run: &Run,
         moved: &Moved<'_>,
     ) -> Option<(u32, u32)> {
-        match Kind::of_run(run) {
-            Some(Kind::Shadows | Kind::Quads | Kind::ClosedForms) => {
-                let frame = self
-                    .transforms
-                    .frame_entry(target, moved.frame, moved.shift)?;
-                Some((
-                    frame,
-                    self.transforms.rows_base(target, key, moved.offsets)?,
-                ))
-            }
-            _ => Some((0, 0)),
+        if matches!(run, Run::Meshes(_)) {
+            return Some((0, 0));
         }
+        let frame = self
+            .transforms
+            .frame_entry(target, moved.frame, moved.shift)?;
+        let rows_base = self
+            .transforms
+            .rows_base(target, moved.rows_key, moved.offsets)?;
+        Some((frame, rows_base))
     }
 
     /// Draws `run`, a text or icon batch keyed `key`, from its kept
@@ -152,13 +166,17 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         moved: &Moved<'_>,
     ) -> Result<(), PaintError> {
+        let Some((frame, rows_base)) = self.table_entries(target, run, moved) else {
+            return Ok(());
+        };
         let parts = (&mut self.text, &mut self.atlas);
-        let rowed = (run, moved.rows.items(), key, at);
-        let kept = self.kept.text_range(parts, (target, painted), rowed)?;
+        let rows = (frame, moved.rows.items(), moved.offsets.len());
+        let kept = self
+            .kept
+            .text_range(parts, (target, painted), (run, rows, key, at))?;
         if let Some(kept) = kept {
-            let at = (moved.shift, moved.table);
-            self.text
-                .draw_kept_in_rows(target, &mut self.atlas, kept, (blend(run), at));
+            let params = (blend(run), &mut self.transforms.table, rows_base);
+            self.text.draw_kept(target, &mut self.atlas, kept, params);
         }
         Ok(())
     }
@@ -170,18 +188,8 @@ impl ScenePainter {
     /// When the pipelines' kept buffers then hold other than the bytes
     /// of the batches kept: a kept range was dropped unreleased.
     pub(super) fn release_undrawn(&mut self) {
-        let mut pipelines = Pipelines {
-            shadows: &mut self.shadows,
-            quads: &mut self.quads,
-            closed_forms: &mut self.closed_forms,
-            meshes: &mut self.meshes,
-            shapes: &self.shapes,
-            images: &mut self.images,
-            text: &mut self.text,
-            atlas: &mut self.atlas,
-        };
+        let mut pipelines = pipelines!(self);
         self.kept.release_undrawn(&mut pipelines);
-        self.row_tables.release_undrawn();
         self.transforms.release_undrawn();
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
         assert_eq!(
@@ -258,3 +266,36 @@ fn blend(run: &Run) -> BlendParams {
         _ => BlendParams::default(),
     }
 }
+
+/// Where an image or surface batch's items are drawn: `transforms`'
+/// table, with their frame's entry and their rows' first.
+fn item_place(
+    transforms: &mut super::transforms::Transforms,
+    (frame, rows_base): (u32, u32),
+) -> super::transforms::ItemPlace<'_> {
+    super::transforms::ItemPlace {
+        table: &mut transforms.table,
+        frame,
+        rows_base,
+    }
+}
+
+/// Draws a mesh batch's instances `range` holds, its items' entries
+/// `items` from `shapes`, moved by `shift`.
+///
+/// # Errors
+/// An item whose entry the store has not uploaded.
+fn draw_meshes(
+    meshes: &mut MeshPipeline,
+    (shapes, entries): (&ShapeStore, &mut vapors_renderer::MeshEntries),
+    target: &Target<'_>,
+    (range, items, shift): (&KeptRange, &[usize], vapors_renderer::Shift),
+) -> Result<(), PaintError> {
+    let drawn = shapes.uploaded(items).map_err(PaintError::Shape)?;
+    meshes.draw_kept(target, range, shift, (entries, drawn.as_slice()));
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "painter_kept_rows_fit_tests.rs"]
+mod rows_fit_tests;

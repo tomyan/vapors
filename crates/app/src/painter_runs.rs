@@ -63,12 +63,12 @@ impl ScenePainter {
         (painted, kept): (&Painted, &KeptBatched),
         (places, at, frame): (&mut BatchPlaces, usize, vapors_elements::FrameDraw),
     ) -> Result<(), PaintError> {
-        let (offsets, table) = places.rows(at, (painted, kept), &mut self.row_tables);
+        let (offsets, rows_key) = places.rows(at, (painted, kept));
         let moved = Moved {
             frame: kept.frames[at],
             shift: Shift::whole(frame.shift),
-            table,
             offsets,
+            rows_key,
             rows: kept.rows.get(at).unwrap_or_default(),
         };
         let run = &kept.batched.batches[at].run;
@@ -84,7 +84,6 @@ impl ScenePainter {
             self.places.assert_current(painted, kept);
             return;
         }
-        self.row_tables.begin();
         self.places.reset((painted, view), kept);
     }
 

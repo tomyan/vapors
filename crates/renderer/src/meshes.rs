@@ -109,7 +109,7 @@ impl MeshPipeline {
             kept: instances_buffer,
             work,
         } = self;
-        let bind_group = bind_group.of(viewports.generation(), || {
+        let bind_group = bind_group.of((viewports.generation(), 0), || {
             made_bind_group(target, layout, work, viewports)
         });
         let run = Draws {

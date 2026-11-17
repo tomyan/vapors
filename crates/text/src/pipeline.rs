@@ -4,7 +4,7 @@
 //! kept one) and the bind group over them, kept between frames. Create
 //! once per target format.
 
-use vapors_renderer::{FrameArena, Retained, RowOffsets, UniformSlots, WorkCounter};
+use vapors_renderer::{FrameArena, Retained, TransformTable, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
 use crate::atlas_texture::AtlasTexture;
@@ -32,14 +32,14 @@ impl Default for BlendParams {
 
 /// Floats per vertex: position 2, uv 2, colour 4.
 pub(crate) const FLOATS_PER_VERTEX: usize = 8;
-/// A vertex's bytes: its floats, then its row's index (`u32`).
-pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 4) as u64;
+/// A vertex's bytes: its floats, then its row's index in its draw's
+/// range and its frame's entry in the transform table (`u32` each).
+pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>() + 8) as u64;
 
-/// Bytes of the params uniform before the rows' offsets: gamma,
-/// contrast, the viewport and a frame's shift, padded to 32.
-pub(crate) const PARAMS_HEAD: usize = 32;
-/// Bytes of the params uniform: its head, then the rows' offsets.
-pub(crate) const PARAMS_SIZE: usize = PARAMS_HEAD + RowOffsets::CAPACITY * 8;
+/// Bytes of the params uniform: gamma, contrast, the viewport and the
+/// first entry of the draw's row range in the transform table, padded to
+/// 32.
+pub(crate) const PARAMS_SIZE: usize = 32;
 
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {
@@ -54,6 +54,10 @@ pub struct TextPipeline {
     pub(crate) vertices: FrameArena,
     /// Vertex bytes kept between frames (`draw_kept.rs`).
     pub(crate) kept: Retained,
+    /// The identity alone, for immediate draws, which are on the page.
+    pub(crate) identity: TransformTable,
+    /// The id of the table kept draws bind: one table a pipeline.
+    pub(crate) table_id: Option<u64>,
     pub(crate) work: WorkCounter,
 }
 
@@ -66,9 +70,7 @@ impl TextPipeline {
             device,
             wgpu::ShaderModuleDescriptor {
                 label: Some("text"),
-                source: wgpu::ShaderSource::Wgsl(
-                    RowOffsets::shader(include_str!("text.wgsl")).into(),
-                ),
+                source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
             },
         );
         let layout = bind_group_layout(device);
@@ -95,6 +97,8 @@ impl TextPipeline {
                 VERTEX_SIZE,
             ),
             kept: Retained::new(device, "text kept", wgpu::BufferUsages::VERTEX),
+            identity: TransformTable::new(device, "text identity"),
+            table_id: None,
             work: WorkCounter::default(),
         }
     }
@@ -121,7 +125,7 @@ pub(crate) fn bind_group(
     layout: &wgpu::BindGroupLayout,
     view: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
-    params: &UniformSlots<PARAMS_SIZE>,
+    (params, table): (&UniformSlots<PARAMS_SIZE>, &TransformTable),
 ) -> wgpu::BindGroup {
     work.create_bind_group(
         device,
@@ -140,6 +144,10 @@ pub(crate) fn bind_group(
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: params.binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: table.binding(),
                 },
             ],
         },
