@@ -106,3 +106,28 @@ fn only_the_gpus_render_nodes_are_bound_not_its_card_nodes() {
     let devices = mounted(&arguments(&builder(), &host(), 4000), "--dev-bind");
     assert_eq!(devices, ["/dev/dri/renderD128"]);
 }
+
+#[test]
+fn only_these_paths_are_bound_read_only() {
+    // When
+    let read_only = mounted(&arguments(&builder(), &host(), 4000), "--ro-bind");
+
+    // Then: written out, so a bind added for convenience (~/.ssh,
+    // ~/.config/gh) fails here rather than passing every fence
+    assert_eq!(
+        read_only,
+        [
+            "/usr",
+            "/etc",
+            "/sys",
+            "/home/u/.rustup",
+            "/home/u/.cargo/bin",
+            "/home/u/.local/share/factory",
+            "/home/u/projects/vapors/.git/objects",
+            "/home/u/.cache/api-build/b1/socket",
+            "/home/u/.cache/api-build/b1/cargo-home/registry",
+            "/opt/api-build/xtask",
+            "/opt/api-build/claude",
+        ]
+    );
+}

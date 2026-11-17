@@ -35,6 +35,7 @@ mod gpu_a11y_phase;
 mod gpu_a11y_phase_settle;
 mod gpu_app_animation;
 mod gpu_app_animation_sync;
+mod gpu_app_samples;
 mod gpu_app_start;
 mod gpu_app_start_sizes;
 mod gpu_app_surface_states;

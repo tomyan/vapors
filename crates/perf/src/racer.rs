@@ -37,6 +37,12 @@ impl RacerFrames {
             settled_after: SETTLING,
         }
     }
+
+    /// Makes the racer's painter draw at `samples`, before the first
+    /// frame.
+    pub fn set_samples(&mut self, samples: vapors_renderer::Samples) {
+        self.racer.set_samples(samples);
+    }
 }
 
 impl Workload for RacerFrames {

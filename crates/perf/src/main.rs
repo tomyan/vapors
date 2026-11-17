@@ -21,7 +21,7 @@ use vapors_perf::scaling_all;
 use vapors_perf::scene_run;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
-use vapors_perf::workloads::{settings_for, workloads};
+use vapors_perf::workloads::{settings_for, workloads_at};
 
 fn main() {
     if let Err(error) = run() {
@@ -52,6 +52,7 @@ fn run() -> Result<(), String> {
         mount_memory,
         first_frame,
         scene_run,
+        samples,
     } = options;
     if let Some(kind) = scene_run {
         let open = || {
@@ -59,7 +60,7 @@ fn run() -> Result<(), String> {
             print_adapter(&gpu);
             gpu
         };
-        return scene_run::run(open, kind);
+        return scene_run::run(open, (kind, samples));
     }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);
@@ -83,7 +84,7 @@ fn run() -> Result<(), String> {
         return scaling_all::run(&gpu, &changes, settings);
     }
     let all = match set {
-        WorkloadSet::Main => workloads(),
+        WorkloadSet::Main => workloads_at(samples),
         WorkloadSet::OffPath => off_path_workloads(),
     };
     let chosen = matching(all, only.as_deref())?;
@@ -94,6 +95,7 @@ fn run() -> Result<(), String> {
     };
     let gpu = gpu_with(FEATURES);
     print_setup(&gpu, settings);
+    println!("Painter samples: {}\n", samples.count());
     let mut timer = Sampler::with_clock(&gpu, clock);
     if set == WorkloadSet::OffPath {
         println!("{OFF_PATH_SETUP}\n");

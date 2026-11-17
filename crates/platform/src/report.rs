@@ -58,6 +58,16 @@ pub fn report_status(text: &str) {
     println!("{}: {text}", prefix());
 }
 
+/// A readout for a run by hand (a GPU time): stdout natively; on the web
+/// the demo bar's line ([`crate::page::READOUT_ID`]), or the status line
+/// on a page without the bar, shown either way.
+pub fn report_readout(text: &str) {
+    #[cfg(target_family = "wasm")]
+    crate::web::write_report(crate::page::Report::Readout, text);
+    #[cfg(not(target_family = "wasm"))]
+    println!("{}: {text}", prefix());
+}
+
 /// The GPU's start-up line: stdout natively, like a status line; on the
 /// web the `adapter` element, or `status` when the page has none.
 #[cfg(not(target_family = "wasm"))]

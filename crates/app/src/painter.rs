@@ -117,7 +117,7 @@ impl ScenePainter {
     /// drawn; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.multisampled.begin_frame();
-        let multisampled = self.multisampled.view_for(target);
+        let multisampled = self.multisampled.view_for(target, Use::Clear);
         let target = attached(*target, multisampled.as_ref());
         clear_target(&target, painted.canvas());
         self.paint(&target, painted)
@@ -151,7 +151,7 @@ impl ScenePainter {
             return Err(DrawOverError::Multisampled);
         }
         self.multisampled.begin_frame();
-        let _ = self.multisampled.view_for(target);
+        let _ = self.multisampled.view_for(target, Use::Clear);
         self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
@@ -194,7 +194,7 @@ mod counts;
 mod kept;
 #[path = "painter_multisampled.rs"]
 mod multisampled;
-use multisampled::{Multisampled, attached};
+use multisampled::{Multisampled, Use, attached};
 #[path = "painter_places.rs"]
 mod places;
 #[path = "painter_region.rs"]

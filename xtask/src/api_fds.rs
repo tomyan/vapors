@@ -38,10 +38,13 @@ pub fn inherited(fdinfo: &Path, fd: &Path) -> Result<Vec<String>, String> {
 }
 
 /// Whether the fdinfo file at `path` says close-on-exec. A descriptor
-/// closed between the listing and this read is not inherited either.
+/// closed between the listing and this read (its file gone) is not
+/// inherited either; any other failure to read it is an error.
 fn closed_on_exec(path: &Path) -> Result<bool, String> {
-    let Ok(info) = std::fs::read_to_string(path) else {
-        return Ok(true);
+    let info = match std::fs::read_to_string(path) {
+        Ok(info) => info,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+        Err(e) => return Err(format!("reading {}: {e}", path.display())),
     };
     let flags = info
         .lines()

@@ -1,15 +1,17 @@
 //! `SceneRenderer`: the scene on a `gpu-surface`.
 
 use crate::camera::{CameraUniform, view_projection};
+use crate::depth::{Attachments, attachments};
 use crate::draw::{MeshNode, Pass, materials_built, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::log::Tracked;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
-use crate::{FrameError, RendererLog, Resource, depth};
+use crate::{FrameError, RendererLog, Resource};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+use vapors_renderer::Samples;
 use vapors_scene3d::{MaterialId, Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
@@ -19,7 +21,9 @@ pub struct SceneRenderer {
     scene: Rc<RefCell<Scene>>,
     meshes: Rc<RefCell<Meshes>>,
     mounted: Option<Mounted>,
-    depth: Option<Tracked<wgpu::TextureView>>,
+    attachments: Option<Tracked<Attachments>>,
+    /// The samples its pass draws at (`docs/plans/flat-scene-f7.md`).
+    samples: Samples,
     log: Rc<RendererLog>,
 }
 
@@ -39,9 +43,18 @@ impl SceneRenderer {
             scene,
             meshes,
             mounted: None,
-            depth: None,
+            attachments: None,
+            samples: Samples::One,
             log: Rc::default(),
         }
+    }
+
+    /// Makes its pass draw at `samples`, resolving into the backing at
+    /// 4; before it is mounted.
+    #[must_use]
+    pub fn with_samples(mut self, samples: Samples) -> Self {
+        self.samples = samples;
+        self
     }
 
     /// Its log, which outlives it: whether it has been dropped.
@@ -60,7 +73,7 @@ impl Drop for SceneRenderer {
 impl SurfaceRenderer for SceneRenderer {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
         let log = &self.log;
-        let pipeline = Pipeline::new(device, self.meshes.borrow().materials());
+        let pipeline = Pipeline::new(device, self.meshes.borrow().materials(), self.samples);
         self.mounted = Some(Mounted {
             camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
             slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
@@ -71,13 +84,14 @@ impl SurfaceRenderer for SceneRenderer {
     }
 
     fn resize(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), SurfaceError> {
-        let view = depth::texture(device, size);
-        self.depth = Some(Tracked::new(view, &self.log, Resource::Depth));
+        let made = attachments(device, size, self.samples);
+        self.attachments = Some(Tracked::new(made, &self.log, Resource::Attachments));
         Ok(())
     }
 
     fn render(&mut self, mut frame: SurfaceFrame<'_>) -> Result<(), SurfaceError> {
-        let (Some(mounted), Some(depth)) = (self.mounted.as_mut(), self.depth.as_ref()) else {
+        let (Some(mounted), Some(attached)) = (self.mounted.as_mut(), self.attachments.as_ref())
+        else {
             return Err(FrameError::NotReady.into());
         };
         release_geometry(&self.meshes, &mut mounted.geometry);
@@ -85,13 +99,13 @@ impl SurfaceRenderer for SceneRenderer {
         let mut scene = self.scene.borrow_mut();
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
-        materials_built(&nodes, &meshes, mounted.pipeline.materials.len())?;
+        materials_built(&nodes, mounted.pipeline.materials.len())?;
         mounted.geometry.upload_missing(&frame, &nodes);
         mounted
             .camera
             .write(&frame, view_projection(&scene, frame.size)?);
         mounted.write_slots(&frame, &scene, &nodes)?;
-        Ok(mounted.draw(&mut frame, depth, &nodes)?)
+        Ok(mounted.draw(&mut frame, attached, &nodes)?)
     }
 }
 
@@ -130,7 +144,7 @@ impl Mounted {
     fn draw(
         &self,
         frame: &mut SurfaceFrame<'_>,
-        depth: &wgpu::TextureView,
+        attached: &Attachments,
         nodes: &[MeshNode],
     ) -> Result<(), FrameError> {
         // in tree order: of two fragments at one depth the first drawn wins
@@ -147,8 +161,8 @@ impl Mounted {
             pipelines: (&self.pipeline.render, &self.pipeline.materials),
             camera: self.camera.bind_group(),
             slots: self.slots.bind_group(),
-            colour: frame.view,
-            depth,
+            colour: (attached.colour.as_ref(), frame.view),
+            depth: &attached.depth,
             work: frame.work,
         };
         record(frame.encoder, &pass, &draws);

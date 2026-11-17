@@ -49,7 +49,7 @@
         bar.append(
           link('demo-before', before, (name) => `← ${name} [`),
           part('strong', title),
-          part('span', line),
+          Object.assign(part('span', line), { id: 'demo-line' }),
           link('demo-after', after, (name) => `${name} → ]`),
         );
         bar.hidden = false;

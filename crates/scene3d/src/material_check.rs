@@ -41,7 +41,7 @@ pub enum MaterialError {
     /// line, counted in its own source, where there is one.
     Wgsl {
         /// The material's label.
-        label: String,
+        label: &'static str,
         /// The line in its own source, 1-based.
         line: Option<u32>,
         /// naga's message.
@@ -51,21 +51,21 @@ pub enum MaterialError {
     /// contract gives it.
     Binding {
         /// The material's label.
-        label: String,
+        label: &'static str,
         /// The binding's name.
         name: String,
     },
     /// It defines a name the renderers use beside it.
     Reserved {
         /// The material's label.
-        label: String,
+        label: &'static str,
         /// The name.
         name: String,
     },
     /// It has no `fn material(at: MaterialInput) -> vec4<f32>`.
     Signature {
         /// The material's label.
-        label: String,
+        label: &'static str,
     },
 }
 
@@ -123,7 +123,7 @@ pub(crate) fn check(material: &Material) -> Result<(), MaterialError> {
 /// validated.
 fn parsed(material: &Material, source: &str) -> Result<Module, MaterialError> {
     let refused = |line: Option<u32>, message: String| MaterialError::Wgsl {
-        label: material.label.clone(),
+        label: material.label,
         line: line.and_then(own_line),
         message,
     };
@@ -151,7 +151,7 @@ fn no_bindings(material: &Material, module: &Module) -> Result<(), MaterialError
     let bound = module.global_variables.iter().map(|(_, global)| global);
     match bound.into_iter().find(|global| global.binding.is_some()) {
         Some(global) => Err(MaterialError::Binding {
-            label: material.label.clone(),
+            label: material.label,
             name: global.name.clone().unwrap_or_default(),
         }),
         None => Ok(()),
@@ -172,10 +172,15 @@ fn no_reserved(material: &Material, module: &Module) -> Result<(), MaterialError
         .global_variables
         .iter()
         .filter_map(|(_, g)| g.name.as_deref());
-    let mut names = functions.chain(types).chain(constants).chain(globals);
+    let entries = module.entry_points.iter().map(|entry| entry.name.as_str());
+    let mut names = functions
+        .chain(entries)
+        .chain(types)
+        .chain(constants)
+        .chain(globals);
     match names.find(|name| RESERVED_NAMES.contains(name)) {
         Some(name) => Err(MaterialError::Reserved {
-            label: material.label.clone(),
+            label: material.label,
             name: name.to_owned(),
         }),
         None => Ok(()),
@@ -204,7 +209,7 @@ fn has_material_fn(material: &Material, module: &Module) -> Result<(), MaterialE
         return Ok(());
     }
     Err(MaterialError::Signature {
-        label: material.label.clone(),
+        label: material.label,
     })
 }
 

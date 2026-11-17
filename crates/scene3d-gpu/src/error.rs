@@ -15,6 +15,9 @@ pub enum FrameError {
     Projection(SceneError),
     /// The camera's world matrix has no finite inverse.
     CameraNotFinite(NodeId),
+    /// The camera's world matrix scales, shears or mirrors
+    /// (`CameraError::NotRigid`, which it holds).
+    CameraNotRigid(CameraError),
     /// A mesh node names geometry another `Meshes` issued.
     ForeignGeometry {
         /// The mesh node.
@@ -44,8 +47,6 @@ pub enum FrameError {
         node: NodeId,
         /// The material it names.
         material: MaterialId,
-        /// The material's label.
-        label: String,
         /// How many materials were built.
         built: usize,
     },
@@ -76,6 +77,7 @@ impl From<CameraError> for FrameError {
             CameraError::NotCamera(node) => Self::ActiveCameraNotCamera(node),
             CameraError::Projection(error) => Self::Projection(error),
             CameraError::NotFinite(node) => Self::CameraNotFinite(node),
+            not_rigid @ CameraError::NotRigid { .. } => Self::CameraNotRigid(not_rigid),
         }
     }
 }
@@ -96,11 +98,10 @@ impl fmt::Display for FrameError {
             Self::MaterialMissing {
                 node,
                 material,
-                label,
                 built,
             } => write!(
                 f,
-                "{node} names {material} (`{label}`), and this renderer built {built} materials when it mounted: give every material to the Meshes before mounting the renderer"
+                "{node} names {material}, and this renderer built {built} materials when it mounted: give every material to the Meshes before mounting the renderer"
             ),
             Self::NotReady => write!(
                 f,
@@ -108,6 +109,7 @@ impl fmt::Display for FrameError {
             ),
             Self::Store(error) => write!(f, "the scene: {error}"),
             Self::Projection(error) => write!(f, "the active camera: {error}"),
+            Self::CameraNotRigid(error) => write!(f, "{error}"),
             Self::CameraNotFinite(node) => write!(
                 f,
                 "camera {node}'s world matrix has no finite inverse: give it and its ancestors transforms of moderate magnitude"

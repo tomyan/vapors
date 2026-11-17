@@ -26,6 +26,7 @@ pub struct Signals {
     pub blue: Signal<bool>,
     pub gone: Signal<bool>,
     pub shown: Signal<bool>,
+    pub lens: Signal<Projection>,
 }
 
 /// The page is the first field, so it is dropped (and disposed) first,
@@ -126,6 +127,7 @@ impl Rig {
             blue: Signal::new(false),
             gone: Signal::new(false),
             shown: Signal::new(false),
+            lens: Signal::new(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
         };
         let eye = CameraHandle::new();
         let props = ScenePageProps {
@@ -133,7 +135,7 @@ impl Rig {
             surface: Some(surface.clone()),
             square: Some(square),
             eye: Some(eye),
-            lens: Some(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
+            lens: Some(signals.lens),
             back: signals.back,
             left: signals.left,
             blue: signals.blue,

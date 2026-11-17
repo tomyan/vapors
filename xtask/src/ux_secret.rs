@@ -68,6 +68,12 @@ impl Secret {
         format!("Authorization: Bearer {}\n", self.key)
     }
 
+    /// The key as header `name`'s value, a line for curl's stdin only
+    /// (`api_upstream`), as [`Secret::header`] is.
+    pub fn header_named(&self, name: &str) -> String {
+        format!("{name}: {}\n", self.key)
+    }
+
     /// `text`, when it holds no run of the key, as written, with its
     /// whitespace removed, or in base64; `output` names where it was going.
     ///
