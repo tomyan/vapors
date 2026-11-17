@@ -32,6 +32,17 @@ pub(crate) struct CompiledKey {
     foreign: bool,
 }
 
+/// A key's rules and whether another crate's sheet reaches it, or its
+/// refusal.
+fn found_rules(
+    found: &Result<CompiledKey, String>,
+) -> Result<(Rc<CompiledRules>, bool), ElementError> {
+    let found = found
+        .as_ref()
+        .map_err(|why| ElementError::Refused(why.clone()))?;
+    Ok((Rc::clone(&found.rules), found.foreign))
+}
+
 impl Document {
     /// `node`'s style, made from `key`: from its compiled winners when it
     /// has them, else by the full cascade, counted by which.
@@ -91,15 +102,14 @@ impl Document {
     ) -> Result<(Rc<CompiledRules>, bool), ElementError> {
         let address = std::ptr::from_ref(key) as usize;
         let kept = self.kept.as_ref().expect("restyle sets it");
-        if !kept.shared.compiled.contains_key(&address) {
-            let made = self.make_compiled(key, winners);
-            let kept = self.kept.as_mut().expect("restyle sets it");
-            kept.shared.compiled.insert(address, made);
+        if let Some(found) = kept.shared.compiled.get(&address) {
+            return found_rules(found);
         }
-        let kept = self.kept.as_ref().expect("restyle sets it");
-        let found = kept.shared.compiled[&address].as_ref();
-        let found = found.map_err(|why| ElementError::Refused(why.clone()))?;
-        Ok((Rc::clone(&found.rules), found.foreign))
+        let made = self.make_compiled(key, winners);
+        let found = found_rules(&made);
+        let kept = self.kept.as_mut().expect("restyle sets it");
+        kept.shared.compiled.insert(address, made);
+        found
     }
 
     fn make_compiled(&self, key: &StyleKey, winners: &KeyWinners) -> Result<CompiledKey, String> {
