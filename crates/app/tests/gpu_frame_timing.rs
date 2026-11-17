@@ -71,6 +71,7 @@ fn paint(app: &mut ElementsApp, gpu: &Gpu, index: u64) {
         index,
         scale_factor: 1.0,
         now: Instant::now(),
+        resumed: false,
     });
     let wait = wgpu::PollType::Wait {
         submission_index: None,

@@ -133,5 +133,6 @@ fn frame<'a>(
         index,
         scale_factor: 1.0,
         now,
+        resumed: false,
     }
 }

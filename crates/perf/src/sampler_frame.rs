@@ -109,6 +109,7 @@ impl Sampler<'_> {
             index: index as u64,
             scale_factor: 1.0,
             now: self.now,
+            resumed: false,
         }
     }
 }

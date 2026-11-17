@@ -48,6 +48,12 @@ pub struct Frame<'a> {
     /// (design 02). On the web it is `performance.now()` then, not the
     /// `requestAnimationFrame` timestamp, which winit does not expose.
     pub now: crate::Instant,
+    /// Whether the loop waited before this frame: the frame before it
+    /// returned `Next::Wait` or `Next::WaitUntil`, or there was none. The
+    /// time since the last frame then includes the wait, so it is not the
+    /// display's frame interval (the GPU-time readout leaves such gaps
+    /// out).
+    pub resumed: bool,
 }
 
 impl Frame<'_> {

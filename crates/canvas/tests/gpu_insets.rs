@@ -55,6 +55,7 @@ fn gpu_the_image_fits_the_frame_less_its_inset_and_the_panel_keeps_the_backgroun
         index: 0,
         scale_factor: 1.0,
         now: vapors_platform::Instant::now(),
+        resumed: false,
     })
     .expect("draws");
 
@@ -119,6 +120,7 @@ fn gpu_an_empty_area_draws_only_the_background_and_never_calls_the_painter() {
         index: 0,
         scale_factor: 1.0,
         now: vapors_platform::Instant::now(),
+        resumed: false,
     })
     .expect("draws");
 

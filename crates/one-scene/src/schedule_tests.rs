@@ -22,13 +22,8 @@ fn a_second_click_on_a_light_turns_it_off() {
 }
 
 #[test]
-fn the_night_comes_and_goes_in_turn_and_every_cube_stays() {
+fn the_night_comes_and_goes_in_turn() {
     // Then
-    assert!(
-        (0..RUN_FRAMES)
-            .step_by(25)
-            .all(|frame| (0..CUBES).all(|cube| expected(frame).cube(cube).1))
-    );
     assert!(!night(Duration::from_millis(14_999)) && night(Duration::from_secs(15)));
     assert!(!night(Duration::from_secs(30)) && night(Duration::from_secs(45)));
 }
@@ -81,7 +76,7 @@ fn the_hovered_middle_cube_takes_the_groups_hover_colour_over_its_lit_colour() {
 
     // Then
     assert!(now.hovered && now.lit[HOVER_CUBE]);
-    assert_eq!(middle, (GROUP_HOVER, true));
+    assert_eq!(middle, GROUP_HOVER);
 }
 
 #[test]
@@ -94,7 +89,7 @@ fn a_lit_cube_the_hover_does_not_colour_keeps_its_lit_colour() {
 
     // Then
     assert!(now.hovered && now.lit[0]);
-    assert_eq!(first.0, LIT);
+    assert_eq!(first, LIT);
 }
 
 #[test]
@@ -107,5 +102,5 @@ fn outside_the_window_the_lit_middle_cube_is_lit() {
 
     // Then
     assert!(!now.hovered);
-    assert_eq!(middle.0, LIT);
+    assert_eq!(middle, LIT);
 }

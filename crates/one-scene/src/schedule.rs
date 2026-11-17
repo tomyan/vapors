@@ -3,11 +3,13 @@
 //! a HUD button every 2 s, cycling through the three lights, each
 //! toggling its cube's `lit` class; and changes the page makes itself
 //! from its time signal: the group turning every frame and the night
-//! token on in every other 15 s span. The cubes stay: a demo whose cube
-//! came and went read as a fault (Tom, 2026-11-17); a hidden mesh's draw
-//! and uniform are pinned in vapors-scene3d-components. And the pointer resting over the cubes in every other 10 s
-//! span, where the group's `:hover` (docs/plans/css-for-3d.md C4) colours
-//! the middle cube.
+//! token on in every other 15 s span; and the pointer resting over the
+//! cubes in every other 10 s span, where the group's `:hover`
+//! (docs/plans/css-for-3d.md C4) colours the middle cube. The cubes stay:
+//! a demo whose cube came and went read as a fault (Tom, 2026-11-17). A
+//! hidden mesh's draw and uniform are pinned in vapors-scene3d-components,
+//! through a signal; the path from a `class:` rule in a page through CSS
+//! to a hidden mesh is no longer driven end to end here.
 
 use std::time::Duration;
 
@@ -124,16 +126,14 @@ impl Expected {
         if self.night { GROUND_AT_NIGHT } else { GROUND }
     }
 
-    /// Cube `cube`'s colour and whether it is shown: always, now that no
-    /// cube is hidden.
+    /// Cube `cube`'s colour; every cube is shown.
     #[must_use]
-    pub fn cube(&self, cube: usize) -> ([u8; 3], bool) {
-        let colour = match (cube == HOVER_CUBE && self.hovered, self.lit[cube]) {
+    pub fn cube(&self, cube: usize) -> [u8; 3] {
+        match (cube == HOVER_CUBE && self.hovered, self.lit[cube]) {
             (true, _) => GROUP_HOVER,
             (false, true) => LIT,
             (false, false) => CUBE_COLOURS[cube],
-        };
-        (colour, true)
+        }
     }
 }
 

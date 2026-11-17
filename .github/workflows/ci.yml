@@ -145,6 +145,10 @@ jobs:
       # The waker on the page: none idle, one frame per wake.
       - name: the waker in headless Chrome
         run: scripts/web-wake-frames.sh target/web "$(mktemp -d)"
+      # The GPU-time readout's row at a phone's 412 x 915: shown in full,
+      # the canvas filling the rest (#491).
+      - name: the readout row in headless Chrome
+        run: scripts/web-readout-row.sh target/web "$(mktemp -d)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web

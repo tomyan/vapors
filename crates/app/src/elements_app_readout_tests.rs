@@ -22,12 +22,22 @@ fn late(frame: u64) -> GpuTime {
     reading(frame, Err(GpuMissing::Deadline { frames: 3 }))
 }
 
-/// `readout`'s lines for `times`, each at its millisecond after a start.
+/// `readout`'s lines for `times`, each at its millisecond after a start,
+/// drawn back to back.
 fn lines(readout: &mut GpuReadout, times: &[(GpuTime, u64)]) -> Vec<Option<String>> {
+    let times: Vec<_> = times
+        .iter()
+        .map(|(gpu, at)| (gpu.clone(), *at, false))
+        .collect();
+    lines_after(readout, &times)
+}
+
+/// As [`lines`], each frame `resumed` after a wait or not.
+fn lines_after(readout: &mut GpuReadout, times: &[(GpuTime, u64, bool)]) -> Vec<Option<String>> {
     let start = Instant::now();
     times
         .iter()
-        .map(|(gpu, at)| readout.take(gpu, start + Duration::from_millis(*at)))
+        .map(|(gpu, at, resumed)| readout.take(gpu, (start + Duration::from_millis(*at), *resumed)))
         .collect()
 }
 
@@ -51,21 +61,21 @@ fn a_line_leads_with_the_gpu_time_as_a_share_of_the_measured_frame_interval() {
 }
 
 #[test]
-fn a_line_whose_frames_came_too_far_apart_says_the_interval_is_not_measured() {
+fn a_page_drawn_on_demand_says_it_has_no_display_interval() {
     // Given
     let mut readout = GpuReadout::new(Samples::Four);
 
-    // When: four frames, 200 to 400 ms apart: an idle page's, not a rate
+    // When: four frames, each after a wait (`Frame::resumed`)
     let times = [
-        (read(1, 300), 0),
-        (read(2, 500), 400),
-        (read(3, 700), 800),
-        (read(4, 1300), 1000),
+        (read(1, 300), 0, true),
+        (read(2, 500), 400, true),
+        (read(3, 700), 800, true),
+        (read(4, 1300), 1000, true),
     ];
-    let lines = lines(&mut readout, &times);
+    let lines = lines_after(&mut readout, &times);
 
     // Then: the first frame says it waits, nothing more in the first
-    // second, then the times with the interval said unknown
+    // second, then the times, with no display interval given
     assert_eq!(
         lines[0].as_deref(),
         Some("4x waiting for GPU time (none while idle)")
@@ -74,9 +84,82 @@ fn a_line_whose_frames_came_too_far_apart_says_the_interval_is_not_measured() {
     assert_eq!(
         lines[3].as_deref(),
         Some(
-            "4x GPU 0.7 ms mean, frame interval not measured yet (0.7 ms median; 2 passes, 83 ns ticks)"
+            "4x GPU 0.70 ms mean, drawn on demand: no display interval (0.70 ms median; 2 passes, 83 ns ticks)"
         )
     );
+}
+
+#[test]
+fn a_slow_page_drawn_back_to_back_counts_its_long_gaps() {
+    // Given
+    let mut readout = GpuReadout::new(Samples::Four);
+
+    // When: four frames 200 to 400 ms apart, none after a wait
+    let times = [
+        (read(1, 300), 0),
+        (read(2, 500), 400),
+        (read(3, 700), 800),
+        (read(4, 1300), 1000),
+    ];
+    let lines = lines(&mut readout, &times);
+
+    // Then: the median gap, 400 ms
+    assert_eq!(
+        lines[3].as_deref(),
+        Some("4x GPU 0% of 400.0 ms frame (0.70 ms mean, 0.70 ms median; 2 passes, 83 ns ticks)")
+    );
+}
+
+#[test]
+fn each_line_takes_its_own_seconds_gaps() {
+    // Given: a second of frames 8 ms apart, then a second 16 ms apart
+    let mut readout = GpuReadout::new(Samples::Four);
+    let first = (0..=125_u64).map(|frame| (read(frame + 1, 1600), frame * 8));
+    let second = (1..=63_u64).map(|frame| (read(frame + 200, 1600), 1000 + frame * 16));
+    let times: Vec<_> = first.chain(second).collect();
+
+    // When
+    let lines: Vec<String> = lines(&mut readout, &times).into_iter().flatten().collect();
+
+    // Then: the second line's interval is the second's, not a mix
+    assert!(
+        lines[1].starts_with("4x GPU 20% of 8.0 ms frame"),
+        "{lines:?}"
+    );
+    assert!(
+        lines[2].starts_with("4x GPU 10% of 16.0 ms frame"),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_device_without_timestamps_keeps_no_gaps() {
+    // Given
+    let mut readout = GpuReadout::new(Samples::Four);
+
+    // When: a long session's frames
+    let times: Vec<_> = (0..1000_u64)
+        .map(|frame| (GpuTime::Unsupported, frame * 8))
+        .collect();
+    lines(&mut readout, &times);
+
+    // Then: nothing held for a line that never comes
+    assert_eq!(readout.intervals.len(), 0);
+}
+
+#[test]
+fn the_gaps_kept_between_lines_are_capped() {
+    // Given: frames with no reading yet, so no line drains the gaps
+    let mut readout = GpuReadout::new(Samples::Four);
+
+    // When
+    let times: Vec<_> = (0..1000_u64)
+        .map(|frame| (GpuTime::Pending, frame))
+        .collect();
+    lines(&mut readout, &times);
+
+    // Then
+    assert_eq!(readout.intervals.len(), super::MOST_INTERVALS);
 }
 
 #[test]
@@ -85,14 +168,18 @@ fn a_reading_taken_again_counts_once() {
     let mut readout = GpuReadout::new(Samples::One);
 
     // When
-    let times = [(read(1, 300), 0), (read(1, 300), 0), (read(1, 300), 1000)];
-    let lines = lines(&mut readout, &times);
+    let times = [
+        (read(1, 300), 0, true),
+        (read(1, 300), 0, true),
+        (read(1, 300), 1000, true),
+    ];
+    let lines = lines_after(&mut readout, &times);
 
     // Then
     assert_eq!(
         lines[2].as_deref(),
         Some(
-            "1x GPU 0.3 ms mean, frame interval not measured yet (0.3 ms median; 2 passes, 83 ns ticks)"
+            "1x GPU 0.30 ms mean, drawn on demand: no display interval (0.30 ms median; 2 passes, 83 ns ticks)"
         )
     );
 }
@@ -118,7 +205,7 @@ fn a_missing_reading_is_said_with_its_reason_once_and_counted() {
     assert_eq!(
         lines[3].as_deref(),
         Some(
-            "4x GPU 1% of 100.0 ms frame (0.5 ms mean, 0.6 ms median; 2 passes, 83 ns ticks), 2 of 4 missing"
+            "4x GPU 1% of 100.0 ms frame (0.50 ms mean, 0.60 ms median; 2 passes, 83 ns ticks), 2 of 4 missing"
         )
     );
 }

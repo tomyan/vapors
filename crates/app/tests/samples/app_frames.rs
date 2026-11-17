@@ -47,6 +47,7 @@ fn made_per_frame(frames: u64) -> Vec<u64> {
                 index,
                 scale_factor: 1.0,
                 now,
+                resumed: false,
             };
             let next = app.frame(&frame);
             assert_ne!(

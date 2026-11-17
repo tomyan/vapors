@@ -120,6 +120,7 @@ fn draw(gpu: &Gpu, view: &mut ImageView) -> (Result<(), String>, Vec<u8>) {
         index: 0,
         scale_factor: 2.0,
         now: vapors_platform::Instant::now(),
+        resumed: false,
     });
     (drawn, read_rgba8(&gpu.device, &gpu.queue, &texture))
 }

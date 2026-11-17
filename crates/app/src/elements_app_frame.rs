@@ -106,7 +106,7 @@ impl ElementsApp {
         let painted = self.record(frame, &encoder, now);
         self.render_passes = encoder.render_passes();
         let submitted = encoder.submit(frame.queue);
-        self.read_out(now);
+        self.read_out((now, frame.resumed));
         painted.and(submitted.map_err(|refused| refused.to_string()))
     }
 

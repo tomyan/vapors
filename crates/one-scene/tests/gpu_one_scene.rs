@@ -51,6 +51,7 @@ fn frame(scene: &mut OneScene, gpu: &Gpu, start: Instant, index: usize) -> (Next
         index: index as u64,
         scale_factor: 1.0,
         now: start + time_of(index),
+        resumed: false,
     });
     (next, scene.frame_counts().surfaces)
 }
