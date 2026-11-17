@@ -171,8 +171,6 @@ fn wasm_release(web_package: &str) -> Step {
     ))
 }
 
-/// Everything CI runs, fastest first. `web_package` is `web.package`
-/// from `.config/factory.toml`.
 /// `steps` without those named in `except`, each skip printed: for a
 /// caller that cannot run them and declares why at its call
 /// (`api_push.rs`).
@@ -200,6 +198,8 @@ pub fn without(steps: Vec<Step>, except: &[String]) -> Result<Vec<Step>, String>
         .collect())
 }
 
+/// Everything CI runs, fastest first. `web_package` is `web.package`
+/// from `.config/factory.toml`.
 pub fn ci(web_package: &str) -> Vec<Step> {
     vec![
         tools(),

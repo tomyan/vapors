@@ -27,6 +27,8 @@ mod api_prices;
 mod api_push_checks;
 #[allow(dead_code, reason = "used by request_push, the next PR")]
 mod api_push_fetch;
+#[allow(dead_code, reason = "used by request_push, the next PR")]
+mod api_push_history;
 mod api_refusals;
 mod api_request_content;
 mod api_request_policy;
@@ -35,6 +37,7 @@ mod api_server;
 mod api_server_ask;
 mod api_server_proxy;
 mod api_session;
+mod api_timed;
 mod api_tool_prompt;
 mod api_upstream;
 mod api_usage;
