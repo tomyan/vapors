@@ -77,14 +77,19 @@ targets, on desktop and (a) on tilers, chosen per adapter and reported.
    between, or a flush) loads it, so the texture is stored at the end
    of every pass, and every pass resolves (Q3).
    - **Owner and key.** The painter owns its 4x textures, one for each
-     (viewport size, format) it draws to: the viewport, not the
-     texture's size, so a view of a smaller mip level gets a texture of
-     that level's size.
-   - **Lifetime.** A texture is made on the first draw to a target of
-     its key, kept while each frame draws to that key, and dropped
-     after a frame that does not, the rule kept bytes and table entries
-     already follow. A resize is a new key: the old texture goes after
-     the first frame at the new size.
+     target view it draws to, at the viewport's size (not the texture's,
+     so a view of a smaller mip level gets a texture of that level's
+     size). Keyed by size alone, two views of one size would share one,
+     and a pass loading it would resolve the other view's frame (#472's
+     review, M1).
+   - **Lifetime.** A texture is made on the first draw to its view,
+     kept while each frame draws to that view, and dropped after a frame
+     that does not, the rule kept bytes and table entries already
+     follow. Each `draw` is a frame, so a painter drawing two targets in
+     an app frame remakes each one's texture on each call, and a tooltip
+     on a view after another view's `draw` meets a fresh texture, which
+     F7a1's uncleared-load check refuses. A resize is a new size: the old
+     texture goes after the first frame at the new size.
    - **Where.** `Target` gains the 4x view beside the target's view
      (`None` at 1x). `FrameEncoder::begin` passes both to
      `OpenPass::begin`, which attaches the 4x view with the target's
@@ -186,3 +191,33 @@ either (the lead checked).
 8. **(b) per adapter: in F7, or a slice of its own if needed?** I
    recommend a slice of its own, built only if the UHD 630's number is
    over the threshold.
+
+## As built: F7a
+
+In two pull requests, the renderer half (F7a1) and the painter half
+(F7a2), to keep each near 400 lines.
+
+- **F7a1.** `PassFormat` (a format and `Samples::One` or `Four`) is what
+  every 2D pipeline is made for; a format alone is one sample.
+  `Target::multisampled` names the 4x view a pass attaches; the pass
+  resolves into the target's view and stores the multisampled colour.
+- **F7a2.** `ScenePainter::new` takes a `PassFormat`. At 4 samples the
+  painter owns its 4x textures (`painter_multisampled.rs`), keyed and
+  dropped as plan item 3 says, and attaches them to `draw`'s and
+  `draw_tooltip`'s targets; `draw_over` is refused by name. A target
+  that already names a multisampled view is refused.
+- **The two-pass case is tested in the renderer.** A painter's frame
+  splits its pass on one view only at `FrameEncoder::flush` (its budget,
+  or a repacked atlas page): `gpu-surface` textures are drawn in their
+  own encoders, on their own views. Both cases go through the same
+  `FrameEncoder` and `OpenPass` that F7a1's
+  `gpu_multisampled_pass.rs` drives across a flush, so no painter-level
+  test repeats it.
+- **Q7's measurement** (2026-11-17, ANV on the UHD 630 and llvmpipe):
+  every demo with a `.pixels` file, at every viewport, draws the same
+  pixels at 4 samples as at 1 (quads and text on whole pixels cover
+  every sample). An svg of a triangle (a mesh) and a circle (a closed
+  form) off the pixel grid differs on 51 pixels, by at most 29 of 255,
+  on both adapters. `gpu_samples.rs` pins both: the demos identical,
+  the shapes within (29, 51) and differing somewhere, so a painter
+  that fell back to 1 sample fails.

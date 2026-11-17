@@ -8,8 +8,8 @@
 
 use vapors_elements::Painted;
 use vapors_renderer::{
-    ClosedFormPipeline, ImagePipeline, MeshEntries, MeshPipeline, QuadPipeline, ShadowPipeline,
-    Target, clear_target,
+    ClosedFormPipeline, ImagePipeline, MeshEntries, MeshPipeline, PassFormat, QuadPipeline,
+    Samples, ShadowPipeline, Target, clear_target,
 };
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
@@ -36,6 +36,8 @@ pub struct ScenePainter {
     transforms: transforms::Transforms,
     /// Where each batch was drawn last frame (`painter_places.rs`).
     places: places::BatchPlaces,
+    /// Its 4x colour textures, at 4 samples.
+    multisampled: Multisampled,
     counts: FrameCounts,
 }
 
@@ -56,10 +58,10 @@ impl ScenePainter {
     /// when the device's side is zero.
     pub fn new(
         device: &wgpu::Device,
-        format: wgpu::TextureFormat,
+        pass: impl Into<PassFormat>,
     ) -> Result<Self, NewPainterError> {
         let side = device.limits().max_texture_dimension_2d;
-        Self::with_atlas(device, format, AtlasConfig::for_max_texture_side(side))
+        Self::with_atlas(device, pass, AtlasConfig::for_max_texture_side(side))
     }
 
     /// As [`new`](Self::new), with the glyph atlas sized by `atlas`.
@@ -70,29 +72,32 @@ impl ScenePainter {
     /// cannot hold `atlas`'s pages (`AtlasConfig::checked`).
     pub fn with_atlas(
         device: &wgpu::Device,
-        format: wgpu::TextureFormat,
+        pass: impl Into<PassFormat>,
         atlas: AtlasConfig,
     ) -> Result<Self, NewPainterError> {
+        let pass = errors::supported_samples(pass.into(), device.features())?;
+        let format = pass.format;
         if !SUPPORTED.contains(&format) {
             return Err(UnsupportedFormat(format).into());
         }
         let atlas = GlyphAtlas::new(atlas.checked(device.limits().max_texture_dimension_2d)?);
         Ok(Self {
-            shadows: ShadowPipeline::new(device, format),
-            quads: QuadPipeline::new(device, format),
-            closed_forms: ClosedFormPipeline::new(device, format),
-            meshes: MeshPipeline::new(device, format),
+            shadows: ShadowPipeline::new(device, pass),
+            quads: QuadPipeline::new(device, pass),
+            closed_forms: ClosedFormPipeline::new(device, pass),
+            meshes: MeshPipeline::new(device, pass),
             mesh_entries: MeshEntries::new(device),
             shapes: ShapeStore::with_buffer_limit(device.limits().max_buffer_size),
-            text: TextPipeline::new(device, format, &atlas),
+            text: TextPipeline::new(device, pass, &atlas),
             atlas,
-            images: ImagePipeline::new(device, format),
+            images: ImagePipeline::new(device, pass),
             format,
             textures: Textures::default(),
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
             transforms: transforms::Transforms::new(device),
             places: places::BatchPlaces::default(),
+            multisampled: Multisampled::new(pass),
             counts: FrameCounts::default(),
         })
     }
@@ -109,8 +114,11 @@ impl ScenePainter {
     /// [`PaintError`] when a glyph, a `gpu-surface` or a shape cannot be
     /// drawn; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        clear_target(target, painted.canvas());
-        self.paint(target, painted)
+        self.multisampled.begin_frame();
+        let multisampled = self.multisampled.view_for(target);
+        let target = attached(*target, multisampled.as_ref());
+        clear_target(&target, painted.canvas());
+        self.paint(&target, painted)
     }
 
     /// Draws the scene over what `target` already holds, with no clear
@@ -125,7 +133,10 @@ impl ScenePainter {
     ///
     /// [`DrawOverError::CanvasBackground`], drawing nothing, when `html`
     /// or `body` sets a background: it is the canvas's, which drawing
-    /// over never paints. As [`ScenePainter::draw`] otherwise.
+    /// over never paints. [`DrawOverError::Multisampled`], drawing
+    /// nothing, from a 4-sample painter: its 4x texture holds nothing of
+    /// what the target holds to draw over. As [`ScenePainter::draw`]
+    /// otherwise.
     pub fn draw_over(
         &mut self,
         target: &Target<'_>,
@@ -134,6 +145,11 @@ impl ScenePainter {
         if let Some(from) = painted.canvas_from() {
             return Err(DrawOverError::CanvasBackground(from));
         }
+        if self.multisampled.samples() == Samples::Four {
+            return Err(DrawOverError::Multisampled);
+        }
+        self.multisampled.begin_frame();
+        let _ = self.multisampled.view_for(target);
         self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
@@ -161,6 +177,7 @@ impl ScenePainter {
             self.textures.end_frame();
         }
         self.release_undrawn();
+        self.multisampled.release_undrawn();
         self.end_counts();
         runs
     }
@@ -170,6 +187,9 @@ impl ScenePainter {
 mod counts;
 #[path = "painter_kept.rs"]
 mod kept;
+#[path = "painter_multisampled.rs"]
+mod multisampled;
+use multisampled::{Multisampled, attached};
 #[path = "painter_places.rs"]
 mod places;
 #[path = "painter_region.rs"]
