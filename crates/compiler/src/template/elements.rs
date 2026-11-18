@@ -23,6 +23,7 @@ impl Parser<'_> {
         if name.is_empty() {
             return Err(self.error(offset, "expected a tag name after `<`"));
         }
+        self.refuse_vapors_tag(&name, offset)?;
         if is_component_name(&name) {
             return self.parse_component(name, offset);
         }

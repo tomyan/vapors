@@ -48,12 +48,13 @@ mod tag_path;
 mod tag_props;
 mod text;
 mod unwrap;
+mod window;
 
 use crate::CompileError;
 use crate::ast::Component;
 use crate::source::Source;
 use crate::styles::OtherSheets;
-use emit::{Emitter, Place};
+use emit::Emitter;
 pub use props_index::PropsIndex;
 
 /// The template emitted with node counters of `width` digits.
@@ -73,7 +74,7 @@ fn emit_template<'a>(
     let mut emitter = emitter.with_scope(component.style.is_some() && component.scope.is_some());
     emitter.indent(3);
     // a refusal stops the emission; the props refused before it stand
-    if let Err(err) = emitter.emit_nodes(&component.template.children, &Place::roots()) {
+    if let Err(err) = emitter.emit_template_nodes(&component.template) {
         let mut errors = std::mem::take(&mut emitter.tags.errors);
         errors.push(err);
         return Err(errors);

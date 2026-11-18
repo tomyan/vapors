@@ -29,6 +29,7 @@ mod scene_hits;
 mod snippet;
 mod style_key;
 mod style_key_refusals;
+mod window_listeners;
 
 pub use appearance::{Appearance, AppearanceSink};
 pub use class_names::class_names;
@@ -48,6 +49,7 @@ pub use snippet::{Args, DynDom, Renderable, Snippet};
 pub use style_key::{MAX_TOGGLES, StyleKey};
 pub use style_key_refusals::PRESENTATION as PRESENTATION_ATTRIBUTES;
 pub use style_key_refusals::SVG_TAGS;
+pub use window_listeners::{WINDOW_EVENTS, WindowListener, WindowListeners};
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
@@ -126,6 +128,13 @@ pub trait Dom: Listeners {
     fn remove(&mut self, node: NodeId);
     /// Calls `handler` for each `event` (such as `click`) on the node.
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler);
+    /// Calls `handler` for each `keydown` or `keyup` the page gets
+    /// (`<vapors:window>`), after the listeners on the event's target and
+    /// its ancestors ran, unless one stopped propagation. Another event
+    /// panics ([`WindowListeners::add`]).
+    fn listen_window(&mut self, event: &str, handler: Handler) -> WindowListener;
+    /// Removes a window listener, when its component unmounts.
+    fn unlisten_window(&mut self, listener: WindowListener);
     /// Adds a component's `<style>` (`sheet`, which only generated code
     /// makes) under its scope, the value its elements carry in
     /// [`SCOPE_ATTRIBUTE`]: its rules match only those elements. Each

@@ -78,6 +78,8 @@ pub struct Document {
     /// the slots that changed. Per document: S5b's process registry
     /// issues table `ShapeId`s, and this run-time range stays apart.
     pub(crate) shapes: std::rc::Rc<std::cell::RefCell<crate::document_shapes::DocumentShapes>>,
+    /// `<vapors:window>`'s listeners: heard after a key's own chain.
+    pub(crate) page_keys: vapors_dom::WindowListeners,
 }
 
 impl Document {
@@ -124,6 +126,7 @@ impl Document {
             shapes: std::rc::Rc::new(std::cell::RefCell::new(
                 crate::document_shapes::DocumentShapes::new(),
             )),
+            page_keys: vapors_dom::WindowListeners::default(),
         }
     }
 

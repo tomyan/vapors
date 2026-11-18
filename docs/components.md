@@ -197,6 +197,51 @@ the one difference from the brief in this slice.
   parameter is reactive already. Recursion, direct or through another
   snippet, is refused for now.
 
+## Page-level keys: `<vapors:window>`
+
+`onkeydown` and `onkeyup` on an element hear only the keys that element
+has focus for. A game reads the arrow keys whatever has focus, so a
+component takes them for the whole page with `<vapors:window>`, as
+Svelte's `<svelte:window>` does:
+
+```
+<script>
+let x: Signal<i32> = Signal::new(0);
+let step = move |event: &mut Event| {
+    match event.key() {
+        "ArrowLeft" => x.update(|v| *v -= 1),
+        "ArrowRight" => x.update(|v| *v += 1),
+        _ => return,
+    }
+    event.prevent_default();
+};
+</script>
+
+<p>{x}</p>
+<vapors:window onkeydown={step} />
+```
+
+The handlers are the ones an element's key listeners take (`&mut Event`
+or none), so code moves between the two unchanged.
+
+- Every key event the page gets reaches each mounted `<vapors:window>`,
+  after the listeners on the focused element (or the body) and its
+  ancestors ran. An event one of them stopped with `stop_propagation`
+  does not reach the window.
+- The listeners are removed when the component unmounts.
+- It goes at the top level of the template: not inside an element,
+  `{if}`, `{for}`, a snippet or a component tag. One per component, self-closing,
+  with `onkeydown` and `onkeyup` as its only attributes, each an
+  expression. Anything else, and any other `vapors:` tag, is refused with
+  its line and column.
+- A game calls `event.prevent_default()` for the keys it uses. That marks
+  the key used by the document (`Document::key_pressed` answers `true`),
+  so the app does not also act on it, and stops the element defaults
+  (Tab's focus move, a range's step). It does not reach the browser:
+  whether the arrow keys or space also scroll a web page is the
+  platform's, not the template's, and a canvas page usually has nothing
+  to scroll.
+
 ## Reactive rules
 
 - Each `{expr}` hole is its own text node with its own effect. When a

@@ -80,18 +80,16 @@ impl crate::Listeners for RecordingDom {
         if self.removed.contains(&target) {
             return None;
         }
-        Some(
-            self.path_to_root(target)
-                .into_iter()
-                .map(|node| {
-                    let listeners = self
-                        .listeners
-                        .get(&(node, name.to_owned()))
-                        .cloned()
-                        .unwrap_or_default();
-                    (node, listeners)
-                })
-                .collect(),
-        )
+        let mut along: Vec<_> = self
+            .path_to_root(target)
+            .into_iter()
+            .map(|node| {
+                let listeners = self.listeners.get(&(node, name.to_owned()));
+                (node, listeners.cloned().unwrap_or_default())
+            })
+            .collect();
+        // the window hears last, as the root's own entry
+        along.extend(self.window.heard(name).map(|heard| (self.root(), heard)));
+        Some(along)
     }
 }

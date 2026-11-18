@@ -249,6 +249,7 @@ mod typing_after_hide;
 mod ua_focus;
 mod update_counts;
 mod used_sharing;
+mod window_keys;
 
 /// Every `.rs` file directly under tests/ is a module above, so none is
 /// silently left out of the binary.

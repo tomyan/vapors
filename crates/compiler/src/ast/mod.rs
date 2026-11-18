@@ -73,11 +73,23 @@ impl Section {
     }
 }
 
+/// `<vapors:window onkeydown={…} onkeyup={…} />`: key listeners for the
+/// whole page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowTag {
+    /// Its listeners, each `onkeydown` or `onkeyup` with an expression.
+    pub attributes: Attributes,
+    /// Byte offset of the tag's `<`.
+    pub offset: usize,
+}
+
 /// The template: top-level elements and blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Document {
     /// Top-level nodes in source order.
     pub children: Vec<Node>,
+    /// The `<vapors:window>` tag, if the template has one.
+    pub window: Option<WindowTag>,
 }
 
 /// A template node.
