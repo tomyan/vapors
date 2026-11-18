@@ -1,0 +1,93 @@
+//! The names CSS defines, each tried against the parser: the reference
+//! lists the ones it accepts and the ones it refuses.
+
+pub const PSEUDO_CLASSES: &[&str] = &[
+    "active",
+    "any-link",
+    "checked",
+    "default",
+    "defined",
+    "disabled",
+    "empty",
+    "enabled",
+    "first-child",
+    "first-of-type",
+    "focus",
+    "focus-visible",
+    "focus-within",
+    "fullscreen",
+    "hover",
+    "in-range",
+    "indeterminate",
+    "invalid",
+    "last-child",
+    "last-of-type",
+    "link",
+    "only-child",
+    "only-of-type",
+    "optional",
+    "out-of-range",
+    "placeholder-shown",
+    "read-only",
+    "read-write",
+    "required",
+    "root",
+    "target",
+    "valid",
+    "visited",
+    "has(a)",
+    "is(a)",
+    "not(a)",
+    "where(a)",
+    "nth-child(2n+1)",
+    "nth-last-child(1)",
+    "nth-of-type(1)",
+    "nth-last-of-type(1)",
+    "lang(en)",
+    "dir(ltr)",
+];
+
+pub const AT_RULES: &[&str] = &[
+    "@media (min-width: 1px) { a {} }",
+    "@container (min-width: 1px) { a {} }",
+    "@supports (color: red) { a {} }",
+    "@keyframes k { from { opacity: 0; } }",
+    "@font-face { font-family: f; }",
+    "@import \"a.css\";",
+    "@layer a;",
+    "@page { margin: 0; }",
+    "@property --x { syntax: '*'; inherits: false; }",
+    "@scope (a) { b {} }",
+    "@starting-style { a {} }",
+];
+
+pub const LENGTH_UNITS: &[&str] = &[
+    "px", "em", "rem", "%", "vw", "vh", "vmin", "vmax", "ch", "ex", "lh", "cm", "mm", "in", "pt",
+    "pc", "q", "svh", "dvh", "lvh", "cqw",
+];
+
+pub const WIDTH_FUNCTIONS: &[&str] = &[
+    "calc(1px + 2%)",
+    "min(1px, 2%)",
+    "max(1px, 2%)",
+    "clamp(1px, 2%, 3px)",
+    "var(--w, 1px)",
+];
+
+pub const COLOURS: &[&str] = &[
+    "red",
+    "#abc",
+    "rgb(1 2 3)",
+    "rgba(1, 2, 3, 0.5)",
+    "hsl(1 2% 3%)",
+    "hwb(1 2% 3%)",
+    "lab(1 2 3)",
+    "lch(1 2 3)",
+    "oklab(0.5 0.1 0.1)",
+    "oklch(0.5 0.1 1)",
+    "transparent",
+    "currentColor",
+    "light-dark(red, blue)",
+    "color(srgb 1 0 0)",
+    "color-mix(in srgb, red, blue)",
+];

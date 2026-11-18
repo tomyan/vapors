@@ -33,7 +33,7 @@ pub(crate) fn is_type(element: &Element, kind: &str) -> bool {
 }
 
 /// The input types built and where the rest arrive (3-E3).
-const INPUT_TYPES: &[(&str, Option<&str>)] = &[
+pub const INPUT_TYPES: &[(&str, Option<&str>)] = &[
     ("range", None),
     ("checkbox", None),
     ("number", None),

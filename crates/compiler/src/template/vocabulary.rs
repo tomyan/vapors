@@ -5,7 +5,7 @@
 /// `fieldset`, `legend`, `small`, `sub`, `sup`, `figure`, `figcaption`, vapors's
 /// `gpu-surface`, docs/gpu-surface.md, and the inline SVG subset,
 /// `svg`, `path`, `rect` and `circle`, docs/icons.md).
-const HTML_TAGS: &[&str] = &[
+pub const HTML_TAGS: &[&str] = &[
     "a",
     "abbr",
     "article",
@@ -82,7 +82,7 @@ const HTML_TAGS: &[&str] = &[
 ];
 
 /// Elements with no body, which close themselves.
-const VOID_TAGS: &[&str] = &["br", "col", "hr", "img", "input"];
+pub const VOID_TAGS: &[&str] = &["br", "col", "hr", "img", "input"];
 
 pub(crate) fn is_html_tag(name: &str) -> bool {
     HTML_TAGS.binary_search(&name).is_ok()
