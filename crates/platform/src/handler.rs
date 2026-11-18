@@ -97,6 +97,7 @@ impl Handler {
             let proxy = self.platform.proxy();
             self.text_bridge = Some(crate::text_bridge_web::TextBridge::new(&proxy)?);
             self.a11y = Some(a11y::WebMirror::new()?);
+            crate::canvas_focus_web::install()?;
         }
         Ok(())
     }

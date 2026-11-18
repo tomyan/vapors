@@ -176,12 +176,27 @@ prepare() {
   # only if the resize asks for a frame and it is drawn at 300 px.
   page resize "$counter" "(function () { var f = Number(document.body.dataset.frames) || 0; if (f >= 1 && !window.vaporsResized) { var c = document.getElementById('vapors'); c.style.width = '500px'; c.style.height = '300px'; window.vaporsResized = true; } return (Number(document.body.dataset.frameHeight) || 0) === 300; })()"
   page subpath "" "$adapter"
+  # Keyboard focus (docs/web.md): once the adapter line is up, the key
+  # at the element holding focus (a synthetic ArrowLeft; winit's keydown
+  # listener is on the canvas and prevents the default, so a key that
+  # returns "prevented" reached it), then what a press on #status does:
+  # focus leaves for <body>, and the same key after a moment. The
+  # owned page focuses an <input> before the app starts (the attribute
+  # autofocus waits for a frame, so it is not reliable here).
+  page focus "" "$adapter && $focus_steps"
+  page focus-owned "" "$adapter && $focus_steps" 's#</body>#<input id="mine"><script>document.getElementById("mine").focus();</script></body>#'
   # A page with its own #adapter: the start-up line goes there and
   # #status keeps what the page wrote ("starting").
   page adapter-element "" 'document.getElementById("adapter").textContent.indexOf("adapter: ") === 0' 's#<p id="status">starting</p>#<p id="status">starting</p><p id="adapter"></p>#'
   ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
 }
+
+# focus_steps: a hold condition (see page): the key before and after a
+# press on #status, recorded on <body> as data-focus-start and
+# data-focus-after, each `<element>:prevented|ignored`. A press on a
+# non-focusable element blurs the focused one, as the browser does.
+focus_steps="(function () { function key() { var t = document.activeElement; var kept = !t.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true, cancelable: true })); return (t.id || t.tagName) + ':' + (kept ? 'prevented' : 'ignored'); } var d = document.body.dataset; if (!d.focusStart) { d.focusStart = key(); document.activeElement.blur(); status.click(); setTimeout(function () { d.focusAfter = key(); }, 100); } return !!d.focusAfter; })()"
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
 demos="hello counter boxes shell panel text stress toasts scroll images cards"
@@ -539,6 +554,19 @@ check adapter-element '^starting$' hidden '?demo=hello'
 adapter_line=$(printf '%s' "$dom" | grep -o '<p id="adapter">[^<]*</p>' | sed 's#<[^>]*>##g' || true)
 echo "adapter-element: #adapter [$adapter_line]"
 printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #adapter is [$adapter_line], wanted the start-up line"
+# focused <page> <start> <after>: the key's element and fate before and
+# after a press on #status (focus_steps).
+focused() {
+  dom=$(dump "$1") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  held "$1" || return
+  start=$(printf '%s' "$dom" | sed -n 's#.*data-focus-start="\([^"]*\)".*#\1#p')
+  after=$(printf '%s' "$dom" | sed -n 's#.*data-focus-after="\([^"]*\)".*#\1#p')
+  echo "$1: the key before [$start], after a press on #status [$after]"
+  [ "$start" = "$2" ] || fail "$1: the key at start went to [$start], wanted [$2]; the canvas takes focus at start unless the page's element has it (crates/platform/src/canvas_focus_web.rs)"
+  [ "$after" = vapors:prevented ] || fail "$1: the key after a press on #status went to [$after], wanted [vapors:prevented]; the canvas takes focus back from <body> (crates/platform/src/canvas_focus_web.rs)"
+}
+focused focus vapors:prevented
+focused focus-owned mine:ignored
 # Real time: a gpu-surface's renderer reports its GPU errors within a
 # 1000 ms deadline, which virtual time runs past while the GPU process
 # works in real time ("the GPU did not report this surface's errors
