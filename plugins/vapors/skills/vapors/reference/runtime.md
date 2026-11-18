@@ -5,7 +5,7 @@ the frame loop, and the 3D scene a game draws with. This page covers the
 web build only. vapors also runs natively in a window (Linux, macOS,
 Windows) with the same code; this skill does not cover that yet.
 
-The starter's [main.rs](../starter/src/main.rs) is a complete example of
+The starter's [main.rs](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/starter/src/main.rs) is a complete example of
 everything here.
 
 ## Starting a page
@@ -49,7 +49,7 @@ Details: [docs/web.md](https://github.com/tomyan/vapors/blob/main/docs/web.md).
 
 ## Signals
 
-`vapors-signals`, with Leptos's semantics. [wisp.md](wisp.md#script)
+`vapors-signals`, with Leptos's semantics. [wisp.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/wisp.md#script)
 covers them as a script uses them. From Rust:
 
 - `Signal::new(v)`, `.get()`, `.set(v)`, `.update(|v| ..)`,

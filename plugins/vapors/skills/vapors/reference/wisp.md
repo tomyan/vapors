@@ -4,7 +4,7 @@ Every example on this page was compiled with `vapors-compiler` at the
 pinned rev and mounted into a document whose first update reported no
 refusal. The full rules, with every refusal, are in
 [docs/components.md](https://github.com/tomyan/vapors/blob/main/docs/components.md);
-what CSS, elements and events exist is in [supported.md](supported.md).
+what CSS, elements and events exist is in [supported.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/supported.md).
 
 A component is one file: an optional `<script>` (Rust), an optional
 `<style>` (CSS), then the template (HTML). The file name gives the type:
@@ -173,7 +173,7 @@ let shuffle = move || scores.update(|all| all.reverse());
 expression is true. `style="..."` may be written as literal text.
 `class={..}` and `style={..}` are refused: the compiler must see every
 class and declaration an element can have. To move or resize something
-every frame, use the 3D scene ([runtime.md](runtime.md)).
+every frame, use the 3D scene ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md)).
 
 `classes.wisp`:
 
@@ -197,7 +197,7 @@ let toggle = move || on.update(|v| *v = !*v);
 `move |event: &mut Event| ..`. It returns `()` or `Result<(), E>` with
 `E: Display`; an `Err` is shown in the page's `#error`. Events bubble,
 as in the DOM. The events the tree fires are listed in
-[supported.md](supported.md#events); a listener for any other name is
+[supported.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/supported.md#events); a listener for any other name is
 refused, except a component's own events.
 
 `Event` has `key()` and `code()` (DOM names: `"ArrowUp"`, `" "`,
@@ -425,7 +425,7 @@ These compile, then the page shows an error in `#error`:
   them in `.column { display: flex; flex-direction: column; }`.
 - A text or number `<input>` needs a width (`width: 12em`).
 - `br`, lists (`ul`, `li`), tables, `label`, `select` and `textarea` are
-  not drawn yet; see [supported.md](supported.md#elements).
+  not drawn yet; see [supported.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/supported.md#elements).
 
 ## Unsupported
 

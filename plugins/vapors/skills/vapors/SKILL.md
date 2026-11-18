@@ -13,12 +13,12 @@ window; this skill covers the browser only.
 
 No model has seen `.wisp` in training. Read these before writing any:
 
-- [reference/wisp.md](reference/wisp.md): the format, every feature
+- [reference/wisp.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/wisp.md): the format, every feature
   with an example that compiles.
-- [reference/supported.md](reference/supported.md): the elements, CSS
+- [reference/supported.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/supported.md): the elements, CSS
   properties, selectors and events that exist, generated from the
   source. Anything else is refused.
-- [reference/runtime.md](reference/runtime.md): the Rust side: starting
+- [reference/runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md): the Rust side: starting
   the page, signals, the frame loop, and the 3D scene games draw with.
 
 ## Set up, and start the first build at once
@@ -29,7 +29,7 @@ anything. Run this block as it is, as your first action. It assumes
 x86_64 Linux, `curl` and `tar`.
 
 ```sh
-command -v rustup || curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+command -v rustup || curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
 export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
 mkdir -p mygame ~/.local/bin && cd mygame
 base=https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/starter
