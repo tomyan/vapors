@@ -270,9 +270,6 @@ let step = move |event: &mut Event| {
 <vapors:window onkeydown={step} />
 ```
 
-In the browser, keys reach the page only while its canvas has focus.
-The starter's `index.html` focuses the canvas when the page loads.
-
 ### Bindings
 
 `bind:value={signal}` on `input` (a `Signal<String>`, or `Signal<f64>`
