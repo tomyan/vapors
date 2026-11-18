@@ -16,13 +16,6 @@
   </head>
   <body>
     <canvas id="vapors"></canvas>
-    <script>
-      // Keys reach the page only while the canvas has focus; give it focus
-      // now rather than waiting for a click.
-      const canvas = document.getElementById('vapors');
-      canvas.tabIndex = 0;
-      canvas.focus();
-    </script>
     <p id="status">starting</p>
     <p id="error" role="alert" hidden></p>
   </body>

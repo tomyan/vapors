@@ -78,8 +78,13 @@ let more = move || quantity.update(|q| *q += 1);
   `with(|v| ..)` borrows.
 - `Effect::new(move || ..)` runs now and again whenever a signal it read
   changes. A signal it writes is picked up after it returns.
-- `Signal::derived(move || ..)` is a `Signal<T>` computed from others,
-  for a prop that takes a `Signal<T>` (a 3D node's `transform`).
+- `Signal::derived(move || ..)` is a read-only `ReadSignal<T>` computed
+  from others (`get`, `with`, no `set`), for a prop that takes a
+  `ReadSignal<T>` (a 3D node's `transform`). `signal.read_only()` makes
+  a view of a signal; a `Signal` or `Memo` binding passed alone as a
+  prop converts by itself, any other expression calls `.read_only()`.
+  A prop typed `Signal<T>` lets the child write: it is a grant, as
+  Svelte's `$bindable` is.
 - Signals, memos and effects belong to the component and stop when it
   unmounts. Handles are `Copy`, so closures capture them by `move`.
 
@@ -270,9 +275,6 @@ let step = move |event: &mut Event| {
 <vapors:window onkeydown={step} />
 ```
 
-In the browser, keys reach the page only while its canvas has focus.
-The starter's `index.html` focuses the canvas when the page loads.
-
 ### Bindings
 
 `bind:value={signal}` on `input` (a `Signal<String>`, or `Signal<f64>`
@@ -426,7 +428,7 @@ let picked = move |_: &mut Event| picks.update(|n| *n += 1);
 
 ## The frame clock
 
-`vapors_elements::frame_time()` is a `Signal<Duration>`: the time since
+`vapors_elements::frame_time()` is a `ReadSignal<Duration>`: the time since
 the first frame, set once at the start of each frame.
 `frame_delta()` is the time since the previous frame (zero on the
 first; after an idle wait it includes the wait). While anything reads
