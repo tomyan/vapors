@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<!-- Replace the title (two to four words) and the sections below. -->
+<title>Dodge code tour</title>
+<style>
+  :root {
+    --bg: #fbfbf9; --fg: #1d2125; --muted: #5b636b; --rule: #dfe2e5; --code-bg: #ffffff;
+    --error: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121518; --fg: #e6e8ea; --muted: #9aa3ab; --rule: #2a3036; --code-bg: #0d1117;
+      --error: #f97066;
+    }
+    :root:not([data-theme="light"]) .shiki,
+    :root:not([data-theme="light"]) .shiki span {
+      color: var(--shiki-dark) !important; background-color: var(--shiki-dark-bg) !important;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121518; --fg: #e6e8ea; --muted: #9aa3ab; --rule: #2a3036; --code-bg: #0d1117;
+    --error: #f97066;
+  }
+  :root[data-theme="dark"] .shiki, :root[data-theme="dark"] .shiki span {
+    color: var(--shiki-dark) !important; background-color: var(--shiki-dark-bg) !important;
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  p { margin: 8px 0; }
+  .file { color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 16px; }
+  pre { margin: 6px 0 0; padding: 14px 16px; overflow-x: auto; border: 1px solid var(--rule);
+        border-radius: 6px; background: var(--code-bg); font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea.code { display: none; }
+  #error { color: var(--error); font-weight: 600; }
+  #error:empty { display: none; }
+</style>
+</head>
+<body>
+<main>
+<h1>Dodge code tour</h1>
+<p>One paragraph: what the game is and how its parts fit together.</p>
+<p id="error" role="alert"></p>
+
+<!-- One section per part worth reading. Paste code verbatim into a
+     textarea: no escaping is needed (only the text "</textarea>" may not
+     appear). data-lang is wisp, rust, css, toml or html; data-file names
+     the file shown above the code. -->
+<section>
+<h2>The page</h2>
+<p>What this file does, and the lines to look at.</p>
+<textarea class="code" data-lang="wisp" data-file="src/page.wisp">
+<script>
+let count: Signal<i32> = Signal::new(0);
+let increment = move || count.update(|n| *n += 1);
+</script>
+
+<style>
+.row { display: flex; }
+</style>
+
+<div class="row"><button onclick={increment}>Clicked {count} times</button></div>
+</textarea>
+</section>
+
+<section>
+<h2>The rules</h2>
+<p>What this file does.</p>
+<textarea class="code" data-lang="rust" data-file="src/game.rs">
+pub fn key(&mut self, key: &str) {
+    let (dx, dy) = match key {
+        "ArrowLeft" => (-1, 0),
+        _ => return,
+    };
+}
+</textarea>
+</section>
+</main>
+
+<!-- The .wisp TextMate grammar (vapors-site editors/grammar); keep equal
+     to assets/wisp.tmLanguage.json beside this template. -->
+<script type="application/json" id="wisp-grammar">
+{
+  "name": "wisp",
+  "scopeName": "source.wisp",
+  "fileTypes": [
+    "wisp"
+  ],
+  "patterns": [
+    {
+      "include": "#script"
+    },
+    {
+      "include": "#style"
+    },
+    {
+      "begin": "<!--",
+      "end": "-->",
+      "name": "comment.block.wisp"
+    },
+    {
+      "include": "#control"
+    },
+    {
+      "include": "#expression"
+    },
+    {
+      "include": "#component"
+    },
+    {
+      "include": "#element"
+    }
+  ],
+  "repository": {
+    "script": {
+      "begin": "(<)(script)(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      },
+      "end": "(</)(script)(>)",
+      "contentName": "meta.embedded.block.rust",
+      "patterns": [
+        {
+          "include": "source.rust"
+        }
+      ],
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "style": {
+      "begin": "(<)(style)(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      },
+      "end": "(</)(style)(>)",
+      "contentName": "meta.embedded.block.css",
+      "patterns": [
+        {
+          "include": "source.css"
+        }
+      ],
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "expression": {
+      "begin": "\\{",
+      "end": "\\}",
+      "contentName": "meta.embedded.expression.rust",
+      "patterns": [
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "control": {
+      "begin": "(\\{/?)(else\\s+if|if|else|for|snippet|render)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.section.block.wisp"
+        },
+        "2": {
+          "name": "keyword.control.wisp"
+        }
+      },
+      "end": "\\}",
+      "patterns": [
+        {
+          "match": "\\bkey(?==)",
+          "name": "keyword.other.wisp"
+        },
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "include": "#expression"
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.wisp"
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.wisp"
+        },
+        {
+          "match": "[\\w:-]+(?=\\s*=)",
+          "name": "entity.other.attribute-name.wisp"
+        }
+      ]
+    },
+    "component": {
+      "begin": "(</?)([A-Z][\\w.:]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "support.class.component.wisp"
+        }
+      },
+      "end": "/?>",
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ],
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "element": {
+      "begin": "(</?)([a-z][\\w:-]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        }
+      },
+      "end": "/?>",
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ],
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    }
+  }
+}
+</script>
+<script type="module">
+const blocks = [...document.querySelectorAll('textarea.code')];
+const shown = (block, html) => {
+  const file = document.createElement('div');
+  file.className = 'file';
+  file.textContent = block.dataset.file || '';
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  block.replaceWith(file, ...holder.childNodes);
+};
+const plain = (block) => {
+  const pre = document.createElement('pre');
+  pre.textContent = block.value.replace(/^\n/, '');
+  shown(block, pre.outerHTML);
+};
+try {
+  const { createHighlighter } = await import('https://cdn.jsdelivr.net/npm/shiki@4.6.0/+esm');
+  const grammar = JSON.parse(document.getElementById('wisp-grammar').textContent);
+  const wisp = { ...grammar, name: 'wisp', embeddedLangs: ['rust', 'css'] };
+  const highlighter = await createHighlighter({
+    themes: ['github-light', 'github-dark'],
+    langs: ['rust', 'css', 'toml', 'html', wisp],
+  });
+  for (const block of blocks) {
+    const html = highlighter.codeToHtml(block.value.replace(/^\n/, ''), {
+      lang: block.dataset.lang,
+      themes: { light: 'github-light', dark: 'github-dark' },
+    });
+    shown(block, html);
+  }
+  document.documentElement.dataset.highlighted = 'yes';
+} catch (error) {
+  document.getElementById('error').textContent = `Highlighting failed, so the code is shown plain: ${error}`;
+  blocks.forEach(plain);
+  document.documentElement.dataset.highlighted = 'no';
+}
+</script>
+</body>
+</html>

@@ -160,3 +160,18 @@ the session has an Artifact tool, publish `site/index.html` as the page
 with the `.js` and the `.wasm` as supporting files under the same names
 (the `.wasm` with content type `application/wasm`). Otherwise give the
 user the `site/` directory: any static server over https serves it.
+
+## Code tour
+
+Once the game works and is published, publish a second artifact that
+walks through the key parts of its code. Start from
+[assets/code-tour.html](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/assets/code-tour.html)
+(`curl -fsSLO https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/assets/code-tour.html`):
+set its title and heading, and give each part of the code a section
+with a few sentences and the code pasted verbatim into a
+`<textarea class="code" data-lang="wisp" data-file="src/page.wisp">`
+(`data-lang` is `wisp`, `rust`, `css`, `toml` or `html`; nothing needs
+escaping). The page highlights the code with shiki from jsdelivr and
+the `.wisp` grammar inlined in it; leave that script as it is. If shiki
+cannot load, the page shows the code plain with an error line above it.
+Publish it as a page on its own, with no supporting files.
