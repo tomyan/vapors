@@ -9,9 +9,7 @@ use vapors_scene3d_components::{Group, GroupProps, Mesh, MeshProps, Scene, Scene
 /// The row's place, following its number: a row reused for another
 /// number would move its node.
 fn following(x: Signal<i32>) -> Signal<vapors_scene3d::Transform> {
-    let place = Signal::new(at(x.get_untracked()));
-    vapors_signals::Effect::new(move || place.set(at(x.get())));
-    place
+    Signal::derived(move || at(x.get()))
 }
 
 fn at(x: i32) -> vapors_scene3d::Transform {
