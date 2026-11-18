@@ -38,6 +38,7 @@ send_wrapper = "=0.6.0"
 wasm-bindgen-futures = "0.4.79"
 
 [dev-dependencies]
+vapors-signals.workspace = true
 serde_json.workspace = true
 png.workspace = true
 vapors-demos.workspace = true

@@ -52,6 +52,15 @@ impl Owner {
     }
 }
 
+/// Runs `f` with no current owner, then restores it: what `f` creates
+/// belongs to no scope, so no owner's disposal removes it. For state
+/// that lives as long as the thread, as an app-wide clock does.
+pub fn unowned<R>(f: impl FnOnce() -> R) -> R {
+    let previous = with_runtime(|runtime| runtime.current_owner.take());
+    let _restore = Restore::new(move || with_runtime(|runtime| runtime.current_owner = previous));
+    f()
+}
+
 /// Registers `f` to run when the current owner is disposed, or before
 /// the memo or effect that is running re-runs.
 ///

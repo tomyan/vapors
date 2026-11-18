@@ -39,7 +39,7 @@ pub use effect::Effect;
 pub use error::{Error, Kind, NodeInfo};
 pub use flush::batch;
 pub use memo::Memo;
-pub use owner::{Owner, on_cleanup};
+pub use owner::{Owner, on_cleanup, unowned};
 pub use signal::Signal;
 pub use track::untrack;
 pub use trigger::Trigger;

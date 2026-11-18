@@ -2998,6 +2998,7 @@ dependencies = [
  "vapors-renderer",
  "vapors-scene",
  "vapors-shapes",
+ "vapors-signals",
  "vapors-text",
  "wasm-bindgen-futures",
  "wgpu",

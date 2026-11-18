@@ -18,6 +18,7 @@ mod elements_app_animation;
 mod elements_app_drag;
 mod elements_app_errors;
 mod elements_app_events;
+mod elements_app_frame_clock;
 mod elements_app_give;
 mod elements_app_give_text;
 mod elements_app_keys;

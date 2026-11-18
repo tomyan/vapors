@@ -158,6 +158,17 @@ impl<T: 'static> Signal<T> {
         write_cell(self.id, self.info, false, f)
     }
 
+    /// Whether a live memo or effect reads this signal. A disposed
+    /// signal has none.
+    #[must_use]
+    pub fn has_subscribers(&self) -> bool {
+        with_runtime(|runtime| {
+            runtime
+                .node(self.id)
+                .is_some_and(|node| !node.observers.is_empty())
+        })
+    }
+
     /// Removes the signal from the graph; later reads are refused.
     pub fn dispose(self) {
         dispose_node(self.id);

@@ -25,6 +25,7 @@ test-support = []
 
 [dependencies]
 vapors-dom.workspace = true
+vapors-signals.workspace = true
 vapors-a11y.workspace = true
 vapors-css.workspace = true
 vapors-scene.workspace = true
@@ -37,7 +38,6 @@ serde_json.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-vapors-signals.workspace = true
 vapors-compiler-examples.workspace = true
 vapors-dom = { workspace = true, features = ["test-support"] }
 serde_json.workspace = true
