@@ -58,6 +58,16 @@ The elements the platform looks for, by id (`vapors_platform::page`):
 - CSS: `html,body{margin:0;height:100%} canvas{width:100vw;height:100vh;
   display:block;touch-action:none}`. Without `touch-action:none` the
   browser scrolls instead of sending touches.
+- Keyboard focus: winit hears keys only on the canvas. The canvas takes
+  focus at start, unless an element of the page already holds it (an
+  `<input>` the page focused), and keeps it from `<body>`: when focus
+  would land there (a click on `#status` or `#error`, or the text
+  input's textarea losing it) the canvas takes it back. Focusable
+  page elements (an `<input>`, `#open`) keep theirs. A browser window
+  that loses focus is left alone, so focus is where it was when the
+  window returns. The page check sends a key before and after a press
+  on `#status` and reads that the canvas's listener took it (the
+  `focus` and `focus-owned` cases).
 - WebGPU: Chrome or Edge 113+, Safari 26+, Firefox 141+, over https or
   localhost. There is no WebGL fallback. `navigator.gpu` is checked
   before anything else, so a browser without WebGPU reads the `NoWebGpu`

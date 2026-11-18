@@ -23,5 +23,9 @@ pub fn for_options(options: &WindowOptions) -> Result<WindowAttributes, Platform
     let canvas = crate::web::canvas()?;
     Ok(Window::default_attributes()
         .with_title(&options.title)
+        // winit focuses the canvas when it makes the window, whoever
+        // holds focus; `canvas_focus_web` does it unless the page's own
+        // element has it
+        .with_active(false)
         .with_canvas(Some(canvas)))
 }

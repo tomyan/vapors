@@ -32,6 +32,9 @@ mod a11y_mirror_web;
 mod a11y_mirror_write;
 mod attributes;
 mod browser_platform;
+mod canvas_focus;
+#[cfg(target_family = "wasm")]
+mod canvas_focus_web;
 mod clicks;
 #[cfg(target_family = "wasm")]
 mod clicks_web;
