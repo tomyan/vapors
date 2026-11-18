@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use vapors_scene3d::{Quat, Transform, Vec3};
-use vapors_signals::Signal;
+use vapors_signals::{ReadSignal, Signal};
 
 use crate::schedule::turn;
 
@@ -13,7 +13,7 @@ use crate::schedule::turn;
 /// # Panics
 /// Never: a rotation about +Y with unit scale is a valid transform.
 #[must_use]
-pub fn turning(time: Signal<Duration>) -> Signal<Transform> {
+pub fn turning(time: Signal<Duration>) -> ReadSignal<Transform> {
     let at = |time| {
         let rotation = Quat::from_rotation_y(turn(time));
         Transform::new(Vec3::ZERO, rotation, Vec3::ONE).expect("a turn about +Y")
@@ -26,8 +26,9 @@ pub fn turning(time: Signal<Duration>) -> Signal<Transform> {
 /// # Panics
 /// For a non-finite coordinate; the page's are literals.
 #[must_use]
-pub fn at(x: f32, y: f32, z: f32) -> Signal<Transform> {
+pub fn at(x: f32, y: f32, z: f32) -> ReadSignal<Transform> {
     Signal::new(Transform::from_translation(Vec3::new(x, y, z)).expect("a finite place"))
+        .read_only()
 }
 
 /// The camera 8 back and 3 up, tilted down at the cubes.
@@ -35,8 +36,8 @@ pub fn at(x: f32, y: f32, z: f32) -> Signal<Transform> {
 /// # Panics
 /// Never: a fixed, finite view.
 #[must_use]
-pub fn looking() -> Signal<Transform> {
+pub fn looking() -> ReadSignal<Transform> {
     let tilt = Quat::from_rotation_x(-0.35);
     let view = Transform::new(Vec3::new(0.0, 3.0, 8.0), tilt, Vec3::ONE).expect("a fixed view");
-    Signal::new(view)
+    Signal::new(view).read_only()
 }

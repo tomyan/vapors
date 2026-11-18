@@ -5,13 +5,13 @@ use crate::node::{Mounted, mount_node};
 use crate::own_keys;
 use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{NodeKind, Transform};
-use vapors_signals::Signal;
+use vapors_signals::{ReadSignal, Signal};
 
 /// What a parent passes to [`Group::mount`].
 pub struct GroupProps {
     /// Where the group sits in its parent: a change moves it and its
     /// subtree, and writes their uniforms alone.
-    pub transform: Signal<Transform>,
+    pub transform: ReadSignal<Transform>,
     /// Its nodes.
     pub children: Snippet,
     /// The anchor's key, which the compiler passes for a tag carrying
@@ -27,7 +27,7 @@ impl GroupProps {
 impl Default for GroupProps {
     fn default() -> Self {
         Self {
-            transform: Signal::new(Transform::IDENTITY),
+            transform: Signal::new(Transform::IDENTITY).read_only(),
             children: Snippet::empty(),
             anchor: None,
         }

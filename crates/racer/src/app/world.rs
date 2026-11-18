@@ -58,7 +58,8 @@ impl TrackWorld {
             .mount(NAME, Box::new(renderer))
             .expect("a new app has no renderers");
         let props = props(&meshes, (race, camera));
-        let (look, lens, car) = (props.look, props.lens.expect("set by props"), props.car);
+        let lens = Signal::new(lens(camera).expect("the racer's camera"));
+        let (look, car) = (props.look, props.car);
         let body = document.borrow().body();
         let page = RacerWorld::mount(
             document,
@@ -66,7 +67,7 @@ impl TrackWorld {
             RacerWorldProps {
                 scene: Some(Rc::clone(&scene)),
                 surface: Some(surface),
-                lens: Some(lens),
+                lens: Some(lens.read_only()),
                 ..props
             },
         );
@@ -117,7 +118,7 @@ impl TrackWorld {
     }
 }
 
-/// The world component's props but its scene and surface: the parts'
+/// The world component's props but its scene, surface and lens: the parts'
 /// geometry and the ground given to `meshes`, the camera and car placed.
 fn props(meshes: &RefCell<Meshes>, (race, camera): (&Race, &Camera)) -> RacerWorldProps {
     let mut held = meshes.borrow_mut();
@@ -128,7 +129,6 @@ fn props(meshes: &RefCell<Meshes>, (race, camera): (&Race, &Camera)) -> RacerWor
     let parts = world::part_geometry(&mut held).expect("the racer's parts");
     RacerWorldProps {
         eye: Some(CameraHandle::new()),
-        lens: Some(Signal::new(lens(camera).expect("the racer's camera"))),
         look: Signal::new(camera_transform(camera, race).expect("the racer's camera")),
         world: Signal::new(world::racers_world()),
         car: Signal::new(car_transform(race).expect("the race")),

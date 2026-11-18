@@ -8,7 +8,7 @@ use crate::schedule::night;
 #[prop] let cube: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let ground: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let eye: Option<vapors_scene3d::CameraHandle> = None;
-#[prop] let lens: Option<Signal<vapors_scene3d::Projection>> = None;
+#[prop] let lens: Option<ReadSignal<vapors_scene3d::Projection>> = None;
 #[prop] let time: Signal<std::time::Duration> = Signal::new(std::time::Duration::ZERO);
 #[prop] let frames: Signal<u64> = Signal::new(0);
 

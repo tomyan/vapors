@@ -10,7 +10,7 @@ use crate::own_keys;
 use crate::placement::Placement;
 use vapors_dom::{Appearance, DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{Colour, GeometryHandle, MaterialId, NodeKind, Transform};
-use vapors_signals::Signal;
+use vapors_signals::{ReadSignal, Signal};
 
 /// What a parent passes to [`Mesh::mount`].
 pub struct MeshProps {
@@ -18,7 +18,7 @@ pub struct MeshProps {
     pub geometry: Option<GeometryHandle>,
     /// Where the mesh sits in its parent; a change writes its uniform
     /// alone.
-    pub transform: Signal<Transform>,
+    pub transform: ReadSignal<Transform>,
     /// The application material it is drawn with, from the renderer's
     /// `Meshes`; `None` for its colour. Fixed when it mounts.
     pub material: Option<MaterialId>,
@@ -36,7 +36,7 @@ impl Default for MeshProps {
     fn default() -> Self {
         Self {
             geometry: None,
-            transform: Signal::new(Transform::IDENTITY),
+            transform: Signal::new(Transform::IDENTITY).read_only(),
             material: None,
             anchor: None,
         }

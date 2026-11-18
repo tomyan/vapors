@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use vapors_elements::{advance_frame_clock, frame_clock_wanted, frame_delta, frame_time};
-use vapors_signals::{Owner, Signal};
+use vapors_signals::{Owner, ReadSignal, Signal};
 
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
@@ -70,4 +70,10 @@ fn a_reader_of_delta_alone_wants_the_clock() {
     assert!(frame_clock_wanted());
     owner.dispose();
     assert!(!frame_clock_wanted());
+}
+
+#[test]
+fn the_clock_is_read_only_to_a_script() {
+    let (time, delta): (ReadSignal<Duration>, ReadSignal<Duration>) = (frame_time(), frame_delta());
+    assert_eq!(time.get_untracked(), delta.get_untracked());
 }

@@ -8,7 +8,7 @@ use crate::node::{Mounted, mount_node, refuse};
 use crate::own_keys;
 use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{CameraHandle, NodeKind, Projection, Transform};
-use vapors_signals::{Effect, Signal};
+use vapors_signals::{Effect, ReadSignal, Signal};
 
 /// What a parent passes to [`Camera::mount`].
 pub struct CameraProps {
@@ -16,10 +16,10 @@ pub struct CameraProps {
     pub handle: Option<CameraHandle>,
     /// How it projects; required. A change writes the camera's lens and
     /// draws the surface again.
-    pub projection: Option<Signal<Projection>>,
+    pub projection: Option<ReadSignal<Projection>>,
     /// Where it sits in its parent, looking down its own -Z; a change
     /// writes the camera's uniform alone.
-    pub transform: Signal<Transform>,
+    pub transform: ReadSignal<Transform>,
     /// The anchor's key, which the compiler passes for a tag carrying
     /// `class`, `class:` or `style`; `None` takes the component's own.
     pub anchor: Option<&'static StyleKey>,
@@ -35,7 +35,7 @@ impl Default for CameraProps {
         Self {
             handle: None,
             projection: None,
-            transform: Signal::new(Transform::IDENTITY),
+            transform: Signal::new(Transform::IDENTITY).read_only(),
             anchor: None,
         }
     }
@@ -93,7 +93,7 @@ node_component!(Camera, CameraProps);
 
 /// Writes each later value of `projection` to the camera and draws its
 /// surface again.
-fn follow_projection(placement: crate::placement::Placement, projection: Signal<Projection>) {
+fn follow_projection(placement: crate::placement::Placement, projection: ReadSignal<Projection>) {
     Effect::new(move || {
         let lens = projection.get();
         let written = placement

@@ -1,6 +1,6 @@
 //! A child component tag mounts the child with a props struct built
 //! from the attributes; a literal converts with `into`, an expression
-//! is passed raw, and `bind:name={signal}` passes the signal itself.
+//! is passed raw (a signal or memo binding converts with `into`), and `bind:name={signal}` passes the signal itself.
 //! Expressions are evaluated into their own `let`s first, so the
 //! allowance on the props literal covers only generated code. `class`,
 //! `class:` and `style` style the component's anchor element instead
@@ -83,7 +83,7 @@ impl Emitter<'_> {
                 AttrValue::Expr(expr) => {
                     let local = format!("{var}_{name}");
                     self.reserve(&local);
-                    self.line(format!("let {local} = {};", self.prop_value(expr)?));
+                    self.emit_prop_let(&local, expr, attribute.name.starts_with("bind:"))?;
                     local
                 }
             };
@@ -117,6 +117,31 @@ impl Emitter<'_> {
 }
 
 impl Emitter<'_> {
+    /// `let local = expr;`, with `.into()` for a signal or memo binding,
+    /// so a prop typed `ReadSignal<T>` takes it. `bind:` passes the
+    /// signal itself: it is a grant of write access.
+    fn emit_prop_let(
+        &mut self,
+        local: &str,
+        expr: &crate::ast::Expr,
+        bound: bool,
+    ) -> Result<(), CompileError> {
+        let value = self.prop_value(expr)?;
+        let converts = !bound
+            && self
+                .script
+                .unwrappable
+                .iter()
+                .any(|name| *name == value.trim());
+        if converts {
+            self.line(Allowance::UselessConversion.attribute());
+            self.line(format!("let {local} = {}.into();", value.trim()));
+        } else {
+            self.line(format!("let {local} = {value};"));
+        }
+        Ok(())
+    }
+
     /// An attribute's value as Rust: a local snippet named alone is
     /// cloned, so passing it as a prop leaves it for later renders
     /// (review-v66b); a snippet is an `Rc`, so the clone is cheap.

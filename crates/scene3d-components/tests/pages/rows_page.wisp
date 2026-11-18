@@ -8,7 +8,7 @@ use vapors_scene3d_components::{Group, GroupProps, Mesh, MeshProps, Scene, Scene
 
 /// The row's place, following its number: a row reused for another
 /// number would move its node.
-fn following(x: Signal<i32>) -> Signal<vapors_scene3d::Transform> {
+fn following(x: Signal<i32>) -> ReadSignal<vapors_scene3d::Transform> {
     Signal::derived(move || at(x.get()))
 }
 

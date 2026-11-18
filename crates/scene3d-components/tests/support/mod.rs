@@ -135,7 +135,7 @@ impl Rig {
             surface: Some(surface.clone()),
             square: Some(square),
             eye: Some(eye),
-            lens: Some(signals.lens),
+            lens: Some(signals.lens.read_only()),
             back: signals.back,
             left: signals.left,
             blue: signals.blue,

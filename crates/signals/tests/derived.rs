@@ -3,10 +3,10 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use vapors_signals::{Effect, Owner, Signal};
+use vapors_signals::{Effect, Owner, ReadSignal, Signal};
 
 /// A derived `source * 10` and the count of times its closure ran.
-fn tenfold(source: Signal<i32>) -> (Signal<i32>, Rc<Cell<u32>>) {
+fn tenfold(source: Signal<i32>) -> (ReadSignal<i32>, Rc<Cell<u32>>) {
     let runs = Rc::new(Cell::new(0));
     let counted = runs.clone();
     let derived = Signal::derived(move || {
