@@ -1,6 +1,6 @@
 ---
 name: vapors
-description: Build a small app or game for the browser with vapors, the Rust GUI framework whose .wisp components (Rust script, CSS, HTML template) compile to Rust and draw with wgpu on WebGPU. Use when asked to build something with vapors or .wisp, to set up a vapors project, or to build, check, screenshot or publish a vapors web page.
+description: Build apps for the browser with vapors, including simple games: a Rust GUI framework whose .wisp components (Rust script, CSS, HTML template) compile to Rust, with signals, scoped styles, a 3D scene and a per-frame clock, drawn with wgpu on WebGPU. Use when asked to build something with vapors or .wisp, to set up a vapors project, or to build, check, screenshot or publish a vapors web page.
 ---
 
 # vapors
@@ -86,9 +86,17 @@ After each change, in this order:
 
 1. **`wisp-check`** on each `.wisp` you changed: it prints every
    refusal as `file:line:col: message` naming the fix, in about a
-   second. Install it once, in the background since it compiles for a
-   minute:
-   `cargo install --locked --git https://github.com/tomyan/vapors --rev <the rev in Cargo.toml> vapors-compiler --bin wisp-check`.
+   second. Install it once, in the background since it compiles for one
+   to two minutes, into a directory of its own so a later install for a new
+   rev cannot keep an old binary:
+
+   ```sh
+   rev=$(sed -n 's/.*rev = "\([0-9a-f]*\)".*/\1/p' Cargo.toml | head -1)
+   CARGO_TARGET_DIR=~/.wisp-check/$rev/target cargo install --locked \
+     --git https://github.com/tomyan/vapors --rev $rev vapors-compiler \
+     --bin wisp-check --root ~/.wisp-check/$rev
+   ~/.wisp-check/$rev/bin/wisp-check src/page.wisp
+   ```
 2. **`cargo test`** for your own Rust.
 3. **`trunk build --offline`** (debug, into `dist/`). A rustc error in
    script code points at the generated file
@@ -140,9 +148,6 @@ every page load waits 120 s.
   shades. It has no lights, shadows, textures, transparency or model
   files yet; do not imitate them. Build models from the starter's
   shapes ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene)).
-- In the browser, keys reach the page only while the canvas has
-  focus. The starter's `index.html` focuses it when the page loads;
-  keep that script.
 - Props of the 3D tags (`<Mesh>`, `<Scene>`, ...) are checked by rustc,
   not `wisp-check`; a wrong one is a rustc error in the generated file.
 

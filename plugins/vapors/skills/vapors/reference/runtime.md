@@ -60,7 +60,7 @@ covers them as a script uses them. From Rust:
 - A component's signals and memos are public fields of its struct
   (`page.world.set(..)`); props are not.
 
-## The frame loop
+## Per-frame motion
 
 `ElementsApp` draws only when something changed: an idle page draws
 nothing. In the browser a redraw runs on `requestAnimationFrame`, so at
@@ -90,6 +90,15 @@ redraws only when something changed.
 
 Read wall-clock time through `vapors_platform::Instant`, never
 `std::time::Instant`, which panics in the browser.
+
+### Simple games
+
+A game uses the same three pieces: the frame clock to move things each
+frame, `<vapors:window onkeydown={..} onkeyup={..} />` to read keys
+whatever has focus (the canvas holds focus from the start), and the 3D
+scene for anything that moves, since an element's position cannot
+follow a signal. Keep the game's state and rules in a plain Rust module
+with unit tests, and let the `.wisp` component read it through signals.
 
 ## The 3D scene
 
