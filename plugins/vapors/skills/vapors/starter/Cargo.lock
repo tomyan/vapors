@@ -2576,7 +2576,7 @@ checksum = "3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6"
 [[package]]
 name = "vapors-a11y"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "serde",
  "vapors-dom",
@@ -2585,7 +2585,7 @@ dependencies = [
 [[package]]
 name = "vapors-app"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "send_wrapper",
  "tracing",
@@ -2604,7 +2604,7 @@ dependencies = [
 [[package]]
 name = "vapors-compiler"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2617,7 +2617,7 @@ dependencies = [
 [[package]]
 name = "vapors-css"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "vapors-scene",
 ]
@@ -2625,7 +2625,7 @@ dependencies = [
 [[package]]
 name = "vapors-dom"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "vapors-signals",
 ]
@@ -2633,7 +2633,7 @@ dependencies = [
 [[package]]
 name = "vapors-elements"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "rustc-hash 2.1.3",
  "serde",
@@ -2652,7 +2652,7 @@ dependencies = [
 [[package]]
 name = "vapors-gpu"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "wgpu",
 ]
@@ -2660,7 +2660,7 @@ dependencies = [
 [[package]]
 name = "vapors-platform"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "arboard",
  "console_error_panic_hook",
@@ -2681,7 +2681,7 @@ dependencies = [
 [[package]]
 name = "vapors-renderer"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "tracing",
  "vapors-scene",
@@ -2692,12 +2692,12 @@ dependencies = [
 [[package]]
 name = "vapors-scene"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 
 [[package]]
 name = "vapors-scene3d"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "glam",
  "naga",
@@ -2706,7 +2706,7 @@ dependencies = [
 [[package]]
 name = "vapors-scene3d-components"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "vapors-app",
  "vapors-compiler",
@@ -2718,7 +2718,7 @@ dependencies = [
 [[package]]
 name = "vapors-scene3d-gpu"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "vapors-app",
  "vapors-renderer",
@@ -2729,7 +2729,7 @@ dependencies = [
 [[package]]
 name = "vapors-shapes"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "lyon_tessellation",
  "zeno",
@@ -2738,12 +2738,12 @@ dependencies = [
 [[package]]
 name = "vapors-signals"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 
 [[package]]
 name = "vapors-text"
 version = "0.0.0"
-source = "git+https://github.com/tomyan/vapors?rev=a246384a2e1be2eb7a904422625b6330bba53eb0#a246384a2e1be2eb7a904422625b6330bba53eb0"
+source = "git+https://github.com/tomyan/vapors?rev=d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43#d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43"
 dependencies = [
  "fontique",
  "log",

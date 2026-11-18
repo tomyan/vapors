@@ -40,7 +40,7 @@ fn start() -> Result<(), String> {
         surface: Some(surface),
         shapes: Some(shapes),
         eye: Some(CameraHandle::new()),
-        lens: Some(Signal::new(view::lens()?)),
+        lens: Some(Signal::new(view::lens()?).read_only()),
     };
     let body = document.borrow().body();
     // the page lives as long as the app: never dropped

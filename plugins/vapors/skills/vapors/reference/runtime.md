@@ -53,7 +53,8 @@ Details: [docs/web.md](https://github.com/tomyan/vapors/blob/main/docs/web.md).
 covers them as a script uses them. From Rust:
 
 - `Signal::new(v)`, `.get()`, `.set(v)`, `.update(|v| ..)`,
-  `.get_untracked()`, `.with(|v| ..)`; `Signal::derived(move || ..)`.
+  `.get_untracked()`, `.with(|v| ..)`; `Signal::derived(move || ..)` returns
+  a read-only `ReadSignal<T>`, as does `signal.read_only()` (reads only).
 - `Memo::new(move || ..)`, `Effect::new(move || ..)`.
 - `batch(|| ..)` runs effects once after several writes;
   `untrack(|| ..)` reads without subscribing.
@@ -67,7 +68,7 @@ nothing. In the browser a redraw runs on `requestAnimationFrame`, so at
 most once per display refresh.
 
 `vapors_elements::frame_time()` and `frame_delta()` return a
-`Signal<Duration>`: the time since the first frame, and the time since
+`ReadSignal<Duration>`: the time since the first frame, and the time since
 the previous frame. While anything reads either, the page draws every
 display refresh; when the last reader unmounts, it idles again. A
 script reads them directly ([wisp.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/wisp.md#the-frame-clock)).
@@ -151,7 +152,7 @@ let shapes = shapes::Shapes::new(&mut meshes.borrow_mut()).map_err(|e| e.to_stri
 ```
 
 Pass `scene`, `surface`, the shapes, a `CameraHandle::new()` and a
-`Signal<Projection>` to the page as props. `app.mount("view", ..)` draws
+`ReadSignal<Projection>` to the page as props. `app.mount("view", ..)` draws
 on the page's `<gpu-surface name="view">`.
 
 - `Meshes::geometry(positions, indices, shades)` takes `Vec<Vec3>`
@@ -175,7 +176,7 @@ helpers in `view.rs`.
 ```html
 <gpu-surface name="view" class="view"></gpu-surface>
 <Scene scene={scene} surface={surface} camera={eye}>
-  <Camera handle={eye} projection={lens} transform={Signal::new(camera())} />
+  <Camera handle={eye} projection={lens} transform={Signal::new(camera()).read_only()} />
   <Mesh geometry={cuboid.clone()} class="box"
     transform={Signal::derived(move || turned(time.get().as_secs_f32() * 0.6))} />
 </Scene>
@@ -187,9 +188,9 @@ Several meshes inside `<Group transform={..}>` move together, and a
 | Tag | Props |
 |---|---|
 | `<Scene>` | `scene`, `surface`, `camera` (all `Option`, all required) |
-| `<Camera>` | `handle`, `projection: Option<Signal<Projection>>`, `transform: Signal<Transform>` |
-| `<Group>` | `transform: Signal<Transform>`, children |
-| `<Mesh>` | `geometry: Option<GeometryHandle>`, `transform: Signal<Transform>` |
+| `<Camera>` | `handle`, `projection: Option<ReadSignal<Projection>>`, `transform: ReadSignal<Transform>` |
+| `<Group>` | `transform: ReadSignal<Transform>`, children |
+| `<Mesh>` | `geometry: Option<GeometryHandle>`, `transform: ReadSignal<Transform>` |
 
 - Import them in the script:
   `use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, MeshProps, Scene, SceneProps};`.
