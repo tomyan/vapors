@@ -82,7 +82,7 @@ impl<'a> Winners<'a> {
     fn literal_of(&self, element: &ElementStyles) -> Result<String, String> {
         let winners = &element.winners;
         let sheets = Sheets::referenced(winners, &self.blocking(winners))?;
-        let mut out = String::from("vapors_dom::KeyWinners { sheets: &[");
+        let mut out = String::from("vapors_elements::__wisp::dom::KeyWinners { sheets: &[");
         for &index in &sheets.order {
             let id = sheet_ref(&self.analysis.sheets[index].0, self.own);
             let _ = write!(out, "({id}, {}), ", hash_literal(self.hashes[index]));
@@ -91,7 +91,7 @@ impl<'a> Winners<'a> {
         for (property, place) in base(winners) {
             let _ = write!(
                 out,
-                "vapors_dom::BaseWinner {{ property: {property}, declaration: {} }}, ",
+                "vapors_elements::__wisp::dom::BaseWinner {{ property: {property}, declaration: {} }}, ",
                 sheets.declaration(place)
             );
         }
@@ -139,20 +139,23 @@ impl Sheets {
 
     fn rule(&self, sheet: usize, rule: usize) -> String {
         format!(
-            "vapors_dom::RuleRef {{ sheet: {}, rule: {rule} }}",
+            "vapors_elements::__wisp::dom::RuleRef {{ sheet: {}, rule: {rule} }}",
             self.renumbered[&sheet]
         )
     }
 
     fn declaration(&self, place: Place) -> String {
         match place.sheet {
-            INLINE_SHEET => format!("vapors_dom::DeclarationRef::Inline({})", place.declaration),
+            INLINE_SHEET => format!(
+                "vapors_elements::__wisp::dom::DeclarationRef::Inline({})",
+                place.declaration
+            ),
             PRESENTATION_SHEET => format!(
-                "vapors_dom::DeclarationRef::Presentation({})",
+                "vapors_elements::__wisp::dom::DeclarationRef::Presentation({})",
                 place.declaration
             ),
             sheet => format!(
-                "vapors_dom::DeclarationRef::Rule {{ rule: {}, declaration: {} }}",
+                "vapors_elements::__wisp::dom::DeclarationRef::Rule {{ rule: {}, declaration: {} }}",
                 self.rule(sheet, place.rule),
                 place.declaration
             ),
@@ -171,13 +174,13 @@ fn in_rule(place: Place) -> Option<usize> {
 fn base(winners: &KeyWinners) -> impl Iterator<Item = (String, Place)> + '_ {
     let longhands = (winners.longhands.iter().enumerate()).filter_map(|(index, winner)| {
         Some((
-            format!("vapors_dom::PropertyRef::Longhand({index})"),
+            format!("vapors_elements::__wisp::dom::PropertyRef::Longhand({index})"),
             always(winner)?,
         ))
     });
     let custom = (winners.custom.iter()).filter_map(|(name, winner)| {
         Some((
-            format!("vapors_dom::PropertyRef::Custom({name:?})"),
+            format!("vapors_elements::__wisp::dom::PropertyRef::Custom({name:?})"),
             always(winner)?,
         ))
     });
@@ -204,12 +207,18 @@ fn conditional(
 /// `SCOPE` too.
 fn sheet_ref(id: &SheetId, own: Option<&str>) -> String {
     match id {
-        SheetId::UserAgent => "vapors_dom::SheetRef::UserAgent".to_owned(),
+        SheetId::UserAgent => "vapors_elements::__wisp::dom::SheetRef::UserAgent".to_owned(),
         SheetId::Scope(scope) if Some(scope.as_str()) == own => {
-            "vapors_dom::SheetRef::Scope(SCOPE)".to_owned()
+            "vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE)".to_owned()
         }
-        SheetId::Scope(scope) => format!("vapors_dom::SheetRef::Scope({})", in_crate(scope)),
-        SheetId::Global(file) => format!("vapors_dom::SheetRef::Global({})", in_crate(file)),
+        SheetId::Scope(scope) => format!(
+            "vapors_elements::__wisp::dom::SheetRef::Scope({})",
+            in_crate(scope)
+        ),
+        SheetId::Global(file) => format!(
+            "vapors_elements::__wisp::dom::SheetRef::Global({})",
+            in_crate(file)
+        ),
     }
 }
 

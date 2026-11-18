@@ -55,7 +55,8 @@ impl Emitter<'_> {
         } else {
             format!("&({read})")
         };
-        let closure = format!("move || vapors_dom::Renderable::snippet({borrowed}),");
+        let closure =
+            format!("move || vapors_elements::__wisp::dom::Renderable::snippet({borrowed}),");
         self.emit_closure(&clones, &[closure]);
         self.emit_dynamic_args(render)?;
         self.close_block_call(handle);

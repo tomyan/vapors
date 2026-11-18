@@ -22,7 +22,7 @@ fn a_component_tag_with_classes_passes_its_key_as_the_anchor_prop() {
     // the component's props type declares
     assert_has(
         &code,
-        "static KEY_MESH0: vapors_dom::StyleKey = { vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\"), attributes: &[], winners: vapors_dom::Winners::ComponentTag } };",
+        "static KEY_MESH0: vapors_elements::__wisp::dom::StyleKey = vapors_elements::__wisp::dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\"), attributes: &[], winners: vapors_elements::__wisp::dom::Winners::ComponentTag };",
     );
     assert_has(&code, "anchor: Some(&KEY_MESH0),");
     assert_lacks(&code, "braking:");
@@ -79,19 +79,19 @@ fn the_keys_tag_comes_from_the_props_type_the_tag_names() {
 }
 
 #[test]
-fn a_components_key_brings_in_the_scripts_use_items_to_name_its_props_type() {
-    // When: the key is a file-level static, outside mount where the
-    // script's `use` items are
+fn a_components_key_names_its_props_type_through_the_scripts_top_level_use() {
+    // When: the key is a file-level static, and the script's `use`
+    // items are at the top of the module too
     let code = generated_with(
         "use vapors_scene3d_components::{Mesh, MeshProps};",
         "<Mesh class=\"body\" />",
     );
 
     // Then
-    assert_has(
-        &code,
-        "static KEY_MESH0: vapors_dom::StyleKey = { #[allow(unused_imports)] use vapors_scene3d_components::{Mesh, MeshProps}; vapors_dom::StyleKey {",
-    );
+    let uses = code.find("use vapors_scene3d_components::{Mesh, MeshProps};");
+    let key = code.find("static KEY_MESH0");
+    assert!(uses.expect("the use") < key.expect("the key"), "{code}");
+    assert_has(&code, "tag: MeshProps::ANCHOR_TAG");
 }
 
 #[test]

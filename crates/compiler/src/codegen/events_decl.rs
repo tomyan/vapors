@@ -38,14 +38,9 @@ fn walk(nodes: &[Node], found: &mut Vec<String>) {
 }
 
 /// `events()` and `events_into()`: the component's own event names and
-/// its children's, with the script's `use` items, which bring the
-/// children's types in. A type already listed is skipped, so a component
+/// its children's, A type already listed is skipped, so a component
 /// that uses itself, directly or through another, ends.
-pub(crate) fn events_method(own: &[String], children: &[String], uses: &[&String]) -> String {
-    let mut imports = String::new();
-    for item in uses {
-        let _ = writeln!(imports, "        #[allow(unused_imports)]\n        {item}");
-    }
+pub(crate) fn events_method(own: &[String], children: &[String]) -> String {
     let mut body = String::new();
     if !own.is_empty() {
         let own: Vec<String> = own.iter().map(|name| format!("{name:?}")).collect();
@@ -79,7 +74,7 @@ pub(crate) fn events_method(own: &[String], children: &[String], uses: &[&String
     /// [`Self::events`] onto `events`, unless this type is in `seen`
     /// already: a component that uses itself is listed once.
     pub fn events_into(seen: &mut std::collections::BTreeSet<&'static str>, {into}: &mut Vec<&'static str>) {{
-{imports}{listed}    }}
+{listed}    }}
 "
     )
 }

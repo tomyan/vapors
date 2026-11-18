@@ -111,9 +111,13 @@ impl Emitter<'_> {
         self.refuse_assigning_handler(expr, &code)?;
         Ok(match self.script.handlers.get(&code) {
             Some(0) => {
-                format!("move |_event: &mut Event| vapors_dom::handle_without_event(&{code})")
+                format!(
+                    "move |_event: &mut Event| vapors_elements::__wisp::dom::handle_without_event(&{code})"
+                )
             }
-            _ => format!("move |event: &mut Event| vapors_dom::handle(event, &{code})"),
+            _ => format!(
+                "move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &{code})"
+            ),
         })
     }
 

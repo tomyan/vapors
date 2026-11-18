@@ -7,7 +7,7 @@ expression: code
 use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{
+use vapors_elements::__wisp::dom::{
     Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
 };
 #[allow(unused_imports)]
@@ -16,246 +16,246 @@ use vapors_signals::{Effect, Memo, Owner, Signal};
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
-static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
+static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elements::__wisp::dom::KeyWinners {
     sheets: &[
-        (vapors_dom::SheetRef::UserAgent, 0xe774_afd0_8061_102b),
-        (vapors_dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
+        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0xe774_afd0_8061_102b),
+        (vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
     ],
     base: &[
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(12),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(12),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 5,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(13),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(13),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(14),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(14),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 4,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(15),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(15),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 4,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(16),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(16),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(17),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(17),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(18),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(18),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(19),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(19),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(20),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(20),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(21),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(21),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(22),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(22),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(23),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(23),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(24),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(24),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(25),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(25),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 4,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(26),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(26),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 4,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(27),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(27),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(28),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(28),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 3,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(31),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(31),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 1,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(32),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(32),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 6,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(37),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(37),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
                 declaration: 0,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(82),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(82),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 1,
                     rule: 0,
                 },
                 declaration: 0,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(83),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(83),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 1,
                     rule: 0,
                 },
                 declaration: 0,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(84),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(84),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 1,
                     rule: 0,
                 },
                 declaration: 0,
             },
         },
-        vapors_dom::BaseWinner {
-            property: vapors_dom::PropertyRef::Longhand(85),
-            declaration: vapors_dom::DeclarationRef::Rule {
-                rule: vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(85),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 1,
                     rule: 0,
                 },
@@ -264,11 +264,11 @@ static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
         },
     ],
     conditional: &[
-        vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
             rule: 68,
         },
-        vapors_dom::RuleRef {
+        vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
             rule: 69,
         },
@@ -276,7 +276,7 @@ static WINNERS_BUTTON0: vapors_dom::KeyWinners = vapors_dom::KeyWinners {
     blocked_by: &[],
     own: Some(1),
 };
-static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
+static KEY_BUTTON0: vapors_elements::__wisp::dom::StyleKey = vapors_elements::__wisp::dom::StyleKey {
     site: concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp:10:1"),
     scope: Some(SCOPE),
     tag: "button",
@@ -284,7 +284,7 @@ static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
     toggles: &[],
     style: None,
     attributes: &[],
-    winners: vapors_dom::Winners::Compiled(&WINNERS_BUTTON0),
+    winners: vapors_elements::__wisp::dom::Winners::Compiled(&WINNERS_BUTTON0),
 };
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]
@@ -335,7 +335,7 @@ impl Counter {
         let CounterProps {} = props;
         dom.borrow_mut()
             .add_style(
-                vapors_dom::CompiledSheet::__compiled(
+                vapors_elements::__wisp::dom::CompiledSheet::__compiled(
                     SCOPE,
                     STYLE,
                     0x20a6_deea_d601_c3e4,
@@ -346,7 +346,9 @@ impl Counter {
         let owner = Owner::new();
         let (count, roots) = owner
             .with(|| {
+                // from src/counter.wisp:2
                 let count: Signal<i32> = Signal::named("count", 0);
+                // from src/counter.wisp:3
                 let increment = move || count.update(|n| *n += 1);
                 let mut roots = Vec::new();
                 let button0 = dom.borrow_mut().create_keyed_element(&KEY_BUTTON0);
@@ -362,7 +364,7 @@ impl Counter {
                         .listen(
                             button0,
                             "click",
-                            Box::new(move |_event: &mut Event| vapors_dom::handle_without_event(
+                            Box::new(move |_event: &mut Event| vapors_elements::__wisp::dom::handle_without_event(
                                 &increment,
                             )),
                         );
@@ -414,7 +416,7 @@ impl Counter {
     /// or child component at the top level.
     #[must_use]
     pub fn roots(&self) -> Vec<NodeId> {
-        vapors_dom::current_nodes(&self.roots)
+        vapors_elements::__wisp::dom::current_nodes(&self.roots)
     }
     /// The top-level entries, for a parent that mounts this component
     /// at its own top level.

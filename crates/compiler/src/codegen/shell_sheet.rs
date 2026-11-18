@@ -24,7 +24,7 @@ pub(super) fn registration(scoped: bool, global: bool, style: &str) -> String {
     };
     let hash = super::key_winners::hash_literal(vapors_css::sheet_hash::sheet_hash(style));
     format!(
-        "        dom.borrow_mut().{method}(vapors_dom::CompiledSheet::__compiled({name}, STYLE, {hash}));\n"
+        "        dom.borrow_mut().{method}(vapors_elements::__wisp::dom::CompiledSheet::__compiled({name}, STYLE, {hash}));\n"
     )
 }
 

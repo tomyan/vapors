@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use super::dom_path::DomPath;
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
 use crate::ast::Component;
@@ -42,13 +43,25 @@ pub fn compile_dir_into_styled(
     out: &Path,
     styles: Styles,
 ) -> Result<Compiled, Vec<CompileError>> {
+    compile_dir_into_with(src, out, (styles, DomPath::Elements))
+}
+
+/// [`compile_dir_into_styled`] with generated code naming the dom `dom`.
+///
+/// # Errors
+/// As [`compile_dir_into`].
+pub fn compile_dir_into_with(
+    src: &Path,
+    out: &Path,
+    (styles, dom): (Styles, DomPath),
+) -> Result<Compiled, Vec<CompileError>> {
     let tree = scan_some(src)?;
     let generated = modules::generated_dir(out);
     let root = src.parent().unwrap_or(src);
     let mut errors = Vec::new();
     let parsed = parse_all(&tree, (root, styles), &generated, &mut errors);
     let (index, indexed) = index_all(&parsed, &mut errors);
-    let (mut outputs, unchecked) = generate_all(&indexed, &index, &mut errors);
+    let (mut outputs, unchecked) = generate_all(&indexed, &index, (dom, &mut errors));
     if !errors.is_empty() {
         errors.sort_by(|a, b| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         return Err(errors);
@@ -116,7 +129,7 @@ fn index_all<'p>(
 fn generate_all(
     indexed: &[&Parsed],
     index: &PropsIndex,
-    errors: &mut Vec<CompileError>,
+    (dom, errors): (DomPath, &mut Vec<CompileError>),
 ) -> (Vec<Output>, Vec<String>) {
     let (mut outputs, mut unchecked) = (Vec::new(), Vec::new());
     let sheets = CrateSheets::of(indexed.iter().map(|file| &file.component));
@@ -124,7 +137,7 @@ fn generate_all(
         let others = sheets.others_for(&file.component);
         match generate_checked(&file.component, index, &others) {
             Ok(generated) => {
-                outputs.push((file.target.clone(), generated.code));
+                outputs.push((file.target.clone(), dom.apply(&generated.code)));
                 unchecked.extend(generated.unchecked);
             }
             Err(refused) => errors.extend(refused),

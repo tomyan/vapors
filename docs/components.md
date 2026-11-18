@@ -307,7 +307,7 @@ binary: its wasm build panics, saying so.
 ```toml
 # Cargo.toml
 [dependencies]
-vapors-dom = { path = "../vapors/crates/dom" }
+vapors-elements = { path = "../vapors/crates/elements" }
 vapors-signals = { path = "../vapors/crates/signals" }
 
 [build-dependencies]
@@ -346,6 +346,36 @@ becomes a nested module.
   a Rust module name; a file or directory whose name makes a Rust
   keyword, such as `type.wisp`; and a missing `OUT_DIR`, which happens
   when it is called outside `build.rs`.
+
+A page's crate needs `vapors-elements` and `vapors-signals`, not
+`vapors-dom`: generated code names the dom through the hidden
+`vapors_elements::__wisp::dom` (the file's second line says which way).
+A crate below `vapors-elements` cannot have it: the layers rule
+(`.config/factory.toml`) forbids `crates/components` depending on
+`vapors-elements`, and `crates/compiler-examples` has it only for tests.
+Those two call `vapors_compiler::build::compile_dir_below_elements("src")`
+in `build.rs`, which names `vapors_dom::` as before and needs
+`vapors-dom` as a dependency. Your own script may still name
+`vapors_dom` if the crate depends on it. `crates/wisp-page` builds
+without it.
+
+A script's `use` items are emitted at the top of the generated module,
+so a `#[prop]` type may name an imported item. A `use` of an item the
+script declares itself (`enum Mode {..}` then `use Mode::*;`) cannot
+move there and is refused; `use` it from a module of the crate.
+
+## Reading a rustc error in a page
+
+The compiler's refusals point into the `.wisp`; rustc's errors in your
+script code point at `target/.../out/wisp/<page>.rs`. Run
+`cargo run -p vapors-compiler --bin wisp-check -- path/to/page.wisp`
+first: it reports every refusal without a build. For a rustc error,
+open the generated file at the line it names. Each piece of script
+code (a `use`, a statement) follows a comment such as
+`// from pages/spin_cube.wisp:12`, and a prop's doc says `at
+pages/spin_cube.wisp:12`; the nearest one above the error is the line
+to edit. Template expressions are not marked: their code sits under the
+`// from` of the last script statement, so look for the expression text.
 
 ## The generated code
 

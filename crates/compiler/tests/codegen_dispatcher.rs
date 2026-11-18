@@ -9,7 +9,7 @@ use codegen::{assert_has, generated_with, refusal};
 #[test]
 fn a_dispatcher_declares_its_events_and_reaches_handlers() {
     // Given
-    let script = "#[dispatcher(optionchoose, comboboxdismiss)]\nlet events;\nlet choose = move |event: &mut Event| -> Result<(), vapors_dom::DispatchRefused> { if let Some(at) = event.target() { events.dispatch(at, Event::new(\"optionchoose\"))?; } Ok(()) };";
+    let script = "#[dispatcher(optionchoose, comboboxdismiss)]\nlet events;\nlet choose = move |event: &mut Event| -> Result<(), vapors_elements::__wisp::dom::DispatchRefused> { if let Some(at) = event.target() { events.dispatch(at, Event::new(\"optionchoose\"))?; } Ok(()) };";
 
     // When
     let code = generated_with(script, "<button onclick={choose}>Go</button>");

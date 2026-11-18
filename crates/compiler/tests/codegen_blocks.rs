@@ -24,7 +24,7 @@ fn if_block_uses_conditional_with_an_anchor() {
         "let if_anchor1 = dom.borrow_mut().create_text(\"\");",
     );
     assert_has(&code, "dom.borrow_mut().append(div0, if_anchor1);");
-    assert_has(&code, "vapors_dom::blocks::conditional(");
+    assert_has(&code, "vapors_elements::__wisp::dom::blocks::conditional(");
     assert_has(&code, "move || count.get() > 0,");
     assert_has(
         &code,
@@ -63,7 +63,7 @@ fn a_top_level_block_is_a_root_through_its_handle() {
     // Then: the handle lists the branch's nodes and the anchor as they are now
     assert_has(
         &code,
-        "let conditional_block1 = vapors_dom::blocks::conditional(",
+        "let conditional_block1 = vapors_elements::__wisp::dom::blocks::conditional(",
     );
     assert_has(&code, "roots.push(Root::Block(conditional_block1));");
 }
@@ -90,7 +90,7 @@ fn for_block_uses_keyed_with_index_and_item_signals() {
         &code,
         "let for_anchor1 = dom.borrow_mut().create_text(\"\");",
     );
-    assert_has(&code, "vapors_dom::blocks::keyed(");
+    assert_has(&code, "vapors_elements::__wisp::dom::blocks::keyed(");
     assert_has(
         &code,
         "(items.get()).into_iter().enumerate().map(|(i, x)| ((x.0), x)).collect()",
@@ -152,8 +152,8 @@ fn nested_blocks_build_inside_the_branch() {
     );
 
     // Then
-    let conditional = at(&code, "vapors_dom::blocks::conditional(");
-    let keyed = at(&code, "vapors_dom::blocks::keyed(");
+    let conditional = at(&code, "vapors_elements::__wisp::dom::blocks::conditional(");
+    let keyed = at(&code, "vapors_elements::__wisp::dom::blocks::keyed(");
     assert!(conditional < keyed, "{code}");
 }
 
@@ -181,6 +181,6 @@ fn a_keyed_for_passes_its_position_in_the_wisp() {
     // Then
     assert_has(
         &code,
-        "vapors_dom::blocks::keyed(dom, ul0, for_anchor1, concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:5:5\"),",
+        "vapors_elements::__wisp::dom::blocks::keyed(dom, ul0, for_anchor1, concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:5:5\"),",
     );
 }

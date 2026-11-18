@@ -8,6 +8,7 @@ use proc_macro2::LineColumn;
 use syn::spanned::Spanned;
 
 use super::names::{bound_names, check_declared};
+use super::script_hoist::{marker, refuse_local_uses};
 use super::script_syntax::{binding, call_of_new, named, reactive_kind};
 use super::script_uses::{UseName, use_names};
 use super::syn_map::{offset_in, render};
@@ -26,6 +27,8 @@ pub(crate) struct Prop {
     pub name: String,
     pub ty: String,
     pub default: String,
+    /// `file:line` of the declaration, set when it is placed.
+    pub at: String,
 }
 
 #[derive(Default)]
@@ -44,6 +47,8 @@ pub(crate) struct ScriptInfo {
     pub statements: Vec<String>,
     /// Every name the script binds, with its position.
     pub declared: Vec<(String, usize)>,
+    /// Its `use` items, each after its marker, for the module's top.
+    pub use_items: Vec<(String, Vec<String>)>,
     /// The names its `use` items bring in.
     pub uses: Vec<UseName>,
     /// The events its `#[dispatcher(…)]` declares.
@@ -54,6 +59,7 @@ pub(crate) struct ScriptInfo {
 pub(crate) fn analyse(
     source: &Source,
     script: Option<&Section>,
+    site: &str,
 ) -> Result<ScriptInfo, CompileError> {
     let Some(section) = script else {
         return Ok(ScriptInfo::default());
@@ -66,8 +72,17 @@ pub(crate) fn analyse(
             )
         })?;
     let mut info = ScriptInfo::default();
-    for stmt in block.stmts {
-        classify(source, section, stmt, &mut info)?;
+    let stmts: Vec<_> = block
+        .stmts
+        .into_iter()
+        .map(|stmt| {
+            let at = position(section, stmt.span().start());
+            (stmt, at)
+        })
+        .collect();
+    refuse_local_uses(source, &stmts)?;
+    for (stmt, at) in stmts {
+        place(source, (section, site), (stmt, at), &mut info)?;
     }
     Ok(info)
 }
@@ -84,6 +99,33 @@ fn position(section: &Section, at: LineColumn) -> usize {
     )
 }
 
+/// Classifies one statement; the code it adds follows a marker naming
+/// the `.wisp` line.
+fn place(
+    source: &Source,
+    (section, site): (&Section, &str),
+    (stmt, at): (syn::Stmt, usize),
+    info: &mut ScriptInfo,
+) -> Result<(), CompileError> {
+    if let syn::Stmt::Item(syn::Item::Use(item)) = &stmt {
+        let names = use_names(item);
+        let text = format!("{}\n{}", marker(source, site, at), render(&stmt));
+        info.use_items
+            .push((text, names.iter().map(|n| n.name.clone()).collect()));
+        info.uses.extend(names);
+        return Ok(());
+    }
+    let (before, props) = (info.statements.len(), info.props.len());
+    classify(source, section, stmt, info)?;
+    if info.statements.len() > before {
+        info.statements.insert(before, marker(source, site, at));
+    }
+    if let Some(prop) = info.props.get_mut(props) {
+        prop.at = format!("{site}:{}", source.position(at).0);
+    }
+    Ok(())
+}
+
 fn classify(
     source: &Source,
     section: &Section,
@@ -91,9 +133,6 @@ fn classify(
     info: &mut ScriptInfo,
 ) -> Result<(), CompileError> {
     let syn::Stmt::Local(local) = stmt else {
-        if let syn::Stmt::Item(syn::Item::Use(item)) = &stmt {
-            info.uses.extend(use_names(item));
-        }
         info.statements.push(render(&stmt));
         return Ok(());
     };
@@ -181,6 +220,7 @@ fn classify_prop(
         name: name.to_string(),
         ty: render(&ty),
         default: render(&default),
+        at: String::new(),
     });
     Ok(())
 }

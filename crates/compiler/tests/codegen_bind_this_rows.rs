@@ -80,7 +80,7 @@ fn the_keys_clone_is_allowed_for_a_copy_key() {
 fn signals_declared_with_a_path_are_taken_by_their_last_segments() {
     // When: the map and the single node, each type written with its path
     let code = generated_with(
-        "let names: Signal<Vec<String>> = Signal::new(Vec::new());\nlet rows: vapors_signals::Signal<std::collections::BTreeMap<String, vapors_dom::NodeId>> = Signal::new(std::collections::BTreeMap::new());\nlet one: vapors_signals::Signal<std::option::Option<vapors_dom::NodeId>> = Signal::new(None);",
+        "let names: Signal<Vec<String>> = Signal::new(Vec::new());\nlet rows: vapors_signals::Signal<std::collections::BTreeMap<String, vapors_elements::__wisp::dom::NodeId>> = Signal::new(std::collections::BTreeMap::new());\nlet one: vapors_signals::Signal<std::option::Option<vapors_elements::__wisp::dom::NodeId>> = Signal::new(None);",
         "<ul bind:this={one}>{for name in names.get() key=name.clone()}<li bind:this={rows}>{name}</li>{/for}</ul>",
     );
 

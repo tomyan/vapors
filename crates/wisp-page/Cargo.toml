@@ -1,0 +1,19 @@
+[package]
+name = "vapors-wisp-page"
+description = "A page crate the way an application writes one: it depends on vapors-elements and vapors-signals, not on vapors-dom, so a build here pins that generated code reaches the dom through vapors-elements (#508)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-elements.workspace = true
+vapors-signals.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[lints]
+workspace = true
