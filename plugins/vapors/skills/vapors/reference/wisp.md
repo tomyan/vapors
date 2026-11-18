@@ -241,10 +241,37 @@ let save = move |_: &mut Event| -> Result<(), String> {
 </div>
 ```
 
-Keys for the whole page (pending: not yet in the pinned rev): a
-`<vapors:window onkeydown={..} onkeyup={..} />` tag at the top level of
-a template hears every key event after the focused element's
-listeners.
+### Keys for the whole page: `<vapors:window>`
+
+A game reads keys whatever has focus. `<vapors:window onkeydown={..}
+onkeyup={..} />` at the top level of a template hears every key event
+the page gets, after the focused element's listeners (an event they
+stopped with `stop_propagation` does not reach it). The handlers take
+`&mut Event` or nothing. One per component; not inside an element,
+`{if}`, `{for}`, a snippet or a component tag. Call
+`event.prevent_default()` for the keys the game uses.
+
+`window_keys.wisp`:
+
+```html
+<script>
+let x: Signal<i32> = Signal::new(0);
+let step = move |event: &mut Event| {
+    match event.key() {
+        "ArrowLeft" => x.update(|v| *v -= 1),
+        "ArrowRight" => x.update(|v| *v += 1),
+        _ => return,
+    }
+    event.prevent_default();
+};
+</script>
+
+<p>Position {x}</p>
+<vapors:window onkeydown={step} />
+```
+
+In the browser, keys reach the page only while its canvas has focus.
+The starter's `index.html` focuses the canvas when the page loads.
 
 ### Bindings
 
@@ -395,6 +422,34 @@ let picked = move |_: &mut Event| picks.update(|n| *n += 1);
   <Picker />
   <p>Picked {picks} times</p>
 </div>
+```
+
+## The frame clock
+
+`vapors_elements::frame_time()` is a `Signal<Duration>`: the time since
+the first frame, set once at the start of each frame.
+`frame_delta()` is the time since the previous frame (zero on the
+first; after an idle wait it includes the wait). While anything reads
+either, the page draws every display refresh (on the web, each
+`requestAnimationFrame`); when the last reader unmounts it goes idle
+again.
+
+`clock.wisp`:
+
+```html
+<script>
+use vapors_elements::{frame_delta, frame_time};
+let time = frame_time();
+let delta = frame_delta();
+// a value that follows the clock: recomputed every frame
+let angle: Memo<f32> = Memo::new(move || time.get().as_secs_f32() * 1.5);
+let fps: Memo<u32> = Memo::new(move || {
+    let dt = delta.get().as_secs_f32();
+    if dt > 0.0 { (1.0 / dt).round() as u32 } else { 0 }
+});
+</script>
+
+<p>Turned {angle} radians at {fps} frames a second</p>
 ```
 
 ## Style

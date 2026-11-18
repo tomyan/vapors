@@ -33,11 +33,11 @@ command -v rustup || curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile min
 export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
 mkdir -p mygame ~/.local/bin && cd mygame
 base=https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/starter
-for f in Cargo.toml rust-toolchain.toml build.rs index.html shoot.mjs \
-         src/main.rs src/game.rs src/view.rs src/page.wisp; do
+for f in Cargo.toml Cargo.lock rust-toolchain.toml build.rs index.html shoot.mjs \
+         src/main.rs src/game.rs src/game_tests.rs src/shapes.rs src/view.rs src/page.wisp; do
   curl -fsSL --create-dirs -o "$f" "$base/$f"
 done
-cargo generate-lockfile   # also installs the pinned toolchain and wasm target
+cargo fetch   # installs the pinned toolchain and wasm target, downloads the crates
 wb=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)
 gh=https://github.com
 curl -fsSL $gh/trunk-rs/trunk/releases/download/v0.22.0/trunk-x86_64-unknown-linux-gnu.tar.gz \
@@ -53,13 +53,16 @@ nohup trunk build --offline > build.log 2>&1 &   # the first debug build, in the
 prebuilt ones above are missing, rather than fetching others. Never
 `cargo install` these tools; it compiles them for minutes.
 
-The starter is a small game: arrow keys move a frog across a road of
-cars, drawn as a 3D scene seen from above, with the score in HTML over
-it. Change it into what you are asked for. Keep the dependencies in
-`Cargo.toml` as they are:
+The starter is a small 3D game: the arrow keys move a frog across a
+road of cars and a river of logs, seen through a perspective camera
+behind and above it, with the title, score and lives in HTML over the
+scene. Change it into what you are asked for. Keep the dependencies as
+they are:
 
 - Every vapors crate is a git dependency at one `rev`. Keep that pin
   and keep them all equal; never switch to a branch or a path.
+- `Cargo.lock` holds the versions this starter was built and
+  screenshot with; keep it, and let cargo add to it.
 - Their default features are off; that keeps the release wasm at 5.5 MB
   rather than 8.5 MB.
 - `rand` works in the browser through `getrandom`'s `wasm_js` feature,
@@ -68,9 +71,10 @@ it. Change it into what you are asked for. Keep the dependencies in
 
 | File | Holds |
 |---|---|
-| `src/game.rs` | the rules, plain Rust with no vapors types, with unit tests |
-| `src/page.wisp` | the view and the game loop: the scene, the keys, the score |
-| `src/view.rs` | where things are drawn: the camera, the lens, a square |
+| `src/game.rs` | the rules, plain Rust with no vapors types (tests in `game_tests.rs`) |
+| `src/page.wisp` | the view and the game loop: the scene, the keys, the HUD |
+| `src/shapes.rs` | low-poly solids built in code: box, wedge, n-sided cylinder |
+| `src/view.rs` | where things are drawn: placing, the camera, the lens |
 | `src/main.rs` | builds the scene renderer and runs the page |
 | `index.html` | the page contract (runtime.md) |
 | `shoot.mjs` | the headless screenshot below |
@@ -133,12 +137,14 @@ every page load waits 120 s.
   input needs a width; otherwise the page shows an error when it runs.
   `br`, lists, tables and `label` are not drawn yet (supported.md).
 - An element's position cannot follow a signal (`style={..}` is
-  refused), so anything that moves is a mesh in the 3D scene
-  (runtime.md).
-- Pending, not yet in the pinned rev: `frame_time()` (the per-frame
-  clock the starter's cars move by) and `<vapors:window onkeydown>`
-  (the starter's keys). Until the pin moves to a rev that has them,
-  the starter does not build.
+  refused), so anything that moves is a mesh in the 3D scene.
+- The 3D scene has meshes, flat CSS colours and baked per-corner
+  shades. It has no lights, shadows, textures, transparency or model
+  files yet; do not imitate them. Build models from the starter's
+  shapes ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene-for-games)).
+- In the browser, keys reach the page only while the canvas has
+  focus. The starter's `index.html` focuses it when the page loads;
+  keep that script.
 - Props of the 3D tags (`<Mesh>`, `<Scene>`, ...) are checked by rustc,
   not `wisp-check`; a wrong one is a rustc error in the generated file.
 

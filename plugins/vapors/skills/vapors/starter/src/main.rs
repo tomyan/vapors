@@ -1,8 +1,9 @@
-//! The page: a 3D scene seen from above through an orthographic camera
-//! (the board), with HTML over it (the score). `page.wisp` holds the
-//! view and the game loop; this file builds what the scene needs.
+//! The page: a 3D scene seen from behind and above the player, with the
+//! title, score and lives in HTML over it. `page.wisp` holds the view,
+//! the keys and the game loop; this file builds what the scene needs.
 
 mod game;
+mod shapes;
 mod view;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
@@ -34,11 +35,11 @@ fn start() -> Result<(), String> {
     let surface = app
         .mount("view", Box::new(renderer))
         .map_err(|e| e.to_string())?;
-    let square = view::square(&mut meshes.borrow_mut()).map_err(|e| e.to_string())?;
+    let shapes = shapes::Shapes::new(&mut meshes.borrow_mut()).map_err(|e| e.to_string())?;
     let props = page::PageProps {
         scene: Some(scene),
         surface: Some(surface),
-        square: Some(square),
+        shapes: Some(shapes),
         eye: Some(CameraHandle::new()),
         lens: Some(Signal::new(view::lens()?)),
     };
@@ -51,8 +52,8 @@ fn start() -> Result<(), String> {
     let options = WindowOptions {
         app_name: "dodge".into(),
         title: "dodge".into(),
-        width: 640,
-        height: 480,
+        width: 960,
+        height: 640,
     };
     run(options, app).map_err(|e| e.to_string())
 }
