@@ -4,7 +4,8 @@
 # a status line never lands in #error; the GPU's start-up line lands in
 # #adapter when the page has one, leaving #status as the page left it; a
 # lost GPU device is reported in #error with the fix; the demos (?demo=)
-# draw, an unknown demo is an error, the page works one directory down
+# draw, the input demos start, ?bar=0 leaves the demo bar out, an
+# unknown demo is an error, the page works one directory down
 # (/vapors/), and each demo's screenshot, after the inputs its .pixels
 # file lists, holds its pixel checks. Copies of the built page; any
 # mismatch fails naming the case.
@@ -120,6 +121,13 @@ prepare() {
   # and the page served one directory down, as the tailnet serves it
   # at /vapors/: its script and wasm load from beside it.
   page hello "" "$adapter"
+  # The input demos start: their controls' records pass the a11y
+  # mirror (a number field's once did not). Held until the adapter line
+  # or an error, whichever comes.
+  for demo in $inputs; do page "$demo-starts" "" "$adapter || !error.hidden"; done
+  # ?bar=0 (crates/web-demo/src/bar_query.rs): no demo bar, and the
+  # canvas takes the window's height.
+  page no-bar "" "$adapter && (function () { document.body.dataset.barShown = String(!document.getElementById('demo-bar').hidden); document.body.dataset.canvasHeight = document.getElementById('vapors').getBoundingClientRect().height + ' of ' + innerHeight; return true; })()"
   # The launch example (crates/one-scene, ?demo=one-scene): HTML over a
   # 3D scene CSS styles, through a gpu-surface. Held until it has drawn
   # 30 frames, so it is animating, not only started.
@@ -177,6 +185,8 @@ prepare() {
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
 demos="hello counter boxes shell panel text stress toasts scroll images cards"
+# The demos with form controls, each checked to start (no screenshot).
+inputs="slider checkbox number field"
 # Demos that change every frame never go idle, and headless Chromium's
 # virtual time then runs hundreds of software-rendered frames past the
 # 60 s deadline; `ticks=5` stops them after five frames.
@@ -516,6 +526,13 @@ check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
 check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
+for demo in $inputs; do check "$demo-starts" '^adapter: ' hidden "?demo=$demo"; done
+check no-bar '^adapter: ' hidden '?demo=hello&bar=0'
+bar_shown=$(printf '%s' "$dom" | sed -n 's#.*data-bar-shown="\([a-z]*\)".*#\1#p')
+canvas_height=$(printf '%s' "$dom" | sed -n 's#.*data-canvas-height="\([0-9. of]*\)".*#\1#p')
+echo "no-bar: bar shown [$bar_shown], canvas height [$canvas_height]"
+[ "$bar_shown" = false ] || fail "no-bar: the demo bar shown [${bar_shown:-not measured}] with ?bar=0, wanted false; see bar_query.rs and start in crates/web-demo/src/main.rs"
+[ -n "$canvas_height" ] && [ "${canvas_height% of *}" = "${canvas_height#* of }" ] || fail "no-bar: the canvas is [${canvas_height:-not measured}] px of the window's height, wanted all of it; see #demo-bar:not([hidden]) + canvas in crates/web-demo/index.html"
 check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
 check adapter-element '^starting$' hidden '?demo=hello'
@@ -589,4 +606,4 @@ for demo in $demos; do
   done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && PAGE_CONTRACT_KEEP=1 $0 target/web \$(mktemp -d), which keeps the pages and logs" >&2; exit 1; }
-echo "ok   the page contract holds in all thirteen cases (one-scene drew $drawn frames in real time), no HTML over the canvas of: $demos one-scene index (overlap-refused lists its four) and nothing outside it but the demo bar, whose links and [ ] keys step through vapors_demos::DEMOS; the gradient screenshot and the screenshots:$shots"
+echo "ok   the page contract holds in all thirteen cases, the input demos ($inputs) start, ?bar=0 leaves the bar out (one-scene drew $drawn frames in real time), no HTML over the canvas of: $demos one-scene index (overlap-refused lists its four) and nothing outside it but the demo bar, whose links and [ ] keys step through vapors_demos::DEMOS; the gradient screenshot and the screenshots:$shots"

@@ -1,7 +1,8 @@
 //! One list of the demos (`vapors_demos::DEMOS`): every elements demo
 //! the crate mounts is in it once, in the same order, and nothing else
 //! of that kind; the index shows every listed demo, apps included, as a
-//! link to its address, in the list's order.
+//! link to its address, in the list's order. No line opens with an
+//! internal stage code.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -43,6 +44,38 @@ fn every_listed_name_is_listed_once_with_a_title_and_a_line() {
         assert!(!again, "{} is listed twice", demo.name);
         assert!(!demo.title.is_empty() && !demo.line.is_empty(), "{demo:?}");
     }
+}
+
+/// Whether `line` opens with a stage code such as `F2c S1:` or `3-E3a:`:
+/// every word before its first colon holds a digit.
+fn opens_with_stage_code(line: &str) -> bool {
+    line.split_once(':').is_some_and(|(before, _)| {
+        before
+            .split_whitespace()
+            .all(|word| word.chars().any(|c| c.is_ascii_digit()))
+    })
+}
+
+#[test]
+fn no_listed_line_opens_with_a_stage_code() {
+    // Given the public page shows each line in its bar and index
+    assert!(
+        opens_with_stage_code("F2c S1: a panel"),
+        "the rule finds one"
+    );
+    assert!(!opens_with_stage_code("Top-down racing: the platform"));
+    assert!(!opens_with_stage_code("a 3D scene: three cubes"));
+
+    // Then
+    let coded: Vec<&str> = DEMOS
+        .iter()
+        .map(|demo| demo.line)
+        .filter(|line| opens_with_stage_code(line))
+        .collect();
+    assert!(
+        coded.is_empty(),
+        "lines open with a stage code {coded:?}; drop it in crates/demos/src/listed.rs"
+    );
 }
 
 /// Each `a` element's `href` under `node`, in document order.

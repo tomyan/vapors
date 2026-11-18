@@ -23,6 +23,11 @@ const LIVE: [&str; 5] = ["status", "log", "alert", "timer", "marquee"];
 /// Roles whose value is `aria-valuenow` in a range.
 const RANGED: [&str; 2] = ["slider", "spinbutton"];
 
+/// Ranged roles ARIA gives no default range (a number field with no
+/// `min` or `max`), so the mirror leaves `aria-valuemin` and
+/// `aria-valuemax` out; a slider's missing range reads as 0 to 100.
+const UNBOUNDED: [&str; 1] = ["spinbutton"];
+
 /// Roles whose value is the element's text, as Chromium computes a
 /// non-native text field's value.
 const TEXT_VALUED: [&str; 3] = ["textbox", "searchbox", "combobox"];
@@ -30,9 +35,9 @@ const TEXT_VALUED: [&str; 3] = ["textbox", "searchbox", "combobox"];
 /// `node`'s attributes, every one the mirror may set.
 ///
 /// # Errors
-/// A ranged role without a value or a range, or a value on a role the
-/// mirror has no attribute for: the document's take should have
-/// refused the node, so the mirror does not guess.
+/// A ranged role without a value, a slider without a range, or a value
+/// on a role the mirror has no attribute for: the document's take
+/// should have refused the node, so the mirror does not guess.
 pub(crate) fn attributes(node: &AxMirrorNode) -> Result<Vec<Attribute>, String> {
     let role = node.role.as_str();
     let states = &node.states;
@@ -109,31 +114,44 @@ fn selected(role: &str, selected: bool) -> Option<String> {
 fn ranged(node: &AxMirrorNode) -> Result<[Attribute; 3], String> {
     let role = node.role.as_str();
     if !RANGED.contains(&role) {
-        if node.value.is_some() && !TEXT_VALUED.contains(&role) {
-            return Err(format!(
-                "the a11y record of {role} \"{}\" carries a value, and the mirror has no \
-                 attribute for a {role}'s value: a11y_mirror_attrs.rs names the roles with one",
-                node.name
-            ));
-        }
+        unranged_value(node)?;
         return Ok([
             ("aria-valuenow", None),
             ("aria-valuemin", None),
             ("aria-valuemax", None),
         ]);
     }
-    let missing = |what: &str| {
-        format!(
-            "the a11y record of {role} \"{}\" has no {what}, which a reader would read as a \
-             default: the document's take should have refused it (a11y_mirror_roles.rs)",
-            node.name
-        )
+    let value = node.value.clone().ok_or_else(|| missing(node, "value"))?;
+    let range = match node.range {
+        Some(range) => Some(range),
+        None if UNBOUNDED.contains(&role) => None,
+        None => return Err(missing(node, "range")),
     };
-    let value = node.value.clone().ok_or_else(|| missing("value"))?;
-    let range = node.range.ok_or_else(|| missing("range"))?;
     Ok([
         ("aria-valuenow", Some(value)),
-        ("aria-valuemin", Some(range.min.to_string())),
-        ("aria-valuemax", Some(range.max.to_string())),
+        ("aria-valuemin", range.map(|range| range.min.to_string())),
+        ("aria-valuemax", range.map(|range| range.max.to_string())),
     ])
+}
+
+/// Refuses a value on a role the mirror has no attribute for.
+fn unranged_value(node: &AxMirrorNode) -> Result<(), String> {
+    let role = node.role.as_str();
+    if node.value.is_none() || TEXT_VALUED.contains(&role) {
+        return Ok(());
+    }
+    Err(format!(
+        "the a11y record of {role} \"{}\" carries a value, and the mirror has no \
+         attribute for a {role}'s value: a11y_mirror_attrs.rs names the roles with one",
+        node.name
+    ))
+}
+
+fn missing(node: &AxMirrorNode, what: &str) -> String {
+    format!(
+        "the a11y record of {} \"{}\" has no {what}, which a reader would read as a \
+         default: refuse it in the document's take (`unexposable`, \
+         crates/elements/src/a11y_mirror_roles.rs)",
+        node.role, node.name
+    )
 }

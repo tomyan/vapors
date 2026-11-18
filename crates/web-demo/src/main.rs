@@ -10,6 +10,7 @@
 mod apps;
 #[cfg(target_family = "wasm")]
 mod bar;
+mod bar_query;
 mod samples;
 mod wake;
 
@@ -35,9 +36,16 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
-    // the bar stepping through the listed demos; none for the index
+    // the bar stepping through the listed demos; none for the index,
+    // nor with ?bar=0 (bar_query.rs)
+    let shows_bar = bar_query::bar_shown(&query_parameters("bar"))?;
     #[cfg(target_family = "wasm")]
-    bar::show(&name)?;
+    if shows_bar {
+        bar::show(&name)?;
+    }
+    // natively there is no page, so no bar
+    #[cfg(not(target_family = "wasm"))]
+    let _ = shows_bar;
     // read once, here, so each run below takes it or refuses it
     let samples = samples::samples_of(&query_parameters("samples"))?;
     if let Some(app) = apps::named(&name) {

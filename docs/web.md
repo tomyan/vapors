@@ -11,6 +11,12 @@ the page that proves it. `?demo=<name>` picks what it shows:
   tap to toggle fit and actual size, `o` or a tap on an empty canvas to
   open a file.
 
+`&bar=0` leaves the demo bar out (`crates/web-demo/src/bar_query.rs`),
+and the canvas takes the window's height: for a page that embeds one
+demo in a frame, where the bar's links would switch the demo inside
+that frame. Without it the bar shows; any other value, or `bar` given
+twice, is an error in `#error`.
+
 An unknown name is an error in `#error` listing the demos. The team
 lead serves the build at `/vapors/` on the tailnet, so each demo is
 `https://<host>/vapors/?demo=<name>`.

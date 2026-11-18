@@ -34,4 +34,4 @@ input:invalid { border-color: #d03030; }
 .value { width: 60px; text-align: right; color: #5a6470; }
 </style>
 
-<div class="card"><div class="row"><div class="label">Amount</div><input type="number" min="0" max="100" step="1" bind:value={amount} /><div class="value">{amount}</div></div><div class="row"><div class="label">Exposure</div><input type="number" min="-5" max="5" step="0.1" data-scrub="4" bind:value={exposure} /><div class="value">{exposure}</div></div></div>
+<div class="card"><div class="row"><div class="label">Amount</div><input type="number" aria-label="Amount" min="0" max="100" step="1" bind:value={amount} /><div class="value">{amount}</div></div><div class="row"><div class="label">Exposure</div><input type="number" aria-label="Exposure" min="-5" max="5" step="0.1" data-scrub="4" bind:value={exposure} /><div class="value">{exposure}</div></div></div>
