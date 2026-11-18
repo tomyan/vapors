@@ -72,7 +72,13 @@ run a second pass after layout (sumi did the same).
   style.
 - At-rules: `@media` (types, `not`/`only`, `and`/`or`/`not`, comma lists,
   `width`, `height`, `resolution` with `min-`/`max-` and the range
-  syntax, `prefers-color-scheme`, `prefers-reduced-motion`),
+  syntax, `aspect-ratio` with `min-`/`max-` (`16/9`), `orientation`
+  (`portrait | landscape`, a square is landscape), `pointer`
+  (`none | coarse | fine`), `hover` (`none | hover`),
+  `prefers-color-scheme`, `prefers-reduced-motion`; `pointer` and `hover`
+  are the browser's own `matchMedia` answers on the web, read at start,
+  and `fine` and `hover` natively; a value outside a list is refused
+  with its position, naming the accepted ones),
   `@container` (size features, no names), `@supports` (property and
   value checked), `@keyframes`.
 - Cascade: user-agent and author origins, `!important`, specificity,

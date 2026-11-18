@@ -309,6 +309,27 @@ at the start of each frame from the frame's own time, so two readers
 see one clock. After a wait (nothing changed, so no frames) the
 `frame_delta` includes the wait.
 
+### The viewport
+
+`vapors_elements::viewport_size()` is a `ReadSignal<Size>` (`width` and
+`height` in CSS px) of the drawing area: the canvas on the web, the
+window's content natively, the numbers layout and `@media` use.
+`orientation()` is a `ReadSignal<Orientation>`, `Portrait` when taller
+than wide and `Landscape` otherwise (a square is landscape), the rule of
+`@media (orientation)`. Both are app-wide, zero or landscape until the
+first update, and set by the app only when the size changes: reading them
+never asks for a frame.
+
+```html
+<script>
+use vapors_elements::{orientation, Orientation};
+let fov = Signal::derived(move || match orientation().get() {
+    Orientation::Portrait => 80.0,
+    Orientation::Landscape => 55.0,
+});
+</script>
+```
+
 While an effect, a derived signal or a template binding that reads
 either signal is mounted, the app draws every display refresh
 (`requestAnimationFrame` on the web); when the last one unmounts it

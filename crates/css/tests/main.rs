@@ -38,6 +38,7 @@ mod cascade_font_weight;
 mod cascade_inline;
 mod cascade_media;
 mod cascade_media_feature;
+mod cascade_media_input;
 mod cascade_media_range;
 mod cascade_presentation;
 mod cascade_restyle;

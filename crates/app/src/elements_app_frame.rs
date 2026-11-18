@@ -91,9 +91,9 @@ impl ElementsApp {
     ) -> Result<(), String> {
         let mut document = self.document.borrow_mut();
         document.set_max_image_side(max_side);
-        document
-            .update(viewport(size, scale))
-            .map_err(|errors| refused(&errors))?;
+        let view = viewport(size, scale);
+        vapors_elements::set_viewport_size(view.width, view.height);
+        document.update(view).map_err(|errors| refused(&errors))?;
         check_tooltip_style(&document)
             .map_err(|error| format!("the document was refused, so nothing is drawn: {error}"))
     }

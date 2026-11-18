@@ -100,6 +100,7 @@ impl ElementsApp {
         if self.painter.is_some() {
             return Err(TWICE.to_owned());
         }
+        set_web_primary_input();
         let size = start_size(start)?;
         let painter = self.make_painter(start.device, start.format);
         let painter = self
@@ -196,3 +197,17 @@ const TWICE: &str = "App::start was called after the app's painter was made (a s
 const UNSTARTED: &str = "the first frame made the painter and built its pipelines: App::start \
     was not called; fix: call App::start before the first frame (an App wrapping an ElementsApp \
     forwards it)";
+
+/// On the web, the primary input is the browser's own answer, read once
+/// at start; natively `fine` and `hover` stand (`PrimaryInput::MOUSE`).
+fn set_web_primary_input() {
+    #[cfg(target_family = "wasm")]
+    {
+        use vapors_platform::media_matches as matches;
+        vapors_elements::set_primary_input(vapors_elements::PrimaryInput::from_media(
+            matches("(pointer: coarse)"),
+            matches("(pointer: fine)"),
+            matches("(hover: hover)"),
+        ));
+    }
+}

@@ -18,6 +18,17 @@ pub(crate) enum Feature {
     ColorScheme(ColorScheme),
     /// `prefers-reduced-motion: reduce | no-preference`.
     ReducedMotion(bool),
+    /// `orientation: portrait | landscape`.
+    Orientation {
+        /// Whether `portrait` was asked.
+        portrait: bool,
+    },
+    /// `aspect-ratio` (and `min-`/`max-`) as width over height.
+    AspectRatio(Vec<(Comparison, f64)>),
+    /// `pointer: none | coarse | fine`.
+    Pointer(crate::cascade::Pointer),
+    /// `hover: hover` (true) or `hover: none`.
+    Hover(bool),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,16 +112,15 @@ fn colon_form(
     value: &[&ComponentValue],
     refuse: &dyn Fn(&str) -> Error,
 ) -> Result<Feature> {
+    let (base, op) = split_range(name);
+    if base == "aspect-ratio" {
+        return super::media_input::aspect_ratio(op, value, refuse);
+    }
     let single = value
         .first()
         .copied()
         .filter(|_| value.len() == 1)
         .ok_or_else(|| refuse("expected one value after :"))?;
-    let (base, op) = match (name.strip_prefix("min-"), name.strip_prefix("max-")) {
-        (Some(base), _) => (base, Comparison::GreaterEq),
-        (_, Some(base)) => (base, Comparison::LessEq),
-        _ => (name, Comparison::Eq),
-    };
     match base {
         "width" => Ok(Feature::Size(
             SizeAxis::Width,
@@ -121,10 +131,20 @@ fn colon_form(
             vec![(op, length(single, refuse)?)],
         )),
         "resolution" => Ok(Feature::Resolution(vec![(op, resolution(single, refuse)?)])),
-        _ if name == base => preference(base, single, refuse),
+        _ if name == base => super::media_input::input(base, single, refuse)
+            .unwrap_or_else(|| preference(base, single, refuse)),
         _ => Err(refuse(
-            "only width, height and resolution take min- and max-",
+            "only width, height, resolution and aspect-ratio take min- and max-",
         )),
+    }
+}
+
+/// `min-x` and `max-x` as `x` with the comparison they mean.
+fn split_range(name: &str) -> (&str, Comparison) {
+    match (name.strip_prefix("min-"), name.strip_prefix("max-")) {
+        (Some(base), _) => (base, Comparison::GreaterEq),
+        (_, Some(base)) => (base, Comparison::LessEq),
+        _ => (name, Comparison::Eq),
     }
 }
 
@@ -145,7 +165,7 @@ fn preference(
             "prefers-reduced-motion takes reduce or no-preference",
         )),
         _ => Err(refuse(
-            "unknown feature; supported: width, height, resolution (with min-/max-), prefers-color-scheme, prefers-reduced-motion",
+            "unknown feature; supported: width, height, resolution, aspect-ratio (with min-/max-), orientation, pointer, hover, prefers-color-scheme, prefers-reduced-motion",
         )),
     }
 }
