@@ -123,6 +123,14 @@ impl Dom for RecordingDom {
         });
     }
 
+    fn listen_window(&mut self, event: &str, handler: Handler) -> crate::WindowListener {
+        self.window.add(event, handler)
+    }
+
+    fn unlisten_window(&mut self, listener: crate::WindowListener) {
+        self.window.remove(listener);
+    }
+
     fn declare_events(&mut self, names: &[&str]) {
         self.calls.push(Call::DeclareEvents(
             names.iter().map(|name| (*name).to_owned()).collect(),

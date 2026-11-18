@@ -94,7 +94,8 @@ impl Document {
         target: NodeId,
         name: &str,
     ) -> Vec<(NodeId, Vec<vapors_dom::Listener>)> {
-        self.chain(target)
+        let mut along: Vec<_> = self
+            .chain(target)
             .into_iter()
             .map(|node| match &self.arena.get(node, "dispatch").kind {
                 Kind::Element(element) => (
@@ -108,7 +109,10 @@ impl Document {
                 ),
                 Kind::Text(_) => (node, Vec::new()),
             })
-            .collect()
+            .collect();
+        // the window hears last, as the root's own entry
+        along.extend(self.page_keys.heard(name).map(|heard| (self.root(), heard)));
+        along
     }
 }
 

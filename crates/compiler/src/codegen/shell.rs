@@ -19,6 +19,8 @@ pub(crate) fn assemble(
         .style
         .as_ref()
         .map_or("", |section| section.text.as_str());
+    // a template of only `<vapors:window>`, like a style-only one, places no node
+    let places = !component.template.children.is_empty();
     let mut file = header(component.site_name(), style, (&component.name, info));
     let scope = component.style.as_ref().and(component.scope.as_ref());
     if let Some(scope) = scope {
@@ -34,7 +36,7 @@ pub(crate) fn assemble(
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
     let registration = super::shell_sheet::registration(scope.is_some(), global, style);
-    file.push_str(&mount_methods(name, info, body, &registration));
+    file.push_str(&mount_methods(name, info, (body, places), &registration));
     file.push_str(&super::events_decl::events_method(
         &info.events,
         &super::events_decl::child_types(component),
@@ -141,9 +143,15 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-/// The mount methods; `add_style` is the line that registers the
+/// The mount methods, from the template's `body` and whether it
+/// `places` nodes; `add_style` is the line that registers the
 /// component's sheet, or empty.
-fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> String {
+fn mount_methods(
+    name: &str,
+    info: &ScriptInfo,
+    (body, places): (&str, bool),
+    add_style: &str,
+) -> String {
     let (returned, built) = field_lists(info);
     let allowances = mount_allowances(info, body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
@@ -152,8 +160,8 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, add_style: &str) -> 
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
     }
-    // a style-only component builds nothing: no place, no roots pushed
-    let (unplaced, roots) = if body.trim().is_empty() {
+    // a style-only or window-only component places nothing: no roots pushed
+    let (unplaced, roots) = if body.trim().is_empty() || !places {
         (
             "        let _ = (parent, before);\n",
             "#[allow(clippy::let_and_return, reason = \"a style-only component has no roots\")] let roots = Vec::new();",

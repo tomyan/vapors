@@ -11,9 +11,10 @@ mod holes;
 mod snippets;
 mod text;
 mod vocabulary;
+mod window;
 
 use crate::CompileError;
-use crate::ast::{Document, Node};
+use crate::ast::{Document, Node, WindowTag};
 use crate::source::Source;
 
 /// Parses the template between `start` and `end`.
@@ -24,10 +25,16 @@ pub(crate) fn parse(source: &Source, start: usize, end: usize) -> Result<Documen
         end,
     };
     let mut children = Vec::new();
+    let mut window = None;
     loop {
         parser.skip_whitespace();
         if parser.at_end() {
-            return Ok(Document { children });
+            return Ok(Document { children, window });
+        }
+        if parser.starts_with("<vapors:") {
+            let first = window.as_ref().map(|tag: &WindowTag| tag.offset);
+            window = Some(parser.parse_window(first)?);
+            continue;
         }
         children.push(parser.parse_top_level()?);
     }

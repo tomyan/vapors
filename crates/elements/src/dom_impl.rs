@@ -184,6 +184,14 @@ impl Dom for Document {
             .push((event.to_owned(), std::rc::Rc::from(handler)));
     }
 
+    fn listen_window(&mut self, event: &str, handler: Handler) -> vapors_dom::WindowListener {
+        self.page_keys.add(event, handler)
+    }
+
+    fn unlisten_window(&mut self, listener: vapors_dom::WindowListener) {
+        self.page_keys.remove(listener);
+    }
+
     fn current_text(&self, node: NodeId) -> Option<&str> {
         match &self.arena.get(node, "current_text").kind {
             Kind::Text(text) => Some(text),

@@ -106,7 +106,7 @@ impl Emitter<'_> {
     /// called with no event, anything else with the event; either may
     /// return `()` or `Result<(), E>`, whose `Err` goes to the error
     /// report (`vapors_dom::handle`).
-    fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
+    pub(super) fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
         self.refuse_assigning_handler(expr, &code)?;
         Ok(match self.script.handlers.get(&code) {
