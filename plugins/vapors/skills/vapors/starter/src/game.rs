@@ -1,27 +1,45 @@
-//! The game's rules, in plain Rust: no vapors types, so `cargo test`
-//! checks them natively.
+//! The game's rules, in plain Rust with no vapors types, so `cargo
+//! test` checks them natively.
 
 /// Columns on the board.
 pub const WIDTH: i32 = 9;
-/// Rows on the board; row 0 is the far side, the last row the start.
+/// Rows on the board: row 0 is the far side, the last row the start.
 pub const HEIGHT: i32 = 7;
 
-/// What one square shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Tile {
-    Grass,
-    Road,
-    Car,
-    Frog,
+/// Each road row: its row, its speed in squares a second (negative
+/// drives left), and its cars' columns at time zero.
+pub const LANES: [(i32, f32, &[f32]); 5] = [
+    (1, 1.5, &[0.0, 4.5]),
+    (2, -2.0, &[2.0, 6.0]),
+    (3, 1.0, &[1.0, 4.0, 7.0]),
+    (4, -1.2, &[3.0, 7.5]),
+    (5, 2.5, &[0.0, 5.0]),
+];
+
+/// How close a car's centre may come to the frog's before it hits:
+/// half a car (1.4 wide) plus half the frog (0.7), rounded down.
+const REACH: f32 = 1.0;
+
+/// Where every car is after `seconds`: its column (fractional, so it
+/// moves smoothly) and its row.
+#[must_use]
+pub fn cars_at(seconds: f32) -> Vec<(f32, i32)> {
+    let width = WIDTH as f32;
+    LANES
+        .iter()
+        .flat_map(|&(row, speed, starts)| {
+            starts
+                .iter()
+                .map(move |start| ((start + speed * seconds).rem_euclid(width), row))
+        })
+        .collect()
 }
 
-/// The whole state of a game.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// The frog and the score.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct World {
     /// The frog's column and row.
     pub frog: (i32, i32),
-    /// Each car's column and row.
-    pub cars: Vec<(i32, i32)>,
     pub crossings: u32,
     pub hits: u32,
 }
@@ -29,25 +47,15 @@ pub struct World {
 impl World {
     #[must_use]
     pub fn new() -> Self {
-        let cars = vec![
-            (0, 1),
-            (4, 1),
-            (2, 2),
-            (7, 3),
-            (3, 3),
-            (5, 4),
-            (1, 5),
-            (6, 5),
-        ];
         Self {
             frog: start(),
-            cars,
             crossings: 0,
             hits: 0,
         }
     }
 
-    /// A key went down: the arrows move the frog one square.
+    /// A key went down: the arrows move the frog one square; reaching
+    /// row 0 scores a crossing and starts again.
     pub fn key(&mut self, key: &str) {
         let (dx, dy) = match key {
             "ArrowLeft" => (-1, 0),
@@ -58,46 +66,21 @@ impl World {
         };
         let (x, y) = self.frog;
         self.frog = ((x + dx).clamp(0, WIDTH - 1), (y + dy).clamp(0, HEIGHT - 1));
-        self.settle();
-    }
-
-    /// One step of time: odd rows drive right, even rows left.
-    pub fn step(&mut self) {
-        for (x, y) in &mut self.cars {
-            let dx = if *y % 2 == 1 { 1 } else { -1 };
-            *x = (*x + dx).rem_euclid(WIDTH);
-        }
-        self.settle();
-    }
-
-    /// A frog under a car goes back to the start; one on row 0 scores.
-    fn settle(&mut self) {
-        if self.cars.contains(&self.frog) {
-            self.hits += 1;
-            self.frog = start();
-        } else if self.frog.1 == 0 {
+        if self.frog.1 == 0 {
             self.crossings += 1;
             self.frog = start();
         }
     }
 
-    /// The board, row by row, for the template.
-    #[must_use]
-    pub fn tiles(&self) -> Vec<Vec<Tile>> {
-        (0..HEIGHT)
-            .map(|y| (0..WIDTH).map(|x| self.tile(x, y)).collect())
-            .collect()
-    }
-
-    fn tile(&self, x: i32, y: i32) -> Tile {
-        if self.frog == (x, y) {
-            Tile::Frog
-        } else if self.cars.contains(&(x, y)) {
-            Tile::Car
-        } else if y == 0 || y == HEIGHT - 1 {
-            Tile::Grass
-        } else {
-            Tile::Road
+    /// A car within reach of the frog sends it back and counts a hit.
+    pub fn run_over(&mut self, cars: &[(f32, i32)]) {
+        let (x, y) = self.frog;
+        if cars
+            .iter()
+            .any(|&(cx, row)| row == y && (cx - x as f32).abs() < REACH)
+        {
+            self.hits += 1;
+            self.frog = start();
         }
     }
 }
@@ -119,10 +102,7 @@ mod tests {
     #[test]
     fn an_arrow_moves_the_frog_one_square() {
         // Given
-        let mut world = World {
-            cars: vec![],
-            ..World::new()
-        };
+        let mut world = World::new();
 
         // When
         world.key("ArrowLeft");
@@ -132,26 +112,9 @@ mod tests {
     }
 
     #[test]
-    fn a_car_driving_into_the_frog_sends_it_back_and_counts_a_hit() {
-        // Given
-        let mut world = World {
-            cars: vec![(0, 1)],
-            frog: (1, 1),
-            ..World::new()
-        };
-
-        // When
-        world.step();
-
-        // Then
-        assert_eq!((world.frog, world.hits), (start(), 1));
-    }
-
-    #[test]
     fn reaching_the_far_side_counts_a_crossing() {
         // Given
         let mut world = World {
-            cars: vec![],
             frog: (0, 1),
             ..World::new()
         };
@@ -161,5 +124,29 @@ mod tests {
 
         // Then
         assert_eq!((world.frog, world.crossings), (start(), 1));
+    }
+
+    #[test]
+    fn a_car_within_reach_sends_the_frog_back_and_counts_a_hit() {
+        // Given
+        let mut world = World {
+            frog: (3, 2),
+            ..World::new()
+        };
+
+        // When
+        world.run_over(&[(3.5, 2)]);
+
+        // Then
+        assert_eq!((world.frog, world.hits), (start(), 1));
+    }
+
+    #[test]
+    fn cars_move_by_their_lane_speed_and_wrap_around() {
+        // When
+        let cars = cars_at(2.0);
+
+        // Then: lane 2 drives left at 2 a second from column 2
+        assert!(cars.contains(&(7.0, 2)));
     }
 }

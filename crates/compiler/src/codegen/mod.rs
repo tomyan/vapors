@@ -9,7 +9,7 @@
 
 mod allowances;
 pub(crate) mod attribute_kind;
-mod attribute_refusals;
+pub(crate) mod attribute_refusals;
 mod basic_shape_attributes;
 mod bind_this_shape;
 mod blocks;

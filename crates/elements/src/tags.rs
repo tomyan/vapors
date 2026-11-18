@@ -5,7 +5,7 @@
 /// Tags laid out and painted now: block-level containers, the inline
 /// elements of F2c S6, `img` (S10), `gpu-surface` (docs/gpu-surface.md),
 /// the `svg` icon and its `path`s (docs/icons.md) and `input` (3-E3; `check` refuses the types not built yet).
-const SUPPORTED: &[&str] = &[
+pub const SUPPORTED: &[&str] = &[
     "html",
     "body",
     "button",
@@ -61,7 +61,7 @@ pub(crate) fn is_scene_anchor(tag: &str) -> bool {
 }
 
 /// Where each unimplemented tag arrives.
-const LATER: &[(&str, &[&str])] = &[
+pub const LATER: &[(&str, &[&str])] = &[
     ("F2d, the first item after F2c", &["br"]),
     ("F3", &["canvas"]),
     (

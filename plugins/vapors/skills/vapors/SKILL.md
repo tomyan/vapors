@@ -1,6 +1,6 @@
 ---
 name: vapors
-description: Build a small app or game with vapors, the Rust GUI framework whose .wisp components (Rust script, CSS, HTML template) compile to Rust and draw with wgpu on desktop and in the browser over WebGPU. Use when asked to build something with vapors or .wisp, to set up a vapors project, or to build, check, screenshot or publish a vapors web page.
+description: Build a small app or game for the browser with vapors, the Rust GUI framework whose .wisp components (Rust script, CSS, HTML template) compile to Rust and draw with wgpu on WebGPU. Use when asked to build something with vapors or .wisp, to set up a vapors project, or to build, check, screenshot or publish a vapors web page.
 ---
 
 # vapors
@@ -8,111 +8,114 @@ description: Build a small app or game with vapors, the Rust GUI framework whose
 vapors is a Rust GUI framework. A component is a `.wisp` file with a
 `<script>` in Rust, a `<style>` in CSS and an HTML template; a build
 script compiles it to Rust. The page runs as wasm in the browser on
-WebGPU (no WebGL fallback) and natively in a window.
+WebGPU (there is no WebGL fallback). vapors also runs natively in a
+window; this skill covers the browser only.
 
-Reference, read as needed:
-[components](https://github.com/tomyan/vapors/blob/main/docs/components.md)
-(the `.wisp` format and every refusal),
-[css](https://github.com/tomyan/vapors/blob/main/docs/css.md)
-(what CSS is supported),
-[web](https://github.com/tomyan/vapors/blob/main/docs/web.md)
-(the page contract), and the demo components in
-[crates/demos/demos](https://github.com/tomyan/vapors/tree/main/crates/demos/demos).
+No model has seen `.wisp` in training. Read these before writing any:
 
-## Set up a project
+- [reference/wisp.md](reference/wisp.md): the format, every feature
+  with an example that compiles.
+- [reference/supported.md](reference/supported.md): the elements, CSS
+  properties, selectors and events that exist, generated from the
+  source. Anything else is refused.
+- [reference/runtime.md](reference/runtime.md): the Rust side: starting
+  the page, signals, the frame loop, and the 3D scene games draw with.
 
-There is no vapors CLI. Make a new cargo project outside any vapors
-checkout and copy the starter into it. The starter is a small game
-(move a square across a road of cars with the arrow keys) built and
-screenshot on 2026-11-18; start from it and change it.
+## Set up, and start the first build at once
+
+The first build takes about a minute for a debug build and a minute and
+a half for a release build on 4 cores, so start it before designing
+anything. Run this block as it is, as your first action. It assumes
+x86_64 Linux, `curl` and `tar`.
 
 ```sh
-mkdir mygame && cd mygame
+command -v rustup || curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+mkdir -p mygame ~/.local/bin && cd mygame
 base=https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/starter
 for f in Cargo.toml rust-toolchain.toml build.rs index.html shoot.mjs \
-         src/main.rs src/game.rs src/board.wisp; do
+         src/main.rs src/game.rs src/view.rs src/page.wisp; do
   curl -fsSL --create-dirs -o "$f" "$base/$f"
 done
-cargo install trunk --locked   # or `cargo binstall trunk`; skip if `trunk --version` works
+cargo generate-lockfile   # also installs the pinned toolchain and wasm target
+wb=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)
+gh=https://github.com
+curl -fsSL $gh/trunk-rs/trunk/releases/download/v0.22.0/trunk-x86_64-unknown-linux-gnu.tar.gz \
+  | tar -xz -C ~/.local/bin trunk
+curl -fsSL $gh/wasm-bindgen/wasm-bindgen/releases/download/$wb/wasm-bindgen-$wb-x86_64-unknown-linux-musl.tar.gz \
+  | tar -xz -C ~/.local/bin --strip-components=1 wasm-bindgen-$wb-x86_64-unknown-linux-musl/wasm-bindgen
+curl -fsSL $gh/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz \
+  | tar -xz -C ~/.local/bin --strip-components=2 binaryen-version_133/bin/wasm-opt
+nohup trunk build --offline > build.log 2>&1 &   # the first debug build, in the background
 ```
 
-The files are browsable at
-[starter/](https://github.com/tomyan/vapors/tree/main/plugins/vapors/skills/vapors/starter).
-Rename the package in `Cargo.toml` if you like; keep the rest of it:
+`--offline` stops trunk from downloading its own tools: it fails if the
+prebuilt ones above are missing, rather than fetching others. Never
+`cargo install` these tools; it compiles them for minutes.
 
-- Every vapors crate is a git dependency at one `rev`. Keep that pin,
-  and keep all of them on the same rev. Do not switch to a branch or
-  to path dependencies.
-- `rust-toolchain.toml` pins the compiler vapors is built with (1.99.1)
-  and the wasm target; rustup installs both on the first build.
-- Generated code reaches the DOM layer through `vapors-elements`; do not
-  add `vapors-dom`.
+The starter is a small game: arrow keys move a frog across a road of
+cars, drawn as a 3D scene seen from above, with the score in HTML over
+it. Change it into what you are asked for. Keep the dependencies in
+`Cargo.toml` as they are:
 
-The first build compiles over 200 crates natively and about 100 for
-wasm (about a minute each with 4 jobs on a 12-thread machine). trunk
-downloads `wasm-bindgen` and `wasm-opt` on its first release build, so
-it needs the network.
-
-## How the starter is laid out
+- Every vapors crate is a git dependency at one `rev`. Keep that pin
+  and keep them all equal; never switch to a branch or a path.
+- Their default features are off; that keeps the release wasm at 5.5 MB
+  rather than 8.5 MB.
+- `rand` works in the browser through `getrandom`'s `wasm_js` feature,
+  already set. Use `vapors_platform::Instant`, never
+  `std::time::Instant`, which panics in the browser.
 
 | File | Holds |
 |---|---|
-| `src/game.rs` | the rules, plain Rust with no vapors types, and their unit tests |
-| `src/board.wisp` | the view: one `Signal<World>`, memos derived from it, a grid of tiles |
-| `src/main.rs` | mounts the board, and wraps `ElementsApp` in an `App` that steps the game on a timer and passes key presses to it |
-| `build.rs` | `vapors_compiler::build::compile_dir("src")`: every `.wisp` under `src` becomes a module (`board.wisp` is `board::Board`) |
-| `index.html` | the page contract: `<canvas id="vapors">`, `#status`, `#error`, and trunk's `<link data-trunk rel="rust" />` |
+| `src/game.rs` | the rules, plain Rust with no vapors types, with unit tests |
+| `src/page.wisp` | the view and the game loop: the scene, the keys, the score |
+| `src/view.rs` | where things are drawn: the camera, the lens, a square |
+| `src/main.rs` | builds the scene renderer and runs the page |
+| `index.html` | the page contract (runtime.md) |
 | `shoot.mjs` | the headless screenshot below |
 
-Keep game state in plain Rust and the view in `.wisp`: the rules can
-then be tested with `cargo test`, and the template only reads signals.
+Keep game state in plain Rust and the view in `.wisp`, so `cargo test`
+checks the rules natively.
 
 ## Check your work
 
-Run these after each change, in this order.
+After each change, in this order:
 
-1. **`wisp-check`** on each `.wisp` you changed. It reports every
-   compiler refusal as `file:line:col: message`, and the message names
-   the fix. Install it once:
-
-   ```sh
-   cargo install --locked --git https://github.com/tomyan/vapors \
-     --rev <the rev in Cargo.toml> vapors-compiler --bin wisp-check
-   wisp-check src/board.wisp   # ok: ... compiles to component `Board`
-   ```
-
-2. **`cargo test`**, natively, for the rules.
-3. **`cargo build`**, natively. A rustc error in script code points at
-   the generated file (`target/debug/build/<crate>-*/out/wisp/board.rs`);
-   open it at that line and find the nearest
-   `// from src/board.wisp:N` comment above it: that is the line to edit.
-4. **`trunk build --release --public-url ./ --dist site`**. Use
-   `--public-url ./` so the page loads its script from beside itself
-   wherever it is served. Keep `--dist site` apart from `trunk serve`,
-   which writes a debug build into `dist/`.
-5. **Look at it.** Serve `site/` and screenshot it headless:
+1. **`wisp-check`** on each `.wisp` you changed: it prints every
+   refusal as `file:line:col: message` naming the fix, in about a
+   second. Install it once, in the background since it compiles for a
+   minute:
+   `cargo install --locked --git https://github.com/tomyan/vapors --rev <the rev in Cargo.toml> vapors-compiler --bin wisp-check`.
+2. **`cargo test`** for the rules.
+3. **`trunk build --offline`** (debug, into `dist/`). A rustc error in
+   script code points at the generated file
+   (`target/wasm32-unknown-unknown/debug/build/<crate>-*/out/wisp/page.rs`);
+   the nearest `// from src/page.wisp:N` comment above that line names
+   the line to edit.
+4. **Look at it.** Serve `dist/` and screenshot it headless:
 
    ```sh
-   (cd site && python3 -m http.server 8000 --bind 127.0.0.1 &)
-   npm install playwright   # if neither playwright nor playwright-core is installed
+   (cd dist && python3 -m http.server 8000 --bind 127.0.0.1 &)
+   npm install playwright   # unless playwright or playwright-core is installed
    node shoot.mjs http://127.0.0.1:8000/ shot   # shot-1.png, then keys, shot-2.png
    ```
 
    Open both PNGs and look at them. The script exits 1 and prints the
-   message when the page shows an error in `#error`. Change the key
-   presses and waits in `shoot.mjs` to exercise your own game.
+   message when the page shows an error in `#error`; some refusals
+   (layout, CSS values) appear only there, when the page runs. Change
+   the keys and waits in `shoot.mjs` to exercise your own game.
 
-For a live view, `trunk serve` rebuilds on save and serves on
-`http://127.0.0.1:8080` (a secure context, so WebGPU works there).
+`trunk serve --offline` rebuilds on save and serves on
+`http://127.0.0.1:8080`, a secure context, so WebGPU works there.
 
 ### When the GPU device is lost
 
 In a container with no GPU, Chromium's WebGPU runs on SwiftShader. With
-the usual flags (`--use-angle=swiftshader`, or none) Playwright's
-Chromium loses the device within two frames: `#error` reads `the GPU
-device was lost (Destroyed: ...)` and nothing draws
-([#513](https://github.com/tomyan/vapors/issues/513)). These flags work,
-and are what `shoot.mjs` uses:
+the usual flags Playwright's Chromium loses the device within two
+frames: `#error` reads `the GPU device was lost (Destroyed: ...)`
+([#513](https://github.com/tomyan/vapors/issues/513)). These work, and
+`shoot.mjs` uses them:
 
 ```
 --no-sandbox --enable-unsafe-webgpu --enable-features=Vulkan --use-angle=vulkan
@@ -120,74 +123,36 @@ VK_DRIVER_FILES=<the browser's directory>/vk_swiftshader_icd.json
 ```
 
 `shoot.mjs` finds the ICD file beside the browser binary; set
-`VK_DRIVER_FILES` or `CHROME` when it cannot. Unset
-`DBUS_SESSION_BUS_ADDRESS` for the browser (the script does): with a
-session bus but no desktop portal, every load waits 120 s.
+`VK_DRIVER_FILES` or `CHROME` when it cannot. It also unsets
+`DBUS_SESSION_BUS_ADDRESS`: with a session bus but no desktop portal,
+every page load waits 120 s.
 
-## Writing .wisp
+## Rough edges
 
-The rules that matter most when starting; docs/components.md has them all.
+- A `<button>` or `<input>` must be a flex or grid item, and a text
+  input needs a width; otherwise the page shows an error when it runs.
+  `br`, lists, tables and `label` are not drawn yet (supported.md).
+- An element's position cannot follow a signal (`style={..}` is
+  refused), so anything that moves is a mesh in the 3D scene
+  (runtime.md).
+- Pending, not yet in the pinned rev: `frame_time()` (the per-frame
+  clock the starter's cars move by) and `<vapors:window onkeydown>`
+  (the starter's keys). Until the pin moves to a rev that has them,
+  the starter does not build.
+- Props of the 3D tags (`<Mesh>`, `<Scene>`, ...) are checked by rustc,
+  not `wisp-check`; a wrong one is a rustc error in the generated file.
 
-- A signal or memo needs its type written out:
-  `let score: Signal<u32> = Signal::new(0);`.
-- In a text hole a bare signal is read for you (`{score}`). In
-  attributes, `{if}` conditions and `{for}` iterables, call `.get()`
-  yourself: `{if lives.get() == 0}`.
-- A `{for}` loop binding is a memo too: `{tile}` in text,
-  `tile.get()` in attributes. Give a `{for}` a `key=` when rows are
-  added, removed or reordered.
-- Classes are literal or toggled: `class="tile" class:car={..}`.
-  `class={..}` and `style={..}` are refused, because the compiler must
-  see every class and declaration an element can have. Put all CSS in
-  `<style>`; it is scoped to the component (`:global(body)` reaches
-  outside it).
-- No `{else if}` (nest an `{if}` in the `{else}`), no HTML comments
-  (use `/* */` in `<style>`), and only HTML tags from the compiler's
-  vocabulary; capitalised tags are child components.
-- Handlers: `onclick={handler}` where `handler` is a script closure
-  (`let restart = move || world.set(World::new());`) or an inline
-  closure taking `&mut Event`.
+## Publish
 
-## Games: what works today and the gaps
+Build for release, then publish what it produces:
 
-These hold at the pinned rev; each was checked against the source.
+```sh
+trunk build --offline --release --public-url ./ --dist site
+```
 
-- **No frame tick or timer in `.wisp`.** `ElementsApp` draws only when
-  the document changes, and its `with_per_frame` hook runs only while
-  something changes every frame. The starter's `Game` wraps
-  `ElementsApp` and returns `Next::WaitUntil(next_step)` so a frame
-  comes at each step. For motion on every display frame, return
-  `Next::Continue` instead.
-- **Keys.** A `.wisp` `onkeydown` reaches only the focused element
-  (one with `tabindex`) and the elements above it; with nothing focused
-  keys go to `<body>`, which a component cannot listen on. The starter
-  reads `vapors_platform::Event::Key { key, pressed, repeat, .. }` in
-  its wrapper instead. `key` uses DOM names (`"ArrowUp"`, `" "` for
-  Space); `pressed: false` is the key-up, so held keys can be tracked.
-- **No positions from values.** With `style={..}` refused, nothing can
-  place an element at a computed x and y. Draw the playfield as a grid
-  of tiles and toggle classes, so things move a whole tile at a time
-  (fine for Frogger-style games). Smooth movement would need the 3D
-  scene ([scene3d](https://github.com/tomyan/vapors/blob/main/docs/scene3d.md),
-  a `transform` signal per node); this skill has not tried it.
-- **Time:** use `vapors_platform::Instant`. `std::time::Instant::now()`
-  panics in the browser.
-- **Randomness:** nothing in the dependencies provides it. A small
-  hand-written generator (xorshift, seeded from the time) avoids
-  setting up `getrandom` for wasm; not tried here.
-- **No audio** API exists.
-
-## Show the result
-
-`site/` (after step 4) is the whole page: `index.html`, one `.js` and
-one `.wasm`. Any static file server can serve it over https or on
-localhost.
-
-From a cloud session that has an Artifact publishing tool, publish
-`site/index.html` as the page with the `.js` and `.wasm` as supporting
-files under the same names (the `.wasm` with content type
-`application/wasm`). Publishing that way was checked on 2026-11-18;
-whether the page then runs inside the artifact viewer, which needs
-WebGPU in its frame, was not. If the published page shows an error or
-stays blank, say so and give the user the built `site/` directory and
-your screenshots instead.
+`site/` holds `index.html`, one `.js` and one `.wasm`. `--public-url ./`
+lets the page load them from beside itself wherever it is served. If
+the session has an Artifact tool, publish `site/index.html` as the page
+with the `.js` and the `.wasm` as supporting files under the same names
+(the `.wasm` with content type `application/wasm`). Otherwise give the
+user the `site/` directory: any static server over https serves it.

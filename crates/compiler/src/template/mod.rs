@@ -10,7 +10,7 @@ mod entities;
 mod holes;
 mod snippets;
 mod text;
-mod vocabulary;
+pub(crate) mod vocabulary;
 mod window;
 
 use crate::CompileError;

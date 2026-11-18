@@ -11,7 +11,7 @@ use crate::source::Source;
 
 /// The HTML boolean attributes, including those of elements vapors does
 /// not implement: on by being present, whatever the value.
-const BOOLEAN_ATTRIBUTES: &[&str] = &[
+pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
     "allowfullscreen",
     "alpha",
     "async",
