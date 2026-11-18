@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
 <!-- Replace the title (two to four words) and the sections below. -->
-<title>Dodge code tour</title>
+<title>Hello code tour</title>
 <style>
   :root {
     --bg: #fbfbf9; --fg: #1d2125; --muted: #5b636b; --rule: #dfe2e5; --code-bg: #ffffff;
@@ -44,8 +44,8 @@
 </head>
 <body>
 <main>
-<h1>Dodge code tour</h1>
-<p>One paragraph: what the game is and how its parts fit together.</p>
+<h1>Hello code tour</h1>
+<p>One paragraph: what the page does and how its parts fit together.</p>
 <p id="error" role="alert"></p>
 
 <!-- One section per part worth reading. Paste code verbatim into a
@@ -70,14 +70,11 @@ let increment = move || count.update(|n| *n += 1);
 </section>
 
 <section>
-<h2>The rules</h2>
+<h2>The turn</h2>
 <p>What this file does.</p>
-<textarea class="code" data-lang="rust" data-file="src/game.rs">
-pub fn key(&mut self, key: &str) {
-    let (dx, dy) = match key {
-        "ArrowLeft" => (-1, 0),
-        _ => return,
-    };
+<textarea class="code" data-lang="rust" data-file="src/view.rs">
+pub fn turned(angle: f32) -> Transform {
+    Transform::new(Vec3::ZERO, Quat::from_rotation_y(angle), Vec3::ONE).expect("a finite turn")
 }
 </textarea>
 </section>

@@ -163,7 +163,7 @@ user the `site/` directory: any static server over https serves it.
 
 ## Code tour
 
-Once the game works and is published, publish a second artifact that
+Once the page works and is published, publish a second artifact that
 walks through the key parts of its code. Start from
 [assets/code-tour.html](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/assets/code-tour.html)
 (`curl -fsSLO https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/assets/code-tour.html`):
