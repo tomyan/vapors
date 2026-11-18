@@ -1,0 +1,212 @@
+{
+  "name": "wisp",
+  "scopeName": "source.wisp",
+  "fileTypes": [
+    "wisp"
+  ],
+  "patterns": [
+    {
+      "include": "#script"
+    },
+    {
+      "include": "#style"
+    },
+    {
+      "begin": "<!--",
+      "end": "-->",
+      "name": "comment.block.wisp"
+    },
+    {
+      "include": "#control"
+    },
+    {
+      "include": "#expression"
+    },
+    {
+      "include": "#component"
+    },
+    {
+      "include": "#element"
+    }
+  ],
+  "repository": {
+    "script": {
+      "begin": "(<)(script)(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      },
+      "end": "(</)(script)(>)",
+      "contentName": "meta.embedded.block.rust",
+      "patterns": [
+        {
+          "include": "source.rust"
+        }
+      ],
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "style": {
+      "begin": "(<)(style)(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      },
+      "end": "(</)(style)(>)",
+      "contentName": "meta.embedded.block.css",
+      "patterns": [
+        {
+          "include": "source.css"
+        }
+      ],
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "expression": {
+      "begin": "\\{",
+      "end": "\\}",
+      "contentName": "meta.embedded.expression.rust",
+      "patterns": [
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "control": {
+      "begin": "(\\{/?)(else\\s+if|if|else|for|snippet|render)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.section.block.wisp"
+        },
+        "2": {
+          "name": "keyword.control.wisp"
+        }
+      },
+      "end": "\\}",
+      "patterns": [
+        {
+          "match": "\\bkey(?==)",
+          "name": "keyword.other.wisp"
+        },
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "source.rust"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "include": "#expression"
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.wisp"
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.wisp"
+        },
+        {
+          "match": "[\\w:-]+(?=\\s*=)",
+          "name": "entity.other.attribute-name.wisp"
+        }
+      ]
+    },
+    "component": {
+      "begin": "(</?)([A-Z][\\w.:]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "support.class.component.wisp"
+        }
+      },
+      "end": "/?>",
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ],
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    },
+    "element": {
+      "begin": "(</?)([a-z][\\w:-]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.wisp"
+        },
+        "2": {
+          "name": "entity.name.tag.wisp"
+        }
+      },
+      "end": "/?>",
+      "patterns": [
+        {
+          "include": "#attributes"
+        }
+      ],
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.wisp"
+        }
+      }
+    }
+  }
+}

@@ -85,6 +85,7 @@ chain_hops = "3"
 # and `lint --verbose` print them; the `files` step shows only refusals.
 [files.allow]
 "crates/elements-corpus/fixtures/apg/combobox-autocomplete.js" = "APG's own example script, copied as published (fixtures/apg/NOTICE.md)"
+"plugins/vapors/skills/vapors/assets/code-tour.html" = "one page an agent copies whole: about 120 lines of template and script, and the .wisp grammar inlined (code_tour_grammar.rs holds it equal to wisp.tmLanguage.json)"
 
 # Files not written by hand; left out of the check.
 [files.generated]
