@@ -22,11 +22,16 @@ pub const TOLERANCE_PERCENT: u64 = 2;
 /// The least growth over the 1000-row count that fails a phase, in
 /// instructions, so a small phase is not failed by 2% of itself. A 2%
 /// step on a phase under 250,000 instructions is under 5000, and one
-/// extra instruction per row over 9000 extra rows is 9000: 5000 sits
+/// extra instruction per row over 9000 extra rows is 9000: this sits
 /// below that, so a phase that gains an instruction per row at 10,000
 /// rows still fails. Growth fails only when it exceeds both this and
 /// [`TOLERANCE_PERCENT`].
-pub const MIN_GROWTH_INSTRUCTIONS: u64 = 5000;
+///
+/// Raised from 5000 to 6500 (#505): a page with no size-dependent work
+/// grows up to 5196 instructions in draw, 25% under this
+/// (`scaling_noise.rs` records the twelve runs, and a test holds this
+/// above them).
+pub const MIN_GROWTH_INSTRUCTIONS: u64 = 6500;
 
 /// Median instructions per phase, at one row count.
 #[derive(Debug)]
