@@ -4,7 +4,9 @@ Date: 2026-11-11. Decided by: Tom.
 
 ## Decision
 
-1. **Classes come from booleans and enums, never strings.** A template
+1. **Classes come from booleans and enums, never strings.** (The enum
+   form is designed in `2026-11-18-style-variants.md`: groups declared
+   with `@variants`, set with `class:Group={variant}`.) A template
    toggles one literal class with `class:name={bool}`, and chooses among
    a known set with an enum. `class={expr}` with a string expression is
    refused, naming the two forms; its 8 current uses are migrated by a
