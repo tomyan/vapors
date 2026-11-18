@@ -226,6 +226,9 @@ the one difference from the brief in this slice.
 - A prop is read once at mount unless its type is `Signal<T>`, in which
   case it reads like a signal. A child's props are not re-sent when the
   parent's values change.
+- A computed `Signal<T>` prop: `transform={Signal::derived(move || tumble(time.get()))}`.
+  It follows what the closure reads and belongs to the owner current at
+  the call, so in a `{for}` row it ends with the row.
 - Signals follow Leptos's semantics. Effects run after the write, or
   after the outermost `batch`, in creation order. A diamond runs once.
   An effect's first run follows the same rule: a signal it writes is

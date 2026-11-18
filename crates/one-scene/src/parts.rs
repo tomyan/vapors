@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use vapors_scene3d::{Quat, Transform, Vec3};
-use vapors_signals::{Effect, Signal};
+use vapors_signals::Signal;
 
 use crate::schedule::turn;
 
@@ -18,9 +18,7 @@ pub fn turning(time: Signal<Duration>) -> Signal<Transform> {
         let rotation = Quat::from_rotation_y(turn(time));
         Transform::new(Vec3::ZERO, rotation, Vec3::ONE).expect("a turn about +Y")
     };
-    let transform = Signal::new(at(time.get_untracked()));
-    Effect::new(move || transform.set(at(time.get())));
-    transform
+    Signal::derived(move || at(time.get()))
 }
 
 /// A node at `(x, y, z)`.
