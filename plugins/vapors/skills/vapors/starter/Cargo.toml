@@ -1,0 +1,15 @@
+[package]
+name = "dodge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+vapors-app = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
+vapors-elements = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
+vapors-platform = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
+vapors-signals = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
+vapors-text = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
+
+[build-dependencies]
+vapors-compiler = { git = "https://github.com/tomyan/vapors", rev = "40092e67b13d3d25d179e41e64041f6202ba66ab" }
