@@ -241,6 +241,42 @@ the one difference from the brief in this slice.
   the runtime usable once it is caught. See the `vapors-signals` crate
   docs.
 
+## Time and animation
+
+CSS transitions and animations need no clock: write them in `<style>`
+and the app draws the frames they need. Use a clock when the script
+must know the value itself, as a game does to test a collision.
+
+```html
+<script>
+use vapors_elements::frame_time;
+let x: Signal<u128> = Signal::derived(move || frame_time().get().as_millis());
+</script>
+
+<p>{x}</p>
+```
+
+`vapors_elements::frame_time()` is the time since the first frame that
+followed the first call, and `frame_delta()` the time since the
+previous frame (zero on the first). Both are `Signal<Duration>`, one
+pair for the whole app: every call returns the same signals, set once
+at the start of each frame from the frame's own time, so two readers
+see one clock. After a wait (nothing changed, so no frames) the
+`frame_delta` includes the wait.
+
+While an effect, a derived signal or a template binding that reads
+either signal is mounted, the app draws every display refresh
+(`requestAnimationFrame` on the web); when the last one unmounts it
+goes back to drawing on change. There is no start or stop call, and a
+page that never calls them draws as before. A derived signal nothing
+reads still counts as a reader until its owner is disposed.
+
+An element's style cannot follow a signal yet: `style={..}` is refused
+(`docs/decisions/2026-11-11-analysable-sources.md`) and a typed
+per-property binding is still being decided. Today a 3D scene's
+`transform={Signal::derived(move || ..)}` on a scene tag is the way to
+move things every frame (`docs/scene3d.md`).
+
 ## Refusals
 
 Every refusal is printed as `file:line:col: message` (the build adds

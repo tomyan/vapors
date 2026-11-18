@@ -78,6 +78,7 @@ mod focus_review;
 mod focus_style;
 mod focus_window;
 mod focus_window_held;
+mod frame_clock;
 mod global_sheets;
 mod grid_off;
 mod html_none;

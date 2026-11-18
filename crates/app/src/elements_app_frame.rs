@@ -166,6 +166,15 @@ impl ElementsApp {
             .map_err(|error| error.to_string())
     }
 
+    /// Sets `vapors_elements::frame_time` and `frame_delta` for the
+    /// frame that starts at `now`, before the update, so what reads
+    /// them is current in it. Does nothing for a page that never read
+    /// them.
+    pub fn advance_clock(&mut self, now: Instant) {
+        let epoch = *self.clock_epoch.get_or_insert(now);
+        vapors_elements::advance_frame_clock(now.duration_since(epoch));
+    }
+
     /// Runs the frame's phases, keeping their times and handing them to
     /// the frame-times hook.
     pub(super) fn run_phases(&mut self, frame: &Frame<'_>) -> Result<(), String> {
@@ -174,6 +183,7 @@ impl ElementsApp {
         if let Some(per_frame) = &mut self.per_frame {
             per_frame(&shown_times(self.last_times.as_ref()));
         }
+        self.advance_clock(frame.now);
         self.input
             .advance_fling(&mut self.document.borrow_mut(), frame.now);
         let mut phases = AppFrame { app: self, frame };

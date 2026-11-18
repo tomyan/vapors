@@ -52,6 +52,8 @@ pub struct ElementsApp {
     input_spent: Duration,
     /// Why the last frame asked for the next (`elements_app_decision.rs`).
     decision: FrameDecision,
+    /// The first frame's time: the frame clock's epoch.
+    clock_epoch: Option<vapors_platform::Instant>,
     /// Whether events came through `App::event` or `give`; `None` before the first.
     hosting: Option<Hosting>,
     /// Render passes the last painted frame's encoder began.
@@ -98,6 +100,7 @@ impl ElementsApp {
             last_times: None,
             input_spent: Duration::ZERO,
             decision: FrameDecision::default(),
+            clock_epoch: None,
             hosting: None,
             render_passes: 0,
             start: start::StartRecord::default(),

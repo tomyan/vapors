@@ -33,6 +33,9 @@ pub struct FrameDecision {
     pub thumbs_fading: bool,
     /// When the shown touch thumbs start to fade.
     pub thumbs_fade_at: Option<Instant>,
+    /// A live reader depends on `frame_time` or `frame_delta`
+    /// (`vapors_elements::frame_clock_wanted`).
+    pub clock_wanted: bool,
 }
 
 impl FrameDecision {
@@ -44,6 +47,7 @@ impl FrameDecision {
             || self.surfaces_want
             || self.flinging
             || self.thumbs_fading
+            || self.clock_wanted
     }
 
     /// The next frame: at once when a reason holds, else at the earlier
@@ -84,6 +88,7 @@ impl ElementsApp {
                 Phase::Shown(at) => Some(at),
                 _ => None,
             },
+            clock_wanted: vapors_elements::frame_clock_wanted(),
         };
         self.decision.next()
     }
@@ -193,5 +198,21 @@ mod thumb_tests {
         // Then
         assert_eq!(waits(soon, later), Next::WaitUntil(soon));
         assert_eq!(waits(later, soon), Next::WaitUntil(soon));
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use vapors_platform::Next;
+
+    use super::FrameDecision;
+
+    #[test]
+    fn a_wanted_frame_clock_draws_again_at_once() {
+        let wanted = FrameDecision {
+            clock_wanted: true,
+            ..FrameDecision::default()
+        };
+        assert_eq!(wanted.next(), Next::Continue);
     }
 }
