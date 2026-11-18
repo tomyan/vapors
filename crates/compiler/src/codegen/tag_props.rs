@@ -67,7 +67,9 @@ impl Emitter<'_> {
 impl Emitter<'_> {
     /// RELAXED: a tag the index cannot resolve, such as another crate's
     /// component (`vapors_components::Combobox`), compiles with its props
-    /// unchecked, and the build warns, naming the tag. A wrong prop then
+    /// unchecked. The build prints one warning per run, naming each such
+    /// component once with its count; `WISP_NOTES=1` adds a positioned
+    /// line per tag (`build/notes.rs`). A wrong prop then
     /// fails in rustc, at the props struct in the generated file. The
     /// compiler reading another crate's props (its `.wisp` sources, or
     /// an index the crate publishes) retires this.

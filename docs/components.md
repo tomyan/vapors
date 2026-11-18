@@ -154,6 +154,10 @@ the one difference from the brief in this slice.
   refused at each attribute, and another crate's component without the
   field fails in rustc at its props struct, naming `anchor`. Writing
   `anchor={..}` on a tag is refused.
+- **Unchecked props:** a tag naming another crate's component compiles
+  with its props unchecked (rustc checks them in the generated file).
+  The build prints one warning per run, naming each such component once
+  with its count; `WISP_NOTES=1` adds each tag's `file:line:col` after it.
 - **Children:** markup inside a component tag is the child's
   `children` prop, a `Snippet`. The child declares it, `#[prop] let
   children: Snippet = Snippet::empty();`, and places it with
