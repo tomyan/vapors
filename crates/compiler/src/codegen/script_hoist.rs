@@ -91,7 +91,7 @@ pub(crate) fn header_imports(bound: &[&str]) -> String {
         ),
         (
             "vapors_signals",
-            &["Effect", "Memo", "Owner", "Signal"],
+            &["Effect", "Memo", "Owner", "ReadSignal", "Signal"],
             true,
         ),
     ];

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use vapors_app::{InvalidateError, Invalidated};
 use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{NodeId, NodeKind, StoreError, Transform};
-use vapors_signals::{Effect, Owner, Signal, on_cleanup};
+use vapors_signals::{Effect, Owner, ReadSignal, on_cleanup};
 
 /// A mounted node component: its owner, its one root (the anchor) and
 /// the scene node it holds.
@@ -42,7 +42,7 @@ pub(crate) fn mount_node(
     dom: &Rc<RefCell<dyn Dom>>,
     (parent, before): (ElementId, Option<ElementId>),
     (component, key, kind): (&'static str, &'static StyleKey, NodeKind),
-    transform: Signal<Transform>,
+    transform: ReadSignal<Transform>,
     children: &Snippet,
 ) -> Mounted {
     let above = placement_of(&*dom.borrow(), parent, component);
@@ -66,7 +66,11 @@ pub(crate) fn mount_node(
 
 /// Writes each value of `transform` to the node and invalidates its
 /// surface: the node's world matrix, and its uniform alone, change.
-fn follow_transform(component: &'static str, placement: Placement, transform: Signal<Transform>) {
+fn follow_transform(
+    component: &'static str,
+    placement: Placement,
+    transform: ReadSignal<Transform>,
+) {
     Effect::new(move || {
         let local = transform.get();
         let written = placement

@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
-use vapors_signals::{Signal, unowned};
+use vapors_signals::{ReadSignal, Signal, unowned};
 
 /// The clock's signals and the frame times that make them.
 #[derive(Clone, Copy)]
@@ -39,17 +39,17 @@ fn clock() -> Clock {
 }
 
 /// The time since the first frame that followed the first call, set
-/// once at the start of each frame. Every call returns the same signal.
+/// once at the start of each frame. Every call returns a read-only view of the same signal.
 #[must_use]
-pub fn frame_time() -> Signal<Duration> {
-    clock().time
+pub fn frame_time() -> ReadSignal<Duration> {
+    clock().time.read_only()
 }
 
 /// The time since the previous frame: zero on the first. After a wait
-/// (`Next::Wait`) it includes the wait. Every call returns the same signal.
+/// (`Next::Wait`) it includes the wait. Every call returns a read-only view of the same signal.
 #[must_use]
-pub fn frame_delta() -> Signal<Duration> {
-    clock().delta
+pub fn frame_delta() -> ReadSignal<Duration> {
+    clock().delta.read_only()
 }
 
 /// Sets the clock for the frame that starts `at` (any steady epoch, the

@@ -6,9 +6,9 @@ use vapors_scene3d_components::{Group, GroupProps, Mesh, MeshProps, Scene, Scene
 #[prop] let square: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let braking: Signal<bool> = Signal::new(false);
 
-fn wheel_at(x: f32) -> Signal<vapors_scene3d::Transform> {
+fn wheel_at(x: f32) -> ReadSignal<vapors_scene3d::Transform> {
     let place = vapors_scene3d::Vec3::new(x, 0.0, 0.0);
-    Signal::new(vapors_scene3d::Transform::from_translation(place).unwrap())
+    Signal::new(vapors_scene3d::Transform::from_translation(place).unwrap()).read_only()
 }
 </script>
 

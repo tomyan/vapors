@@ -40,6 +40,7 @@ mod codegen_key_winners;
 mod codegen_lints;
 mod codegen_names;
 mod codegen_page_scope;
+mod codegen_read_props;
 mod codegen_refusals;
 mod codegen_snapshot;
 mod codegen_snippet_refusals;

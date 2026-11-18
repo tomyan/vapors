@@ -114,13 +114,16 @@ fn check_param_type(ty: &syn::Type, param: &Param) -> Result<(), String> {
     Ok(())
 }
 
-/// `T` of a `Signal<T>` or `Memo<T>`.
+/// `T` of a `Signal<T>`, `Memo<T>` or `ReadSignal<T>`.
 fn reactive_inner(ty: &syn::Type) -> Option<String> {
     let syn::Type::Path(path) = ty else {
         return None;
     };
     let last = path.path.segments.last()?;
-    if last.ident != "Signal" && last.ident != "Memo" {
+    if !["Signal", "Memo", "ReadSignal"]
+        .iter()
+        .any(|name| last.ident == name)
+    {
         return None;
     }
     let syn::PathArguments::AngleBracketed(args) = &last.arguments else {

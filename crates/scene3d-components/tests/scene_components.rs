@@ -181,3 +181,24 @@ fn a_page_dropped_after_its_app_removes_its_nodes_without_a_refusal() {
     // Then: the page's nodes are gone, the root alone left
     assert_eq!(scene.borrow().len(), 1);
 }
+
+#[test]
+fn a_transform_prop_takes_a_signal_or_a_derived_value() {
+    // Given: a signal and a value computed from it
+    let signal = vapors_signals::Signal::new(vapors_scene3d::Transform::IDENTITY);
+    let derived = vapors_signals::Signal::derived(move || signal.get());
+
+    // When: each fills a tag's read-only prop
+    let from_signal = vapors_scene3d_components::MeshProps {
+        transform: signal.into(),
+        ..Default::default()
+    };
+    let from_derived = vapors_scene3d_components::MeshProps {
+        transform: derived,
+        ..Default::default()
+    };
+
+    // Then: both read the same value
+    let (a, b) = (from_signal.transform, from_derived.transform);
+    assert_eq!(a.get_untracked(), b.get_untracked());
+}

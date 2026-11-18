@@ -9,7 +9,7 @@ use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, Me
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
 #[prop] let eye: Option<vapors_scene3d::CameraHandle> = None;
-#[prop] let lens: Option<Signal<vapors_scene3d::Projection>> = None;
+#[prop] let lens: Option<ReadSignal<vapors_scene3d::Projection>> = None;
 #[prop] let look: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let world: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
 #[prop] let car: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);

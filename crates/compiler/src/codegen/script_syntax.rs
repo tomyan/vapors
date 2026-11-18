@@ -14,7 +14,7 @@ pub(crate) fn binding(pat: &syn::Pat) -> (Option<String>, Option<syn::Type>) {
     }
 }
 
-/// `Signal` or `Memo` when the type is one of them.
+/// `Signal`, `Memo` or `ReadSignal` when the type is one of them.
 pub(crate) fn reactive_kind(ty: &syn::Type) -> Option<&'static str> {
     let syn::Type::Path(path) = ty else {
         return None;
@@ -22,6 +22,7 @@ pub(crate) fn reactive_kind(ty: &syn::Type) -> Option<&'static str> {
     match path.path.segments.last()?.ident.to_string().as_str() {
         "Signal" => Some("Signal"),
         "Memo" => Some("Memo"),
+        "ReadSignal" => Some("ReadSignal"),
         _ => None,
     }
 }

@@ -80,7 +80,9 @@ impl<T: PartialEq + 'static> Memo<T> {
             marker: PhantomData,
         }
     }
+}
 
+impl<T: 'static> Memo<T> {
     /// Kind, name and creation site, for messages.
     #[must_use]
     pub fn info(&self) -> NodeInfo {

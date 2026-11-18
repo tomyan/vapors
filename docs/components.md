@@ -275,8 +275,8 @@ or none), so code moves between the two unchanged.
 - A prop is read once at mount unless its type is `Signal<T>`, in which
   case it reads like a signal. A child's props are not re-sent when the
   parent's values change.
-- A computed `Signal<T>` prop: `transform={Signal::derived(move || tumble(time.get()))}`.
-  It follows what the closure reads and belongs to the owner current at
+- A computed prop: `transform={Signal::derived(move || tumble(time.get()))}`,
+  a read-only `ReadSignal<T>` (see "Read-only props"). It follows what the closure reads and belongs to the owner current at
   the call, so in a `{for}` row it ends with the row.
 - Signals follow Leptos's semantics. Effects run after the write, or
   after the outermost `batch`, in creation order. A diamond runs once.
@@ -295,7 +295,7 @@ must know the value itself, as a game does to test a collision.
 ```html
 <script>
 use vapors_elements::frame_time;
-let x: Signal<u128> = Signal::derived(move || frame_time().get().as_millis());
+let x: ReadSignal<u128> = Signal::derived(move || frame_time().get().as_millis());
 </script>
 
 <p>{x}</p>
@@ -303,8 +303,8 @@ let x: Signal<u128> = Signal::derived(move || frame_time().get().as_millis());
 
 `vapors_elements::frame_time()` is the time since the first frame that
 followed the first call, and `frame_delta()` the time since the
-previous frame (zero on the first). Both are `Signal<Duration>`, one
-pair for the whole app: every call returns the same signals, set once
+previous frame (zero on the first). Both are `ReadSignal<Duration>`, one
+pair for the whole app: every call returns views of the same signals, set once
 at the start of each frame from the frame's own time, so two readers
 see one clock. After a wait (nothing changed, so no frames) the
 `frame_delta` includes the wait.
@@ -321,6 +321,26 @@ An element's style cannot follow a signal yet: `style={..}` is refused
 per-property binding is still being decided. Today a 3D scene's
 `transform={Signal::derived(move || ..)}` on a scene tag is the way to
 move things every frame (`docs/scene3d.md`).
+
+## Read-only props
+
+A prop typed `ReadSignal<T>` gives the child read access only: it has
+`get`, `with`, the `_untracked` and `try_` forms, and no `set` or
+`update`. A prop typed `Signal<T>` is a deliberate grant of write
+access, as Svelte's `$bindable` is: the child may write it, and the
+parent's `bind:name={signal}` passes the signal itself. In Svelte a
+prop is read-only unless declared `$bindable`; here the type says it.
+
+The scene tags' `transform` and `projection` props take `ReadSignal`.
+A `Signal` or `Memo` binding of the script passed alone converts, as
+in `transform={tilt}` (the compiler writes `.into()` for a binding it
+knows is a signal or memo); `Signal::derived(..)` and `frame_time()`
+already are read-only. Any other expression, such as a field of a
+struct or a function's result, calls `.read_only()` itself
+(`signal.read_only()`) or returns a `ReadSignal`. Computed values are
+read-only because a write would be lost at the next change of their
+inputs: `Signal::derived(..).set(..)` does not compile.
+(`docs/decisions/2026-11-18-read-signal.md`.)
 
 ## Refusals
 

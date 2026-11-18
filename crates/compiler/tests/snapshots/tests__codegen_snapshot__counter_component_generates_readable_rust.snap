@@ -11,7 +11,7 @@ use vapors_elements::__wisp::dom::{
     Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
 };
 #[allow(unused_imports)]
-use vapors_signals::{Effect, Memo, Owner, Signal};
+use vapors_signals::{Effect, Memo, Owner, ReadSignal, Signal};
 /// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].

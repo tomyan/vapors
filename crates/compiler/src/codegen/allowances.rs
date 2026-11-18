@@ -28,6 +28,7 @@ pub(crate) enum Allowance {
     NeedlessPassByValue,
     NeedlessUpdate,
     TooManyLines,
+    UselessConversion,
 }
 
 impl Allowance {
@@ -39,6 +40,7 @@ impl Allowance {
             Allowance::NeedlessPassByValue => "clippy::needless_pass_by_value",
             Allowance::NeedlessUpdate => "clippy::needless_update",
             Allowance::TooManyLines => "clippy::too_many_lines",
+            Allowance::UselessConversion => "clippy::useless_conversion",
         }
     }
 
@@ -61,6 +63,9 @@ impl Allowance {
             }
             Allowance::TooManyLines => {
                 "mount_before builds the whole template, so its length follows the template's size"
+            }
+            Allowance::UselessConversion => {
+                "a prop that is a signal or memo binding converts into the child's prop type (ReadSignal or Signal); the compiler cannot see when the types already match"
             }
             Allowance::NeedlessUpdate => {
                 "a child's props end with ..Default::default(); the compiler cannot see when every prop is already given"
