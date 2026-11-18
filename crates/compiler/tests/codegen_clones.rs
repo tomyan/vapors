@@ -19,7 +19,7 @@ fn children_read_by_a_tag_inside_an_if_are_cloned_before_its_builder() {
 
     // Then: within the {if}'s call, the clone precedes its builder closure
     let call = code
-        .find("vapors_dom::blocks::conditional(")
+        .find("vapors_elements::__wisp::dom::blocks::conditional(")
         .expect("the if");
     let clone = call
         + code[call..]
@@ -57,7 +57,7 @@ fn a_render_argument_read_in_an_if_is_cloned_before_its_builder() {
     // Then: between the {if}'s call and its builder (a later hole's
     // clone of `label` does not count)
     let call = code
-        .find("vapors_dom::blocks::conditional(")
+        .find("vapors_elements::__wisp::dom::blocks::conditional(")
         .expect("the if");
     let builder = call
         + code[call..]

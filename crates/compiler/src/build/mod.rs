@@ -15,6 +15,7 @@
 //! (`text-input.wisp` is `text_input`, holding `TextInput`), with a
 //! nested module per subdirectory.
 
+mod dom_path;
 mod files;
 mod modules;
 mod tree;
@@ -23,7 +24,8 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use crate::CompileError;
-pub use files::{Styles, compile_dir_into, compile_dir_into_styled};
+pub use dom_path::DomPath;
+pub use files::{Styles, compile_dir_into, compile_dir_into_styled, compile_dir_into_with};
 
 /// What [`compile_dir_into`] produced.
 #[derive(Debug)]
@@ -54,7 +56,15 @@ pub struct BuildScriptReport {
 /// script. On a refusal it prints each as `error: file:line:col: message` and
 /// exits with status 1, which fails the build.
 pub fn compile_dir(src: impl AsRef<Path>) {
-    run(src.as_ref(), None, Styles::Scoped);
+    run(src.as_ref(), None, (Styles::Scoped, DomPath::Elements));
+}
+
+/// [`compile_dir`] for a crate below `vapors-elements`, which depends on
+/// `vapors-dom` itself and cannot depend on `vapors-elements` (the
+/// layers rule): generated code names `vapors_dom::` as written.
+/// `crates/components` and `crates/compiler-examples` are such crates.
+pub fn compile_dir_below_elements(src: impl AsRef<Path>) {
+    run(src.as_ref(), None, (Styles::Scoped, DomPath::VaporsDom));
 }
 
 /// [`compile_dir`] into `OUT_DIR/<under>/`, so a crate can compile a
@@ -65,17 +75,21 @@ pub fn compile_dir(src: impl AsRef<Path>) {
 /// `..`, a separator) would write outside `OUT_DIR` and is refused.
 /// Every build of the crate compiles it, release and wasm included.
 pub fn compile_dir_under(src: impl AsRef<Path>, under: &str) {
-    run(src.as_ref(), Some(under), Styles::Scoped);
+    run(
+        src.as_ref(),
+        Some(under),
+        (Styles::Scoped, DomPath::Elements),
+    );
 }
 
 /// [`compile_dir`] for components whose `<style>` the app adds as a
 /// global sheet: nothing is scoped. The layout corpus uses it, so its
 /// CSS means what Chromium reads.
 pub fn compile_dir_global(src: impl AsRef<Path>) {
-    run(src.as_ref(), None, Styles::Global);
+    run(src.as_ref(), None, (Styles::Global, DomPath::Elements));
 }
 
-fn run(src: &Path, under: Option<&str>, styles: Styles) {
+fn run(src: &Path, under: Option<&str>, (styles, dom): (Styles, DomPath)) {
     let src = resolve_src(src, std::env::var_os("CARGO_MANIFEST_DIR"));
     let report = match under.map(out_dir_under).transpose() {
         Ok(under) => {
@@ -83,7 +97,7 @@ fn run(src: &Path, under: Option<&str>, styles: Styles) {
                 Some(under) => Path::new(&out).join(under).into_os_string(),
                 None => out,
             });
-            styled_report(&src, out_dir, styles)
+            styled_report(&src, out_dir, (styles, dom))
         }
         Err(refusal) => failed(&src, vec![refusal]),
     };
@@ -111,14 +125,18 @@ pub fn resolve_src(src: &Path, manifest_dir: Option<OsString>) -> PathBuf {
 /// The lines [`compile_dir`] prints, given the value of `OUT_DIR`.
 #[must_use]
 pub fn build_script_report(src: &Path, out_dir: Option<OsString>) -> BuildScriptReport {
-    styled_report(src, out_dir, Styles::Scoped)
+    styled_report(src, out_dir, (Styles::Scoped, DomPath::Elements))
 }
 
-fn styled_report(src: &Path, out_dir: Option<OsString>, styles: Styles) -> BuildScriptReport {
+fn styled_report(
+    src: &Path,
+    out_dir: Option<OsString>,
+    (styles, dom): (Styles, DomPath),
+) -> BuildScriptReport {
     let Some(out_dir) = out_dir else {
         return failed(src, vec![missing_out_dir()]);
     };
-    match compile_dir_into_styled(src, Path::new(&out_dir), styles) {
+    match compile_dir_into_with(src, Path::new(&out_dir), (styles, dom)) {
         Ok(compiled) => BuildScriptReport {
             stdout: rerun_lines(&compiled.inputs)
                 .into_iter()

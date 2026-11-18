@@ -91,7 +91,7 @@ impl Emitter<'_> {
         });
         self.indent(1);
         self.emit_clones(row_clones);
-        self.line("vapors_dom::blocks::keyed(");
+        self.line("vapors_elements::__wisp::dom::blocks::keyed(");
         self.indent(1);
         KeyedCall::Hoisted(handle)
     }

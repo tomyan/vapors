@@ -245,3 +245,10 @@ pub use tags::FIRED as FIRED_EVENTS;
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
 pub use update_counts::UpdateCounts;
+
+/// What generated `.wisp` code names, so a page's crate need not depend
+/// on `vapors-dom` itself. Not for use outside generated code.
+#[doc(hidden)]
+pub mod __wisp {
+    pub use vapors_dom as dom;
+}

@@ -33,6 +33,7 @@ mod props_index;
 mod render_dynamic;
 mod script;
 mod script_dispatcher;
+mod script_hoist;
 mod script_syntax;
 mod script_uses;
 mod shell;
@@ -154,7 +155,8 @@ fn generated(
     others: &OtherSheets,
 ) -> Result<(String, Checked), Vec<CompileError>> {
     let source = Source::new(&component.path, &component.text);
-    let info = script::analyse(&source, component.script.as_ref()).map_err(|err| vec![err])?;
+    let info = script::analyse(&source, component.script.as_ref(), component.site_name())
+        .map_err(|err| vec![err])?;
     let analysis = crate::styles::analyse(component, &others.sheets).map_err(|refusal| {
         // the template's own refusal, worded for it, when codegen has one
         emit_template(component, &source, &info, (1, index), None)

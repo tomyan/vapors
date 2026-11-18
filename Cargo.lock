@@ -3352,6 +3352,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-wisp-page"
+version = "0.0.0"
+dependencies = [
+ "vapors-compiler",
+ "vapors-elements",
+ "vapors-signals",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -41,7 +41,7 @@ impl PropsIndex {
     /// or a second component at one path, naming both files.
     pub fn add(&mut self, component: &Component, module: &[String]) -> Result<(), CompileError> {
         let source = Source::new(&component.path, &component.text);
-        let info = script::analyse(&source, component.script.as_ref())?;
+        let info = script::analyse(&source, component.script.as_ref(), component.site_name())?;
         let mut key = module.to_vec();
         key.push(component.name.clone());
         if let Some(first) = self.components.get(&key) {

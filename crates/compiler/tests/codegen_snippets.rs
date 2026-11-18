@@ -52,7 +52,10 @@ fn a_snippet_declares_a_typed_local_built_against_dyn_dom() {
 
     // Then: the tuple of its parameter types, read through its arguments
     assert_has(&code, "let row: Snippet<(String, u32)> = Snippet::new(");
-    assert_has(&code, "snippet_args: vapors_dom::Args<(String, u32)>");
+    assert_has(
+        &code,
+        "snippet_args: vapors_elements::__wisp::dom::Args<(String, u32)>",
+    );
 }
 
 #[test]
@@ -118,10 +121,10 @@ fn rendering_an_expression_rebuilds_through_a_dynamic_block() {
     );
 
     // Then
-    assert_has(&code, "vapors_dom::blocks::dynamic(");
+    assert_has(&code, "vapors_elements::__wisp::dom::blocks::dynamic(");
     assert_has(
         &code,
-        "move || vapors_dom::Renderable::snippet(&(cards[0]))",
+        "move || vapors_elements::__wisp::dom::Renderable::snippet(&(cards[0]))",
     );
     assert_has(&code, "move || (1,)");
 }
@@ -137,7 +140,7 @@ fn rendering_a_signal_holding_a_snippet_reads_the_signal() {
     // Then
     assert_has(
         &code,
-        "move || vapors_dom::Renderable::snippet(&(body.get()))",
+        "move || vapors_elements::__wisp::dom::Renderable::snippet(&(body.get()))",
     );
     assert_has(&code, "roots.push(Root::Block(");
 }
@@ -151,7 +154,10 @@ fn a_parenthesised_callee_is_borrowed_without_doubled_parentheses() {
     );
 
     // Then: clippy's double_parens refuses `&((..))`
-    assert_has(&code, "vapors_dom::Renderable::snippet(&(if true");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::Renderable::snippet(&(if true",
+    );
     assert_lacks(&code, "&((");
 }
 
@@ -190,6 +196,9 @@ fn a_prop_that_is_not_declared_a_snippet_renders_through_the_dynamic_block() {
     );
 
     // Then: not `maybe.render(..)`, which rustc would refuse
-    assert_has(&code, "vapors_dom::Renderable::snippet(&(maybe))");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::Renderable::snippet(&(maybe))",
+    );
     assert_lacks(&code, "maybe.render(");
 }

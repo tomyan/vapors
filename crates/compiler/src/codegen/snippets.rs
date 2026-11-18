@@ -74,7 +74,7 @@ impl Emitter<'_> {
         self.push_scope(params.iter().map(|param| param.name.clone()).collect());
         let built = self.emit_snippet_body(
             &snippet.children,
-            &format!(", {args}: vapors_dom::Args<{tuple}>"),
+            &format!(", {args}: vapors_elements::__wisp::dom::Args<{tuple}>"),
             &param_memos(&params),
         );
         self.pop_scope();
@@ -91,7 +91,11 @@ impl Emitter<'_> {
         let local = format!("{var}_children");
         self.reserve(&local);
         self.line(format!("let {local} = Snippet::new("));
-        let built = self.emit_snippet_body(children, ", _snippet_args: vapors_dom::Args<()>", &[]);
+        let built = self.emit_snippet_body(
+            children,
+            ", _snippet_args: vapors_elements::__wisp::dom::Args<()>",
+            &[],
+        );
         self.line(");");
         built?;
         Ok(format!("children: {local},"))

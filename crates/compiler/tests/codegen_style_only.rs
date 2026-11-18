@@ -15,7 +15,7 @@ fn a_style_only_component_registers_its_sheet_and_builds_nothing() {
     // Then
     assert_has(
         &code,
-        "dom.borrow_mut().add_style(vapors_dom::CompiledSheet::__compiled(SCOPE, STYLE,",
+        "dom.borrow_mut().add_style(vapors_elements::__wisp::dom::CompiledSheet::__compiled(SCOPE, STYLE,",
     );
     assert_lacks(&code, "create_keyed_element");
     assert_lacks(&code, "create_element");

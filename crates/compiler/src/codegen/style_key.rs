@@ -9,8 +9,6 @@
 //! `style` gets a key the same way, which it passes to the component
 //! (`component_anchor`); its other attributes are props, not carried.
 
-use std::fmt::Write;
-
 use super::emit::Emitter;
 use super::key_parts::key_parts;
 use crate::CompileError;
@@ -26,8 +24,6 @@ pub(crate) struct Keyed<'e> {
     pub(super) name: &'e str,
     /// Where `class:` directives past the limit can go instead.
     pub(super) elsewhere: String,
-    /// The tag names a type the script's `use` items bring in.
-    pub(super) reads_uses: bool,
     /// Whether the key carries the literal attributes (an element's;
     /// a component tag's are props).
     pub(super) carries_attributes: bool,
@@ -51,7 +47,6 @@ impl<'e> Keyed<'e> {
             tag: format!("{:?}", element.tag),
             name: &element.tag,
             elsewhere: "a child element".to_owned(),
-            reads_uses: false,
             carries_attributes: true,
             kind: KeyedKind::Element,
             attributes: &element.attributes,
@@ -64,7 +59,6 @@ impl<'e> Keyed<'e> {
             tag: format!("{}Props::ANCHOR_TAG", tag.name),
             name: &tag.name,
             elsewhere: format!("an element inside <{}>", tag.name),
-            reads_uses: true,
             carries_attributes: false,
             kind: KeyedKind::ComponentTag,
             attributes: &tag.attributes,
@@ -93,24 +87,11 @@ impl Emitter<'_> {
     pub(super) fn key_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
         let name = format!("KEY_{}", var.to_ascii_uppercase());
         let winners = self.winners_static(keyed, var)?;
-        let mut key = self.style_key(keyed, &winners)?;
-        if keyed.reads_uses {
-            key = format!("{{ {} {key} }}", self.script_uses());
-        }
-        self.keys
-            .push(format!("static {name}: vapors_dom::StyleKey = {key};"));
+        let key = self.style_key(keyed, &winners)?;
+        self.keys.push(format!(
+            "static {name}: vapors_elements::__wisp::dom::StyleKey = {key};"
+        ));
         Ok(name)
-    }
-
-    /// The script's `use` items, for a file-level static that names a
-    /// type they bring in (`MeshProps::ANCHOR_TAG`).
-    fn script_uses(&self) -> String {
-        let uses = self.script.statements.iter();
-        let uses = uses.filter(|statement| statement.starts_with("use "));
-        uses.fold(String::new(), |mut out, item| {
-            let _ = write!(out, "#[allow(unused_imports)] {item}");
-            out
-        })
     }
 
     /// `Winners::Compiled(&WINNERS_{VAR})` for an element, after adding
@@ -122,10 +103,10 @@ impl Emitter<'_> {
     /// after the analysis refused has none, and its output is dropped.
     fn winners_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
         if keyed.kind == KeyedKind::ComponentTag {
-            return Ok("vapors_dom::Winners::ComponentTag".to_owned());
+            return Ok("vapors_elements::__wisp::dom::Winners::ComponentTag".to_owned());
         }
         let Some(winners) = self.winners else {
-            return Ok("vapors_dom::Winners::Unanalysed".to_owned());
+            return Ok("vapors_elements::__wisp::dom::Winners::Unanalysed".to_owned());
         };
         let (line, column) = self.source.position(keyed.offset);
         let literal = winners.literal(line, column).ok_or_else(|| {
@@ -139,9 +120,11 @@ impl Emitter<'_> {
         let literal = literal.map_err(|why| self.source.error(keyed.offset, why))?;
         let name = format!("WINNERS_{}", var.to_ascii_uppercase());
         self.keys.push(format!(
-            "static {name}: vapors_dom::KeyWinners = {literal};"
+            "static {name}: vapors_elements::__wisp::dom::KeyWinners = {literal};"
         ));
-        Ok(format!("vapors_dom::Winners::Compiled(&{name})"))
+        Ok(format!(
+            "vapors_elements::__wisp::dom::Winners::Compiled(&{name})"
+        ))
     }
 
     fn style_key(&self, keyed: &Keyed, winners: &str) -> Result<String, CompileError> {
@@ -155,7 +138,7 @@ impl Emitter<'_> {
             .map(|(name, value)| format!("({name:?}, {value:?})"))
             .collect();
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
+            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
             keyed.tag,
             quoted(&parts.classes),
             quoted(&parts.toggles),

@@ -19,7 +19,7 @@ pub(crate) fn assemble(
         .style
         .as_ref()
         .map_or("", |section| section.text.as_str());
-    let mut file = header(component.site_name(), style);
+    let mut file = header(component.site_name(), style, (&component.name, info));
     let scope = component.style.as_ref().and(component.scope.as_ref());
     if let Some(scope) = scope {
         file.push_str(&super::shell_sheet::scope_constant(scope));
@@ -35,30 +35,29 @@ pub(crate) fn assemble(
     file.push_str(&component_struct(name, info));
     let registration = super::shell_sheet::registration(scope.is_some(), global, style);
     file.push_str(&mount_methods(name, info, body, &registration));
-    let uses: Vec<&String> = info
-        .statements
-        .iter()
-        .filter(|statement| statement.starts_with("use "))
-        .collect();
     file.push_str(&super::events_decl::events_method(
         &info.events,
         &super::events_decl::child_types(component),
-        &uses,
     ));
     file.push_str(&super::shell_methods::accessors());
     file.push_str(&super::shell_methods::drop_impl(name));
     file
 }
 
-fn header(path: &str, style: &str) -> String {
+fn header(path: &str, style: &str, (name, info): (&str, &ScriptInfo)) -> String {
+    let bound: Vec<&str> = info.uses.iter().map(|used| used.name.as_str()).collect();
+    let mut out = super::script_hoist::header_imports(&bound);
+    let own = [name.to_owned(), format!("{name}Props")];
+    for (item, names) in &info.use_items {
+        // a component that uses itself: the module defines the names
+        if names.iter().all(|used| own.contains(used)) {
+            continue;
+        }
+        out.push_str(item);
+        out.push('\n');
+    }
     format!(
-        "use std::cell::RefCell;
-use std::rc::Rc;
-#[allow(unused_imports)]
-use vapors_dom::{{Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
-#[allow(unused_imports)]
-use vapors_signals::{{Effect, Memo, Owner, Signal}};
-
+        "{out}
 /// The `<style>` of `{path}`, resolved at run time by the css crate.
 pub const STYLE: &str = {style:?};
 
@@ -76,8 +75,8 @@ fn props_struct(name: &str, info: &ScriptInfo) -> String {
     for prop in &info.props {
         let _ = writeln!(
             fields,
-            "    /// `{0}`, declared with `#[prop]`.\n    pub {0}: {1},",
-            prop.name, prop.ty
+            "    /// `{0}`, declared with `#[prop]` at `{2}`.\n    pub {0}: {1},",
+            prop.name, prop.ty, prop.at
         );
         let _ = writeln!(defaults, "            {}: {},", prop.name, prop.default);
     }

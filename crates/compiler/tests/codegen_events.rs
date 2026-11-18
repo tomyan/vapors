@@ -23,7 +23,10 @@ fn zero_arg_handler_is_wrapped() {
         &code,
         "listen(div0, \"click\", Box::new(move |_event: &mut Event|",
     );
-    assert_has(&code, "vapors_dom::handle_without_event(&increment)");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::handle_without_event(&increment)",
+    );
 }
 
 #[test]
@@ -40,7 +43,7 @@ fn event_aware_handler_is_called_with_the_event_and_its_result_reported() {
     // Then
     assert_has(
         &code,
-        "listen(div0, \"click\", Box::new(move |event: &mut Event| vapors_dom::handle(event, &handle_click)))",
+        "listen(div0, \"click\", Box::new(move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &handle_click)))",
     );
     assert_lacks(&code, "handle_click()");
 }
@@ -59,7 +62,7 @@ fn inline_closure_handler_is_called_with_the_event() {
     // Then
     assert_has(
         &code,
-        "Box::new(move |event: &mut Event| vapors_dom::handle(event, &move |_event| count.set(0)))",
+        "Box::new(move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &move |_event| count.set(0)))",
     );
 }
 
@@ -121,7 +124,7 @@ fn the_event_name_is_the_attribute_name_after_on() {
     // Then
     assert_has(
         &code,
-        "listen(input0, \"input\", Box::new(move |event: &mut Event| vapors_dom::handle(event, &typed)))",
+        "listen(input0, \"input\", Box::new(move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &typed)))",
     );
 }
 
@@ -152,5 +155,8 @@ fn a_handler_that_assigns_only_to_its_own_bindings_is_taken() {
     );
 
     // Then
-    assert_has(&code, "vapors_dom::handle_without_event(&bump)");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::handle_without_event(&bump)",
+    );
 }

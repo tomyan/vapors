@@ -42,14 +42,14 @@ fn an_elements_winners_list_the_user_agent_sheet_and_its_own_by_scope_hashed_as_
     // Then
     assert_has(
         &code,
-        "winners: vapors_dom::Winners::Compiled(&WINNERS_DIV0)",
+        "winners: vapors_elements::__wisp::dom::Winners::Compiled(&WINNERS_DIV0)",
     );
     // the own sheet, second, marked as the key's own for check 1
     assert_has(&code, "blocked_by: &[], own: Some(1) }");
     assert_has(
         &code,
         &format!(
-            "sheets: &[(vapors_dom::SheetRef::UserAgent, {}), (vapors_dom::SheetRef::Scope(SCOPE), {})]",
+            "sheets: &[(vapors_elements::__wisp::dom::SheetRef::UserAgent, {}), (vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE), {})]",
             hash(vapors_css::user_agent::TEXT),
             hash(STYLE)
         ),
@@ -66,11 +66,14 @@ fn an_always_declaration_is_a_base_winner_and_a_state_rule_is_left_to_run_time()
     assert_has(
         &code,
         &format!(
-            "vapors_dom::BaseWinner {{ property: vapors_dom::PropertyRef::Longhand({}), declaration: vapors_dom::DeclarationRef::Rule {{ rule: vapors_dom::RuleRef {{ sheet: 1, rule: 0 }}, declaration: 0 }} }}",
+            "vapors_elements::__wisp::dom::BaseWinner {{ property: vapors_elements::__wisp::dom::PropertyRef::Longhand({}), declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {{ rule: vapors_elements::__wisp::dom::RuleRef {{ sheet: 1, rule: 0 }}, declaration: 0 }} }}",
             longhand("color")
         ),
     );
-    assert_has(&code, "vapors_dom::RuleRef { sheet: 1, rule: 1 }]");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::RuleRef { sheet: 1, rule: 1 }]",
+    );
 }
 
 #[test]
@@ -82,7 +85,7 @@ fn the_literal_style_wins_as_an_inline_declaration() {
     assert_has(
         &code,
         &format!(
-            "vapors_dom::BaseWinner {{ property: vapors_dom::PropertyRef::Longhand({}), declaration: vapors_dom::DeclarationRef::Inline(1) }}",
+            "vapors_elements::__wisp::dom::BaseWinner {{ property: vapors_elements::__wisp::dom::PropertyRef::Longhand({}), declaration: vapors_elements::__wisp::dom::DeclarationRef::Inline(1) }}",
             longhand("color")
         ),
     );
@@ -98,7 +101,7 @@ fn a_component_tags_key_has_no_winners_as_its_props_type_decides_its_tag() {
     // Then
     assert_has(
         &code,
-        "attributes: &[], winners: vapors_dom::Winners::ComponentTag }",
+        "attributes: &[], winners: vapors_elements::__wisp::dom::Winners::ComponentTag }",
     );
 }
 
@@ -133,11 +136,14 @@ fn another_components_sheet_that_can_reach_an_element_is_listed_with_its_hash() 
     assert_has(
         &code,
         &format!(
-            "(vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"other.wisp\")), {})]",
+            "(vapors_elements::__wisp::dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"other.wisp\")), {})]",
             hash(other_style)
         ),
     );
-    assert_has(&code, "vapors_dom::RuleRef { sheet: 2, rule: 0 }]");
+    assert_has(
+        &code,
+        "vapors_elements::__wisp::dom::RuleRef { sheet: 2, rule: 0 }]",
+    );
 }
 
 #[test]
@@ -174,7 +180,7 @@ fn a_sheet_holding_a_rule_that_blocks_sharing_is_named_by_its_renumbered_index()
     assert_has(
         &code,
         &format!(
-            "(vapors_dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"b.wisp\")), {})]",
+            "(vapors_elements::__wisp::dom::SheetRef::Scope(concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"b.wisp\")), {})]",
             hash(blocking)
         ),
     );

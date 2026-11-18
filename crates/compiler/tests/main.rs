@@ -14,6 +14,7 @@ mod common_codegen;
 mod common_props;
 
 mod build_dir;
+mod build_dom_path;
 mod build_global;
 mod build_props;
 mod build_props_anchor;
@@ -38,6 +39,7 @@ mod codegen_events;
 mod codegen_key_winners;
 mod codegen_lints;
 mod codegen_names;
+mod codegen_page_scope;
 mod codegen_refusals;
 mod codegen_snapshot;
 mod codegen_snippet_refusals;

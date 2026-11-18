@@ -8,7 +8,7 @@ pub(super) fn accessors() -> String {
     /// or child component at the top level.
     #[must_use]
     pub fn roots(&self) -> Vec<NodeId> {
-        vapors_dom::current_nodes(&self.roots)
+        vapors_elements::__wisp::dom::current_nodes(&self.roots)
     }
 
     /// The top-level entries, for a parent that mounts this component

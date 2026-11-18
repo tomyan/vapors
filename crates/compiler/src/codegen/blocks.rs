@@ -39,8 +39,10 @@ impl Emitter<'_> {
             .roots
             .then(|| self.fresh(&format!("{function}_block")));
         match &handle {
-            Some(handle) => self.line(format!("let {handle} = vapors_dom::blocks::{function}(")),
-            None => self.line(format!("vapors_dom::blocks::{function}(")),
+            Some(handle) => self.line(format!(
+                "let {handle} = vapors_elements::__wisp::dom::blocks::{function}("
+            )),
+            None => self.line(format!("vapors_elements::__wisp::dom::blocks::{function}(")),
         }
         self.indent(1);
         handle
