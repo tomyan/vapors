@@ -19,22 +19,22 @@ No model has seen `.wisp` in training. Read these before writing any:
   properties, selectors and events that exist, generated from the
   source. Anything else is refused.
 - [reference/runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md): the Rust side: starting
-  the page, signals, the frame loop, and the 3D scene games draw with.
+  the page, signals, the frame loop, and the 3D scene.
 
 ## Set up, and start the first build at once
 
-The first build takes about a minute for a debug build and a minute and
-a half for a release build on 4 cores, so start it before designing
+The first build takes one to two minutes for a debug build and about
+two for a release build on 4 cores, so start it before designing
 anything. Run this block as it is, as your first action. It assumes
 x86_64 Linux, `curl` and `tar`.
 
 ```sh
 command -v rustup || curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
 export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
-mkdir -p mygame ~/.local/bin && cd mygame
+mkdir -p myapp ~/.local/bin && cd myapp
 base=https://raw.githubusercontent.com/tomyan/vapors/main/plugins/vapors/skills/vapors/starter
 for f in Cargo.toml Cargo.lock rust-toolchain.toml build.rs index.html shoot.mjs \
-         src/main.rs src/game.rs src/game_tests.rs src/shapes.rs src/view.rs src/page.wisp; do
+         src/main.rs src/shapes.rs src/view.rs src/page.wisp; do
   curl -fsSL --create-dirs -o "$f" "$base/$f"
 done
 cargo fetch   # installs the pinned toolchain and wasm target, downloads the crates
@@ -53,34 +53,32 @@ nohup trunk build --offline > build.log 2>&1 &   # the first debug build, in the
 prebuilt ones above are missing, rather than fetching others. Never
 `cargo install` these tools; it compiles them for minutes.
 
-The starter is a small 3D game: the arrow keys move a frog across a
-road of cars and a river of logs, seen through a perspective camera
-behind and above it, with the title, score and lives in HTML over the
-scene. Change it into what you are asked for. Keep the dependencies as
-they are:
+The starter is a hello page: one box turning slowly on the frame clock
+under a perspective camera, a heading over the scene, and a line
+showing the last key pressed. Build what you are asked for from it.
+Keep the dependencies as they are:
 
 - Every vapors crate is a git dependency at one `rev`. Keep that pin
   and keep them all equal; never switch to a branch or a path.
+- The vapors crates' default features are off; that takes about 3 MB
+  off the release wasm (5.4 MB for the starter).
 - `Cargo.lock` holds the versions this starter was built and
   screenshot with; keep it, and let cargo add to it.
-- Their default features are off; that keeps the release wasm at 5.5 MB
-  rather than 8.5 MB.
 - `rand` works in the browser through `getrandom`'s `wasm_js` feature,
   already set. Use `vapors_platform::Instant`, never
   `std::time::Instant`, which panics in the browser.
 
 | File | Holds |
 |---|---|
-| `src/game.rs` | the rules, plain Rust with no vapors types (tests in `game_tests.rs`) |
-| `src/page.wisp` | the view and the game loop: the scene, the keys, the HUD |
+| `src/page.wisp` | the view: the scene, the clock, the keys, the HTML over the scene |
 | `src/shapes.rs` | low-poly solids built in code: box, wedge, n-sided cylinder |
-| `src/view.rs` | where things are drawn: placing, the camera, the lens |
+| `src/view.rs` | the box's turn, the camera, the lens |
 | `src/main.rs` | builds the scene renderer and runs the page |
 | `index.html` | the page contract (runtime.md) |
 | `shoot.mjs` | the headless screenshot below |
 
-Keep game state in plain Rust and the view in `.wisp`, so `cargo test`
-checks the rules natively.
+Keep state and rules in plain Rust modules with unit tests, and the
+view in `.wisp`, so `cargo test` checks the rules natively.
 
 ## Check your work
 
@@ -91,7 +89,7 @@ After each change, in this order:
    second. Install it once, in the background since it compiles for a
    minute:
    `cargo install --locked --git https://github.com/tomyan/vapors --rev <the rev in Cargo.toml> vapors-compiler --bin wisp-check`.
-2. **`cargo test`** for the rules.
+2. **`cargo test`** for your own Rust.
 3. **`trunk build --offline`** (debug, into `dist/`). A rustc error in
    script code points at the generated file
    (`target/wasm32-unknown-unknown/debug/build/<crate>-*/out/wisp/page.rs`);
@@ -108,7 +106,7 @@ After each change, in this order:
    Open both PNGs and look at them. The script exits 1 and prints the
    message when the page shows an error in `#error`; some refusals
    (layout, CSS values) appear only there, when the page runs. Change
-   the keys and waits in `shoot.mjs` to exercise your own game.
+   the keys and waits in `shoot.mjs` to exercise your own page.
 
 `trunk serve --offline` rebuilds on save and serves on
 `http://127.0.0.1:8080`, a secure context, so WebGPU works there.
@@ -141,7 +139,7 @@ every page load waits 120 s.
 - The 3D scene has meshes, flat CSS colours and baked per-corner
   shades. It has no lights, shadows, textures, transparency or model
   files yet; do not imitate them. Build models from the starter's
-  shapes ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene-for-games)).
+  shapes ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene)).
 - In the browser, keys reach the page only while the canvas has
   focus. The starter's `index.html` focuses it when the page loads;
   keep that script.

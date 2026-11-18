@@ -1,7 +1,7 @@
 # The Rust side of a vapors page
 
 What an app's own Rust touches: starting a page in the browser, signals,
-the frame loop, and the 3D scene a game draws with. This page covers the
+the frame loop, and the 3D scene. This page covers the
 web build only. vapors also runs natively in a window (Linux, macOS,
 Windows) with the same code; this skill does not cover that yet.
 
@@ -17,7 +17,7 @@ let body = document.borrow().body();
 std::mem::forget(page::Page::mount(&document, body, page::PageProps { .. }));
 vapors_platform::app_draws_open();   // the page has no Open button
 vapors_platform::hide_status_line(); // #status would cover the page
-let options = WindowOptions { app_name: "dodge".into(), title: "dodge".into(), width: 640, height: 480 };
+let options = WindowOptions { app_name: "hello".into(), title: "hello".into(), width: 640, height: 480 };
 vapors_platform::run(options, app).map_err(|e| e.to_string())
 ```
 
@@ -71,33 +71,30 @@ most once per display refresh.
 the previous frame. While anything reads either, the page draws every
 display refresh; when the last reader unmounts, it idles again. A
 script reads them directly ([wisp.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/wisp.md#the-frame-clock)).
-The starter's loop, in `page.wisp`:
+The starter's turning box, in `page.wisp`:
 
 ```rust
+// the time since the first frame; reading it draws every display refresh
 let time = frame_time();
-let delta = frame_delta();
-// where every piece is: recomputed each frame
-let pieces: Memo<Vec<Piece>> = Memo::new(move || pieces_at(time.get().as_secs_f32()));
-// the rules, once a frame
-Effect::new(move || {
-    let dt = delta.get().as_secs_f32();
-    let mut next = world.get_untracked();
-    next.tick(&pieces_at(time.get_untracked().as_secs_f32()), dt);
-    world.set_if_changed(next);
-});
 ```
 
-The effect reads only `delta`, so it runs once a frame, and writes
-`world` only when the rules changed something.
+```html
+<Mesh geometry={cuboid.clone()} class="box"
+  transform={Signal::derived(move || turned(time.get().as_secs_f32() * 0.6))} />
+```
+
+To apply rules once a frame, read `frame_delta()` in an
+`Effect::new(move || ..)`, compute the new state from the current one
+(`get_untracked()`), and write it with `set_if_changed`, so the page
+redraws only when something changed.
 
 Read wall-clock time through `vapors_platform::Instant`, never
 `std::time::Instant`, which panics in the browser.
 
-## The 3D scene, for games
+## The 3D scene
 
 An element's position cannot follow a signal (`style={..}` is refused),
-so anything that moves is a mesh in a 3D scene, with HTML drawn over it
-for the title, score and lives. Reference:
+so anything that moves is a mesh in a 3D scene, with HTML drawn over it. Reference:
 [docs/scene3d.md](https://github.com/tomyan/vapors/blob/main/docs/scene3d.md).
 
 ### What the scene has, and what it does not
@@ -128,7 +125,7 @@ facing away, faces pointing down darkest.
 Make each once in `main.rs` (`Shapes::new`), pass the handles to the
 page as a prop, and place, turn and scale copies with transforms. Build
 a model from several meshes inside a `<Group>`, which moves them
-together: the starter's car is a box with a wedge on top. Keep the
+together, such as a box with a wedge on top. Keep the
 style smooth low-poly: a few chamfered or sloped shapes read better
 than stacked cubes. For a new shape, add a function beside these that
 lists its faces as convex polygons, counter-clockwise seen from
@@ -157,29 +154,26 @@ on the page's `<gpu-surface name="view">`.
   `Transform::from_translation(v)` (`Vec3`, `Quat` from
   `vapors-scene3d`) return a `Result`: a non-finite value is refused.
 - Conventions: right-handed, +X right, +Y up, +Z towards the viewer; a
-  camera looks down its own -Z. The starter's camera sits behind the
-  start row and above it, turned about X by -0.62 radians to look down
-  at the lanes.
+  camera looks down its own -Z. The starter's camera sits in front of
+  the box and above it, turned about X by -0.42 radians to look down
+  at it.
 
 ### In the template
 
-From the starter's `page.wisp`; `at`, `heading` and `lying` are its
-own helpers in `view.rs`.
+From the starter's `page.wisp`; `camera` and `turned` are its own
+helpers in `view.rs`.
 
 ```html
 <gpu-surface name="view" class="view"></gpu-surface>
 <Scene scene={scene} surface={surface} camera={eye}>
-  <Camera handle={eye} projection={lens} transform={Signal::new(behind())} />
-  {for piece in pieces.get()}
-    <Group transform={Signal::derived(move || { let p = piece.get(); at((p.x, 0.0, p.row as f32), heading(p.speed), (1.0, 1.0, 1.0)) })}>
-      <Mesh geometry={cuboid.clone()} class="car"
-        transform={Signal::new(at((0.0, 0.25, 0.0), 0.0, (0.75, 0.45, 1.3)))} />
-      <Mesh geometry={wedge.clone()} class="cabin"
-        transform={Signal::new(at((0.0, 0.62, 0.0), 0.0, (0.6, 0.3, 0.6)))} />
-    </Group>
-  {/for}
+  <Camera handle={eye} projection={lens} transform={Signal::new(camera())} />
+  <Mesh geometry={cuboid.clone()} class="box"
+    transform={Signal::derived(move || turned(time.get().as_secs_f32() * 0.6))} />
 </Scene>
 ```
+
+Several meshes inside `<Group transform={..}>` move together, and a
+`{for}` of meshes or groups adds and removes them with a list.
 
 | Tag | Props |
 |---|---|
@@ -194,9 +188,8 @@ own helpers in `view.rs`.
   `class:name={..}` on the tag, from the component's `<style>`. These
   rules are not checked at build time (#512).
 - A transform that changes is a `Signal::derived(move || ..)`; each
-  change redraws only that node. A `{for}` of meshes or groups adds and
-  removes them with the list.
+  change redraws only that node.
 - The props of these tags are checked by rustc, not by `wisp-check`,
   so a wrong prop name shows up as a rustc error in the generated file.
-- Put the HUD after the `<Scene>`, positioned absolutely over the
-  `gpu-surface`.
+- Put HTML that goes over the scene after the `<Scene>`, positioned
+  absolutely over the `gpu-surface`.

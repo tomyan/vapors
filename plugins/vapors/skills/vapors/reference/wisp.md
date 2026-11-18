@@ -8,8 +8,8 @@ what CSS, elements and events exist is in [supported.md](https://github.com/tomy
 
 A component is one file: an optional `<script>` (Rust), an optional
 `<style>` (CSS), then the template (HTML). The file name gives the type:
-`score-board.wisp` or `score_board.wisp` is `ScoreBoard`, in the module
-`score_board`, with props struct `ScoreBoardProps`.
+`text-field.wisp` or `text_field.wisp` is `TextField`, in the module
+`text_field`, with props struct `TextFieldProps`.
 
 `counter.wisp`:
 
@@ -109,8 +109,8 @@ inside the `{else}`.
 
 ```html
 <script>
-let lives: Signal<u32> = Signal::new(3);
-let lose = move || lives.update(|n| *n = n.saturating_sub(1));
+let stock: Signal<u32> = Signal::new(3);
+let sell = move || stock.update(|n| *n = n.saturating_sub(1));
 </script>
 
 <style>
@@ -118,16 +118,16 @@ let lose = move || lives.update(|n| *n = n.saturating_sub(1));
 </style>
 
 <div class="column">
-  {if lives.get() == 0}
-    <p>Game over</p>
+  {if stock.get() == 0}
+    <p>Sold out</p>
   {else}
-    {if lives.get() == 1}
-      <p>Last life</p>
+    {if stock.get() == 1}
+      <p>Last one</p>
     {else}
-      <p>{lives} lives</p>
+      <p>{stock} left</p>
     {/if}
   {/if}
-  <button onclick={lose}>Lose a life</button>
+  <button onclick={sell}>Sell one</button>
 </div>
 ```
 
@@ -145,13 +145,13 @@ harmless.
 
 ```html
 <script>
-use crate::Score;
+use crate::Task;
 
-let scores: Signal<Vec<Score>> = Signal::new(vec![
-    Score { id: 1, name: "Ada".into(), points: 40 },
-    Score { id: 2, name: "Bo".into(), points: 25 },
+let tasks: Signal<Vec<Task>> = Signal::new(vec![
+    Task { id: 1, title: "Write the page".into(), done: true },
+    Task { id: 2, title: "Publish it".into(), done: false },
 ]);
-let shuffle = move || scores.update(|all| all.reverse());
+let reverse = move || tasks.update(|all| all.reverse());
 </script>
 
 <style>
@@ -159,11 +159,11 @@ let shuffle = move || scores.update(|all| all.reverse());
 </style>
 
 <div class="column">
-  {for (i, score) in scores.get() key=score.id}
-    <p class="row" class:first={i.get() == 0}>{i} {score.get().name}: {score.get().points}</p>
+  {for (i, task) in tasks.get() key=task.id}
+    <p class="row" class:done={task.get().done}>{i}. {task.get().title}</p>
   {/for}
   {for word in ["a", "b", "c"]}<span>{word}</span>{/for}
-  <button onclick={shuffle}>Reverse</button>
+  <button onclick={reverse}>Reverse</button>
 </div>
 ```
 
@@ -243,13 +243,13 @@ let save = move |_: &mut Event| -> Result<(), String> {
 
 ### Keys for the whole page: `<vapors:window>`
 
-A game reads keys whatever has focus. `<vapors:window onkeydown={..}
-onkeyup={..} />` at the top level of a template hears every key event
-the page gets, after the focused element's listeners (an event they
+To read keys whatever has focus, put `<vapors:window onkeydown={..}
+onkeyup={..} />` at the top level of a template. It hears every key
+event the page gets, after the focused element's listeners (an event they
 stopped with `stop_propagation` does not reach it). The handlers take
 `&mut Event` or nothing. One per component; not inside an element,
 `{if}`, `{for}`, a snippet or a component tag. Call
-`event.prevent_default()` for the keys the game uses.
+`event.prevent_default()` for the keys the page uses.
 
 `window_keys.wisp`:
 
@@ -376,7 +376,7 @@ let names: Signal<Vec<String>> = Signal::new(vec!["Ada".into(), "Bo".into()]);
   {snippet badge(name: String, rank: usize)}
     <span class="badge">{rank}. {name}</span>
   {/snippet}
-  <Card title={"Players".to_string()}>
+  <Card title={"People".to_string()}>
     {for (i, name) in names.get()}{render badge(name.get(), i.get() + 1)}{/for}
   </Card>
 </div>

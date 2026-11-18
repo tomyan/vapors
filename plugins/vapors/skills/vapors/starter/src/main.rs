@@ -1,8 +1,7 @@
-//! The page: a 3D scene seen from behind and above the player, with the
-//! title, score and lives in HTML over it. `page.wisp` holds the view,
-//! the keys and the game loop; this file builds what the scene needs.
+//! The page: a box turning in a 3D scene, with HTML over it. `page.wisp`
+//! holds the view, the clock and the keys; this file builds what the
+//! scene needs and runs the page.
 
-mod game;
 mod shapes;
 mod view;
 
@@ -50,8 +49,8 @@ fn start() -> Result<(), String> {
     app_draws_open();
     hide_status_line();
     let options = WindowOptions {
-        app_name: "dodge".into(),
-        title: "dodge".into(),
+        app_name: "hello".into(),
+        title: "hello".into(),
         width: 960,
         height: 640,
     };
