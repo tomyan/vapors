@@ -144,7 +144,8 @@ impl Document {
         Some((bounds, role))
     }
 
-    /// A slider's or spinbutton's range: the element's, else its
+    /// A slider's or spinbutton's range: a range input's, a number
+    /// field's `min` and `max` when it has both, else its
     /// `aria-valuemin` and `aria-valuemax`.
     fn ax_range(&self, node: NodeId, role: &str) -> Option<AxRange> {
         if role != "slider" && role != "spinbutton" {
@@ -155,6 +156,10 @@ impl Document {
                 min: range.min,
                 max: range.max,
             });
+        }
+        let field = self.number_field(node);
+        if let Some((Some(min), Some(max))) = field.map(|field| (field.min, field.max)) {
+            return Some(AxRange { min, max });
         }
         let number = |name: &str| self.attribute(node, name)?.parse::<f64>().ok();
         Some(AxRange {

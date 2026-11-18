@@ -92,23 +92,55 @@ fn states_and_a_description_are_aria_attributes_and_live_roles_are_off() {
 }
 
 #[test]
-fn a_ranged_role_without_a_value_or_range_is_refused_naming_it() {
+fn a_ranged_role_without_a_value_is_refused_naming_it() {
     // Given
-    let mut slider = node(5, None, "spinbutton", "Amount");
-    slider.range = Some(AxRange { min: 0.0, max: 9.0 });
+    let mut spinbutton = node(5, None, "spinbutton", "Amount");
+    spinbutton.range = Some(AxRange { min: 0.0, max: 9.0 });
 
     // When
-    let refused = attributes(&slider).expect_err("no value");
+    let refused = attributes(&spinbutton).expect_err("no value");
 
     // Then
     assert!(
         refused.contains("spinbutton \"Amount\" has no value"),
         "{refused}"
     );
+}
+
+#[test]
+fn a_slider_without_a_range_is_refused_naming_where_the_take_refuses() {
+    // Given ARIA reads a slider with no range as 0 to 100
+    let mut slider = node(5, None, "slider", "Radius");
     slider.value = Some("1".to_owned());
-    slider.range = None;
+
+    // When
     let refused = attributes(&slider).expect_err("no range");
-    assert!(refused.contains("has no range"), "{refused}");
+
+    // Then
+    assert!(
+        refused.contains("slider \"Radius\" has no range"),
+        "{refused}"
+    );
+    assert!(
+        refused.contains("crates/elements/src/a11y_mirror_roles.rs"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn a_spinbutton_without_a_range_carries_its_value_and_no_bounds() {
+    // Given a number field with no min or max: ARIA requires neither
+    let mut spinbutton = node(5, None, "spinbutton", "Amount");
+    spinbutton.value = Some("3".to_owned());
+
+    // Then
+    let set = set(&spinbutton);
+    assert!(set.contains(&"aria-valuenow=3".to_owned()), "{set:?}");
+    assert!(
+        !set.iter()
+            .any(|attribute| attribute.starts_with("aria-valuem")),
+        "{set:?}"
+    );
 }
 
 #[test]

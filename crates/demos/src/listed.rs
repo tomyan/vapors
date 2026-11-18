@@ -53,78 +53,74 @@ const fn app(name: &'static str, title: &'static str, line: &'static str) -> Lis
 
 /// Every demo, in order.
 pub const DEMOS: &[Listed] = &[
-    elements("hello", "Hello", "F2c S1: a styled panel with text"),
-    elements(
-        "counter",
-        "Counter",
-        "F2c S2: a button that counts clicks and taps",
-    ),
+    elements("hello", "Hello", "A styled panel with text"),
+    elements("counter", "Counter", "A button that counts clicks and taps"),
     elements(
         "boxes",
         "Boxes",
-        "F2c S3: borders, rounded corners, shadows, buttons",
+        "Borders, rounded corners, shadows, buttons",
     ),
     elements(
         "shell",
         "Shell",
-        "F2c S4: an editor shell, a grid that drops its panel on a phone",
+        "An editor shell, a grid that drops its panel on a phone",
     ),
     elements(
         "panel",
         "Panel",
-        "F2c S5: nested components, each with its own scoped CSS",
+        "Nested components, each with its own scoped CSS",
     ),
     elements(
         "text",
         "Text",
-        "F2c S6: a paragraph of bold, italic and code, and a word you can tap",
+        "A paragraph of bold, italic and code, and a word you can tap",
     ),
     elements(
         "stress",
         "Stress",
-        "F2c S7: 1,000 elements, a counter ticking every frame, and how long each update takes",
+        "1,000 elements, a counter ticking every frame, and how long each update takes",
     ),
     elements(
         "toasts",
         "Toasts",
-        "F2c S8: toasts raised above the shell, each kept until dismissed",
+        "Toasts raised above the shell, each kept until dismissed",
     ),
     elements(
         "scroll",
         "Scroll",
-        "F2c S9: two long lists, each scrolling in its own region by wheel and finger",
+        "Two long lists, each scrolling in its own region by wheel and finger",
     ),
     elements(
         "images",
         "Images",
-        "F2c S10: a history list with a thumbnail per turn",
+        "A history list with a thumbnail per turn",
     ),
     elements(
         "cards",
         "Cards",
-        "1-R1: cards whose contents their parent passes as children",
+        "Cards whose contents their parent passes as children",
     ),
     elements(
         "slider",
         "Slider",
-        "3-E3a: a range input bound to a signal, dragged and stepped by key",
+        "A range input bound to a signal, dragged and stepped by key",
     ),
     elements(
         "checkbox",
         "Checkbox",
-        "3-E3b: checkboxes bound to signals, toggled by click or Space",
+        "Checkboxes bound to signals, toggled by click or Space",
     ),
     elements(
         "number",
         "Number",
-        "3-E3c: number fields, one typed into and one scrubbed, bound to signals",
+        "Number fields, one typed into and one scrubbed, bound to signals",
     ),
     elements(
         "field",
         "Field",
-        "E6a: a text field bound to a signal, with a caret, a selection and word moves",
+        "A text field bound to a signal, with a caret, a selection and word moves",
     ),
-    app("image", "Image", "F0: the image view, pinch and drag"),
+    app("image", "Image", "The image view, pinch and drag"),
     app(
         "one-scene",
         "One scene",
