@@ -192,8 +192,8 @@ fn each_change_is_judged_as_the_brief_says() {
 
 #[test]
 fn growth_over_the_percentage_and_under_the_floor_passes() {
-    // Given: +4.9% of 100,000 is 4,900, under the 5,000 floor
-    let scaling = scaling([100_000, 104_900, 104_900]);
+    // Given: +6.4% of 100,000 is 6,400, under the 6,500 floor
+    let scaling = scaling([100_000, 106_400, 106_400]);
 
     // When
     let violations = scaling.violations(Judged::EveryPhase).expect("judged");
@@ -204,8 +204,8 @@ fn growth_over_the_percentage_and_under_the_floor_passes() {
 
 #[test]
 fn growth_over_the_percentage_and_the_floor_fails() {
-    // Given: +5,001 is over the floor and 5.001% of 100,000
-    let scaling = scaling([100_000, 105_001, 105_001]);
+    // Given: +6,501 is over the floor and 6.501% of 100,000
+    let scaling = scaling([100_000, 106_501, 106_501]);
 
     // When
     let violations = scaling.violations(Judged::EveryPhase).expect("judged");

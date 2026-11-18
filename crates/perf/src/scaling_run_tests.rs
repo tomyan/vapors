@@ -63,7 +63,7 @@ fn the_apps_other_frame_phases_are_judged_with_the_rest() {
 
 #[test]
 fn an_app_phase_that_grows_with_the_page_is_a_violation() {
-    // Given: tick flat at 1000 rows, 6000 instructions up at 10,000
+    // Given: tick flat at 1000 rows, 7000 instructions up at 10,000
     let small = at_size(
         1000,
         &counted(&[("update", 100), ("tick", 100)]),
@@ -71,7 +71,7 @@ fn an_app_phase_that_grows_with_the_page_is_a_violation() {
     );
     let large = at_size(
         10_000,
-        &counted(&[("update", 100), ("tick", 6100)]),
+        &counted(&[("update", 100), ("tick", 7100)]),
         &EVERY_PHASE,
     );
     let sizes = [small.expect("known"), large.expect("known")];
