@@ -13,7 +13,7 @@ fn success_prints_a_rerun_line_per_input() {
     write(&src, "counter.wisp", COUNTER);
 
     // When
-    let report = build_script_report(&src, Some(out.into_os_string()));
+    let report = build_script_report(&src, Some(out.into_os_string()), None);
 
     // Then
     assert!(!report.failed);
@@ -37,7 +37,7 @@ fn a_refusal_is_printed_rustc_style_and_fails() {
     write(&src, "a.wisp", "<blink></blink>");
 
     // When
-    let report = build_script_report(&src, Some(out.into_os_string()));
+    let report = build_script_report(&src, Some(out.into_os_string()), None);
 
     // Then
     assert!(report.failed);
@@ -63,7 +63,7 @@ fn a_missing_out_dir_fails_and_names_it() {
     write(&src, "counter.wisp", COUNTER);
 
     // When
-    let report = build_script_report(&src, None);
+    let report = build_script_report(&src, None, None);
 
     // Then
     assert!(report.failed);

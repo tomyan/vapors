@@ -18,6 +18,7 @@
 mod dom_path;
 mod files;
 mod modules;
+mod notes;
 mod tree;
 
 use std::ffi::OsString;
@@ -90,16 +91,19 @@ pub fn compile_dir_global(src: impl AsRef<Path>) {
 }
 
 fn run(src: &Path, under: Option<&str>, (styles, dom): (Styles, DomPath)) {
+    println!("cargo::rerun-if-env-changed=WISP_NOTES");
     let src = resolve_src(src, std::env::var_os("CARGO_MANIFEST_DIR"));
-    let report = match under.map(out_dir_under).transpose() {
-        Ok(under) => {
+    let notes = notes::notes_wanted(std::env::var_os("WISP_NOTES"));
+    let under = under.map(out_dir_under).transpose();
+    let report = match (under, notes) {
+        (Ok(under), Ok(notes)) => {
             let out_dir = std::env::var_os("OUT_DIR").map(|out| match under {
                 Some(under) => Path::new(&out).join(under).into_os_string(),
                 None => out,
             });
-            styled_report(&src, out_dir, (styles, dom))
+            styled_report(&src, out_dir, (styles, dom), notes)
         }
-        Err(refusal) => failed(&src, vec![refusal]),
+        (Err(refusal), _) | (_, Err(refusal)) => failed(&src, vec![refusal]),
     };
     for line in &report.stdout {
         println!("{line}");
@@ -122,16 +126,25 @@ pub fn resolve_src(src: &Path, manifest_dir: Option<OsString>) -> PathBuf {
     }
 }
 
-/// The lines [`compile_dir`] prints, given the value of `OUT_DIR`.
+/// The lines [`compile_dir`] prints, given the values of `OUT_DIR` and
+/// `WISP_NOTES`.
 #[must_use]
-pub fn build_script_report(src: &Path, out_dir: Option<OsString>) -> BuildScriptReport {
-    styled_report(src, out_dir, (Styles::Scoped, DomPath::Elements))
+pub fn build_script_report(
+    src: &Path,
+    out_dir: Option<OsString>,
+    notes: Option<OsString>,
+) -> BuildScriptReport {
+    match notes::notes_wanted(notes) {
+        Ok(notes) => styled_report(src, out_dir, (Styles::Scoped, DomPath::Elements), notes),
+        Err(refusal) => failed(src, vec![refusal]),
+    }
 }
 
 fn styled_report(
     src: &Path,
     out_dir: Option<OsString>,
     (styles, dom): (Styles, DomPath),
+    notes: bool,
 ) -> BuildScriptReport {
     let Some(out_dir) = out_dir else {
         return failed(src, vec![missing_out_dir()]);
@@ -140,12 +153,7 @@ fn styled_report(
         Ok(compiled) => BuildScriptReport {
             stdout: rerun_lines(&compiled.inputs)
                 .into_iter()
-                .chain(
-                    compiled
-                        .unchecked
-                        .iter()
-                        .map(|note| format!("cargo::warning={note}")),
-                )
+                .chain(notes::warning_lines(&compiled.unchecked, notes))
                 .collect(),
             stderr: Vec::new(),
             failed: false,
