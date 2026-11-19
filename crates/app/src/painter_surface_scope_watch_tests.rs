@@ -157,7 +157,7 @@ fn a_scope_resolved_when_popped_is_read_at_once_and_wakes_nothing() {
     let scope = Box::pin(ready(Some(error("bad bind group"))));
 
     // When
-    let mut watched = Watched::new(scope, &waker);
+    let mut watched = Watched::new(scope, None, &waker);
 
     // Then
     assert!(matches!(watched.outcome(), Outcome::Caught(_)));
@@ -169,7 +169,7 @@ fn natively_an_unresolved_scope_is_read_on_a_later_outcome() {
     // Given
     let (_, waker) = counting();
     let late = Late::default();
-    let mut watched = Watched::new(Box::pin(late.clone()), &waker);
+    let mut watched = Watched::new(Box::pin(late.clone()), None, &waker);
     let before = watched.outcome();
 
     // When

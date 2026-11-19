@@ -172,7 +172,7 @@ impl Mounted {
         // paying for the renderer's uploads and first draws (R3a2: the
         // racer's world made frame 0 18.7 ms at 4 samples without it)
         let renderer = &mut self.renderer;
-        self.scopes.run(device, turn, || {
+        self.scopes.run_submitting(device, Some(queue), turn, || {
             render_at_start(renderer, (device, queue), backing)
         })?;
         self.stale = false;
@@ -208,9 +208,11 @@ impl Mounted {
     ) -> Result<(), Refusal> {
         let backing = self.backing.as_ref().expect("allocated before rendering");
         let renderer = &mut self.renderer;
-        self.scopes.run(target.device, turn, || {
-            render_into(renderer, target, backing, work)
-        })?;
+        let device = target.device;
+        self.scopes
+            .run_submitting(device, Some(target.queue), turn, || {
+                render_into(renderer, target, backing, work)
+            })?;
         self.stale = false;
         Ok(())
     }
