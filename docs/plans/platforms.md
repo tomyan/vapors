@@ -24,7 +24,8 @@ canvas, and drives one `App` (`crates/platform/src/window.rs`). The
 handler creates the window in `resumed` once and never handles
 `suspended` (`crates/platform/src/handler_events.rs`); that is right on
 desktops, where `suspended` does not come, and wrong on Android and
-iOS, where the surface is destroyed on suspend (section 3).
+iOS, where the surface is destroyed on suspend (section 3). The phone
+hosts would not use this handler at all (3.5).
 
 **GPU.** Natively `wgpu::Backends::PRIMARY` (Vulkan, Metal, DX12), on
 the web `BROWSER_WEBGPU` with no WebGL fallback
@@ -95,8 +96,9 @@ iOS backends compile by target with no feature, and Android needs
 `android-native-activity` or `android-game-activity`, neither
 enabled, so an Android build fails today at winit. The lock already
 carries `objc2`, `jni`, `ndk` and `android-activity` through winit
-(`Cargo.lock`), so the FFI crates the phone shims need add nothing
-new to the dependency tree.
+(`Cargo.lock`), so the FFI crate the phone hosts need would add little
+to the dependency tree, and the Android feature of winit is not needed
+once phones leave winit (3.5).
 
 **Threading.** The UI thread owns the graph, the tree, the scene and
 queue submission (`docs/design/02-scheduler-frame-threading.md`,
@@ -119,7 +121,9 @@ touche's decisions (`~/projects/touche/DESIGN.md`, `docs/MVP.md`):
   minimum-functionality rule, so the native build is the iOS path when
   scheduled (`DESIGN.md` 7., "Noted 2026-10-22"). Tom's assessment of
   the iOS native build is there too: medium-large, mostly glue, Android
-  first because the Pixel is here.
+  first because the Pixel is here. Tom decided on 2026-11-19 that the
+  native phone builds are a library inside thin Kotlin and Swift hosts
+  (3.5; `docs/decisions/2026-11-19-phones-as-library.md`).
 - The app shell is a fixed viewport with safe-area insets as padding,
   the on-screen keyboard resizing the viewport, rotation keeping the
   zoom (`DESIGN.md` 3., "App shell").
@@ -289,16 +293,51 @@ code at 90d1c8a; "gap" means a slice in section 7.
 
 ### 3.5 Android
 
-- Windowing and entry: winit's Android backend needs
-  `android-native-activity` or `android-game-activity` (`Cargo.toml`
-  enables neither) and an `android_main(app: AndroidApp)` entry with
-  `EventLoop::builder().with_android_app(app)`. The entry attribute
-  under edition 2024 is `#[unsafe(no_mangle)]`, which
-  `unsafe_code = "forbid"` refuses, so the entry and every JNI call
-  live in one crate, `vapors-android`, with the lint relaxed in its
-  `Cargo.toml` and the reason in its `lib.rs`; app code never sees
-  it. The window is created in `resumed` and dropped in `suspended`,
-  every time (A3, on S2).
+**The approach for both phones.** On Android and iOS vapors would be a
+library inside a thin host written in the platform's language (Kotlin,
+Swift), not an app that owns the process through winit. The reasons:
+
+- winit gives little on phones: no IME or soft keyboard on Android or
+  iOS, no pickers, no clipboard. Every one of those is a platform API
+  that a host in Kotlin or Swift calls directly (`InputConnection`,
+  `UITextInput`, the pickers, `ClipboardManager`, `UIPasteboard`);
+  with winit each would be bridged back into Rust through JNI or
+  objc2.
+- The winit plan already needed a Gradle project with Kotlin or Java
+  activity code (A1, A5, D7) and an Xcode project (I1). The platform
+  languages are in the build either way.
+- `accesskit_android` and `accesskit_ios` attach to a host `View` or
+  `UIView`; a host-owned view is where they would attach.
+
+What it would cost, stated so the slices can be judged against it:
+
+- Phones leave winit, so vapors needs an embedding API: the host hands
+  a surface (a `SurfaceView` or `CAMetalLayer`) through
+  `raw-window-handle` to wgpu, and forwards input, lifecycle and
+  insets as calls. Frames would be on demand, matching `Next::Wait`:
+  the host draws when the app asks and not on a timer of its own.
+- Desktop stays on winit, so `App` has two drivers (three with the web
+  driver, `docs/decisions/2026-11-18-web-driver.md`). Each translates
+  its platform into the same events and frame contract; none would
+  branch inside the app.
+- Embedding vapors views in an existing app (UIKit, SwiftUI, Android
+  Views, Compose) may need more than one `App` and surface in a
+  process. `vapors-platform` drives one `App` in one window today
+  (section 1); whether that can be lifted is E3's question, and until
+  it is answered the claim "embeddable in existing apps" is only
+  proven for one view per process.
+- The FFI boundary is one crate (uniffi or a C ABI; E1 picks) with the
+  relaxed `unsafe` guard declared in its `Cargo.toml` and the reason
+  in its `lib.rs`, where the boundary runs. App code never sees it.
+
+**Android.**
+
+- Entry and windowing: the host is a Kotlin `Activity` (or a Compose
+  or View `ViewGroup` for an embedded view) holding a `SurfaceView`.
+  Its `SurfaceHolder.Callback` would call the library on surface
+  created, changed and destroyed; the library creates the wgpu surface
+  from the `ANativeWindow` and drops it on destroy (S2's table). No
+  `android_main`, no winit activity feature, no `GameActivity`.
 - GPU: Vulkan only (`PRIMARY` has no GLES), so a device without a
   Vulkan driver is refused by name, consistent with "no fallback". The
   Pixel 9 Pro's Mali (Valhall) reported 16384 and f16 under Chrome's
@@ -306,78 +345,86 @@ code at 90d1c8a; "gap" means a slice in section 7.
   wgpu's Vulkan backend reports natively is A2's first line. A
   known-bad driver list is `DESIGN.md`'s condition; it starts empty and
   grows from refusals seen on devices, never from guesses.
-- Text input and IME: winit has no IME on Android. `GameActivity`
-  (the `android-game-activity` feature; `android-activity`'s
-  `text_input_state`, `set_text_input_state`, `show_soft_input`)
-  carries the soft keyboard and composition; `NativeActivity` carries
-  nothing. The bridge is `text_bridge_web.rs`'s shape against that
-  state (A4). GameActivity needs its Java class from the Android Game
-  Development Kit in the APK, so the build is a Gradle project that
-  links the Rust library (`cargo ndk`), not `cargo-apk` (D7).
-- Clipboard: arboard has no Android; `ClipboardManager` through JNI
-  in `vapors-android`.
-- Files: rfd has no Android; the Photo Picker and
-  `ACTION_OPEN_DOCUMENT` return through an activity result, which
-  needs a Java or Kotlin method in the Gradle project's activity and
-  a JNI call back; export through `ACTION_CREATE_DOCUMENT` or the
-  share sheet the same way (A5).
+- Text input and IME: the host view would implement
+  `onCreateInputConnection` and an `InputConnection` for the focused
+  field, showing and hiding the soft keyboard through
+  `InputMethodManager`. Composition and selection go to the library as
+  `Event::TextEdited`, the same events `text_bridge_web.rs` produces
+  (A4).
+- Clipboard: `ClipboardManager` called from the host; the text or image
+  reaches the library as the answer to a clipboard request, with the
+  three states and the deadline of `07-platform-services.md`.
+- Files: the Photo Picker, `ACTION_OPEN_DOCUMENT` and
+  `ACTION_CREATE_DOCUMENT` or the share sheet run in the host's
+  activity with the standard result callbacks; the bytes reach the
+  library as `Event::FileOpened` (A5).
 - Menus: in-app.
-- Accessibility: `accesskit_android` (`05-accessibility.md` names it
-  available as of 2026-10-25; its winit integration is checked in A6).
-  TalkBack on the Pixel by hand; `adb shell uiautomator dump` reads
-  the tree for a scripted check.
+- Accessibility: `accesskit_android` attached to the host `View`, fed
+  `AxUpdate` through the FFI crate (`05-accessibility.md` names the
+  crate available as of 2026-10-25; that it works with a host view is
+  a claim in section 10, checked in A6). TalkBack on the Pixel by
+  hand; `adb shell uiautomator dump` reads the tree for a scripted
+  check.
 - Packaging and store: an App Bundle (`.aab`), Play App Signing, the
   64-bit requirement, a target API level Play moves up yearly; the
-  Gradle project owns all of it. The Trusted Web Activity listing of
-  the web page is the alternative with no native build (D3).
+  host's Gradle project owns all of it. The Trusted Web Activity
+  listing of the web page is the alternative with no native build
+  (D3).
 - Updates: Play. A sideloaded APK during development uses S5's check
   with no download.
-- Lifecycle: `suspended` destroys the surface and `resumed` recreates
-  it (S2, A3); `onTrimMemory` and low-memory kills make the proxy
+- Lifecycle: the host forwards `onPause`, `onResume`, surface
+  destruction and `onTrimMemory`; low-memory kills make the proxy
   pipeline the condition for large files (`DESIGN.md` 7.); rotation is
-  a resize and a scale event, which `handler_events.rs` already
-  requests a frame for.
-- Safe areas: the display cutout and system bars through
-  `WindowInsets` (JNI), into `Environment` as `env(safe-area-inset-*)`
-  (S3); the soft keyboard resizing the viewport is
-  `windowSoftInputMode="adjustResize"` in the manifest, the native
-  counterpart of `interactive-widget=resizes-content`.
-- Touch: winit `Touch` into `gestures.rs`, the same recogniser the
-  web uses. Built.
+  a size and a scale call, each asking for a frame.
+- Safe areas: the host reads `WindowInsets` (display cutout, system
+  bars, soft keyboard) and passes them in; the library puts them in
+  `Environment` as `env(safe-area-inset-*)` (S3). The host handles the
+  keyboard resize through `windowSoftInputMode="adjustResize"` or the
+  insets, the native counterpart of `interactive-widget=resizes-content`.
+- Touch: the host forwards `MotionEvent`s as pointer and touch events
+  to the library, into `gestures.rs`, the same recogniser the web
+  uses.
 
 ### 3.6 iOS
 
-- Windowing and entry: winit's UIKit backend, main thread. The app is
-  built from an Xcode project or by cargo-mobile2 or xbuild, which
-  generate one; the project owns signing, provisioning, the icon set
-  and the launch screen. Nothing here can build it: no Mac.
+The approach and its costs are in 3.5.
+
+- Entry and windowing: the host is a Swift app: a `UIViewController`
+  with a `UIView` whose layer is a `CAMetalLayer`, or a
+  `UIViewRepresentable` for SwiftUI. The host owns the main thread and
+  the run loop (the model assumes the UI thread), the signing, the
+  icon set and the launch screen. The library creates the wgpu surface
+  from the layer. Nothing here can build: no Mac.
 - GPU: Metal. Apple kills an app that renders while backgrounded and
   jettisons one that grows past a few GB (`DESIGN.md` 7., "two to
   three gigabytes"), so S2's suspend path and the proxy pipeline are
-  conditions.
-- Text input and IME: winit has no soft keyboard or IME on iOS
-  (`DESIGN.md` 7., `03-events-focus-input-ime.md`). A `UITextInput`
-  bridge through objc2 in `vapors-ios`, the same shape as the web
-  textarea bridge (I3).
-- Clipboard: `UIPasteboard` through objc2 (arboard: no iOS). Files:
+  conditions. The host would stop drawing on
+  `UIApplication.didEnterBackgroundNotification` and tell the library.
+- Text input and IME: the host view adopts `UIKeyInput` or
+  `UITextInput` for the focused field and shows the keyboard with
+  `becomeFirstResponder`; marked text and selection go to the library
+  as `Event::TextEdited` (I3).
+- Clipboard: `UIPasteboard` called from the host. Files:
   `PHPickerViewController` and `UIDocumentPickerViewController`, the
-  share sheet `UIActivityViewController`, through objc2 (I4).
+  share sheet `UIActivityViewController`, presented by the host; the
+  result reaches the library as an event (I4).
 - Menus: in-app; `UIMenu` for iPad keyboard shortcuts is optional.
-- Accessibility: `accesskit_ios` (`05-accessibility.md` names it
-  available, correcting touche's note; the largest unknown per
-  `DESIGN.md`, checked in I5 by VoiceOver on a device).
+- Accessibility: `accesskit_ios` attached to the host `UIView`
+  (`05-accessibility.md` names it available, correcting touche's note;
+  the largest unknown per `DESIGN.md`; that it works with a host view
+  is in section 10, checked in I5 by VoiceOver on a device).
 - Packaging and store: Apple Developer Program, signing, TestFlight,
   review. A native app is not a thin wrapper, so the
   minimum-functionality rule does not apply; the paid tier unlocked by
   a subscription bought elsewhere is `DESIGN.md`'s reading of the
   store rules, re-read against the current guidelines before I6.
 - Updates: the App Store.
-- Lifecycle: `suspended` and `resumed` (S2); memory warnings;
-  rotation.
-- Safe areas: the view's `safeAreaInsets`; whether winit 0.30 exposes
-  them is in section 10, else objc2 in `vapors-ios` (S3).
-- Touch: winit `Touch` and `PinchGesture`, both built in the
-  recogniser.
+- Lifecycle: the host forwards scene and application state changes,
+  memory warnings and rotation.
+- Safe areas: the host reads the view's `safeAreaInsets` and passes
+  them in (S3); winit's support no longer matters.
+- Touch: the host forwards `UITouch` events, and `UIPinchGestureRecognizer`
+  where it is used, to the recogniser in `gestures.rs`.
 
 ## 4. What can be tested where
 
@@ -399,14 +446,15 @@ in `gate_plan_job_if_tests.rs` already express conditions).
 
 | Project | What it does | Same as vapors | Different | Taken |
 |---|---|---|---|---|
-| Tauri | A Rust process around the OS webview; `tauri-bundler` makes `.app`, `.dmg`, `.msi`, NSIS, AppImage, `.deb`; a signed updater plugin; mobile through generated Xcode and Gradle projects | Rust core, per-platform shells generated | The UI is the platform's webview, not a GPU renderer; vapors draws itself and has no JavaScript side natively | cargo-packager (the bundler extracted from Tauri as a crate), pinned in `tools.toml` (D4); the generated Xcode and Gradle shells as the shape of ours |
-| Slint | Own language compiled to Rust, own renderers (femtovg, Skia, software), winit, AccessKit on desktops, Android through its activity crate, iOS experimental | winit plus a GPU renderer plus AccessKit, one tree projected to a11y | A software renderer fallback where vapors refuses without a GPU; its own language where vapors takes HTML and CSS | Its `slint-android-activity` as the reference for a winit-based Android entry with GameActivity |
-| Flutter | Dart, the Impeller renderer, an embedder per platform written in the platform's language (Objective-C, Kotlin), semantics tree pushed to each platform, a hidden DOM for semantics on the web | The hidden-DOM a11y mirror on the web (`05-accessibility.md` names it); one renderer on every target | Platform shims in native languages with a message channel; vapors' shims are Rust FFI crates with no channel | The embedder split: what lives in the Gradle and Xcode shells (activity results, pickers) and what in Rust |
-| Bevy | winit and wgpu on every target including Android (GameActivity by default) and iOS (an Xcode project in its mobile example), AccessKit on desktops | The same window and GPU crates, so the same suspend and resume shape | No IME on phones, no a11y on phones, no packaging tooling | Its `bevy_winit` handling of `suspended` (drop the window and surface) and `resumed` (recreate), the mobile example's project layout |
+| Tauri | A Rust process around the OS webview; `tauri-bundler` makes `.app`, `.dmg`, `.msi`, NSIS, AppImage, `.deb`; a signed updater plugin; mobile through generated Xcode and Gradle projects | Rust core, per-platform shells generated | The UI is the platform's webview, not a GPU renderer; vapors draws itself and has no JavaScript side natively | cargo-packager (the bundler extracted from Tauri as a crate), pinned in `tools.toml` (D4); the generated Xcode and Gradle shells as the shape of our starters (E4); not its process-owning mobile entry, since vapors' phone hosts would own the process and call the library |
+| Slint | Own language compiled to Rust, own renderers (femtovg, Skia, software), winit, AccessKit on desktops, Android through its activity crate, iOS experimental | winit plus a GPU renderer plus AccessKit, one tree projected to a11y | A software renderer fallback where vapors refuses without a GPU; its own language where vapors takes HTML and CSS | Nothing for phones: its winit-based Android entry is the route vapors would not take; the activity crate remains a reference for what a Java side must do |
+| Flutter | Dart, the Impeller renderer, an embedder per platform written in the platform's language (Objective-C, Kotlin), semantics tree pushed to each platform, a hidden DOM for semantics on the web | The hidden-DOM a11y mirror on the web (`05-accessibility.md` names it); one renderer on every target | Platform code in native languages with a message channel; vapors' hosts would be Kotlin and Swift calling one Rust FFI crate with typed calls and events, no channel | The embedder shape: a host in Kotlin and Swift owning input, text, pickers and the surface, the engine behind a narrow API; and its add-to-app route for views inside existing apps, the reference for E3 (from memory; section 10) |
+| Bevy | winit and wgpu on every target including Android (GameActivity by default) and iOS (an Xcode project in its mobile example), AccessKit on desktops | The same window and GPU crates, so the same suspend and resume shape | No IME on phones, no a11y on phones, no packaging tooling | The rule that the surface is dropped on suspend and recreated on resume, which S2 and the host callbacks would apply without winit |
 | Dioxus and Blitz | Dioxus renders through the webview (wry) or through Blitz: Stylo for CSS, Taffy for layout, Parley for text, Vello for paint on wgpu; `dx` builds mobile projects | Blitz is the closest sibling: HTML and CSS to a GPU through Taffy and Parley, the same two crates vapors uses (`Cargo.toml`) | Stylo and Vello where vapors has its own CSS engine and painter; a virtual DOM where vapors compiles components | Nothing to take yet; a comparison for the benchmark the finish line defers |
-| egui | winit and wgpu, AccessKit through `accesskit_winit`, Android through `eframe`, no official iOS | The `accesskit_winit` integration, activated on the reader's first query so an app with no reader pays nothing (`05-accessibility.md` "Taken from where") | Immediate mode; no text IME on phones | The adapter lifecycle |
+| egui | winit and wgpu, AccessKit through `accesskit_winit`, Android through `eframe`, no official iOS | The `accesskit_winit` integration, activated on the reader's first query so an app with no reader pays nothing (`05-accessibility.md` "Taken from where") | Immediate mode; no text IME on phones | The adapter lifecycle on desktops; phones would not use `accesskit_winit` |
 
-What none of them give: a one-crate platform layer whose every answer
+What none of them give: a platform layer (one crate on desktops, one
+FFI crate on phones) whose every answer
 is three states with a deadline (`07-platform-services.md`); each has
 a plugin or channel surface vapors rules out.
 
@@ -433,10 +481,10 @@ the desktop; the web page is the free tier and is shipping. So:
 5. **Linux**: ships as the dev platform's by-product; an AppImage from
    the packaging command costs one slice and is the CI proof of the
    command.
-6. **Android native**: the Pixel is here and a11y has an adapter, so
-   it is the first phone; it waits for the proxy pipeline and for the
+6. **Android native** (a Kotlin host around the library, 3.5): the
+   Pixel is here and a11y has an adapter, so it is the first phone; it waits for the proxy pipeline and for the
    desktops, since the Play listing can be the TWA meanwhile (D3).
-7. **iOS native**: after Android, when a Mac and an iPhone exist;
+7. **iOS native** (a Swift host, 3.5): after Android, when a Mac and an iPhone exist;
    Safari's home-screen install covers it until then (`DESIGN.md` 7.).
 
 ## 7. Slices
@@ -451,8 +499,8 @@ commitments.
 | # | Delivers | Accepted when |
 |---|---|---|
 | S1 | `cargo xtask targets`: `cargo check -p vapors-platform -p vapors-app` for `x86_64-pc-windows-msvc`, `aarch64-apple-darwin`, `aarch64-linux-android` and `aarch64-apple-ios` with the targets from `rust-toolchain.toml`; refuses naming the missing target or `cargo ndk` | A Linux-only `use` outside `cfg` in the platform crate fails the step naming the target; the step is in `ci.yml` and the gate; a missing target is a refusal, never a skip |
-| S2 | Suspend and resume: `suspended` drops the surface and the window where the platform destroys them, `resumed` recreates them, the app gets `Event::Suspended` and `Event::Resumed`; the decision table is a pure function as `hidden_window.rs` is | Unit tests on the table (suspend during a frame, resume before the GPU was ready, two suspends); `surface_gradient --check` under Xvfb unchanged; the fake driver proves a frame after suspend without resume is refused by name |
-| S3 | Safe-area insets in `Environment` as `env(safe-area-inset-*)`, fed by the platform: 0 on desktops, the page's computed `env()` on the web (read once per resize from a probe element), the shim's insets on phones; `Frame` carries them | A demo pads by the insets; the page oracle sets `env()` through a viewport-fit page and reads the same box; an inset that is not finite is refused naming the side |
+| S2 | Suspend and resume: `suspended` (winit) or the host's surface callbacks drop the surface and the window where the platform destroys them, `resumed` or the host's callbacks recreate them, the app gets `Event::Suspended` and `Event::Resumed`; the decision table is a pure function as `hidden_window.rs` is | Unit tests on the table (suspend during a frame, resume before the GPU was ready, two suspends); `surface_gradient --check` under Xvfb unchanged; the fake driver proves a frame after suspend without resume is refused by name |
+| S3 | Safe-area insets in `Environment` as `env(safe-area-inset-*)`, fed by the platform: 0 on desktops, the page's computed `env()` on the web (read once per resize from a probe element), the host's insets on phones; `Frame` carries them | A demo pads by the insets; the page oracle sets `env()` through a viewport-fit page and reads the same box; an inset that is not finite is refused naming the side |
 | S4 | `cargo xtask bundle <package>`: cargo-packager pinned in `tools.toml`, producing the AppImage on Linux, `.app` and `.dmg` on macOS, NSIS on Windows, from one `[bundle]` table in `factory.toml` (name, identifier, icon); refuses naming the missing tool, icon or identifier | The Linux AppImage runs under Xvfb in CI and prints its version line; a bundle with a missing icon is refused naming the path; `cargo xtask bundle --help` lists the targets |
 | S5 | The update check natively: the same `version.json` as touche's page, fetched with the page's 10 s deadline (`update.js`), compared with the build's stamp, surfaced as a platform event the app shows as a Toast with a link; no download, no self-replacement | A stand-in server serving another version produces the event within the deadline; the same version produces nothing; an unreachable server is `Unreachable`, never "up to date"; the check and its numbers are shared with the page by a test that reads both |
 | S6 | Native a11y (R7): `accesskit_winit` taking `AxUpdate` (`a11y_mirror.rs`) as the DOM mirror does, the same records and placements, actions back through dispatch; activated on the reader's first query | A fake adapter receives the same tree the model mirror holds for every R6 unit scenario; a `Click` action on a button runs the demo's handler; AT-SPI under `dbus-run-session` with `at-spi2-core` under Xvfb exposes the counter's button by name, read back with `pyatspi` or `accerciser`'s CLI in CI; Orca by hand on a session |
@@ -484,27 +532,36 @@ commitments.
 | M3 | Developer ID signing and notarisation in the release step, from the Intel Mac over ssh or the runner, secrets by name; refuses when any is missing | `spctl --assess` passes on the notarised bundle; `stapler validate` passes |
 | M4 | VoiceOver pass by hand when the Mac Studio comes; findings as slices | The checklist committed |
 
+### Phones, shared
+
+| # | Delivers | Accepted when |
+|---|---|---|
+| E1 | The embedding API and its FFI crate, `vapors-embed`: the relaxed `unsafe` guard declared in its `Cargo.toml` with the reason in `lib.rs`; the choice between uniffi and a C ABI recorded with the reason; calls to create from a `raw-window-handle` surface, resize and scale, pointer and key input, suspend and resume, insets, and "draw a frame"; events out (frame wanted, text edited, file opened) | A Rust test host drives an `App` through the API on lavapipe with a fake window handle: a frame only when the app asked (`Next::Wait` draws 0 frames idle), a frame after suspend without resume refused by name, a non-finite inset refused naming the side; the guard is checked by a test that reads the manifest |
+| E2 | The winit driver and the embedding driver share the frame contract: one function from events to `Frame` used by both, so `App` has two drivers and no branch inside it | The existing `window` job unchanged and green; one test feeds the same event script to both drivers and compares the frames |
+| E3 | The multi-view question: whether one process can hold several `App`s and surfaces (device and queue shared or one per view), for views embedded in an existing app. First a written finding from reading `crates/platform` and `crates/gpu` for what is global; then a test with two `App`s on two fake surfaces | The finding is committed with the file and line of each global; if two views work, the test shows both drawing and idle at 0 frames; if not, the API refuses a second view by name and the plan says one view per process |
+| E4 | Starters and the integration skill: a Kotlin starter (Gradle project) and a Swift starter (Xcode project) under `platforms/`, each a host around `vapors-embed`, and a skill that tells an agent how to add vapors to an existing Android or iOS app. The skill lives in `plugins/` and the lead updates it when the pin moves | The Android starter builds here with the NDK (A1); the Swift starter builds on a Mac (I1); each starter's README lists the host calls it makes, and a test compares that list with the API's functions so a new call without a README line fails |
+
 ### Android
 
 | # | Delivers | Accepted when |
 |---|---|---|
-| A1 | `vapors-android`: the entry crate with the relaxed `unsafe` guard declared, `android-game-activity`, a Gradle project under `platforms/android/` linking the library through `cargo ndk`; `cargo xtask android build`, refusing when the NDK, SDK or Gradle is missing | The APK builds here; the refusals name each missing tool |
+| A1 | The Kotlin host in `platforms/android/`: a `SurfaceView` whose `SurfaceHolder.Callback` calls `vapors-embed`, a Gradle project linking the library through `cargo ndk`; `cargo xtask android build`, refusing when the NDK, SDK or Gradle is missing | The APK builds here; the refusals name each missing tool |
 | A2 | `cargo xtask android run`: install and start on the attached Pixel, `logcat` filtered to the app's prefix, `screencap` to a file; the adapter line (name, limits) recorded in `docs/gpu-limits.md` by a `gpu-info` run on the device | The hello demo's screenshot from the Pixel is held to `hello.pixels` at the device's scale, or the difference is named |
-| A3 | S2 on the device: background and foreground ten times, rotation, the soft keyboard | A scripted `adb shell input keyevent` sequence leaves the app drawing and `logcat` shows no device loss |
-| A4 | The text bridge on GameActivity's text input state: `Event::TextEdited` from composition, the soft keyboard shown for a focused field, hidden when none | The web text-input scenario replayed on the device gives the same field text and selection after each step |
-| A5 | Pickers and share: Photo Picker and `ACTION_OPEN_DOCUMENT` through the activity, `Event::FileOpened` as on the web; export through `ACTION_CREATE_DOCUMENT` or the share sheet | A file from the camera roll opens; a cancel sends nothing; an activity that is gone is `Unreachable` |
-| A6 | `accesskit_android` taking `AxUpdate`; TalkBack on the Pixel | `uiautomator dump` shows the counter's button by name; a TalkBack double-tap changes the count once (the R6 PR 6 check) |
+| A3 | S2 on the device through the host's lifecycle calls: background and foreground ten times, rotation, the soft keyboard | A scripted `adb shell input keyevent` sequence leaves the app drawing and `logcat` shows no device loss |
+| A4 | The `InputConnection` in the host view: `Event::TextEdited` from composition, the soft keyboard shown for a focused field, hidden when none | The web text-input scenario replayed on the device gives the same field text and selection after each step |
+| A5 | Pickers, clipboard and share in the host: Photo Picker and `ACTION_OPEN_DOCUMENT`, `Event::FileOpened` as on the web; export through `ACTION_CREATE_DOCUMENT` or the share sheet | A file from the camera roll opens; a cancel sends nothing; an activity that is gone is `Unreachable` |
+| A6 | `accesskit_android` on the host view taking `AxUpdate`; TalkBack on the Pixel | `uiautomator dump` shows the counter's button by name; a TalkBack double-tap changes the count once (the R6 PR 6 check) |
 | A7 | The App Bundle, Play App Signing, the target API level, the listing's data-safety answers derived from `DESIGN.md` 1.6 | An internal-testing upload accepted by Play |
 
 ### iOS
 
 | # | Delivers | Accepted when |
 |---|---|---|
-| I1 | `vapors-ios`: the Xcode project under `platforms/ios/` linking the static library, `cargo xtask ios build` on a Mac, refusing without Xcode | The hello demo on the simulator, screenshot held to its pixels |
-| I2 | S2 and S3 on a device: suspend, resume, rotation, safe areas | Scripted through `xcrun simctl` on the simulator; a device by hand |
-| I3 | The `UITextInput` bridge | The web text-input scenario on the simulator |
-| I4 | Pickers and the share sheet through objc2 | A photo opens; a cancel sends nothing |
-| I5 | `accesskit_ios` taking `AxUpdate`; VoiceOver on a device | The counter by name in the Accessibility Inspector; one press per double-tap |
+| I1 | The Swift host in `platforms/ios/`: a `UIView` on a `CAMetalLayer` calling `vapors-embed`, the Xcode project linking the static library, `cargo xtask ios build` on a Mac, refusing without Xcode | The hello demo on the simulator, screenshot held to its pixels |
+| I2 | S2 and S3 on a device through the host's calls: suspend, resume, rotation, safe areas | Scripted through `xcrun simctl` on the simulator; a device by hand |
+| I3 | The `UITextInput` conformance in the host view | The web text-input scenario on the simulator |
+| I4 | Pickers, clipboard and the share sheet in the host | A photo opens; a cancel sends nothing |
+| I5 | `accesskit_ios` on the host `UIView` taking `AxUpdate`; VoiceOver on a device | The counter by name in the Accessibility Inspector; one press per double-tap |
 | I6 | Signing, TestFlight, the review answers | A TestFlight build installed on Tom's iPhone |
 
 ## 8. Decisions for Tom
@@ -517,7 +574,7 @@ commitments.
 | D4 | Packaging tool | (a) cargo-packager, pinned, one `[bundle]` table. (b) Own scripts per platform | (a): one tool covers AppImage, `.app`, `.dmg`, NSIS and MSI; xtask refuses when it is missing and verifies its output by running it, so its failures stay loud |
 | D5 | Windows signing | (a) Azure Trusted Signing (cloud, monthly, identity validation). (b) An EV certificate on a hardware token | (a) if Tom's business passes its validation; it signs from a runner with no token to ship. Check eligibility first (section 10) |
 | D6 | macOS distribution | (a) Developer ID with notarisation, download from the site. (b) The Mac App Store as well | (a): `DESIGN.md` sells the desktop on the site; the store's sandbox adds file-access work for no customer reached |
-| D7 | Android activity | (a) GameActivity, a Gradle project. (b) NativeActivity with `cargo-apk`, no Java | (a): NativeActivity has no text input, so (b) cannot type; the Gradle project is also where pickers return |
+| D7 | Phone architecture (decided by Tom, 2026-11-19) | (a) vapors as a library in thin Kotlin and Swift hosts, with starters and a skill. (b) winit's Android and iOS backends with GameActivity or NativeActivity and objc2 bridges | (a), decided: the platform's own APIs do text input, pickers and clipboard, and the accessibility adapters attach to a host view. Costs are the embedding API, two drivers of `App`, and the multi-view question (3.5, E1 to E4) |
 | D8 | Linux package | (a) AppImage first, Flatpak when asked. (b) Flatpak first | (a): the AppImage is the CI proof of S4 under Xvfb; Flatpak needs a runtime manifest and a build step outside cargo |
 | D9 | Updates natively | (a) The notice and a download link, the page's mechanism. (b) In-place self-update | (a) first; (b) only with a signed manifest, after D5 and M3 exist, since replacing a binary without a signature check is a supply-chain hole |
 
@@ -525,13 +582,20 @@ commitments.
 
 - **AccessKit on phones.** `05-accessibility.md` names `accesskit_android`
   and `accesskit_ios` as available on 2026-10-25; their fit with
-  winit's phone windows and their coverage of text are unknown here.
+  a host `View` or `UIView` and their coverage of text are unknown here.
   A6 and I5 are the checks; if either adapter cannot take the tree, the
   phone slips behind a web-mirror path in a WebView, which is the TWA.
-- **winit's phone gaps.** No IME, no soft keyboard, insets unverified:
-  every one is a shim in the FFI crates, each with the relaxed
-  `unsafe` guard. The crates stay small by the 200-line rule, and each
-  shim is one file with one responsibility.
+- **The embedding API.** It is new surface that every phone host
+  depends on. If it is wide, the hosts drift from it; E4's README check
+  and E1's tests are what hold it. The one FFI crate carries the
+  relaxed `unsafe` guard; it stays small by the 200-line rule, one file
+  per responsibility.
+- **One view per process.** If E3 finds global state that cannot be
+  lifted, embedding in an existing app works for one vapors view at
+  a time, and the plan must say so to those who ask.
+- **Two drivers.** A behaviour fixed in the winit driver and not in
+  the embedding driver would diverge; E2's shared function and the
+  same-script test are the guard.
 - **Android GPU drivers.** Vulkan-only with no fallback refuses some
   devices by name. The refusal is the design; the risk is the number.
   A device cloud run (A2's follow-up) measures it before Play.
@@ -559,7 +623,7 @@ the slice named, and this section is updated with the date and result.
 
 | Claim | Checked by |
 |---|---|
-| winit 0.30 compiles its macOS, Windows and iOS backends with no feature and refuses an Android build without one of the two activity features | S1 |
+| winit 0.30 compiles its macOS and Windows backends with no feature; the platform crate builds for the phone targets without winit's phone backends | S1 |
 | `cargo check --target x86_64-pc-windows-msvc` needs no linker on Linux once the target's `rust-std` is installed | S1 |
 | cargo-packager produces AppImage, `.app`, `.dmg`, NSIS and MSI from one configuration and is maintained | S4 |
 | GitHub's Windows runners expose WARP to wgpu's DX12 backend and have a desktop session a winit window can open in | W1 |
@@ -567,9 +631,12 @@ the slice named, and this section is updated with the date and result.
 | Apple's macOS 26 is the last release for Intel Macs (WWDC 2025), so the Intel Mac over ssh signs and notarises while 26 is supported | M3 |
 | Azure Trusted Signing accepts an individual or a company with Tom's business history; the CA/B Forum hardware-key rule for OV certificates since June 2023 | D5, W3 |
 | winit's `PinchGesture` on Windows precision touchpads; winit's Windows and macOS IME preedit sequences match `ime.rs`'s assumption of an empty preedit before a commit | W1, M1 |
-| `android-activity`'s GameActivity text-input API carries composition, and the AGDK Java class ships with it | A1, A4 |
 | Play's current target API level and the App Bundle requirement | A7 |
-| `accesskit_android` and `accesskit_ios` exist as published crates with winit-compatible adapters | A6, I5 |
-| winit 0.30 exposes iOS safe-area insets | S3, I2 |
+| `accesskit_android` and `accesskit_ios` exist as published crates | A6, I5 |
 | The App Store guideline on features unlocked by a purchase made elsewhere, as `DESIGN.md` reads it | I6 |
 | The Pixel 9 Pro's limits under wgpu's Vulkan backend equal those Chrome's WebGPU reported (16384, f16) | A2 |
+| `accesskit_android` and `accesskit_ios` can be attached to a host `View` or `UIView` that the host app owns, and take their tree from calls through an FFI crate rather than from a winit window | A6, I5 |
+| A wgpu surface can be created from a host's `ANativeWindow` (from a `SurfaceView`) and from a `CAMetalLayer` through `raw-window-handle`, and be dropped and recreated on the host's surface callbacks | E1, A1, I1 |
+| An Android `InputConnection` and an iOS `UITextInput` on a view that vapors draws into carry composition and selection to the library as the web textarea does | A4, I3 |
+| uniffi (or a C ABI) can carry the embedding API's calls and events with the relaxed guard in one crate | E1 |
+| Flutter's add-to-app embeds a view in an existing Android or iOS app, and how it holds several engines | E3 |
