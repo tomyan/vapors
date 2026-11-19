@@ -120,22 +120,43 @@ so anything that moves is a mesh in a 3D scene, with HTML drawn over it. Referen
 
 ### What the scene has, and what it does not
 
-- Meshes of triangles, each corner with a shade from 0 to 1, baked in
-  when the geometry is made. The mesh's CSS `color` times the shade is
-  what is drawn. That is all the shading there is.
+- Meshes of triangles, each corner with a shade from 0 to 1 and,
+  for a lit mesh, a normal. A mesh's `shading` chooses how it is drawn
+  (`vapors_scene3d::Shading`, fixed when it mounts):
+  - `Unlit` (the default): its CSS `color` times the shade.
+  - `Lit`: lit by the scene's lights, each facet flat (Lambert), times
+    the shade.
+  - `Glossy`: `Lit` plus a white highlight.
 - Depth testing, perspective and orthographic cameras, groups whose
   transforms nest.
-- Not yet: lights, shadows, textures, transparency, materials beyond a
-  colour, and loading model files. Do not imitate them (no fake light
-  pools, glows, blob shadows or painted-on textures); build with flat
-  colours and baked shades.
+- Not yet: shadows, textures, transparency, materials beyond a colour,
+  and loading model files. Do not imitate them (no blob shadows, glows
+  or painted-on textures).
+
+### Lights
+
+`<Scene ambient={..}>` sets a fill light that reaches every face, and
+each `<Light kind={..} transform={..} />` inside the scene adds one, up
+to 8:
+
+- `Light::Directional { colour, intensity }` shines along its node's
+  -Z, like the sun: turn it with the transform.
+- `Light::Point { colour, intensity, range }` shines from its node's
+  position and fades to nothing at `range`: a lamp.
+
+The starter's page lights its box with a warm sun from above and
+behind the camera's left and a cool ambient (`src/view.rs`: `sun`,
+`sun_turn`, `ambient`). A lit mesh needs normals (the starter's shapes
+have them) and at least one light or a non-zero ambient; without
+either the page shows an error naming the mesh and the fix. Reference:
+[docs/scene3d.md, Lighting](https://github.com/tomyan/vapors/blob/main/docs/scene3d.md#lighting).
 
 ### Low-poly models in code
 
 The starter's `src/shapes.rs` builds three solids, each face with its
-own corners and one shade, so the facets read without lights: faces
-pointing up are lightest, faces towards the camera lighter than those
-facing away, faces pointing down darkest.
+own corners and its outward normal, so a `Lit` or `Glossy` mesh shades
+each facet flat from the lights. Their baked shade is 1: drawn
+`Unlit`, they show their plain colour with no facets.
 
 | Function | Shape, before its transform |
 |---|---|

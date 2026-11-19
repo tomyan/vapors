@@ -2,10 +2,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_elements::frame_time;
-use vapors_scene3d::{CameraHandle, Projection, Scene as Store};
-use vapors_scene3d_components::{Camera, CameraProps, Mesh, MeshProps, Scene, SceneProps};
+use vapors_scene3d::{CameraHandle, Projection, Scene as Store, Shading};
+use vapors_scene3d_components::{
+    Camera, CameraProps, Light, LightProps, Mesh, MeshProps, Scene, SceneProps,
+};
 use crate::shapes::Shapes;
-use crate::view::{camera, turned};
+use crate::view::{ambient, camera, sun, sun_turn, turned};
 
 #[prop] let scene: Option<Rc<RefCell<Store>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
@@ -31,9 +33,10 @@ h1 { margin: 0 0 8px; font-size: 28px; }
 
 <vapors:window onkeydown={key} />
 <gpu-surface name="view" class="view"></gpu-surface>
-<Scene scene={scene} surface={surface} camera={eye}>
+<Scene scene={scene} surface={surface} camera={eye} ambient={ambient()}>
   <Camera handle={eye} projection={lens} transform={Signal::new(camera()).read_only()} />
-  <Mesh geometry={cuboid.clone()} class="box"
+  <Light kind={Some(sun())} transform={Signal::new(sun_turn()).read_only()} />
+  <Mesh geometry={cuboid.clone()} class="box" shading={Shading::Lit}
     transform={Signal::derived(move || turned(time.get().as_secs_f32() * 0.6))} />
 </Scene>
 <div class="hud">

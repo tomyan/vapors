@@ -1,7 +1,7 @@
 //! Where things are drawn. +X is right, +Y up, +Z towards the viewer; a
 //! camera looks down its own -Z.
 
-use vapors_scene3d::{Projection, Quat, Transform, Vec3};
+use vapors_scene3d::{Ambient, Colour, Light, Projection, Quat, Transform, Vec3};
 
 /// The box, turned `angle` radians about +Y.
 ///
@@ -28,4 +28,35 @@ pub fn camera() -> Transform {
 /// Never for these fixed numbers.
 pub fn lens() -> Result<Projection, String> {
     Projection::perspective(0.8, 0.1, 100.0).map_err(|e| e.to_string())
+}
+
+/// Warm white sunlight.
+///
+/// # Panics
+/// Never: fixed, valid numbers.
+#[must_use]
+pub fn sun() -> Light {
+    let colour = Colour::srgb(1.0, 0.96, 0.9).expect("a fixed colour");
+    Light::Directional { colour, intensity: 1.0 }
+}
+
+/// The sun's direction: a directional light shines along its node's -Z,
+/// so this turns it to come from above, behind the camera's left.
+///
+/// # Panics
+/// Never: a fixed, finite turn.
+#[must_use]
+pub fn sun_turn() -> Transform {
+    let turn = Quat::from_rotation_y(-0.6) * Quat::from_rotation_x(-0.9);
+    Transform::new(Vec3::ZERO, turn, Vec3::ONE).expect("a fixed turn")
+}
+
+/// Cool fill light, so faces turned from the sun are not black.
+///
+/// # Panics
+/// Never: fixed, valid numbers.
+#[must_use]
+pub fn ambient() -> Ambient {
+    let colour = Colour::srgb(0.7, 0.8, 1.0).expect("a fixed colour");
+    Ambient::new(colour, 0.35).expect("a fixed intensity")
 }
