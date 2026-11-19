@@ -26,6 +26,7 @@ mod draw;
 mod error;
 mod geometry;
 mod lights;
+mod lit;
 mod log;
 mod pipeline;
 mod renderer;

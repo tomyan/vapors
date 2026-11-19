@@ -3,6 +3,7 @@
 
 #![allow(dead_code)] // each test file uses part of it
 
+pub mod lit;
 pub mod materials;
 
 use std::cell::RefCell;

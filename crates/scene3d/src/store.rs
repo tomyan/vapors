@@ -164,6 +164,7 @@ impl Scene {
             world_version: 0,
             visible: true,
             material: None,
+            shading: crate::Shading::Unlit,
             dirty: false,
         };
         let index = self.free.pop().unwrap_or_else(|| self.push_slot());

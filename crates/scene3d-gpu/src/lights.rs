@@ -1,7 +1,7 @@
 //! The lights uniform: the scene's ambient level and up to
 //! [`MAX_LIGHTS`] lights in one buffer, written only when the bytes the
 //! scene now gives differ from the ones last written. No pipeline reads
-//! it yet (`docs/plans/lighting.md`, LT3).
+//! it but the lit pipeline (`lit.rs`).
 //!
 //! Layout, all colours linear light times intensity:
 //! - 16 bytes: ambient `rgb`, 0.
@@ -38,6 +38,10 @@ impl LightsUniform {
         });
         let written = vec![0; WORDS * 4];
         Self { buffer, written }
+    }
+
+    pub(crate) fn buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
     }
 
     /// Writes the scene's lights and ambient through `frame.work`

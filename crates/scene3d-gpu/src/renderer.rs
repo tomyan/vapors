@@ -2,9 +2,10 @@
 
 use crate::camera::{CameraUniform, view_projection};
 use crate::depth::{Attachments, attachments};
-use crate::draw::{MeshNode, Pass, materials_built, mesh_nodes, record};
+use crate::draw::{MeshNode, Pass, Which, materials_built, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::lights::LightsUniform;
+use crate::lit::{self, LitPipeline};
 use crate::log::Tracked;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
@@ -13,7 +14,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_renderer::Samples;
-use vapors_scene3d::{MaterialId, Meshes, NodeId, Scene};
+use vapors_scene3d::{Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
 /// given to its [`Meshes`]. Each render borrows the `Meshes` mutably to
@@ -33,6 +34,8 @@ struct Mounted {
     pipeline: Tracked<Pipeline>,
     camera: Tracked<CameraUniform>,
     lights: Tracked<LightsUniform>,
+    /// Made by the first frame with a lit mesh (`lit.rs`).
+    lit: Option<LitPipeline>,
     slots: Tracked<Slots>,
     geometry: GpuGeometry,
 }
@@ -79,6 +82,7 @@ impl SurfaceRenderer for SceneRenderer {
         self.mounted = Some(Mounted {
             camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
             lights: Tracked::new(LightsUniform::new(device), log, Resource::Lights),
+            lit: None,
             slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
             geometry: GpuGeometry::new(log),
             pipeline: Tracked::new(pipeline, log, Resource::Pipeline),
@@ -103,6 +107,8 @@ impl SurfaceRenderer for SceneRenderer {
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
         materials_built(&nodes, mounted.pipeline.materials.len())?;
+        lit::refuse(&scene, &nodes)?;
+        mounted.make_lit(frame.device, self.samples, &nodes);
         mounted.geometry.upload_missing(&frame, &nodes);
         mounted
             .camera
@@ -112,6 +118,15 @@ impl SurfaceRenderer for SceneRenderer {
         mounted.draw(&mut frame, attached, &nodes)?;
         self.log.rendered();
         Ok(())
+    }
+}
+
+/// The pipeline `mesh` draws with.
+fn which(mesh: &MeshNode) -> Which {
+    match (mesh.lit, mesh.material) {
+        (true, _) => Which::Lit,
+        (false, Some(material)) => Which::Material(material.index()),
+        (false, None) => Which::Colour,
     }
 }
 
@@ -125,6 +140,14 @@ fn release_geometry(meshes: &RefCell<Meshes>, uploaded: &mut GpuGeometry) {
 }
 
 impl Mounted {
+    /// Makes the lit pipeline when `nodes` need it and it is not made.
+    fn make_lit(&mut self, device: &wgpu::Device, samples: Samples, nodes: &[MeshNode]) {
+        if self.lit.is_none() && nodes.iter().any(|mesh| mesh.lit) {
+            let lights = self.lights.buffer();
+            self.lit = Some(LitPipeline::new(device, (&self.pipeline, lights), samples));
+        }
+    }
+
     /// Writes the slot of each shown mesh node that does not hold the
     /// node's current world version: new, moved, recoloured, or in a
     /// grown buffer. A hidden node's slot is written once it is shown.
@@ -159,12 +182,13 @@ impl Mounted {
             .iter()
             .filter(|mesh| mesh.visible)
             .map(|mesh| {
-                let material = mesh.material.map(MaterialId::index);
-                Ok((material, self.offset(mesh.node), self.geometry.get(mesh)?))
+                let offset = self.offset(mesh.node);
+                Ok((which(mesh), offset, self.geometry.get(mesh)?))
             })
             .collect::<Result<Vec<_>, FrameError>>()?;
         let pass = Pass {
             pipelines: (&self.pipeline.render, &self.pipeline.materials),
+            lit: self.lit.as_ref(),
             camera: self.camera.bind_group(),
             slots: self.slots.bind_group(),
             colour: (attached.colour.as_ref(), frame.view),
