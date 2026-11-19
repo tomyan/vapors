@@ -25,8 +25,17 @@ fn vs_lit(
     return LitVertex(camera.view_projection * world, world.xyz, normal_matrix(linear) * normal, shade);
 }
 
+fn fragment(in: LitVertex, gloss: f32) -> vec4<f32> {
+    let rgb = lit_colour(node.colour.rgb, in.shade, in.world, normalize(in.normal), gloss);
+    return vec4<f32>(rgb, node.colour.a);
+}
+
 @fragment
 fn fs_lit(in: LitVertex) -> @location(0) vec4<f32> {
-    let rgb = lit_colour(node.colour.rgb, in.shade, in.world, normalize(in.normal));
-    return vec4<f32>(rgb, node.colour.a);
+    return fragment(in, 0.0);
+}
+
+@fragment
+fn fs_glossy(in: LitVertex) -> @location(0) vec4<f32> {
+    return fragment(in, SPECULAR);
 }

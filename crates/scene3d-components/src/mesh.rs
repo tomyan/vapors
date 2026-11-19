@@ -2,14 +2,14 @@
 //! its anchor's computed `color`, and shown while its `visibility` is
 //! `visible` (docs/plans/css-for-3d.md C3); or, given `material={..}`,
 //! drawn by an application material that sees that colour
-//! (vapors-scene3d `material.rs`).
+//! (vapors-scene3d `material.rs`); `shading` lights it (docs/plans/lighting.md).
 
 use crate::component::node_component;
 use crate::node::{Mounted, mount_node};
 use crate::own_keys;
 use crate::placement::Placement;
 use vapors_dom::{Appearance, DynDom, NodeId as ElementId, Snippet, StyleKey};
-use vapors_scene3d::{Colour, GeometryHandle, MaterialId, NodeKind, Transform};
+use vapors_scene3d::{Colour, GeometryHandle, MaterialId, NodeKind, Shading, Transform};
 use vapors_signals::{ReadSignal, Signal};
 
 /// What a parent passes to [`Mesh::mount`].
@@ -22,6 +22,10 @@ pub struct MeshProps {
     /// The application material it is drawn with, from the renderer's
     /// `Meshes`; `None` for its colour. Fixed when it mounts.
     pub material: Option<MaterialId>,
+    /// How it is shaded: its colour as it is (`Unlit`), or lit by the
+    /// scene's lights (`Lit`, `Glossy`; its geometry needs normals).
+    /// Fixed when it mounts, and refused at the frame with a material.
+    pub shading: Shading,
     /// The anchor's key, which the compiler passes for a tag carrying
     /// `class`, `class:` or `style`; `None` takes the component's own.
     pub anchor: Option<&'static StyleKey>,
@@ -38,6 +42,7 @@ impl Default for MeshProps {
             geometry: None,
             transform: Signal::new(Transform::IDENTITY).read_only(),
             material: None,
+            shading: Shading::Unlit,
             anchor: None,
         }
     }
@@ -87,6 +92,11 @@ impl Mesh {
             .borrow_mut()
             .set_material(placed.node, props.material);
         set.expect("a node mount_node just added as a mesh takes a material");
+        let shaded = placed
+            .scene
+            .borrow_mut()
+            .set_shading(placed.node, props.shading);
+        shaded.expect("a node mount_node just added as a mesh takes a shading");
         let sink = appearance_sink(mounted.placement.clone());
         dom.borrow_mut().watch_appearance(mounted.anchor, sink);
         let (placement, anchor) = (&mounted.placement, mounted.anchor);

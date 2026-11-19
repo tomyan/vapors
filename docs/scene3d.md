@@ -62,7 +62,7 @@ let surface = app.mount("view", Box::new(renderer))?;
   `Meshes::flat_geometry` holds the result. Normals upload in a vertex
   buffer of their own, only when present; the unlit pipeline does not
   bind it, so such a geometry draws the same pixels. Nothing lights
-  by them until LT3.
+  by them until LT3 (see Lighting).
 - `Meshes::geometry(positions, indices, shades)` takes a shade from 0
   to 1 for each position (one-scene D4, row R1): the vertex is drawn
   in that fraction of the node's colour (multiplied on the
@@ -180,6 +180,52 @@ version, measured side by side.
   `projection`) are `Option`s refused at mount when `None`. Markup that
   is not a node component inside `<Scene>` or `<Group>` is refused,
   naming its template site.
+
+## Lighting
+
+A mesh chooses its `shading` (`vapors_scene3d::Shading`, a closed enum;
+`<Mesh shading={..}>`, fixed at mount, `Unlit` by default):
+
+- `Unlit`: its colour times the vertex shade, as always.
+- `Lit`: ambient plus Lambert diffuse over the scene's lights, in
+  linear light (the colour is converted from sRGB, shaded and encoded
+  back), times the vertex shade.
+- `Glossy`: `Lit` plus a white Blinn-Phong highlight (shininess 32,
+  strength 0.5, scaled by each light's colour and falloff). The view
+  direction is the eye to the fragment under a perspective camera
+  (`Projection::is_perspective`), and the camera's backward axis under
+  an orthographic one. `Lit` stays Lambert only, so a scene shaded
+  before keeps its pixels.
+
+Lights are `<Light kind={..}>` nodes (`Light::Directional`, shining
+along the node's -Z; `Light::Point`, falling off smoothly to zero at
+`range`), at most 8, and `<Scene ambient={..}>`. The lights uniform
+(`lights.rs`) holds them and the eye, and is written only when a light,
+the ambient or the camera's eye changes (a scene with no lights never
+writes it). The lit pipelines are made by the first frame that draws a
+lit mesh; a scene without lit meshes makes none.
+
+```html
+<gpu-surface name="view" class="view"></gpu-surface>
+<Scene scene={scene} surface={surface} camera={eye} ambient={dusk}>
+  <Camera handle={eye} projection={lens} transform={back} />
+  <Light kind={sun} transform={sun_turn} />
+  <Light kind={lamp} transform={lamp_at} />
+  <Mesh geometry={hull} shading={Shading::Glossy} />
+</Scene>
+```
+
+Here `hull` is made by `Meshes::flat_geometry` or `lit_geometry`,
+`sun` is `Light::Directional { .. }` and `lamp` is `Light::Point { .. }`.
+
+Refused at the frame, each naming the node and the fix: a lit mesh whose
+geometry has no normals; a lit mesh in a scene with no light and zero
+ambient; a lit mesh that also names an application material (the
+material draws by its own function, not the lights). Reproduce each with
+`cargo test -p vapors-scene3d-gpu --test gpu_scene_lit_refusals`. The
+pixel tests hold each shading to the CPU's formula within 1/255 per
+channel: `gpu_scene_lit` (directional), `gpu_scene_lit_point` and
+`gpu_scene_lit_specular`.
 
 ## Lifecycle
 

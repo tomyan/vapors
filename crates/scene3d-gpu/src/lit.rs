@@ -6,11 +6,13 @@ use crate::FrameError;
 use crate::draw::MeshNode;
 use crate::pipeline::{Pipeline, render_pipeline, shader, vertex_buffers};
 use vapors_renderer::projective::PROJECTIVE_WGSL;
-use vapors_scene3d::{NORMAL_BYTES, Scene};
+use vapors_scene3d::{MaterialId, NORMAL_BYTES, NodeId, Scene};
 
-/// The pipeline, and the group 2 it reads: the lights uniform.
+/// The pipelines (Lambert; Lambert and specular), and the group 2 they
+/// read: the lights uniform.
 pub(crate) struct LitPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
+    pub(crate) glossy: wgpu::RenderPipeline,
     pub(crate) bind_group: wgpu::BindGroup,
 }
 
@@ -46,19 +48,20 @@ impl LitPipeline {
             Some(&pipeline.layouts.node),
             Some(&layout),
         ];
-        let pipeline = lit_pipeline(device, &layouts, samples);
+        let [pipeline, glossy] = lit_pipelines(device, &layouts, samples);
         Self {
             pipeline,
+            glossy,
             bind_group,
         }
     }
 }
 
-fn lit_pipeline(
+fn lit_pipelines(
     device: &wgpu::Device,
     layouts: &[Option<&wgpu::BindGroupLayout>],
     samples: vapors_renderer::Samples,
-) -> wgpu::RenderPipeline {
+) -> [wgpu::RenderPipeline; 2] {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("scene3d lit"),
         bind_group_layouts: layouts,
@@ -77,11 +80,14 @@ fn lit_pipeline(
         attributes: &wgpu::vertex_attr_array![2 => Float32x3],
     };
     let buffers = [positions, Some(normals)];
-    let entries = ("vs_lit", "fs_lit");
-    render_pipeline(device, (&layout, &module), entries, &buffers, samples)
+    ["fs_lit", "fs_glossy"].map(|fragment| {
+        let entries = ("vs_lit", fragment);
+        render_pipeline(device, (&layout, &module), entries, &buffers, samples)
+    })
 }
 
-/// Refuses lit meshes with no normals, or with no light and zero ambient.
+/// Refuses lit meshes with no normals or an application material, or
+/// with no light and zero ambient.
 pub(crate) fn refuse(scene: &Scene, nodes: &[MeshNode]) -> Result<(), FrameError> {
     let lit: Vec<&MeshNode> = nodes.iter().filter(|mesh| mesh.lit).collect();
     let Some(first) = lit.first().map(|mesh| mesh.node) else {
@@ -91,9 +97,19 @@ pub(crate) fn refuse(scene: &Scene, nodes: &[MeshNode]) -> Result<(), FrameError
         let (node, geometry) = (mesh.node, mesh.geometry);
         return Err(FrameError::LitWithoutNormals { node, geometry });
     }
+    if let Some(&(node, material)) = lit_materials(&lit).first() {
+        return Err(FrameError::LitWithMaterial { node, material });
+    }
     let dark = scene.ambient().linear().iter().all(|&c| c <= 0.0);
     if dark && scene.lights().is_empty() {
         return Err(FrameError::LitWithoutLight(first));
     }
     Ok(())
+}
+
+/// Each lit mesh that also names an application material, which the lit
+/// pipeline would silently ignore.
+fn lit_materials(lit: &[&MeshNode]) -> Vec<(NodeId, MaterialId)> {
+    let named = |mesh: &&MeshNode| mesh.material.map(|material| (mesh.node, material));
+    lit.iter().filter_map(named).collect()
 }

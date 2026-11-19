@@ -1,9 +1,11 @@
 use super::*;
-use vapors_scene3d::{Ambient, Colour, NodeKind, Quat, Transform};
+use vapors_scene3d::{Ambient, Colour, NodeKind, Projection, Quat, Transform};
 
 fn colour(r: f32, g: f32, b: f32) -> Colour {
     Colour::srgb(r, g, b).unwrap()
 }
+
+const EYE: [f32; 4] = [0.0; 4];
 
 fn words(bytes: &[u8]) -> Vec<u32> {
     let (chunks, _) = bytes.as_chunks::<4>();
@@ -45,7 +47,7 @@ fn three_lights() -> Scene {
 #[test]
 fn the_bytes_hold_ambient_and_the_directional_light() {
     // Given / When
-    let bytes = lights_bytes(&three_lights()).unwrap();
+    let bytes = lights_bytes(&three_lights(), EYE).unwrap();
 
     // Then
     assert_eq!(bytes.len() as u64, LIGHTS_BYTES);
@@ -64,7 +66,7 @@ fn the_bytes_hold_ambient_and_the_directional_light() {
 #[test]
 fn the_bytes_hold_two_point_lights_in_world_space_and_zeros_after() {
     // Given / When
-    let bytes = lights_bytes(&three_lights()).unwrap();
+    let bytes = lights_bytes(&three_lights(), EYE).unwrap();
 
     // Then
     let f = floats(&bytes);
@@ -88,7 +90,7 @@ fn a_scene_without_lights_is_all_zeros() {
     scene.update();
 
     // Then
-    assert!(lights_bytes(&scene).unwrap().iter().all(|b| *b == 0));
+    assert!(lights_bytes(&scene, EYE).unwrap().iter().all(|b| *b == 0));
 }
 
 #[test]
@@ -109,8 +111,48 @@ fn a_light_whose_world_position_overflows_is_refused_naming_it() {
     scene.update();
 
     // When
-    let refused = lights_bytes(&scene).unwrap_err();
+    let refused = lights_bytes(&scene, EYE).unwrap_err();
 
     // Then
     assert_eq!(refused, FrameError::LightDegenerate(node));
+}
+
+fn camera_scene(projection: Projection) -> Scene {
+    let mut scene = Scene::new();
+    let root = scene.root();
+    let handle = vapors_scene3d::CameraHandle::new();
+    let at = Transform::from_translation(Vec3::new(1.0, 2.0, 5.0)).unwrap();
+    let camera = NodeKind::Camera { handle, projection };
+    scene.add(root, camera, at).unwrap();
+    scene.set_camera(Some(handle));
+    scene.update();
+    scene
+}
+
+#[test]
+fn a_perspective_camera_gives_its_position_and_one() {
+    // Given
+    let scene = camera_scene(Projection::perspective(1.0, 0.1, 10.0).unwrap());
+
+    // When / Then
+    assert_eq!(eye(&scene).unwrap(), [1.0, 2.0, 5.0, 1.0]);
+}
+
+#[test]
+fn an_orthographic_camera_gives_the_way_back_to_the_viewer_and_zero() {
+    // Given
+    let scene = camera_scene(Projection::orthographic(4.0, 0.1, 10.0).unwrap());
+
+    // When / Then
+    assert_eq!(eye(&scene).unwrap(), [0.0, 0.0, 1.0, 0.0]);
+}
+
+#[test]
+fn the_eye_sits_in_the_unused_words_of_the_header() {
+    // Given / When
+    let bytes = lights_bytes(&Scene::new(), [1.0, 2.0, 3.0, 1.0]).unwrap();
+
+    // Then: perspective after ambient, the eye after the count
+    let f = floats(&bytes);
+    assert_eq!((f[3], f[5..8].to_vec()), (1.0, vec![1.0, 2.0, 3.0]));
 }

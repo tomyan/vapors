@@ -13,6 +13,11 @@ pub enum Shading {
     /// scene's lights, in linear light, times the vertex shade. Its
     /// geometry needs normals (`Meshes::lit_geometry`).
     Lit,
+    /// [`Shading::Lit`] and a Blinn-Phong specular highlight: white
+    /// light times the light's colour and falloff, from the eye the
+    /// active camera gives (its position under a perspective projection,
+    /// its backward axis under an orthographic one).
+    Glossy,
 }
 
 impl Scene {

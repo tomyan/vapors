@@ -226,3 +226,23 @@ fn a_shorter_side_extent_that_is_not_positive_is_refused() {
         Err(SceneError::HeightNotPositive { height: 0.0 })
     );
 }
+
+#[test]
+fn only_a_perspective_projection_is_perspective() {
+    // Given / When / Then
+    assert!(
+        Projection::perspective(FRAC_PI_2, 1.0, 100.0)
+            .unwrap()
+            .is_perspective()
+    );
+    assert!(
+        !Projection::orthographic(4.0, 1.0, 100.0)
+            .unwrap()
+            .is_perspective()
+    );
+    assert!(
+        !Projection::orthographic_shorter(4.0, 1.0, 100.0)
+            .unwrap()
+            .is_perspective()
+    );
+}
