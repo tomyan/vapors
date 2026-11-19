@@ -11,6 +11,9 @@ let camera_toggle = move || action.set(String::from("camera"));
 .camera-mode { width: 164px; display: block; position: absolute; left: 16px; bottom: 92px; }
 .small .camera-mode { left: auto; right: 16px; bottom: 144px; }
 .short .camera-mode { left: 8px; right: auto; bottom: 84px; }
+@media (width <= 320px) {
+.short .camera-mode { bottom: 136px; }
+}
 </style>
 
 <div class:small={small.get()} class:short={short.get()}>

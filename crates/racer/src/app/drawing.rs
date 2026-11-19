@@ -83,7 +83,7 @@ impl Racer {
             scale: self.pacing.scale,
         }
     }
-    pub(super) fn sync_hud(&self, viewport: Viewport) {
+    pub(crate) fn sync_hud(&self, viewport: Viewport) {
         self.hud.short.set_if_changed(viewport.height < 480.0);
         self.hud.compact.set_if_changed(viewport.width < 760.0);
         self.hud.follow.set_if_changed(self.run.camera.follow);
