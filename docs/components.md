@@ -47,7 +47,7 @@ when the component mounts. Some `let` forms have a special meaning:
 | `let count: Signal<i32> = Signal::new(0);` | a public field `count: Signal<i32>` on the component struct. The signal is created with `Signal::named("count", ..)`, so refusals name it. |
 | `let doubled: Memo<i32> = Memo::new(..);` | a public field, like a signal |
 | `#[prop] let label: String = "Count".into();` | a field of `CounterProps`, with that value as its default |
-| `let increment = move \|\| ..;` | a handler. A closure with no parameters is wrapped so it can take an event. |
+| `let increment = move \|\| ..;` | a handler. A closure with no parameters is called without the event, in the script or inline in the template. |
 | `use crate::todo_item::{TodoItem, TodoItemProps};` | brings a child component into scope for its tag |
 | `#[dispatcher(pick)] let events;` | a `vapors_dom::Dispatcher` for the component's own events (doc 03, "A component's own events"); at most one, with no other attribute on that `let` |
 
@@ -97,7 +97,12 @@ the one difference from the brief in this slice.
   compares them without case.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
-  an inline closure that takes `&mut Event`. It returns `()` or
+  an inline closure that takes `&mut Event` or no parameters
+  (`onclick={move || hop()}` is called without the event, as a script
+  closure with no parameters is); an inline closure with two or more
+  parameters is refused at compile time, naming the file and line. On a
+  component tag `onclick={..}` is still an ordinary prop, passed as
+  written (tag listeners, doc 2026-11-18, are not built yet). It returns `()` or
   `Result<(), E>` with `E: Display`, so it may use `?`; an `Err` goes to
   the app's error report. A handler is `Fn`, since a listener may run
   again inside itself when it dispatches: it keeps its state in a
