@@ -9,12 +9,18 @@ use crate::{RendererLog, Resource};
 use std::collections::HashMap;
 use std::rc::Rc;
 use vapors_app::SurfaceFrame;
-use vapors_scene3d::{Geometry, GeometryId};
+use vapors_scene3d::{Geometry, GeometryId, Vec3};
 
 /// One piece's buffers.
 pub(crate) struct Uploaded {
     pub(crate) vertices: wgpu::Buffer,
     pub(crate) indices: wgpu::Buffer,
+    /// The normals, in a buffer of their own (vertex buffer slot 1,
+    /// [`vapors_scene3d::NORMAL_BYTES`] a vertex), only when the geometry
+    /// has them. The unlit pipeline binds only `vertices`, so it ignores
+    /// them; the lit pipeline (LT3) binds both.
+    #[allow(dead_code)] // read by the lit pipeline (LT3)
+    pub(crate) normals: Option<wgpu::Buffer>,
     pub(crate) index_count: u32,
 }
 
@@ -80,6 +86,18 @@ fn vertex_bytes(geometry: &Geometry) -> Vec<u8> {
         .collect()
 }
 
+/// Each vertex's normal's three floats, when the geometry has normals.
+fn normal_bytes(geometry: &Geometry) -> Option<Vec<u8>> {
+    let normals = geometry.normals()?;
+    Some(
+        normals
+            .iter()
+            .flat_map(Vec3::to_array)
+            .flat_map(f32::to_le_bytes)
+            .collect(),
+    )
+}
+
 fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
     let positions = vertex_bytes(geometry);
     let indices: Vec<u8> = geometry
@@ -100,6 +118,10 @@ fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
             &indices,
             wgpu::BufferUsages::INDEX,
         ),
+        normals: normal_bytes(geometry).map(|bytes| {
+            let usage = wgpu::BufferUsages::VERTEX;
+            buffer(frame, "scene3d normals", &bytes, usage)
+        }),
         index_count: u32::try_from(geometry.indices().len())
             .expect("more than u32::MAX indices: wgpu cannot draw them in one call"),
     }

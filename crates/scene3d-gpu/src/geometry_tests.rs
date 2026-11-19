@@ -93,3 +93,26 @@ fn each_uploaded_vertex_is_the_size_the_scene_checks() {
         vapors_scene3d::VERTEX_BYTES
     );
 }
+
+#[test]
+fn normals_are_uploaded_only_for_geometry_that_has_them() {
+    // Given
+    let mut meshes = Meshes::new();
+    let triangle = || vec![Vec3::ZERO, Vec3::X, Vec3::Y];
+    let plain = meshes
+        .geometry(triangle(), vec![0, 1, 2], vec![1.0; 3])
+        .unwrap();
+    let with = (meshes)
+        .lit_geometry(triangle(), vec![0, 1, 2], vec![1.0; 3], vec![Vec3::Z; 3])
+        .unwrap();
+
+    // When
+    let bytes =
+        |handle: &vapors_scene3d::GeometryHandle| normal_bytes(meshes.get(handle.id()).unwrap());
+
+    // Then
+    assert_eq!(bytes(&plain), None);
+    let with = bytes(&with).expect("normals");
+    assert_eq!(with.len(), 3 * vapors_scene3d::NORMAL_BYTES);
+    assert_eq!(&with[8..12], &1.0f32.to_le_bytes(), "the first normal's z");
+}

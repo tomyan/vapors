@@ -57,6 +57,8 @@ pub enum MeshError {
         /// Its value.
         shade: f32,
     },
+    /// Normals the scene cannot light by.
+    Normals(crate::NormalError),
 }
 
 /// WebGPU's default `maxBufferSize` (256 MiB), the limit every
@@ -180,6 +182,7 @@ impl fmt::Display for MeshError {
                 f,
                 "the geometry has {shades} shades for {positions} positions: give one shade, from 0 to 1, per position"
             ),
+            Self::Normals(error) => error.fmt(f),
             Self::ShadeOutOfRange { at, shade } => write!(
                 f,
                 "shade {at} is {shade}, outside 0 to 1: give each vertex's shade as a fraction of the node's colour"
