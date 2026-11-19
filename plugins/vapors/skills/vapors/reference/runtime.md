@@ -84,6 +84,17 @@ let time = frame_time();
   transform={Signal::derived(move || turned(time.get().as_secs_f32() * 0.6))} />
 ```
 
+## The viewport
+
+`vapors_elements::viewport_size()` (`ReadSignal<Size>`, CSS px) and
+`orientation()` (`ReadSignal<Orientation>`: `Portrait` when taller than
+wide, a square is `Landscape`) are app-wide, set only when the size
+changes, and never draw a frame themselves. Use them for a camera's field
+of view or where touch controls go. In CSS the same viewport answers
+`@media (orientation: portrait)`, `(min-aspect-ratio: 16/9)`,
+`(pointer: none | coarse | fine)` and `(hover: none | hover)`; the last two
+come from the browser's `matchMedia` on the web, `fine` and `hover` natively.
+
 To apply rules once a frame, read `frame_delta()` in an
 `Effect::new(move || ..)`, compute the new state from the current one
 (`get_untracked()`), and write it with `set_if_changed`, so the page

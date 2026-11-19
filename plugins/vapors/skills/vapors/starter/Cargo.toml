@@ -8,20 +8,20 @@ publish = false
 # Default features are off: complex-script-breaks (line breaking for
 # Thai, Khmer and the like) adds 3 MB to the release wasm (8.5 to 5.5 MB).
 [dependencies]
-vapors-app = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43", default-features = false, features = ["grid"] }
-vapors-elements = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43", default-features = false, features = ["grid"] }
-vapors-platform = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
-vapors-scene3d = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
-vapors-scene3d-components = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
-vapors-scene3d-gpu = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
-vapors-signals = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
-vapors-text = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43", default-features = false }
+vapors-app = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf", default-features = false, features = ["grid"] }
+vapors-elements = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf", default-features = false, features = ["grid"] }
+vapors-platform = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
+vapors-scene3d = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
+vapors-scene3d-components = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
+vapors-scene3d-gpu = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
+vapors-signals = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
+vapors-text = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf", default-features = false }
 rand = "0.10"
 # rand's source of randomness; in the browser it needs the wasm_js feature
 getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [build-dependencies]
-vapors-compiler = { git = "https://github.com/tomyan/vapors", rev = "d23b2a4dd7dc865a046d3a171c8ce99aec8d8e43" }
+vapors-compiler = { git = "https://github.com/tomyan/vapors", rev = "84da8a2005040ee1dbcaba823fe7ecfb45b832bf" }
 
 # Debug builds are for iterating, so no debug info. With this and the
 # default features off, the first debug build took 44 s rather than
