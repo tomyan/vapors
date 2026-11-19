@@ -1,7 +1,7 @@
 //! A node: what it is, where it sits, and reading it from the scene.
 
 use crate::{
-    CameraHandle, Colour, GeometryHandle, NodeId, Projection, Scene, StoreError, Transform,
+    CameraHandle, Colour, GeometryHandle, Light, NodeId, Projection, Scene, StoreError, Transform,
 };
 use glam::Mat4;
 
@@ -25,6 +25,9 @@ pub enum NodeKind {
         /// How it projects.
         projection: Projection,
     },
+    /// A light: a directional one shines along the node's -Z, a point
+    /// one from its position.
+    Light(Light),
 }
 
 #[derive(Debug)]

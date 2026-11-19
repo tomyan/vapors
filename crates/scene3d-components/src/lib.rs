@@ -1,5 +1,5 @@
 //! The 3D scene in `.wisp` (`docs/plans/3d-2.md`, row 4 and decision
-//! 1): `<Scene>`, `<Group>`, `<Mesh>` and `<Camera>`, Rust components
+//! 1): `<Scene>`, `<Group>`, `<Mesh>`, `<Camera>` and `<Light>`, Rust components
 //! with typed props, mounted through the compiler's component-tag path
 //! like any child component.
 //!
@@ -15,7 +15,7 @@
 //! ```
 //!
 //! Each component keeps one anchor element, tagged `scene`, `group`,
-//! `mesh` or `camera` and made from a `StyleKey`: the one the compiler
+//! `mesh`, `camera` or `light` and made from a `StyleKey`: the one the compiler
 //! passes as the `anchor` prop for a tag carrying `class`, `class:` or
 //! `style` (`docs/plans/css-for-3d.md`, C1), or else the component's
 //! own (`own_keys.rs`). The user-agent sheet gives those tags
@@ -61,6 +61,7 @@ mod children;
 mod component;
 mod group;
 mod hits;
+mod light;
 mod mesh;
 mod node;
 mod own_keys;
@@ -69,5 +70,6 @@ mod scene;
 
 pub use camera::{Camera, CameraProps};
 pub use group::{Group, GroupProps};
+pub use light::{Light, LightProps};
 pub use mesh::{Mesh, MeshProps};
 pub use scene::{Scene, SceneProps};

@@ -219,6 +219,7 @@ The 3D scene components (`<Scene>`, `<Group>`, `<Mesh>`, `<Camera>`) are styled 
 - `group`: `pointer-events`, `visibility`
 - `mesh`: `animation-delay`, `animation-direction`, `animation-duration`, `animation-fill-mode`, `animation-iteration-count`, `animation-name`, `animation-play-state`, `animation-timing-function`, `color`, `cursor`, `opacity`, `pointer-events`, `transition-delay`, `transition-duration`, `transition-property`, `transition-timing-function`, `visibility`
 - `camera`: none
+- `light`: none
 - `decal`: `pointer-events`, `visibility`
 
 ## Known refusals

@@ -22,17 +22,20 @@ pub enum Resource {
     /// The pass's attachments: the depth texture, and at 4 samples the
     /// multisampled colour texture.
     Attachments,
+    /// The lights uniform's buffer.
+    Lights,
     /// One uploaded piece of geometry: its vertex and index buffers.
     Geometry,
 }
 
 impl Resource {
     /// Every kind.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Pipeline,
         Self::Camera,
         Self::Slots,
         Self::Attachments,
+        Self::Lights,
         Self::Geometry,
     ];
 }
@@ -43,8 +46,8 @@ impl Resource {
 pub struct RendererLog {
     dropped: Cell<bool>,
     renders: Cell<u64>,
-    made: [Cell<u64>; 5],
-    freed: [Cell<u64>; 5],
+    made: [Cell<u64>; 6],
+    freed: [Cell<u64>; 6],
 }
 
 impl RendererLog {
@@ -83,7 +86,7 @@ impl RendererLog {
         self.dropped.set(true);
     }
 
-    fn count(cells: &[Cell<u64>; 5], kind: Resource) {
+    fn count(cells: &[Cell<u64>; 6], kind: Resource) {
         let cell = &cells[kind as usize];
         cell.set(cell.get() + 1);
     }

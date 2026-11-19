@@ -60,3 +60,18 @@ fn a_negative_channel_is_refused_by_name() {
         })
     );
 }
+
+#[test]
+fn linear_undoes_the_srgb_transfer_function() {
+    // Given: the toe, the knee's neighbour and the ends
+    let colour = Colour::srgb(0.0, 0.04, 1.0).unwrap();
+
+    // When
+    let [r, g, b] = colour.linear();
+
+    // Then
+    assert_eq!(r, 0.0);
+    assert!((g - 0.04 / 12.92).abs() < 1e-7);
+    assert!((b - 1.0).abs() < 1e-6);
+    assert!((Colour::srgb(0.5, 0.5, 0.5).unwrap().linear()[0] - 0.214_041).abs() < 1e-5);
+}

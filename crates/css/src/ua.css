@@ -118,4 +118,4 @@ hr {
    each is a keyed element in the document, for the cascade, with no
    box, no paint and no place in the accessibility tree
    (docs/plans/css-for-3d.md, section 4.1). */
-scene, group, mesh, camera, decal { display: none; }
+scene, group, mesh, camera, light, decal { display: none; }

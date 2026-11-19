@@ -11,11 +11,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::SurfaceHandle;
 use vapors_dom::{Dom, DynDom, NodeId as ElementId, Root, Snippet, StyleKey};
-use vapors_scene3d::{CameraHandle, Scene as Store};
+use vapors_scene3d::{Ambient, CameraHandle, Scene as Store};
 use vapors_signals::Owner;
 
 /// What a parent passes to [`Scene::mount`].
-#[derive(Default)]
 pub struct SceneProps {
     /// The scene the surface's `SceneRenderer` draws; required.
     pub scene: Option<Rc<RefCell<Store>>>,
@@ -25,11 +24,26 @@ pub struct SceneProps {
     /// The active camera, by the handle a `<Camera>` holds. `None`, or a
     /// handle no camera holds, is refused by the frame.
     pub camera: Option<CameraHandle>,
+    /// The scene's ambient light; none by default.
+    pub ambient: Ambient,
     /// Its nodes.
     pub children: Snippet,
     /// The anchor's key, which the compiler passes for a tag carrying
     /// `class`, `class:` or `style`; `None` takes the component's own.
     pub anchor: Option<&'static StyleKey>,
+}
+
+impl Default for SceneProps {
+    fn default() -> Self {
+        Self {
+            scene: None,
+            surface: None,
+            camera: None,
+            ambient: Ambient::NONE,
+            children: Snippet::default(),
+            anchor: None,
+        }
+    }
 }
 
 impl SceneProps {
@@ -66,6 +80,7 @@ impl Scene {
             )
         };
         scene.borrow_mut().set_camera(props.camera);
+        scene.borrow_mut().set_ambient(props.ambient);
         let owner = Owner::new();
         let key = own_keys::anchor_key("Scene", props.anchor, &own_keys::SCENE);
         let (anchor, placement) = owner.with(|| {

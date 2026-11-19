@@ -37,6 +37,10 @@ pub enum StoreError {
     NotMesh(NodeId, &'static str),
     /// A camera's setter, named, called on a group or mesh.
     NotCamera(NodeId, &'static str),
+    /// A ninth light, past [`crate::MAX_LIGHTS`].
+    TooManyLights,
+    /// A light node's kind the scene cannot use.
+    Light(crate::SceneError),
 }
 
 impl fmt::Display for StoreError {
@@ -73,6 +77,12 @@ impl fmt::Display for StoreError {
                 f,
                 "{id} is not a camera, so Scene::{setter} cannot apply to it: pass a camera node's id"
             ),
+            Self::TooManyLights => write!(
+                f,
+                "the scene already holds {} lights, the most one lights uniform takes: remove a light before adding another (`cargo test -p vapors-scene3d --lib lights`)",
+                crate::MAX_LIGHTS
+            ),
+            Self::Light(error) => write!(f, "light: {error}"),
         }
     }
 }

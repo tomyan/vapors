@@ -21,17 +21,20 @@ pub enum SceneTag {
     Mesh,
     /// `<Camera>`: a view of the scene.
     Camera,
+    /// `<Light>`: a directional or point light; neither drawn nor hit.
+    Light,
     /// `<Decal>` (docs/plans/one-scene.md S8): paths on a mesh.
     Decal,
 }
 
 impl SceneTag {
     /// Every scene tag.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Scene,
         Self::Group,
         Self::Mesh,
         Self::Camera,
+        Self::Light,
         Self::Decal,
     ];
 
@@ -49,6 +52,7 @@ impl SceneTag {
             Self::Group => "group",
             Self::Mesh => "mesh",
             Self::Camera => "camera",
+            Self::Light => "light",
             Self::Decal => "decal",
         }
     }
@@ -82,7 +86,7 @@ struct Group {
 }
 
 const MESH: u8 = SceneTag::Mesh.bit();
-/// The tags whose nodes are drawn or hit: all but `camera`.
+/// The tags whose nodes are drawn or hit: all but `camera` and `light`.
 const DRAWN: u8 =
     SceneTag::Scene.bit() | SceneTag::Group.bit() | SceneTag::Mesh.bit() | SceneTag::Decal.bit();
 const NONE: u8 = 0;

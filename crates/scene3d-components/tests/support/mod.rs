@@ -7,6 +7,7 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod hits;
 pub mod keyed;
+pub mod lights;
 pub mod rows;
 
 use scene_page::{ScenePage, ScenePageProps};

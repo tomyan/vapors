@@ -23,6 +23,7 @@ pub struct Scene {
     live: usize,
     pub(crate) dirty: Vec<NodeId>,
     pub(crate) camera: Option<CameraHandle>,
+    pub(crate) ambient: crate::Ambient,
 }
 
 impl Scene {
@@ -42,6 +43,7 @@ impl Scene {
             live: 0,
             dirty: Vec::new(),
             camera: None,
+            ambient: crate::Ambient::NONE,
         };
         scene.root = scene.insert(NodeKind::Group, Transform::IDENTITY, None);
         scene
@@ -78,6 +80,7 @@ impl Scene {
         local: Transform,
     ) -> Result<NodeId, StoreError> {
         self.node(parent)?;
+        self.check_light(&kind)?;
         let id = self.insert(kind, local, Some(parent));
         self.node_mut(parent)?.children.push(id);
         Ok(id)
