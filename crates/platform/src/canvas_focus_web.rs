@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{Document, Event, HtmlCanvasElement};
 
 use crate::PlatformError;
-use crate::canvas_focus::{Held, takes_focus};
+use crate::canvas_focus::{Failed, Held, failure_message, takes_focus};
 
 /// Focus the canvas, unless the page's element holds focus, and keep it
 /// off `<body>` for the page's life.
@@ -43,14 +43,23 @@ fn listen(document: &Document, canvas: &HtmlCanvasElement, name: &str) -> Result
     let listener = Closure::<dyn FnMut(Event)>::new(move |_event: Event| {
         let (doc, canvas) = (doc.clone(), canvas.clone());
         let later = Closure::once_into_js(move || take(&doc, &canvas, false));
-        if let Some(window) = web_sys::window() {
-            drop(window.set_timeout_with_callback(later.unchecked_ref()));
-        }
+        schedule(&later);
     });
     document.add_event_listener_with_callback(name, listener.as_ref().unchecked_ref())?;
     // the page has no teardown: the listener lives as long as it does
     listener.forget();
     Ok(())
+}
+
+/// Run `later` after the event; report when it cannot.
+fn schedule(later: &JsValue) {
+    let Some(window) = web_sys::window() else {
+        crate::report::report_error(&failure_message(Failed::NoWindow, ""));
+        return;
+    };
+    if let Err(e) = window.set_timeout_with_callback(later.unchecked_ref()) {
+        crate::report::report_error(&failure_message(Failed::Timeout, &format!("{e:?}")));
+    }
 }
 
 /// Focuses the canvas if `takes_focus` says so; `at_start` skips the
@@ -63,8 +72,10 @@ fn take(document: &Document, canvas: &HtmlCanvasElement, at_start: bool) {
             ));
             false
         });
-    if takes_focus(held(document, canvas), focused) {
-        drop(canvas.focus());
+    if takes_focus(held(document, canvas), focused)
+        && let Err(e) = canvas.focus()
+    {
+        crate::report::report_error(&failure_message(Failed::Focus, &format!("{e:?}")));
     }
 }
 
