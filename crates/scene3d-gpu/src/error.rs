@@ -64,6 +64,13 @@ pub enum FrameError {
     },
     /// A lit mesh, no light node and zero ambient.
     LitWithoutLight(NodeId),
+    /// A lit mesh that also names an application material.
+    LitWithMaterial {
+        /// The mesh node.
+        node: NodeId,
+        /// The material it names.
+        material: MaterialId,
+    },
     /// The mesh uniform slots would need a buffer past the device's
     /// `max_buffer_size`.
     TooManySlots {
@@ -153,6 +160,10 @@ impl fmt::Display for FrameError {
             Self::LitWithoutLight(node) => write!(
                 f,
                 "lit mesh {node} is in a scene with no light and zero ambient, so it would draw black: add a <Light> or give <Scene> an ambient level, or set shading Unlit (`cargo test -p vapors-scene3d-gpu --test gpu_scene_lit_refusals`)"
+            ),
+            Self::LitWithMaterial { node, material } => write!(
+                f,
+                "lit mesh {node} also names {material}, and a material draws by its own function, not the lights: drop the material or set shading Unlit (`cargo test -p vapors-scene3d-gpu --test gpu_scene_lit_refusals`)"
             ),
             Self::TooManySlots {
                 slots,

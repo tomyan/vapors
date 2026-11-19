@@ -23,6 +23,8 @@ pub(crate) struct MeshNode {
     pub(crate) material: Option<MaterialId>,
     /// Drawn lit (`Shading::Lit`), by the lit pipeline.
     pub(crate) lit: bool,
+    /// Drawn with a specular highlight too (`Shading::Glossy`).
+    pub(crate) glossy: bool,
 }
 
 /// Every mesh node under the root, parents before children, each
@@ -51,6 +53,7 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
     if let Some(material) = material.filter(|&material| !meshes.issued_material(material)) {
         return Err(FrameError::ForeignMaterial { node, material });
     }
+    let shading = scene.shading(node)?;
     Ok(Some(MeshNode {
         node,
         geometry,
@@ -58,7 +61,8 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
         colour,
         visible: scene.visible(node)?,
         material,
-        lit: scene.shading(node)? == Shading::Lit,
+        lit: shading != Shading::Unlit,
+        glossy: shading == Shading::Glossy,
     }))
 }
 
@@ -103,6 +107,7 @@ pub(crate) enum Which {
     Colour,
     Material(usize),
     Lit,
+    Glossy,
 }
 
 /// One mesh's draw: pipeline, slot offset and geometry.
@@ -121,7 +126,7 @@ pub(crate) fn record(encoder: &mut wgpu::CommandEncoder, pass: &Pass<'_>, draws:
         }
         render.set_bind_group(1, pass.slots, &[*offset]);
         render.set_vertex_buffer(0, geometry.vertices.slice(..));
-        if let (Which::Lit, Some(normals)) = (which, &geometry.normals) {
+        if let (Which::Lit | Which::Glossy, Some(normals)) = (which, &geometry.normals) {
             render.set_vertex_buffer(1, normals.slice(..));
         }
         render.set_index_buffer(geometry.indices.slice(..), wgpu::IndexFormat::Uint32);
@@ -135,11 +140,14 @@ fn set_pipeline(render: &mut wgpu::RenderPass<'_>, pass: &Pass<'_>, which: Which
     match (which, pass.lit) {
         (Which::Colour, _) => render.set_pipeline(colour),
         (Which::Material(at), _) => render.set_pipeline(&materials[at]),
-        (Which::Lit, Some(lit)) => {
-            render.set_pipeline(&lit.pipeline);
+        (Which::Lit | Which::Glossy, Some(lit)) => {
+            let glossy = which == Which::Glossy;
+            render.set_pipeline(if glossy { &lit.glossy } else { &lit.pipeline });
             render.set_bind_group(2, &lit.bind_group, &[]);
         }
-        (Which::Lit, None) => unreachable!("a lit mesh makes the lit pipeline before it draws"),
+        (Which::Lit | Which::Glossy, None) => {
+            unreachable!("a lit mesh makes the lit pipeline before it draws")
+        }
     }
 }
 

@@ -22,6 +22,14 @@ enum Kind {
 }
 
 impl Projection {
+    /// Whether rays through the viewport meet at the eye (perspective),
+    /// rather than running parallel (either orthographic kind): what a
+    /// specular highlight needs to find its view direction.
+    #[must_use]
+    pub fn is_perspective(&self) -> bool {
+        matches!(self.kind, Kind::Perspective { .. })
+    }
+
     /// A perspective projection. Refuses a non-finite value, a field of
     /// view outside (0, pi), `near <= 0` and `far <= near`.
     ///

@@ -4,7 +4,7 @@ mod support;
 
 use support::lit::{box_mesh, shining, sun};
 use support::{Fixture, RED, render};
-use vapors_scene3d::{Ambient, Colour, Projection, Shading, Transform, Vec3};
+use vapors_scene3d::{Ambient, Colour, Material, Projection, Shading, Transform, Vec3};
 
 fn fixture() -> Fixture {
     let fixture = Fixture::new();
@@ -61,4 +61,26 @@ fn gpu_ambient_alone_lights_a_lit_mesh() {
 
     // When / Then
     render(&mut renderer, &gpu).expect("renders");
+}
+
+#[test]
+fn gpu_a_lit_mesh_with_a_material_is_refused_naming_node_and_material() {
+    // Given: a lit box that also names a material
+    let fixture = fixture();
+    let wgsl = "fn material(at: MaterialInput) -> vec4<f32> { return at.colour; }";
+    let material = Material {
+        label: "plain",
+        wgsl: wgsl.into(),
+    };
+    let id = fixture.meshes.borrow_mut().material(material).unwrap();
+    let node = box_mesh(&fixture, RED, Transform::IDENTITY, Shading::Lit);
+    sun(&fixture, shining(-Vec3::Z));
+    fixture
+        .scene
+        .borrow_mut()
+        .set_material(node, Some(id))
+        .unwrap();
+
+    // When / Then
+    refused(&fixture, &[&node.to_string(), "plain", "Unlit"]);
 }

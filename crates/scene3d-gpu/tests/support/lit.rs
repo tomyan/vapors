@@ -1,8 +1,8 @@
 //! A lit box and its lights, for the lit material's tests.
 
-use super::Fixture;
+use super::{Fixture, SIZE, at, to_pixel};
 use vapors_scene3d::{
-    Colour, Light, NodeId, NodeKind, Quat, Shading, Transform, Vec3, flat_shaded,
+    Colour, Light, NodeId, NodeKind, Quat, Shading, Transform, Vec3, flat_shaded, project,
 };
 
 /// A unit box's twelve triangles, counter-clockwise from outside.
@@ -52,4 +52,36 @@ pub fn sun(fixture: &Fixture, at: Transform) -> NodeId {
 pub fn shining(direction: Vec3) -> Transform {
     let turn = Quat::from_rotation_arc(-Vec3::Z, direction.normalize());
     Transform::new(Vec3::ZERO, turn, Vec3::ONE).unwrap()
+}
+
+fn encode(c: f32) -> f32 {
+    if c <= 0.003_130_8 {
+        c * 12.92
+    } else {
+        1.055 * c.powf(1.0 / 2.4) - 0.055
+    }
+}
+
+/// The 8-bit colour `lighting.wgsl` is held to for `albedo` (sRGB):
+/// its linear colour times `scale` (ambient plus diffuse, the lights'
+/// colour being white) plus a white `spec`, encoded back to sRGB.
+pub fn encoded(albedo: [u8; 4], scale: f32, spec: f32) -> [f32; 3] {
+    let [r, g, b, _] = albedo.map(|c| f32::from(c) / 255.0);
+    let linear = Colour::srgb(r, g, b).unwrap().linear();
+    linear.map(|a| (255.0 * encode(a * scale + spec)).min(255.0))
+}
+
+/// The rendered colour at the pixel `world` projects to.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // inside the backing
+pub fn colour_at(pixels: &[u8], fixture: &Fixture, world: Vec3) -> [u8; 4] {
+    #[allow(clippy::cast_precision_loss)]
+    let aspect = SIZE.width as f32 / SIZE.height as f32;
+    let matrix = fixture.scene.borrow().view_projection(aspect).unwrap();
+    let [x, y] = to_pixel(project(matrix, world).expect("in front of the eye"));
+    at(pixels, x as u32, y as u32)
+}
+
+/// Whether `got` is within 1/255 per channel of `want`.
+pub fn near(got: [u8; 4], want: [f32; 3]) -> bool {
+    (0..3).all(|i| (f32::from(got[i]) - want[i]).abs() <= 1.0)
 }

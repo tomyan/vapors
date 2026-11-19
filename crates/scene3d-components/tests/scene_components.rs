@@ -4,6 +4,8 @@
 
 #[path = "components/material.rs"]
 mod material;
+#[path = "components/shading.rs"]
+mod shading;
 mod support;
 
 use support::{Rig, at};

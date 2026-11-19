@@ -3,29 +3,17 @@
 
 mod support;
 
-use support::lit::{box_mesh, shining, sun};
+use support::lit::{box_mesh, encoded, shining, sun};
 use support::{Fixture, render};
 use vapors_scene3d::{Ambient, Colour, Projection, Quat, Shading, Transform, Vec3};
 
 const ALBEDO: [u8; 4] = [204, 128, 77, 255];
 
-fn encode(c: f32) -> f32 {
-    if c <= 0.003_130_8 {
-        c * 12.92
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
-    }
-}
-
 /// The 8-bit colour of a face with `normal` lit by white from `to_light`
 /// and `ambient`: the formula `lighting.wgsl` is held to.
 fn expected(normal: Vec3, to_light: Vec3, ambient: f32) -> [f32; 3] {
     let lambert = normal.dot(to_light).max(0.0);
-    let [r, g, b, _] = ALBEDO.map(|c| f32::from(c) / 255.0);
-    Colour::srgb(r, g, b)
-        .unwrap()
-        .linear()
-        .map(|a| 255.0 * encode(a * (ambient + lambert)))
+    encoded(ALBEDO, ambient + lambert, 0.0)
 }
 
 /// A box turned to show three faces: its transform and their normals.

@@ -124,6 +124,7 @@ impl SurfaceRenderer for SceneRenderer {
 /// The pipeline `mesh` draws with.
 fn which(mesh: &MeshNode) -> Which {
     match (mesh.lit, mesh.material) {
+        (true, _) if mesh.glossy => Which::Glossy,
         (true, _) => Which::Lit,
         (false, Some(material)) => Which::Material(material.index()),
         (false, None) => Which::Colour,
