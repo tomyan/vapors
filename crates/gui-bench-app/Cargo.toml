@@ -13,8 +13,9 @@ name = "vapors-bench"
 path = "src/main.rs"
 
 # The dependency set is declared here, with the crate, so the builder
-# slices (s1 to s3) never change the root Cargo.lock: features may change,
-# packages may not.
+# slices (s1 to s3) never change the root Cargo.lock, which the builder
+# push check refuses (only crates/ and docs/ may change): features may
+# change, packages may not. vapors-compiler is for s1's build.rs.
 [dependencies]
 vapors-app.workspace = true
 vapors-components.workspace = true
