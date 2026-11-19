@@ -45,9 +45,9 @@ fn a_binary_file_is_refused() {
 #[test]
 fn more_than_the_cap_is_refused_naming_the_count() {
     let refused =
-        checked(&z(&["300\t101\tcrates/a/src/lib.rs"]), "", &default()).expect_err("refused");
+        checked(&z(&["500\t101\tcrates/a/src/lib.rs"]), "", &default()).expect_err("refused");
     assert!(
-        refused.starts_with("401 lines changed, over 400"),
+        refused.starts_with("601 lines changed, over 600"),
         "{refused}"
     );
 }

@@ -11,8 +11,9 @@
 pub const ALLOWED: [&str; 2] = ["crates/", "docs/"];
 
 /// The most lines a pushed branch may change, added and removed: the
-/// PR rule (about 400).
-pub const LINE_CAP: u64 = 400;
+/// PR rule, raised from 400 by Tom on 2026-11-19: the last six harness
+/// slices were 490 to 730 lines, most of it tests and docs.
+pub const LINE_CAP: u64 = 600;
 
 /// File modes refused: a symlink can point a checkout outside the tree,
 /// and a gitlink names another repository.
