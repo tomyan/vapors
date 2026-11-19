@@ -165,6 +165,8 @@ mod cancel;
 pub(crate) mod capture;
 #[path = "events_hit.rs"]
 mod hit;
+#[path = "events_kind.rs"]
+pub(crate) mod kind;
 #[path = "events_mouse.rs"]
 mod mouse;
 #[path = "events_tap.rs"]

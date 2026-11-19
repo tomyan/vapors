@@ -36,7 +36,7 @@ pub use class_names::class_names;
 pub use compiled_sheet::CompiledSheet;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
-pub use event_pointer::{Capture, Pointer};
+pub use event_pointer::{Capture, Pointer, PointerKind};
 pub use key_winners::{
     BaseWinner, DeclarationRef, KeyWinners, PropertyRef, RuleRef, SheetRef, Winners,
 };

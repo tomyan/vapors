@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 use vapors_components::hold_button::{HoldButton, HoldButtonProps};
 use vapors_dom::{
-    Event, Listeners, NodeId, Pointer,
+    Event, Listeners, NodeId, Pointer, PointerKind,
     recording::{Call, RecordingDom},
 };
 use vapors_signals::Signal;
@@ -73,10 +73,24 @@ impl Mounted {
     }
 
     pub fn pointer(&self, name: &str, id: u32) -> Event {
+        // the document's convention: id 1 is the mouse, the rest fingers
+        let kind = if id == 1 {
+            PointerKind::Mouse
+        } else {
+            PointerKind::Touch
+        };
+        self.pointer_of(name, id, kind)
+    }
+
+    /// `name` for pointer `id` made by `kind`; `HoldButton` keys on the id
+    /// alone, so `pointer` follows the id convention and `kind_is_not_read` varies it.
+    pub fn pointer_of(&self, name: &str, id: u32, kind: PointerKind) -> Event {
         self.send(Event::new(name).with_pointer(Pointer {
             id,
+            kind,
             pressed: name == "pointerdown",
-            ..Pointer::default()
+            client: [0.0; 2],
+            offset: [0.0; 2],
         }))
     }
 }
