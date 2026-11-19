@@ -71,6 +71,8 @@ fn main() -> Result<(), String> {
         title: format!("idle fps: {name}"),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     let frames = Arc::new(AtomicU64::new(0));
     if name == "image" {

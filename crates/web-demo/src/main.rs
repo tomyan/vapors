@@ -35,6 +35,8 @@ fn start() -> Result<(), String> {
         title: format!("vapors demo: {name}"),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     // the bar stepping through the listed demos; none for the index,
     // nor with ?bar=0 (bar_query.rs)

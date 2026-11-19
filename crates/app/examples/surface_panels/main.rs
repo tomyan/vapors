@@ -54,6 +54,8 @@ fn start() -> Result<(), String> {
         title: "vapors: two surface panels".into(),
         width: 800,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     run(options, Alternating::new(app, right)).map_err(|error| error.to_string())?;
     failure.get().map_or(Ok(()), Err)

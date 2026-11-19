@@ -40,6 +40,8 @@ fn main() -> ExitCode {
         title: "vapors: clear window".into(),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     support::exit_code(run(options, app), "clear_window")
 }

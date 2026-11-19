@@ -79,6 +79,8 @@ fn main() -> ExitCode {
         title: "vapors: wake window".into(),
         width: 320,
         height: 200,
+        decorations: true,
+        app_id: None,
     };
     if let Err(error) = run(options, app) {
         eprintln!("wake_window: {error}");

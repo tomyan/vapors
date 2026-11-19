@@ -63,6 +63,8 @@ fn main() -> ExitCode {
         title: "vapors: image window".into(),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     support::exit_code(run(options, window), "image_window")
 }

@@ -198,6 +198,8 @@ pub fn run(limit: Option<u64>, readout: Option<Samples>) -> Result<(), String> {
         title: "Vapors / One scene".into(),
         width: SIZE.0,
         height: SIZE.1,
+        decorations: true,
+        app_id: None,
     };
     let mut scene = OneScene::at(limit, readout.unwrap_or(Samples::One))?;
     if readout.is_some() {

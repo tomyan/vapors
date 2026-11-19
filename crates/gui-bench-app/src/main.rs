@@ -1,23 +1,25 @@
 //! vapors under gui-bench: one window per run that shows the scenario the
-//! command line names. Built in slices s1 to s3
-//! (`docs/decisions/2026-11-19-gui-bench.md`); until s1, it refuses.
+//! command line names (`docs/decisions/2026-11-19-gui-bench.md`). Slice
+//! s1 builds the window, the sidebar, the top bar and the metric cards;
+//! the rest follows in s2 and s3 (see `FLAGS.md` for parts built by hand).
 
-// The vendored spec, compiled into the tests now so its own tests run
-// before the app uses it; s1 includes it in the binary too.
-#[cfg(test)]
+mod app;
 #[allow(clippy::all, clippy::pedantic, dead_code)] // vendored unchanged; docs/gui-bench/spec/NOTICE.md
 #[path = "../../../docs/gui-bench/spec/cli.rs"]
 mod cli;
-#[cfg(test)]
 #[allow(clippy::all, clippy::pedantic, dead_code)] // vendored unchanged; docs/gui-bench/spec/NOTICE.md
 #[path = "../../../docs/gui-bench/spec/dashboard.rs"]
 mod dashboard;
+include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 #[cfg(test)]
 mod spec_tests;
+#[cfg(test)]
+mod tests;
 
 fn main() {
-    eprintln!(
-        "vapors-bench: not built yet; slice s1 builds the app (docs/decisions/2026-11-19-gui-bench.md)"
-    );
-    std::process::exit(2);
+    let scenario = cli::from_env("vapors-bench");
+    if let Err(message) = app::run(scenario) {
+        eprintln!("vapors-bench: {message}");
+        std::process::exit(2);
+    }
 }

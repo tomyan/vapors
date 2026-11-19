@@ -80,6 +80,8 @@ fn open(app: impl App + 'static, failure: &Failure) -> Result<(), String> {
         title: "vapors: surface gradient".into(),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     run(options, app).map_err(|error| error.to_string())?;
     failure.get().map_or(Ok(()), Err)
