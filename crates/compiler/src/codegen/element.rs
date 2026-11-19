@@ -8,6 +8,7 @@
 use super::allowances::shown_text;
 use super::attribute_kind::{AttributeKind, kind};
 use super::emit::{Emitter, Place};
+use super::syn_map::parse_expr;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Attributes, Element, Expr};
 
@@ -102,23 +103,42 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    /// The listener for a handler: a zero-argument script closure is
-    /// called with no event, anything else with the event; either may
-    /// return `()` or `Result<(), E>`, whose `Err` goes to the error
-    /// report (`vapors_dom::handle`).
+    /// The listener for a handler: a zero-argument closure, a script
+    /// one or written inline, is called with no event, anything else
+    /// with the event; either may return `()` or `Result<(), E>`, whose
+    /// `Err` goes to the error report (`vapors_dom::handle`). An inline
+    /// closure with two or more parameters is refused.
     pub(super) fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
         self.refuse_assigning_handler(expr, &code)?;
-        Ok(match self.script.handlers.get(&code) {
-            Some(0) => {
-                format!(
-                    "move |_event: &mut Event| vapors_elements::__wisp::dom::handle_without_event(&{code})"
-                )
-            }
-            _ => format!(
-                "move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &{code})"
-            ),
+        let arity = match parse_expr(self.source, expr)? {
+            syn::Expr::Closure(closure) => Some(self.inline_arity(expr, &closure, &code)?),
+            _ => self.script.handlers.get(&code).copied(),
+        };
+        Ok(if arity == Some(0) {
+            format!(
+                "move |_event: &mut Event| vapors_elements::__wisp::dom::handle_without_event(&{code})"
+            )
+        } else {
+            format!("move |event: &mut Event| vapors_elements::__wisp::dom::handle(event, &{code})")
         })
+    }
+
+    /// The parameters of an inline handler closure: at most one (the event).
+    fn inline_arity(
+        &self,
+        expr: &Expr,
+        closure: &syn::ExprClosure,
+        code: &str,
+    ) -> Result<usize, CompileError> {
+        let count = closure.inputs.len();
+        if count <= 1 {
+            return Ok(count);
+        }
+        Err(self.source.error(expr.offset, format!(
+            "the handler `{code}` takes {count} parameters, and a listener is called with at most one, the event: write `onclick={{move || ..}}` to ignore the event or `onclick={{move |event| ..}}` to use it; check with `cargo run -p vapors-compiler --bin wisp-check -- {}`",
+            self.source.path
+        )))
     }
 
     /// A statement, inside a block with the clones when there are any.

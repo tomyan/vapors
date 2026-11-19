@@ -160,3 +160,43 @@ fn a_handler_that_assigns_only_to_its_own_bindings_is_taken() {
         "vapors_elements::__wisp::dom::handle_without_event(&bump)",
     );
 }
+
+#[test]
+fn inline_closure_without_parameters_is_called_without_the_event() {
+    // Given
+    let script = "let count: Signal<i32> = Signal::new(0);";
+
+    // When
+    let code = generated_with(script, "<button onclick={move || count.set(0)}>x</button>");
+
+    // Then
+    assert_has(
+        &code,
+        "Box::new(move |_event: &mut Event| vapors_elements::__wisp::dom::handle_without_event(&move || count.set(0)))",
+    );
+}
+
+#[test]
+fn inline_closure_with_two_parameters_is_refused_naming_file_line_and_fix() {
+    // When
+    let err = refusal("<script>\nlet a: Signal<i32> = Signal::new(0);\n</script>\n<button onclick={|x, y| a.set(0)}>x</button>").to_string();
+
+    // Then
+    assert!(err.contains("counter.wisp:4"), "{err}");
+    assert!(err.contains("takes 2 parameters"), "{err}");
+    assert!(err.contains("onclick={move || ..}"), "{err}");
+    assert!(
+        err.contains("cargo run -p vapors-compiler --bin wisp-check"),
+        "{err}"
+    );
+}
+
+#[test]
+fn component_tag_closure_is_passed_as_a_prop_unchanged() {
+    // When
+    let code = generated_with("", "<Child onclick={move || hop()} />");
+
+    // Then
+    assert_has(&code, "let child0_onclick = move || hop();");
+    assert_lacks(&code, "handle_without_event");
+}
