@@ -20,6 +20,7 @@ mod inline;
 mod media;
 mod media_eval;
 mod media_feature;
+mod media_input;
 mod media_items;
 mod media_range;
 mod presentation;
@@ -31,7 +32,10 @@ pub use compiled::CompiledRules;
 pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, SVG_TAGS, declarations_of};
 pub use share::{Unshareable, rule_indices_for_key, unshareable};
 pub(crate) use {collect::rank, compute::initial, compute::resolve_for};
-pub use {computed::ComputedStyle, environment::Environment};
+pub use {
+    computed::ComputedStyle,
+    environment::{Environment, Pointer},
+};
 pub(crate) use {font_weight::is_parent_relative, inline::INLINE_SPECIFICITY};
 pub use {inline::INLINE_SHEET, restyle::RestyleScope};
 

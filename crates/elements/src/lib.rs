@@ -100,6 +100,7 @@ mod lane_decline;
 mod lay_out_text;
 mod layout;
 mod link;
+mod viewport_signals;
 pub use link::{Navigation, Opened};
 mod media_checks;
 mod node;
@@ -249,6 +250,10 @@ pub use tags::{LATER as LATER_TAGS, SUPPORTED as SUPPORTED_TAGS};
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
 pub use update_counts::UpdateCounts;
+pub use viewport_signals::{
+    Orientation, PrimaryInput, Size, orientation, set_primary_input, set_viewport_size,
+    viewport_size,
+};
 
 /// What generated `.wisp` code names, so a page's crate need not depend
 /// on `vapors-dom` itself. Not for use outside generated code.

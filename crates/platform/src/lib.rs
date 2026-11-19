@@ -126,6 +126,14 @@ pub use uncaptured::{Uncaptured, UncapturedErrors};
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 
+/// Whether the browser's own `matchMedia(query)` matches, such as
+/// `(pointer: coarse)`. Only on the web: natively there is no browser.
+#[cfg(target_family = "wasm")]
+#[must_use]
+pub fn media_matches(query: &str) -> bool {
+    web::media_matches(query)
+}
+
 /// Declare that the app draws its own Open button, so the page needs no
 /// `<button id="open">`: without this call a page lacking one is
 /// reported as an error. A button the page has is hidden. Call it before

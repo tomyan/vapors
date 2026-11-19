@@ -1,8 +1,8 @@
 //! Evaluating a parsed media feature against the environment or a
 //! container's size.
 
-use super::Environment;
 use super::media_feature::{Feature, SizeAxis};
+use super::{Environment, Pointer};
 use crate::value::{ColorScheme, Context};
 
 /// What size features compare against: the viewport or a container.
@@ -12,6 +12,8 @@ pub(crate) struct Sizes {
     resolution: f64,
     color_scheme: ColorScheme,
     reduced_motion: bool,
+    pointer: Pointer,
+    hover: bool,
     /// What feature lengths resolve against.
     ctx: Context,
 }
@@ -33,6 +35,8 @@ impl Sizes {
             resolution: env.resolution,
             color_scheme: env.color_scheme,
             reduced_motion: env.reduced_motion,
+            pointer: env.pointer,
+            hover: env.hover,
             ctx: Context {
                 font_size: env.root_font_size,
                 root_font_size: env.root_font_size,
@@ -60,6 +64,12 @@ impl Feature {
             Self::Resolution(tests) => tests.iter().all(|(op, v)| op.holds(sizes.resolution, *v)),
             Self::ColorScheme(s) => sizes.color_scheme == *s,
             Self::ReducedMotion(r) => sizes.reduced_motion == *r,
+            Self::Orientation { portrait } => (sizes.height > sizes.width) == *portrait,
+            Self::AspectRatio(tests) => tests
+                .iter()
+                .all(|(op, v)| op.holds(sizes.width / sizes.height, *v)),
+            Self::Pointer(p) => sizes.pointer == *p,
+            Self::Hover(h) => sizes.hover == *h,
         }
     }
 }

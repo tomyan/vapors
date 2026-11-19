@@ -22,6 +22,14 @@ pub fn has_webgpu() -> bool {
     })
 }
 
+/// Whether the browser's own `matchMedia(query)` matches; false when
+/// the page has no window or the browser has no such function.
+pub fn media_matches(query: &str) -> bool {
+    web_sys::window()
+        .and_then(|window| window.match_media(query).ok().flatten())
+        .is_some_and(|list| list.matches())
+}
+
 /// Whether [`app_draws_open`] ran: the app draws its own Open and opens
 /// no files through the page's button.
 static APP_DRAWS_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

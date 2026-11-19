@@ -4,7 +4,6 @@
 //! `tracing` span named `update phase`, its `phase` field `style`,
 //! `layout` or `paint`, for a reader of the spans (`crates/perf`).
 
-use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
 
 use crate::changed_slots::ChangedSlots;
@@ -188,11 +187,4 @@ impl Document {
     }
 }
 
-pub(crate) fn environment(viewport: Viewport) -> Environment {
-    Environment {
-        viewport_width: f64::from(viewport.width),
-        viewport_height: f64::from(viewport.height),
-        resolution: f64::from(viewport.scale),
-        ..Environment::default()
-    }
-}
+pub(crate) use crate::viewport_signals::environment_of as environment;
