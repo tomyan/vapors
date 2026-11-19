@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::rc::{Rc, Weak};
 use std::task::{Context, Poll, Waker};
 
-use super::Caught;
+use super::{Caught, WorkDone};
 
 /// The loop's waker once the owner gives it (`ScenePainter::wake_with`),
 /// shared with every watched scope: an error wakes whichever waker is
@@ -49,7 +49,7 @@ impl Watched {
     /// Reads `scope`'s result if it has one now; otherwise watches it
     /// until it does or its deadline passes, waking `waker` for an
     /// error or the deadline.
-    pub(super) fn new(mut scope: Caught, waker: &LoopWaker) -> Self {
+    pub(super) fn new(mut scope: Caught, work: Option<WorkDone>, waker: &LoopWaker) -> Self {
         let outcome = Rc::new(RefCell::new(Outcome::Waiting));
         let mut context = Context::from_waker(Waker::noop());
         let unresolved = match scope.as_mut().poll(&mut context) {
@@ -57,7 +57,7 @@ impl Watched {
                 *outcome.borrow_mut() = outcome_of(error);
                 None
             }
-            Poll::Pending => Some(Watch::new(scope, deadline(), &outcome, waker)),
+            Poll::Pending => Some(Watch::new(scope, deadline(work), &outcome, waker)),
         };
         Self::keeping(outcome, unresolved)
     }
@@ -101,16 +101,21 @@ impl Watched {
     }
 }
 
-/// The page's timer at `DEADLINE`, counting visible time only
-/// (`visible_deadline`).
+/// The page's timer at `DEADLINE`, counting visible time only, from
+/// when the GPU reports `work` done if there is some (`staged_deadline`),
+/// else from now (`visible_deadline`).
 #[cfg(target_family = "wasm")]
-fn deadline() -> Deadline {
-    Box::pin(super::deadline::visible_deadline(super::deadline::WebPage))
+fn deadline(work: Option<WorkDone>) -> Deadline {
+    use super::deadline::{WebPage, staged_deadline, visible_deadline};
+    match work {
+        Some(work) => Box::pin(staged_deadline(WebPage, work)),
+        None => Box::pin(visible_deadline(WebPage)),
+    }
 }
 
 /// Natively a scope resolves when popped; frames judge one that did not.
 #[cfg(not(target_family = "wasm"))]
-fn deadline() -> Deadline {
+fn deadline(_work: Option<WorkDone>) -> Deadline {
     Box::pin(std::future::pending())
 }
 
@@ -185,3 +190,7 @@ mod tests;
 #[cfg(test)]
 #[path = "painter_surface_scope_watch_hidden_tests.rs"]
 mod hidden_tests;
+
+#[cfg(test)]
+#[path = "painter_surface_scope_work_tests.rs"]
+mod work_tests;

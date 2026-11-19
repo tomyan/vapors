@@ -19,19 +19,19 @@ type Alarms = Rc<RefCell<Vec<(Duration, Rc<Cell<bool>>)>>>;
 /// A page whose visibility the test sets and whose latest timer it
 /// fires; every timer asked for is recorded.
 #[derive(Clone, Default)]
-struct FakePage {
-    hidden: Rc<Cell<bool>>,
+pub(super) struct FakePage {
+    pub(super) hidden: Rc<Cell<bool>>,
     unreadable: Rc<Cell<bool>>,
     alarms: Alarms,
 }
 
 impl FakePage {
-    fn fire(&self) {
+    pub(super) fn fire(&self) {
         let alarms = self.alarms.borrow();
         alarms.last().expect("a timer is armed").1.set(true);
     }
 
-    fn armed(&self) -> Vec<Duration> {
+    pub(super) fn armed(&self) -> Vec<Duration> {
         self.alarms
             .borrow()
             .iter()
