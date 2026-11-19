@@ -23,6 +23,12 @@
 .short .stats { padding: 6px 10px; }
 .short .stat { display: flex; align-items: center; gap: 8px; }
 .short .value { font-size: 18px; }
+@media (width <= 320px) {
+.short .stats { padding: 6px 8px; gap: 6px; }
+.short .stat { min-width: 0; gap: 4px; }
+.short .caption { font-size: 12px; flex-shrink: 0; }
+.short .value { font-size: 16px; }
+}
 </style>
 
 <div class:small={small.get()} class:short={short.get()}>
