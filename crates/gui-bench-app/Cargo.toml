@@ -1,0 +1,37 @@
+[package]
+name = "vapors-gui-bench-app"
+description = "vapors' app for gui-bench (docs/decisions/2026-11-19-gui-bench.md)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "vapors-bench"
+path = "src/main.rs"
+
+# The dependency set is declared here, with the crate, so the builder
+# slices (s1 to s3) never change the root Cargo.lock, which the builder
+# push check refuses (only crates/ and docs/ may change): features may
+# change, packages may not. vapors-compiler is for s1's build.rs.
+[dependencies]
+vapors-app.workspace = true
+vapors-components.workspace = true
+vapors-dom.workspace = true
+vapors-elements = { workspace = true, features = ["complex-script-breaks", "grid"] }
+vapors-platform.workspace = true
+vapors-renderer.workspace = true
+vapors-signals.workspace = true
+vapors-text = { workspace = true, features = ["complex-script-breaks"] }
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
+vapors-scene.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[lints]
+workspace = true

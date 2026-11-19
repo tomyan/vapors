@@ -3149,6 +3149,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-gui-bench-app"
+version = "0.0.0"
+dependencies = [
+ "vapors-app",
+ "vapors-compiler",
+ "vapors-components",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-platform",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-signals",
+ "vapors-text",
+]
+
+[[package]]
 name = "vapors-one-scene"
 version = "0.0.0"
 dependencies = [
