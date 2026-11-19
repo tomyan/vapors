@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 use vapors_components::hold_button::{HoldButton, HoldButtonProps};
 use vapors_dom::{
-    Event, Listeners, NodeId, Pointer,
+    Event, Listeners, NodeId, Pointer, PointerKind,
     recording::{Call, RecordingDom},
 };
 use vapors_signals::Signal;
@@ -75,8 +75,11 @@ impl Mounted {
     pub fn pointer(&self, name: &str, id: u32) -> Event {
         self.send(Event::new(name).with_pointer(Pointer {
             id,
+            // HoldButton keys on the id alone; any kind serves
+            kind: PointerKind::Touch,
             pressed: name == "pointerdown",
-            ..Pointer::default()
+            client: [0.0; 2],
+            offset: [0.0; 2],
         }))
     }
 }

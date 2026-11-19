@@ -174,6 +174,7 @@ mod pointer_capture_review;
 mod pointer_dblclick;
 mod pointer_dispatch;
 mod pointer_hit;
+mod pointer_kind;
 mod pointer_states;
 mod positioned;
 mod positioned_rows;

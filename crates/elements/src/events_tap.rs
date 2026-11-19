@@ -9,6 +9,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use vapors_dom::PointerKind;
+
 use crate::document::Document;
 use crate::events::Point;
 use crate::events::touch::touch_id;
@@ -33,9 +35,12 @@ impl Document {
             return;
         };
         if !document.borrow().in_disabled_button(hit) {
-            let event = document
-                .borrow()
-                .pointer_event("click", touch_id(0), hit, point);
+            let event = document.borrow().pointer_event(
+                "click",
+                (touch_id(0), PointerKind::Touch),
+                hit,
+                point,
+            );
             crate::events::tree::dispatch_click(document, hit, event);
         }
         let still = document.borrow().still_in(hit);
@@ -54,9 +59,12 @@ impl Document {
         if document.borrow().in_disabled_button(hit) {
             return;
         }
-        let event = document
-            .borrow()
-            .pointer_event("dblclick", touch_id(0), hit, point);
+        let event = document.borrow().pointer_event(
+            "dblclick",
+            (touch_id(0), PointerKind::Touch),
+            hit,
+            point,
+        );
         crate::events::tree::dispatch_bubbling(document, hit, event);
     }
 }

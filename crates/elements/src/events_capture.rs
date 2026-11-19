@@ -10,7 +10,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_dom::{Capture, Event, NodeId, Pointer};
+use vapors_dom::{Capture, Event, NodeId, Pointer, PointerKind};
 
 use super::{Asked, Point, tree::dispatch};
 use crate::document::Document;
@@ -45,7 +45,13 @@ impl Document {
 
     /// `name` for pointer `id` at `point`, with the offset from
     /// `target`'s padding box.
-    pub(super) fn pointer_event(&self, name: &str, id: u32, target: NodeId, point: Point) -> Event {
+    pub(super) fn pointer_event(
+        &self,
+        name: &str,
+        (id, kind): (u32, PointerKind),
+        target: NodeId,
+        point: Point,
+    ) -> Event {
         let origin = self
             .painted
             .as_ref()
@@ -63,6 +69,7 @@ impl Document {
             client: point,
             offset,
             id,
+            kind,
             pressed,
         });
         if id == MOUSE && matches!(name, "pointerdown" | "pointerup" | "click" | "dblclick") {
@@ -117,7 +124,11 @@ pub(super) fn release_capture(document: &Rc<RefCell<Document>>, id: u32) {
 /// Makes an asked-for change of pointer `id`'s capture:
 /// `lostpointercapture` to the element that had it, then
 /// `gotpointercapture` to the one that gets it.
-pub(super) fn process_pending(document: &Rc<RefCell<Document>>, id: u32, point: Point) {
+pub(super) fn process_pending(
+    document: &Rc<RefCell<Document>>,
+    (id, kind): (u32, PointerKind),
+    point: Point,
+) {
     let (had, gets) = {
         let mut doc = document.borrow_mut();
         let captured = doc.pointer.captures.entry(id).or_default();
@@ -137,7 +148,9 @@ pub(super) fn process_pending(document: &Rc<RefCell<Document>>, id: u32, point: 
     }
     for (name, node) in [("lostpointercapture", had), ("gotpointercapture", gets)] {
         if let Some(node) = node {
-            let event = document.borrow().pointer_event(name, id, node, point);
+            let event = document
+                .borrow()
+                .pointer_event(name, (id, kind), node, point);
             dispatch(document, node, event);
         }
     }

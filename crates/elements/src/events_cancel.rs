@@ -8,6 +8,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use vapors_dom::PointerKind;
+
 use super::capture::{MOUSE, dispatch_pointer, process_pending, release_capture};
 use crate::document::Document;
 
@@ -37,16 +39,19 @@ impl Document {
             )
         };
         if let Some(target) = target {
-            let event = document
-                .borrow()
-                .pointer_event("pointercancel", MOUSE, target, point);
+            let event = document.borrow().pointer_event(
+                "pointercancel",
+                (MOUSE, PointerKind::Mouse),
+                target,
+                point,
+            );
             dispatch_pointer(document, MOUSE, target, event);
         }
         crate::range_drag::dropped(document, MOUSE);
         crate::number_scrub::dropped(document, MOUSE);
         document.borrow_mut().pointer.text_presses.remove(&MOUSE);
         release_capture(document, MOUSE);
-        process_pending(document, MOUSE, point);
+        process_pending(document, (MOUSE, PointerKind::Mouse), point);
         document.borrow_mut().release(None);
     }
 }

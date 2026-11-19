@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use vapors_dom::NodeId;
+use vapors_dom::{NodeId, PointerKind};
 
 use super::Point;
 use super::capture::{MOUSE, dispatch_pointer, process_pending, release_capture};
@@ -26,14 +26,17 @@ impl Document {
         modifiers: crate::Modifiers,
     ) {
         document.borrow_mut().pointer.mouse_press = (Some(clicks), modifiers);
-        process_pending(document, MOUSE, point);
+        process_pending(document, (MOUSE, PointerKind::Mouse), point);
         document.borrow_mut().keyboard = false;
         let target = document.borrow().pointer_target(MOUSE, point);
         let target = document.borrow_mut().press(target);
         let prevented = target.is_some_and(|target| {
-            let event = document
-                .borrow()
-                .pointer_event("pointerdown", MOUSE, target, point);
+            let event = document.borrow().pointer_event(
+                "pointerdown",
+                (MOUSE, PointerKind::Mouse),
+                target,
+                point,
+            );
             dispatch_pointer(document, MOUSE, target, event)
         });
         if prevented {
@@ -67,23 +70,27 @@ impl Document {
         modifiers: crate::Modifiers,
     ) {
         document.borrow_mut().pointer.mouse_press.1 = modifiers;
-        process_pending(document, MOUSE, point);
+        process_pending(document, (MOUSE, PointerKind::Mouse), point);
         let target = document.borrow().pointer_target(MOUSE, point);
         if let Some(target) = target {
-            let event = document
-                .borrow()
-                .pointer_event("pointerup", MOUSE, target, point);
+            let event = document.borrow().pointer_event(
+                "pointerup",
+                (MOUSE, PointerKind::Mouse),
+                target,
+                point,
+            );
             dispatch_pointer(document, MOUSE, target, event);
         }
         crate::range_drag::released(document, MOUSE);
         crate::number_scrub::released(document, MOUSE);
         release_capture(document, MOUSE);
-        process_pending(document, MOUSE, point);
+        process_pending(document, (MOUSE, PointerKind::Mouse), point);
         let click = document.borrow_mut().release(target);
         if let Some(click) = click {
-            let event = document
-                .borrow()
-                .pointer_event("click", MOUSE, click, point);
+            let event =
+                document
+                    .borrow()
+                    .pointer_event("click", (MOUSE, PointerKind::Mouse), click, point);
             crate::events::tree::dispatch_click(document, click, event);
             double_click(document, click, point);
         }
@@ -105,8 +112,9 @@ pub(crate) fn double_click(document: &Rc<RefCell<Document>>, clicked: NodeId, po
     if !second {
         return;
     }
-    let event = document
-        .borrow()
-        .pointer_event("dblclick", MOUSE, clicked, point);
+    let event =
+        document
+            .borrow()
+            .pointer_event("dblclick", (MOUSE, PointerKind::Mouse), clicked, point);
     dispatch_bubbling(document, clicked, event);
 }

@@ -10,7 +10,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::NodeId;
+use vapors_dom::{NodeId, PointerKind};
 
 use crate::document::Document;
 
@@ -55,16 +55,19 @@ impl Document {
     /// The pointer moved to `point`: `:hover` follows it, and its target
     /// gets `pointermove`; while captured, the capturing element does.
     pub fn pointer_moved(document: &Rc<RefCell<Document>>, point: Point) {
-        process_pending(document, MOUSE, point);
+        process_pending(document, (MOUSE, PointerKind::Mouse), point);
         document.borrow_mut().pointer.position = Some(point);
         let target = match hover_capturing(document) {
             Some(capturing) => Some(capturing),
             None => document.borrow_mut().hover(point),
         };
         if let Some(target) = target {
-            let event = document
-                .borrow()
-                .pointer_event("pointermove", MOUSE, target, point);
+            let event = document.borrow().pointer_event(
+                "pointermove",
+                (MOUSE, PointerKind::Mouse),
+                target,
+                point,
+            );
             dispatch_pointer(document, MOUSE, target, event);
         }
         crate::range_drag::moved(document, MOUSE, point);

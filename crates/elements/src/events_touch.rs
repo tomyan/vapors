@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
+use vapors_dom::PointerKind;
 
 use super::capture::{
     TOUCHES, ask_unless_asked, dispatch_pointer, process_pending, release_capture,
@@ -49,9 +50,10 @@ impl Document {
         doc.pointer.touches.push((finger, point));
         drop(doc);
         let Some(target) = target else { return };
-        let event = document
-            .borrow()
-            .pointer_event("pointerdown", id, target, point);
+        let event =
+            document
+                .borrow()
+                .pointer_event("pointerdown", (id, PointerKind::Touch), target, point);
         let prevented = dispatch_pointer(document, id, target, event);
         document.borrow_mut().pointer.touch_down_prevented = prevented;
         let Some(target) = document.borrow().still_in(target) else {
@@ -147,9 +149,11 @@ impl Document {
             let down = doc.pointer.touches.iter_mut().find(|(f, _)| *f == finger)?;
             down.1 = point;
         }
-        process_pending(document, id, point);
+        process_pending(document, (id, PointerKind::Touch), point);
         let target = document.borrow().pointer_target(id, point)?;
-        let event = document.borrow().pointer_event(name, id, target, point);
+        let event = document
+            .borrow()
+            .pointer_event(name, (id, PointerKind::Touch), target, point);
         dispatch_pointer(document, id, target, event);
         Some(())
     }
@@ -162,7 +166,7 @@ impl Document {
         };
         if Self::touch_event(document, finger, point, name).is_some() {
             release_capture(document, id);
-            process_pending(document, id, point);
+            process_pending(document, (id, PointerKind::Touch), point);
         }
         Self::forget_touch(document, finger, id);
         // a finger's drag of a range ends at its lift, with `change`
