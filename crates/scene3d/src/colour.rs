@@ -45,6 +45,19 @@ impl Colour {
         let [r, g, b] = self.rgb;
         [r, g, b, 1.0]
     }
+
+    /// The channels as linear light: the sRGB transfer function undone,
+    /// for lighting sums.
+    #[must_use]
+    pub fn linear(&self) -> [f32; 3] {
+        self.rgb.map(|c| {
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        })
+    }
 }
 
 #[cfg(test)]

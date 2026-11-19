@@ -4,6 +4,7 @@ use crate::camera::{CameraUniform, view_projection};
 use crate::depth::{Attachments, attachments};
 use crate::draw::{MeshNode, Pass, materials_built, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
+use crate::lights::LightsUniform;
 use crate::log::Tracked;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
@@ -31,6 +32,7 @@ pub struct SceneRenderer {
 struct Mounted {
     pipeline: Tracked<Pipeline>,
     camera: Tracked<CameraUniform>,
+    lights: Tracked<LightsUniform>,
     slots: Tracked<Slots>,
     geometry: GpuGeometry,
 }
@@ -76,6 +78,7 @@ impl SurfaceRenderer for SceneRenderer {
         let pipeline = Pipeline::new(device, self.meshes.borrow().materials(), self.samples);
         self.mounted = Some(Mounted {
             camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
+            lights: Tracked::new(LightsUniform::new(device), log, Resource::Lights),
             slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
             geometry: GpuGeometry::new(log),
             pipeline: Tracked::new(pipeline, log, Resource::Pipeline),
@@ -104,6 +107,7 @@ impl SurfaceRenderer for SceneRenderer {
         mounted
             .camera
             .write(&frame, view_projection(&scene, frame.size)?);
+        mounted.lights.write(&frame, &scene)?;
         mounted.write_slots(&frame, &scene, &nodes)?;
         mounted.draw(&mut frame, attached, &nodes)?;
         self.log.rendered();

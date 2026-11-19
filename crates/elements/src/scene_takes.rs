@@ -81,7 +81,7 @@ impl<'a> Takes<'a> {
     }
 }
 
-/// Whether `node` is a scene anchor (`scene`, `group`, `mesh`, `camera`, `decal`).
+/// Whether `node` is a scene anchor (`scene`, `group`, `mesh`, `camera`, `light`, `decal`).
 fn is_scene_anchor(doc: &Document, node: NodeId) -> bool {
     let element = doc.arena.get(node, "scene hit").element();
     element.is_some_and(|element| {

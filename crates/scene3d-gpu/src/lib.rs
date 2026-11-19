@@ -25,6 +25,7 @@ mod depth;
 mod draw;
 mod error;
 mod geometry;
+mod lights;
 mod log;
 mod pipeline;
 mod renderer;

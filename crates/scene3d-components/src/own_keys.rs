@@ -4,7 +4,7 @@
 //! anchor of one component shares one key, and so one computed style
 //! per parent style. A key passed in must have that same tag.
 
-use crate::{CameraProps, GroupProps, MeshProps, SceneProps};
+use crate::{CameraProps, GroupProps, LightProps, MeshProps, SceneProps};
 use vapors_dom::StyleKey;
 
 /// Where an own key's anchor came from, for messages.
@@ -29,6 +29,7 @@ const fn own(tag: &'static str) -> StyleKey {
 pub(crate) static SCENE: StyleKey = own(SceneProps::ANCHOR_TAG);
 pub(crate) static GROUP: StyleKey = own(GroupProps::ANCHOR_TAG);
 pub(crate) static MESH: StyleKey = own(MeshProps::ANCHOR_TAG);
+pub(crate) static LIGHT: StyleKey = own(LightProps::ANCHOR_TAG);
 pub(crate) static CAMERA: StyleKey = own(CameraProps::ANCHOR_TAG);
 
 /// The key `component`'s anchor is made from: `passed`, or its `own`.

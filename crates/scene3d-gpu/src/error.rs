@@ -52,6 +52,9 @@ pub enum FrameError {
     },
     /// The active camera resolved to a node that is not a camera.
     ActiveCameraNotCamera(NodeId),
+    /// A light node whose world matrix gives no finite position or a
+    /// direction of zero length.
+    LightDegenerate(NodeId),
     /// The mesh uniform slots would need a buffer past the device's
     /// `max_buffer_size`.
     TooManySlots {
@@ -125,6 +128,10 @@ impl fmt::Display for FrameError {
             Self::ActiveCameraNotCamera(node) => write!(
                 f,
                 "the active camera resolved to node {node}, which is not a camera: a vapors-scene3d defect; report it with the scene that produced it"
+            ),
+            Self::LightDegenerate(node) => write!(
+                f,
+                "light {node}'s world matrix gives no finite position or no direction: give it and its ancestors finite, non-zero scales (`cargo test -p vapors-scene3d-gpu lights`)"
             ),
             Self::TooManySlots {
                 slots,

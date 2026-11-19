@@ -58,6 +58,15 @@ pub enum SceneError {
         /// Its value.
         value: f32,
     },
+    /// A light's intensity or range outside what it can take.
+    OutOfRange {
+        /// The field, such as `Light::Point range`.
+        field: &'static str,
+        /// Its value.
+        value: f32,
+        /// What to give instead.
+        rule: &'static str,
+    },
     /// Finite inputs whose matrix overflows to NaN or infinity.
     MatrixNotFinite {
         /// The constructor or method that built the matrix.
@@ -84,6 +93,9 @@ impl fmt::Display for SceneError {
             Self::UpParallel => fmt_up_parallel(f),
             Self::ChannelOutOfRange { channel, value } => fmt_channel(f, channel, *value),
             Self::MatrixNotFinite { what, inputs } => fmt_matrix(f, what, inputs),
+            Self::OutOfRange { field, value, rule } => {
+                write!(f, "{field} is {value}: give {rule}")
+            }
         }
     }
 }

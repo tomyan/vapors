@@ -45,6 +45,7 @@ fn each_scene_tag_reads_the_longhands_of_section_4_2() {
         (SceneTag::Group, drawn.to_vec()),
         (SceneTag::Mesh, mesh),
         (SceneTag::Camera, Vec::new()),
+        (SceneTag::Light, Vec::new()),
         (SceneTag::Decal, drawn.to_vec()),
     ];
 
