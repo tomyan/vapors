@@ -44,6 +44,8 @@ pub(crate) struct Node {
     /// The application material a mesh is drawn with, or none for its
     /// colour (`material.rs`).
     pub(crate) material: Option<crate::MaterialId>,
+    /// How a mesh is shaded (`shading.rs`).
+    pub(crate) shading: crate::Shading,
     pub(crate) dirty: bool,
 }
 

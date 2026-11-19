@@ -55,6 +55,15 @@ pub enum FrameError {
     /// A light node whose world matrix gives no finite position or a
     /// direction of zero length.
     LightDegenerate(NodeId),
+    /// A lit mesh whose geometry has no normals.
+    LitWithoutNormals {
+        /// The mesh node.
+        node: NodeId,
+        /// The geometry it names.
+        geometry: GeometryId,
+    },
+    /// A lit mesh, no light node and zero ambient.
+    LitWithoutLight(NodeId),
     /// The mesh uniform slots would need a buffer past the device's
     /// `max_buffer_size`.
     TooManySlots {
@@ -92,6 +101,10 @@ impl From<SceneError> for FrameError {
 }
 
 impl fmt::Display for FrameError {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one message for each refusal, each naming its fix"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ForeignMaterial { node, material } => write!(
@@ -132,6 +145,14 @@ impl fmt::Display for FrameError {
             Self::LightDegenerate(node) => write!(
                 f,
                 "light {node}'s world matrix gives no finite position or no direction: give it and its ancestors finite, non-zero scales (`cargo test -p vapors-scene3d-gpu lights`)"
+            ),
+            Self::LitWithoutNormals { node, geometry } => write!(
+                f,
+                "lit mesh {node} names {geometry}, which has no normals: make it with Meshes::lit_geometry (or flat_shaded) or set shading Unlit (`cargo test -p vapors-scene3d-gpu --test gpu_scene_lit_refusals`)"
+            ),
+            Self::LitWithoutLight(node) => write!(
+                f,
+                "lit mesh {node} is in a scene with no light and zero ambient, so it would draw black: add a <Light> or give <Scene> an ambient level, or set shading Unlit (`cargo test -p vapors-scene3d-gpu --test gpu_scene_lit_refusals`)"
             ),
             Self::TooManySlots {
                 slots,

@@ -39,7 +39,13 @@ impl Pipeline {
             .map(|material| material_pipeline(device, (&layout, material), samples))
             .collect();
         Self {
-            render: render_pipeline(device, (&layout, &shader), ("vs_main", "fs_main"), samples),
+            render: render_pipeline(
+                device,
+                (&layout, &shader),
+                ("vs_main", "fs_main"),
+                &vertex_buffers(),
+                samples,
+            ),
             materials,
             layouts,
         }
@@ -62,10 +68,16 @@ fn material_pipeline(
     .concat();
     let shader = shader(device, material.label, source);
     let entries = ("vs_material", "fs_material");
-    render_pipeline(device, (layout, &shader), entries, samples)
+    render_pipeline(
+        device,
+        (layout, &shader),
+        entries,
+        &vertex_buffers(),
+        samples,
+    )
 }
 
-fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderModule {
+pub(crate) fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderModule {
     vapors_renderer::pipelines::shader_module(
         device,
         wgpu::ShaderModuleDescriptor {
@@ -75,17 +87,22 @@ fn shader(device: &wgpu::Device, label: &str, source: String) -> wgpu::ShaderMod
     )
 }
 
-fn render_pipeline(
-    device: &wgpu::Device,
-    (layout, shader): (&wgpu::PipelineLayout, &wgpu::ShaderModule),
-    (vertex, fragment_entry): (&str, &str),
-    samples: vapors_renderer::Samples,
-) -> wgpu::RenderPipeline {
-    let buffers = [Some(wgpu::VertexBufferLayout {
+/// The vertex buffer every pipeline reads: positions and shades.
+pub(crate) fn vertex_buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 1] {
+    [Some(wgpu::VertexBufferLayout {
         array_stride: VERTEX_BYTES as u64,
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &VERTEX_ATTRIBUTES,
-    })];
+    })]
+}
+
+pub(crate) fn render_pipeline(
+    device: &wgpu::Device,
+    (layout, shader): (&wgpu::PipelineLayout, &wgpu::ShaderModule),
+    (vertex, fragment_entry): (&str, &str),
+    buffers: &[Option<wgpu::VertexBufferLayout<'_>>],
+    samples: vapors_renderer::Samples,
+) -> wgpu::RenderPipeline {
     vapors_renderer::pipelines::render_pipeline(
         device,
         &wgpu::RenderPipelineDescriptor {
@@ -95,7 +112,7 @@ fn render_pipeline(
                 module: shader,
                 entry_point: Some(vertex),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &buffers,
+                buffers,
             },
             fragment: Some(fragment(shader, fragment_entry)),
             primitive: wgpu::PrimitiveState::default(),

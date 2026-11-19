@@ -24,6 +24,7 @@ fn mesh_in(meshes: &mut Meshes) -> MeshNode {
         colour,
         visible: true,
         material: None,
+        lit: false,
     }
 }
 

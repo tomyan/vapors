@@ -18,8 +18,7 @@ pub(crate) struct Uploaded {
     /// The normals, in a buffer of their own (vertex buffer slot 1,
     /// [`vapors_scene3d::NORMAL_BYTES`] a vertex), only when the geometry
     /// has them. The unlit pipeline binds only `vertices`, so it ignores
-    /// them; the lit pipeline (LT3) binds both.
-    #[allow(dead_code)] // read by the lit pipeline (LT3)
+    /// them; the lit pipeline binds both.
     pub(crate) normals: Option<wgpu::Buffer>,
     pub(crate) index_count: u32,
 }

@@ -2,9 +2,10 @@
 
 use crate::FrameError;
 use crate::geometry::Uploaded;
+use crate::lit::LitPipeline;
 use vapors_app::WorkCounter;
 use vapors_scene3d::{
-    Colour, GeometryHandle, GeometryId, MaterialId, Meshes, NodeId, NodeKind, Scene,
+    Colour, GeometryHandle, GeometryId, MaterialId, Meshes, NodeId, NodeKind, Scene, Shading,
 };
 
 /// A mesh node to draw.
@@ -20,6 +21,8 @@ pub(crate) struct MeshNode {
     /// The application material it is drawn with (`Scene::material`),
     /// or none for its colour.
     pub(crate) material: Option<MaterialId>,
+    /// Drawn lit (`Shading::Lit`), by the lit pipeline.
+    pub(crate) lit: bool,
 }
 
 /// Every mesh node under the root, parents before children, each
@@ -55,6 +58,7 @@ fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<Mesh
         colour,
         visible: scene.visible(node)?,
         material,
+        lit: scene.shading(node)? == Shading::Lit,
     }))
 }
 
@@ -81,6 +85,8 @@ pub(crate) fn materials_built(nodes: &[MeshNode], built: usize) -> Result<(), Fr
 pub(crate) struct Pass<'a> {
     /// The colour pipeline, and each material's in `Meshes`' order.
     pub(crate) pipelines: (&'a wgpu::RenderPipeline, &'a [wgpu::RenderPipeline]),
+    /// The lit pipeline, once a lit mesh has made it.
+    pub(crate) lit: Option<&'a LitPipeline>,
     pub(crate) camera: &'a wgpu::BindGroup,
     pub(crate) slots: &'a wgpu::BindGroup,
     /// The view drawn into: the multisampled one at 4 samples, resolved
@@ -91,9 +97,16 @@ pub(crate) struct Pass<'a> {
     pub(crate) work: &'a WorkCounter,
 }
 
-/// One mesh's draw: its material's place (none for its colour), its
-/// slot offset and its geometry.
-pub(crate) type Draw<'a> = (Option<usize>, u32, &'a Uploaded);
+/// The pipeline a mesh draws with.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Which {
+    Colour,
+    Material(usize),
+    Lit,
+}
+
+/// One mesh's draw: pipeline, slot offset and geometry.
+pub(crate) type Draw<'a> = (Which, u32, &'a Uploaded);
 
 /// Clears the backing to transparent and the depth to far, then draws
 /// each of `draws`, setting the pipeline where the material changes.
@@ -101,17 +114,32 @@ pub(crate) fn record(encoder: &mut wgpu::CommandEncoder, pass: &Pass<'_>, draws:
     let mut render = begin(encoder, pass);
     render.set_bind_group(0, pass.camera, &[]);
     let mut set = None;
-    for (material, offset, geometry) in draws {
-        if set != Some(*material) {
-            let (colour, materials) = pass.pipelines;
-            render.set_pipeline(material.map_or(colour, |at| &materials[at]));
-            set = Some(*material);
+    for (which, offset, geometry) in draws {
+        if set != Some(*which) {
+            set_pipeline(&mut render, pass, *which);
+            set = Some(*which);
         }
         render.set_bind_group(1, pass.slots, &[*offset]);
         render.set_vertex_buffer(0, geometry.vertices.slice(..));
+        if let (Which::Lit, Some(normals)) = (which, &geometry.normals) {
+            render.set_vertex_buffer(1, normals.slice(..));
+        }
         render.set_index_buffer(geometry.indices.slice(..), wgpu::IndexFormat::Uint32);
         let indices = 0..geometry.index_count;
         pass.work.draw_indexed(&mut render, indices, 0, 0..1);
+    }
+}
+
+fn set_pipeline(render: &mut wgpu::RenderPass<'_>, pass: &Pass<'_>, which: Which) {
+    let (colour, materials) = pass.pipelines;
+    match (which, pass.lit) {
+        (Which::Colour, _) => render.set_pipeline(colour),
+        (Which::Material(at), _) => render.set_pipeline(&materials[at]),
+        (Which::Lit, Some(lit)) => {
+            render.set_pipeline(&lit.pipeline);
+            render.set_bind_group(2, &lit.bind_group, &[]);
+        }
+        (Which::Lit, None) => unreachable!("a lit mesh makes the lit pipeline before it draws"),
     }
 }
 
