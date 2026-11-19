@@ -32,6 +32,7 @@ pub struct Geometry {
     positions: Vec<Vec3>,
     indices: Vec<u32>,
     shades: Vec<f32>,
+    normals: Option<Vec<Vec3>>,
     /// The positions' least and greatest corner, worked out once.
     bounds: (Vec3, Vec3),
 }
@@ -54,6 +55,13 @@ impl Geometry {
     #[must_use]
     pub fn bounds(&self) -> (Vec3, Vec3) {
         self.bounds
+    }
+
+    /// Each position's unit normal, when the geometry was given them
+    /// (`Meshes::lit_geometry`); `None` for plain geometry.
+    #[must_use]
+    pub fn normals(&self) -> Option<&[Vec3]> {
+        self.normals.as_deref()
     }
 
     /// Each position's shade, from 0 to 1: the fraction of the node's
@@ -127,12 +135,26 @@ impl Meshes {
         indices: Vec<u32>,
         shades: Vec<f32>,
     ) -> Result<GeometryHandle, MeshError> {
+        self.add(positions, indices, shades, None)
+    }
+
+    /// Validates and holds a geometry, with `normals` when given.
+    pub(crate) fn add(
+        &mut self,
+        positions: Vec<Vec3>,
+        indices: Vec<u32>,
+        shades: Vec<f32>,
+        normals: Option<Vec<Vec3>>,
+    ) -> Result<GeometryHandle, MeshError> {
         crate::mesh_error::check(&positions, &indices)?;
         crate::mesh_error::check_shades(&shades, positions.len())?;
         let id = GeometryId {
             meshes: self.id,
             index: self.issued,
         };
+        if let Some(normals) = &normals {
+            crate::normals::check(id, normals, positions.len())?;
+        }
         self.issued += 1;
         let bounds = (positions.iter())
             .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(low, high), p| {
@@ -142,6 +164,7 @@ impl Meshes {
             positions,
             indices,
             shades,
+            normals,
             bounds,
         };
         let geometry = Rc::new(geometry);

@@ -52,6 +52,17 @@ let surface = app.mount("view", Box::new(renderer))?;
   node's id is refused (`StoreError::Stale`), never another node's.
 - The root names the active camera by `CameraHandle`; none, two, or an
   unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
+- Normals (lighting LT1, `docs/plans/lighting.md`): `Meshes::lit_geometry(
+  positions, indices, shades, normals)` is the explicit route to
+  geometry with one unit normal per position (finite, length 1 within
+  1e-3; each refusal names the geometry and the vertex).
+  `flat_shaded(positions, indices, shades)` splits triangles into
+  corners of their own with the face normal (the cross product of
+  edges, outward for counter-clockwise triangles), and
+  `Meshes::flat_geometry` holds the result. Normals upload in a vertex
+  buffer of their own, only when present; the unlit pipeline does not
+  bind it, so such a geometry draws the same pixels. Nothing lights
+  by them until LT3.
 - `Meshes::geometry(positions, indices, shades)` takes a shade from 0
   to 1 for each position (one-scene D4, row R1): the vertex is drawn
   in that fraction of the node's colour (multiplied on the
