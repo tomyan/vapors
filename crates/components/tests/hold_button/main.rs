@@ -84,3 +84,18 @@ fn unchanged_enabled_and_reset_values_do_not_release_a_hold() {
     // Then
     assert!(m.pressed.get());
 }
+#[test]
+fn kind_is_not_read() {
+    // Given: HoldButton keys on the id alone; retire this when it reads `kind`
+    use vapors_dom::PointerKind::{Mouse, Pen, Touch};
+    for kind in [Mouse, Touch, Pen] {
+        let m = Mounted::new();
+        // When
+        let mut down = m.pointer_of("pointerdown", 10, kind);
+        // Then
+        assert_eq!(down.take_capture(), Some(Capture::Set), "{kind:?}");
+        assert!(m.pressed.get(), "{kind:?}");
+        m.pointer_of("pointerup", 10, kind);
+        assert!(!m.pressed.get(), "{kind:?}");
+    }
+}

@@ -77,10 +77,22 @@ down, no pan scrolls (Chromium cancels such a touch all the same: only
 touches no listener owns, whether or not anything scrolls, as Chromium
 does (checked by `fixtures/capture.events`). `:active` follows the
 first finger down only and clears when it lifts (or when the mouse
-button is released). `Pointer` has no `pointer_type` or `is_primary`
-yet: a listener tells a touch by `id >= 2`. A finger is forgotten when
+button is released). `Pointer` has no `is_primary`
+yet. A finger is forgotten when
 it lifts or is cancelled even if its event found no element; nothing
 sends `pointercancel` for window loss yet.
+
+`Pointer::kind` is the web's `pointerType`: `PointerKind::Mouse`,
+`Touch` or `Pen`, with `kind.as_str()` the web's string. It has no
+default. The document derives it from the pointer id in one place
+(`events_kind.rs`: `MOUSE` is `Mouse`, `TOUCHES + n` is `Touch`), so
+id and kind cannot disagree, taps' `click` and `dblclick` and the
+capture events included; an id no source makes (0) panics naming that
+file and line. Nothing makes `Pen`: winit 0.30 reports no pen, and its
+web backend turns every pointer type but `touch` into mouse events.
+That ends when a source that reports a pen is wired in: `kind_of` then
+needs more than an id, and `pointer_kind.rs` (which pins that no path
+makes `Pen`) changes with it.
 
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured

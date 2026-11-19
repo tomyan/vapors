@@ -63,6 +63,7 @@ impl Document {
             client: point,
             offset,
             id,
+            kind: super::kind::kind_of(id),
             pressed,
         });
         if id == MOUSE && matches!(name, "pointerdown" | "pointerup" | "click" | "dblclick") {
