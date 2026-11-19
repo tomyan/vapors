@@ -1,5 +1,9 @@
 # Comparative benchmark
 
+Superseded on 2026-11-19 by `docs/decisions/2026-11-19-gui-bench.md`:
+vapors is measured with gui-bench. The research below on fairness and
+driving each framework still applies.
+
 After the performance finish line (`docs/plans/perf-finish-line.md`,
 "After the line", decided by Tom 2026-11-11): the js-framework-benchmark
 operations and 7GUIs, run natively against GPUI, Blitz, iced, Slint and
