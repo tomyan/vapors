@@ -25,6 +25,9 @@ mod watch;
 pub(super) use watch::LoopWaker;
 use watch::{Outcome, Watched};
 
+/// The GPU's report that the work a scope covers is done.
+pub(super) type WorkDone = Pin<Box<dyn Future<Output = ()>>>;
+
 /// A scope's result, once the GPU reports it.
 pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
 
@@ -50,7 +53,28 @@ pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
 /// latency is unmeasured. A period the page was hidden at either end is
 /// re-armed in full (`visible_deadline`), since refusing is permanent
 /// until remount.
+///
+/// On the web, for a scope around work submitted to the queue, it runs
+/// from when the GPU reports that work done (`WORK_DONE_DEADLINE` bounds
+/// that wait), not from when the scope is popped: it measures the
+/// browser reporting an error, not the GPU drawing.
 pub(crate) const DEADLINE: Duration = Duration::from_millis(1000);
+
+/// How long, on the web, the GPU may take to report the work a scope
+/// covers done before its surface is refused. `DEADLINE` runs from that
+/// report, so this bounds the drawing and that bounds the reporting.
+///
+/// A GUESS, not a measurement: no browser runs in the build sandbox.
+/// The Toad Trip lit frame (1280x720, sun and two point lights, headless
+/// Chromium on `SwiftShader`) took over `DEADLINE` and never finished
+/// inside a second. 30 s is generous for a slow GPU, and still ends a
+/// hung one with a named refusal. To measure: time `submit` to
+/// `onSubmittedWorkDone` for that page and for a heavier one, as
+/// `scripts/web-scope-latency.mjs` times `popErrorScope`, and set this
+/// to a few times the slowest frame a working page needs. Visible time
+/// only, like `DEADLINE` (`visible_deadline`).
+#[cfg(any(target_family = "wasm", test))]
+pub(crate) const WORK_DONE_DEADLINE: Duration = Duration::from_secs(30);
 
 /// Whether a frame refuses a scope unresolved at its deadline. Natively
 /// yes: nothing else watches the clock. Not on the web, where the
@@ -85,17 +109,36 @@ impl Scopes {
         turn: Turn<'_>,
         call: impl FnOnce() -> Result<T, SurfaceError>,
     ) -> Result<T, Refusal> {
+        self.run_submitting(device, None, turn, call)
+    }
+
+    /// `run` for a call that submits to `queue`: on the web its deadline
+    /// starts when the GPU reports that work done.
+    pub(super) fn run_submitting<T>(
+        &mut self,
+        device: &wgpu::Device,
+        queue: Option<&wgpu::Queue>,
+        turn: Turn<'_>,
+        call: impl FnOnce() -> Result<T, SurfaceError>,
+    ) -> Result<T, Refusal> {
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let result = call();
-        self.wait_for(Box::pin(scope.pop()), turn);
+        let work = queue.and_then(work_done);
+        self.wait_for_work(Box::pin(scope.pop()), work, turn);
         self.take_resolved();
         let value = result.map_err(Refusal::Renderer)?;
         self.refusal().map(|()| value)
     }
 
     /// Keeps `scope` until it resolves, refusing at `DEADLINE` from now.
+    #[cfg(test)]
     pub(super) fn wait_for(&mut self, scope: Caught, turn: Turn<'_>) {
-        let watched = Watched::new(scope, turn.waker);
+        self.wait_for_work(scope, None, turn);
+    }
+
+    /// `wait_for`, its deadline starting when `work` is reported done.
+    fn wait_for_work(&mut self, scope: Caught, work: Option<WorkDone>, turn: Turn<'_>) {
+        let watched = Watched::new(scope, work, turn.waker);
         self.pending.push((watched, turn.now + DEADLINE));
     }
 
@@ -163,6 +206,35 @@ fn timed_out() -> String {
         "the GPU did not report this surface's errors within {} ms",
         DEADLINE.as_millis()
     )
+}
+
+/// The refusal of work the GPU did not report done by
+/// `WORK_DONE_DEADLINE`; the surface's name is added where it is refused.
+#[cfg(any(target_family = "wasm", test))]
+fn work_timed_out() -> String {
+    format!(
+        "the GPU did not report this surface's submitted work done within {} ms, so its \
+         error scope's own {} ms wait never began (a slow GPU or a hung one: measure with \
+         scripts/web-scope-latency.mjs, or raise WORK_DONE_DEADLINE in \
+         crates/app/src/painter_surface_scope.rs)",
+        WORK_DONE_DEADLINE.as_millis(),
+        DEADLINE.as_millis()
+    )
+}
+
+/// The GPU's report that `queue`'s submitted work is done, on the web;
+/// natively a scope resolves when popped, so none.
+#[cfg(target_family = "wasm")]
+#[allow(clippy::unnecessary_wraps)] // the same signature as the native one, which has none
+fn work_done(queue: &wgpu::Queue) -> Option<WorkDone> {
+    Some(deadline::work_done_from(|report| {
+        queue.on_submitted_work_done(report);
+    }))
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn work_done(_queue: &wgpu::Queue) -> Option<WorkDone> {
+    None
 }
 
 #[cfg(test)]
