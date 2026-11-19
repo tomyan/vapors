@@ -144,10 +144,10 @@ every page load waits 120 s.
   `br`, lists, tables and `label` are not drawn yet (supported.md).
 - An element's position cannot follow a signal (`style={..}` is
   refused), so anything that moves is a mesh in the 3D scene.
-- The 3D scene has meshes, flat CSS colours and baked per-corner
-  shades. It has no lights, shadows, textures, transparency or model
-  files yet; do not imitate them. Build models from the starter's
-  shapes ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene)).
+- The 3D scene has meshes, flat CSS colours, and directional and point
+  lights (at most 8). It has no shadows, textures, transparency or
+  model files yet; do not imitate them. Build models from the starter's
+  shapes and light them ([runtime.md](https://github.com/tomyan/vapors/blob/main/plugins/vapors/skills/vapors/reference/runtime.md#the-3d-scene)).
 - Props of the 3D tags (`<Mesh>`, `<Scene>`, ...) are checked by rustc,
   not `wisp-check`; a wrong one is a rustc error in the generated file.
 

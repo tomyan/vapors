@@ -1,7 +1,7 @@
-//! Low-poly solids built in code. Each face has its own corners and one
-//! baked shade, so the facets read without lights: faces pointing up are
-//! lightest, faces towards the camera (+Z) lighter than those away. The
-//! shade multiplies the mesh's CSS `color`.
+//! Low-poly solids built in code. Each face has its own corners and its
+//! own normal, so a lit mesh (`shading={Shading::Lit}`) shades each facet
+//! flat from the scene's lights. The baked shade is 1 everywhere: the
+//! lights do the shading, and an unlit mesh draws its plain CSS `color`.
 
 use std::f32::consts::TAU;
 
@@ -17,7 +17,7 @@ pub struct Shapes {
 
 impl Shapes {
     /// # Errors
-    /// As [`Meshes::geometry`]; never for these fixed shapes.
+    /// As [`Meshes::lit_geometry`]; never for these fixed shapes.
     pub fn new(meshes: &mut Meshes) -> Result<Self, MeshError> {
         Ok(Self {
             cuboid: cuboid(meshes)?,
@@ -30,7 +30,7 @@ impl Shapes {
 /// A cube 1 unit wide centred on the origin; scale it into any box.
 ///
 /// # Errors
-/// As [`Meshes::geometry`].
+/// As [`Meshes::lit_geometry`].
 pub fn cuboid(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
     let c = |x: f32, y: f32, z: f32| Vec3::new(x * 0.5, y * 0.5, z * 0.5);
     let faces = vec![
@@ -78,7 +78,7 @@ pub fn cuboid(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
 /// height at the back (-Z), sloping down to the front edge (+Z).
 ///
 /// # Errors
-/// As [`Meshes::geometry`].
+/// As [`Meshes::lit_geometry`].
 pub fn wedge(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
     let c = |x: f32, y: f32, z: f32| Vec3::new(x * 0.5, y * 0.5, z * 0.5);
     let faces = vec![
@@ -110,7 +110,7 @@ pub fn wedge(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
 /// 1 unit across, centred on the origin. Lay it down with a rotation.
 ///
 /// # Errors
-/// As [`Meshes::geometry`]; fewer than 3 sides gives no solid.
+/// As [`Meshes::lit_geometry`]; fewer than 3 sides gives no solid.
 pub fn cylinder(meshes: &mut Meshes, sides: u32) -> Result<GeometryHandle, MeshError> {
     let rim = |i: u32, y: f32| {
         let angle = TAU * i as f32 / sides as f32;
@@ -125,23 +125,18 @@ pub fn cylinder(meshes: &mut Meshes, sides: u32) -> Result<GeometryHandle, MeshE
 }
 
 /// Flat faces, each a convex polygon wound counter-clockwise seen from
-/// outside, each with its own corners and its shade.
+/// outside, each with its own corners and its outward normal.
 fn solid(meshes: &mut Meshes, faces: &[Vec<Vec3>]) -> Result<GeometryHandle, MeshError> {
-    let (mut positions, mut indices, mut shades) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut positions, mut indices, mut normals) = (Vec::new(), Vec::new(), Vec::new());
     for face in faces {
         let first = positions.len() as u32;
         let normal = (face[1] - face[0]).cross(face[2] - face[0]).normalize();
         positions.extend_from_slice(face);
-        shades.extend(std::iter::repeat_n(shade(normal), face.len()));
+        normals.extend(std::iter::repeat_n(normal, face.len()));
         for i in 1..face.len() as u32 - 1 {
             indices.extend([first, first + i, first + i + 1]);
         }
     }
-    meshes.geometry(positions, indices, shades)
-}
-
-/// Lightest facing up, darker on the sides, darkest facing away from
-/// the camera or down.
-fn shade(normal: Vec3) -> f32 {
-    (0.6 + 0.4 * normal.y + 0.15 * normal.z - 0.05 * normal.x).clamp(0.35, 1.0)
+    let shades = vec![1.0; positions.len()];
+    meshes.lit_geometry(positions, indices, shades, normals)
 }
