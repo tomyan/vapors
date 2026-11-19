@@ -88,3 +88,5 @@ mod gpu_frames;
 mod gpu_hud_iu5_probe;
 #[cfg(test)]
 mod gpu_hud_iu5_tests;
+#[cfg(test)]
+mod hud_320_tests;

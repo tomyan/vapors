@@ -38,6 +38,9 @@ let enabled: Signal<bool> = Signal::new(true);
 .note { position: absolute; left: 16px; top: 98px; padding: 8px 12px; background-color: #182a2f; border-radius: 4px; font-size: 14px; }
 .small .note { top: 94px; right: 16px; font-size: 14px; }
 .short .note { top: 52px; left: 8px; right: auto; max-width: 300px; padding: 4px 8px; }
+@media (width <= 320px) {
+.short .note { top: 72px; }
+}
 </style>
 
 <gpu-surface name="track" class="track"></gpu-surface>
