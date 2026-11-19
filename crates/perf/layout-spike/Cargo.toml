@@ -1,0 +1,56 @@
+# A measurement spike, not part of the root workspace: its own [workspace]
+# and Cargo.lock keep the root's untouched, and no shipping crate depends
+# on it. Plan and results: docs/plans/layout-comparison.md.
+[package]
+name = "vapors-layout-spike"
+description = "Layout comparison spike: lanes, Taffy, compile-time boundaries and generated code on the same trees (docs/plans/layout-comparison.md)."
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace]
+
+[features]
+# All options by default, so a plain `cargo test` runs the agreement test
+# (tests/agree.rs refuses to compile without all four); size.sh builds
+# one option with --no-default-features.
+default = ["all"]
+# One feature per option, so a wasm build holds exactly one of them.
+taffy = ["dep:taffy"]
+lanes = ["dep:vapors-elements", "dep:vapors-dom", "dep:vapors-text", "dep:tracing"]
+fixed = []
+generated = []
+all = ["taffy", "lanes", "fixed", "generated"]
+
+[dependencies]
+taffy = { version = "=0.15.1", optional = true, default-features = false, features = ["std", "flexbox", "block_layout", "calc", "content_size", "taffy_tree"] }
+vapors-elements = { path = "../../elements", optional = true, default-features = false }
+vapors-dom = { path = "../../dom", optional = true }
+vapors-text = { path = "../../text", optional = true, default-features = false }
+tracing = { version = "=0.1.44", optional = true, default-features = false, features = ["std"] }
+
+[[bin]]
+name = "bench"
+required-features = ["all"]
+
+[[bin]]
+name = "size"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# The timing build: speed, one codegen unit as the judged profile.
+[profile.timing]
+inherits = "release"
+opt-level = 3
