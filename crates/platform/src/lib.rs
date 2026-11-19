@@ -31,6 +31,8 @@ mod a11y_mirror_web;
 #[cfg(any(target_family = "wasm", test))]
 mod a11y_mirror_write;
 mod attributes;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod attributes_tests;
 mod browser_platform;
 mod canvas_focus;
 #[cfg(target_family = "wasm")]
@@ -77,6 +79,7 @@ mod picker_web;
 mod platform;
 mod redraw;
 mod report;
+mod session;
 mod shortcut_modifier;
 mod start;
 mod start_gate;

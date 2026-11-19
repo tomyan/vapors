@@ -44,6 +44,8 @@ pub fn run_with(readout: Option<vapors_renderer::Samples>) -> Result<(), String>
             title: "Vapors / Circuit".into(),
             width: 1100,
             height: 720,
+            decorations: true,
+            app_id: None,
         },
         racer,
     )

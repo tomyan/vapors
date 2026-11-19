@@ -27,6 +27,15 @@ pub struct WindowOptions {
     pub width: u32,
     /// Logical height in points.
     pub height: u32,
+    /// Whether the window has a title bar and borders. `false` asks the
+    /// compositor for a borderless window; where the platform cannot
+    /// honour it (X11, the web) opening the window fails.
+    pub decorations: bool,
+    /// The Wayland application id, which a compositor matches to rules and
+    /// a desktop entry; `None` leaves winit's default. Where the platform
+    /// cannot honour `Some` (X11, macOS, Windows, the web) opening the
+    /// window fails.
+    pub app_id: Option<String>,
 }
 
 /// One redraw: the surface texture to draw into and the device to do it with.

@@ -81,7 +81,11 @@ impl Handler {
     }
 
     fn open(&mut self, event_loop: &ActiveEventLoop) -> Result<(), PlatformError> {
-        let attributes = crate::attributes::for_options(&self.options)?;
+        #[cfg(not(target_family = "wasm"))]
+        let session = crate::session::Session::of(event_loop);
+        #[cfg(target_family = "wasm")]
+        let session = crate::session::Session::Web;
+        let attributes = crate::attributes::for_options(&self.options, session)?;
         let window = event_loop
             .create_window(attributes)
             .map_err(|e| PlatformError::Windowing(e.to_string()))?;
