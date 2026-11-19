@@ -4,7 +4,9 @@
 [zortax/gui-bench](https://github.com/zortax/gui-bench) at `f0644e8`
 (`apps/shared/dashboard.rs`, `apps/shared/cli.rs`, `IDIOMS.md`). The
 gui-bench apps declare `license = "Apache-2.0"`; the repository has no
-LICENSE file at that commit.
+LICENSE file at that commit. Tom accepted that risk on 2026-11-19, relying
+on those declarations; zortax/gui-bench#1 asks upstream for a LICENSE
+file, to be recorded here when it lands.
 
 They stay byte-identical to upstream so an upstream change applies as a
 diff: `cp` the three files from a newer gui-bench checkout, review what
