@@ -52,6 +52,8 @@ fn start() -> Result<(), String> {
         title: format!("vapors demo: {name}"),
         width: 640,
         height: 400,
+        decorations: true,
+        app_id: None,
     };
     run(options, shot).map_err(|e| e.to_string())?;
     if let Some(message) = failure.get() {
