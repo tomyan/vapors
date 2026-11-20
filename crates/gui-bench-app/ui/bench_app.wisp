@@ -8,8 +8,7 @@ use crate::export_menu::{ExportMenu, ExportMenuProps};
 // filters and the search input share; the count of messages the feed shows.
 let active: Signal<usize> = Signal::new(0);
 #[prop] let rows: usize = 0;
-#[prop] let controls: Controls = Controls::unbound();
-let controls = controls.bound("BenchApp");
+#[prop] let controls: Controls;
 let search: Signal<String> = controls.search;
 </script>
 

@@ -44,16 +44,6 @@ fn prop_without_a_type_annotation_is_refused() {
 }
 
 #[test]
-fn prop_without_a_default_is_refused() {
-    // When
-    let err = refusal("<script>\n#[prop]\nlet label: String;\n</script>\n<span>{label}</span>");
-
-    // Then
-    assert_eq!(err.line, 2, "{err}");
-    assert!(err.message.contains("default"), "{err}");
-}
-
-#[test]
 fn a_script_syntax_error_is_positioned_in_the_file() {
     // When
     let err = refusal("<script>\nlet a = 1;\nlet b = ;\n</script>\n<span>x</span>");

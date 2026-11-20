@@ -30,6 +30,16 @@ pub struct PropsIndex {
 pub(crate) struct Declared {
     pub file: String,
     pub props: Vec<String>,
+    /// The props declared without a default, a tag must pass.
+    pub required: Vec<Required>,
+}
+
+/// A prop declared without a default.
+#[derive(Debug, Clone)]
+pub(crate) struct Required {
+    pub name: String,
+    /// `file:line` of its declaration.
+    pub at: String,
 }
 
 impl PropsIndex {
@@ -55,11 +65,21 @@ impl PropsIndex {
             ));
         }
         let props = info.props.iter().map(|prop| prop.name.clone()).collect();
+        let required = info
+            .props
+            .iter()
+            .filter(|prop| prop.required)
+            .map(|prop| Required {
+                name: prop.name.clone(),
+                at: prop.at.clone(),
+            })
+            .collect();
         self.components.insert(
             key,
             Declared {
                 file: component.path.clone(),
                 props,
+                required,
             },
         );
         self.modules.insert(component.path.clone(), module.to_vec());

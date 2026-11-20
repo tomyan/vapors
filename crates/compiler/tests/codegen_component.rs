@@ -119,7 +119,7 @@ fn props_become_a_struct_with_defaults() {
     assert_has(&code, "impl Default for CounterProps {");
     assert_has(&code, "label: String::from(\"Count\"),");
     assert_has(&code, "props: CounterProps,");
-    assert_has(&code, "let CounterProps { label } = props;");
+    assert_has(&code, "let (CounterProps { label },) = (props,);");
     assert_has(&code, "let shown = &(label);");
     assert_lacks(&code, "label.get()");
 }

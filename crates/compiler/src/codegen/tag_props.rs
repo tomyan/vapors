@@ -8,7 +8,7 @@
 
 use super::component_anchor::styles_anchor;
 use super::emit::Emitter;
-use super::props_index::{Declared, PropsIndex};
+use super::props_index::{Declared, PropsIndex, Required};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, ComponentTag, Node};
 
@@ -42,13 +42,13 @@ struct Passed {
 }
 
 impl Emitter<'_> {
-    pub(super) fn check_props(&mut self, tag: &ComponentTag) {
-        let Some(index) = self.tags.index else {
-            return;
-        };
+    /// Checks the tag; returns the names of the props its component
+    /// requires, or `None` for a tag that is not checked.
+    pub(super) fn check_props(&mut self, tag: &ComponentTag) -> Option<Vec<String>> {
+        let index = self.tags.index?;
         let Some(declared) = index.of(&self.source.path, &self.script.uses, &tag.name) else {
             self.note_unchecked(tag);
-            return;
+            return None;
         };
         for (offset, refusal) in super::component_anchor::anchor_refusals(tag, declared) {
             self.tags.errors.push(self.source.error(offset, refusal));
@@ -61,7 +61,31 @@ impl Emitter<'_> {
                     .push(self.source.error(passed.offset, refusal));
             }
         }
+        self.refuse_omitted(tag, declared);
+        Some(declared.required.iter().map(|r| r.name.clone()).collect())
     }
+
+    /// A required prop the tag does not pass is refused at the tag.
+    fn refuse_omitted(&mut self, tag: &ComponentTag, declared: &Declared) {
+        let given = passed(tag);
+        for required in &declared.required {
+            if given.iter().any(|p| p.name == required.name) {
+                continue;
+            }
+            let message = omitted(&tag.name, required, &declared.file);
+            self.tags
+                .errors
+                .push(self.source.error(tag.offset, message));
+        }
+    }
+}
+
+fn omitted(tag: &str, required: &Required, file: &str) -> String {
+    let name = &required.name;
+    format!(
+        "`<{tag}>` omits `{name}`, a required prop: {file} declares it at {} with no default; pass `{name}={{..}}` in the tag (check with `cargo run -p vapors-compiler --bin wisp-check -- {file}`)",
+        required.at
+    )
 }
 
 impl Emitter<'_> {

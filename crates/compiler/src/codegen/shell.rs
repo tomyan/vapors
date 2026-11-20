@@ -68,19 +68,30 @@ pub const STYLE: &str = {style:?};
 }
 
 fn props_struct(name: &str, info: &ScriptInfo) -> String {
-    let doc = format!("/// What a parent passes to [`{name}::mount`]; each prop has a default.\n");
+    let all = info.props.iter().all(|prop| !prop.required);
+    let rule = if all {
+        "each prop has a default"
+    } else {
+        "each prop has a default but the `Required` ones, which the mount refuses when missing"
+    };
+    let doc = format!("/// What a parent passes to [`{name}::mount`]; {rule}.\n");
     if info.props.is_empty() {
         return format!("{doc}#[derive(Default)]\npub struct {name}Props {{}}\n");
     }
     let mut fields = String::new();
     let mut defaults = String::new();
     for prop in &info.props {
+        let (ty, default) = if prop.required {
+            (format!("Required<{}>", prop.ty), "Required::Missing")
+        } else {
+            (prop.ty.clone(), prop.default.as_str())
+        };
         let _ = writeln!(
             fields,
             "    /// `{0}`, declared with `#[prop]` at `{2}`.\n    pub {0}: {1},",
-            prop.name, prop.ty, prop.at
+            prop.name, ty, prop.at
         );
-        let _ = writeln!(defaults, "            {}: {},", prop.name, prop.default);
+        let _ = writeln!(defaults, "            {}: {default},", prop.name);
     }
     format!(
         "{doc}pub struct {name}Props {{
@@ -153,9 +164,10 @@ fn mount_methods(
     add_style: &str,
 ) -> String {
     let (returned, built) = field_lists(info);
-    let allowances = mount_allowances(info, body);
+    let allowances = mount_allowances(body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
+    let takes = required_takes(name, info);
     let mut statements = String::new();
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
@@ -184,8 +196,8 @@ fn mount_methods(
     where
         Rc<RefCell<D>>: DynDom,
     {{
-        let {name}Props {{ {prop_names} }} = props;
-{unplaced}{add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let ({name}Props {{ {prop_names} }},) = (props,);
+{takes}{unplaced}{add_style}        dom.borrow_mut().declare_events(&Self::events());
         let disposes_on_drop = true;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
@@ -196,4 +208,18 @@ fn mount_methods(
     }}
 "
     )
+}
+
+/// `let p = p.take(..);` for each required prop: the mount's refusal of
+/// one no tag passed.
+fn required_takes(component: &str, info: &ScriptInfo) -> String {
+    let mut takes = String::new();
+    for prop in info.props.iter().filter(|prop| prop.required) {
+        let (name, at) = (&prop.name, &prop.at);
+        let _ = writeln!(
+            takes,
+            "        let {name} = {name}.take({component:?}, {name:?}, {at:?});"
+        );
+    }
+    takes
 }

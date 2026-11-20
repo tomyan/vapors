@@ -26,7 +26,10 @@ pub(crate) struct Field {
 pub(crate) struct Prop {
     pub name: String,
     pub ty: String,
+    /// Empty for a required prop, declared without one.
     pub default: String,
+    /// Declared without a default: the parent must pass it.
+    pub required: bool,
     /// `file:line` of the declaration, set when it is placed.
     pub at: String,
 }
@@ -152,7 +155,7 @@ fn classify(
     let (name, ty) = binding(&local.pat);
     let init = local.init.as_ref().map(|init| (*init.expr).clone());
     match (is_prop, name, ty) {
-        (true, Some(name), ty) => classify_prop(source, offset, &name, ty, init, info),
+        (true, Some(name), ty) => classify_prop(source, offset, &name, ty, init.as_ref(), info),
         (true, None, _) => Err(source.error(offset, PROP_NEEDS_A_NAME)),
         (false, Some(name), Some(ty)) if reactive_kind(&ty).is_some() => {
             classify_field(source, offset, &name, &ty, init, info)
@@ -196,7 +199,7 @@ fn classify_prop(
     offset: usize,
     name: &str,
     ty: Option<syn::Type>,
-    init: Option<syn::Expr>,
+    init: Option<&syn::Expr>,
     info: &mut ScriptInfo,
 ) -> Result<(), CompileError> {
     let Some(ty) = ty else {
@@ -205,12 +208,7 @@ fn classify_prop(
             format!("prop `{name}` needs a type, which becomes its field in the props struct: `#[prop] let {name}: T = default;`"),
         ));
     };
-    let Some(default) = init else {
-        return Err(source.error(
-            offset,
-            format!("prop `{name}` needs a default value, used when the parent does not pass one: `#[prop] let {name}: T = default;`"),
-        ));
-    };
+    let required = init.is_none();
     if reactive_kind(&ty).is_some() {
         info.unwrappable.push(name.to_string());
     } else {
@@ -219,7 +217,8 @@ fn classify_prop(
     info.props.push(Prop {
         name: name.to_string(),
         ty: render(&ty),
-        default: render(&default),
+        default: init.map(render).unwrap_or_default(),
+        required,
         at: String::new(),
     });
     Ok(())
