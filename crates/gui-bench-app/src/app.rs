@@ -3,12 +3,12 @@
 
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
-use crate::dashboard::WINDOW;
+use crate::dashboard::{KPIS, NAV_ITEMS, Page, WINDOW, page};
 use std::{cell::RefCell, rc::Rc};
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_platform::WindowOptions;
-use vapors_signals::Signal;
+use vapors_signals::{Effect, Signal};
 use vapors_text::FontSystem;
 
 /// Opens the window for `scenario`; the `list` scenario is refused, naming
@@ -34,23 +34,51 @@ pub struct Mounted {
     pub document: Rc<RefCell<Document>>,
     #[allow(dead_code)] // read by the tests, which click the nav items
     pub active: Signal<usize>,
+    #[allow(dead_code)] // read by the tests, which type into the search input
+    pub search: Signal<String>,
     _root: BenchApp,
+    _guard: Effect,
 }
 
-/// Mounts the dashboard into a fresh document.
-pub fn mount() -> Mounted {
+/// Mounts the dashboard into a fresh document; `on_unbuilt` gets the nav
+/// item whenever one whose page a later slice builds becomes active.
+pub fn mount_with(on_unbuilt: impl Fn(usize) + 'static) -> Mounted {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
     let body = document.borrow().body();
     let root = BenchApp::mount(&document, body, BenchAppProps::default());
+    let active = root.active;
+    let guard = Effect::named("unbuilt page", move || {
+        let item = active.get();
+        if page(item) != Page::Overview {
+            on_unbuilt(item);
+        }
+    });
     Mounted {
         document,
-        active: root.active,
+        active,
+        search: root.search,
         _root: root,
+        _guard: guard,
     }
 }
 
+/// The heights of metric card `k`'s sparkline bars, in whole px, by bar.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // the spec's heights are whole, 14 to 44
+pub fn spark_heights(k: usize) -> Vec<(usize, u32)> {
+    let heights = KPIS[k].spark.iter().map(|height| *height as u32);
+    heights.enumerate().collect()
+}
+
+/// The refusal for a click on a nav item whose page s3 builds: the message
+/// on stderr and a non-zero exit, as a missing page must not look built.
+fn exit_unbuilt(item: usize) {
+    let what = format!("the {} page", NAV_ITEMS[item]);
+    eprintln!("vapors-bench: {}", not_built(&what));
+    std::process::exit(2);
+}
+
 fn open(title: &str) -> Result<(), String> {
-    let mounted = mount();
+    let mounted = mount_with(exit_unbuilt);
     let app = ElementsApp::new(Rc::clone(&mounted.document));
     let failure = app.failure();
     vapors_platform::run(options(title), app).map_err(|error| error.to_string())?;
