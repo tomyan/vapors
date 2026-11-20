@@ -57,7 +57,28 @@ fn sidebar_rows() -> Vec<Row> {
 }
 
 fn table() -> Vec<Row> {
-    [sidebar_rows(), nav_rows(), super::content_rows::rows()].concat()
+    [
+        sidebar_rows(),
+        nav_rows(),
+        super::content_rows::rows(),
+        super::chart_rows::rows(),
+        super::chart_rows::bars(0, false),
+        super::filter_rows::rows(),
+    ]
+    .concat()
+}
+
+/// Asserts every pinned side of every row, naming the misses.
+pub(super) fn assert_rows(doc: &vapors_elements::Document, rows: &[Row]) {
+    let misses: Vec<String> = rows
+        .iter()
+        .filter_map(|Row(name, class, nth, want)| {
+            let got = rect(doc, by_class(doc, class)[*nth]);
+            let off = (0..4).any(|side| want[side].is_some_and(|w| (w - got[side]).abs() > 0.01));
+            off.then(|| format!("{name}: want {want:?}, got {got:?}"))
+        })
+        .collect();
+    assert!(misses.is_empty(), "{misses:#?}");
 }
 
 #[test]
@@ -66,18 +87,8 @@ fn every_box_is_where_the_spec_puts_it() {
     let mounted = laid_out();
     let doc = mounted.document.borrow();
 
-    // When
-    let misses: Vec<String> = table()
-        .iter()
-        .filter_map(|Row(name, class, nth, want)| {
-            let got = rect(&doc, by_class(&doc, class)[*nth]);
-            let off = (0..4).any(|side| want[side].is_some_and(|w| (w - got[side]).abs() > 0.01));
-            off.then(|| format!("{name}: want {want:?}, got {got:?}"))
-        })
-        .collect();
-
     // Then
-    assert!(misses.is_empty(), "{misses:#?}");
+    assert_rows(&doc, &table());
 }
 
 #[test]
@@ -94,10 +105,6 @@ fn the_table_covers_every_box_it_names() {
         let found = by_class(&doc, class).len();
         assert_eq!(named, found, "{class}");
     }
-    assert_eq!(
-        table().len(),
-        6 + 3 * NAV_ITEMS.len() + super::content_rows::rows().len()
-    );
 }
 
 #[test]

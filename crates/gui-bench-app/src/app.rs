@@ -3,6 +3,7 @@
 
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
+use crate::controls::Controls;
 use crate::dashboard::{KPIS, NAV_ITEMS, Page, WINDOW, page};
 use std::{cell::RefCell, rc::Rc};
 use vapors_app::ElementsApp;
@@ -36,6 +37,8 @@ pub struct Mounted {
     pub active: Signal<usize>,
     #[allow(dead_code)] // read by the tests, which type into the search input
     pub search: Signal<String>,
+    #[allow(dead_code)] // read by the tests, which read the chart's and the filters' state
+    pub controls: Controls,
     _root: BenchApp,
     _guard: Effect,
 }
@@ -45,7 +48,8 @@ pub struct Mounted {
 pub fn mount_with(on_unbuilt: impl Fn(usize) + 'static) -> Mounted {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
     let body = document.borrow().body();
-    let root = BenchApp::mount(&document, body, BenchAppProps::default());
+    let controls = Controls::new();
+    let root = BenchApp::mount(&document, body, BenchAppProps { controls });
     let active = root.active;
     let guard = Effect::named("unbuilt page", move || {
         let item = active.get();
@@ -57,6 +61,7 @@ pub fn mount_with(on_unbuilt: impl Fn(usize) + 'static) -> Mounted {
         document,
         active,
         search: root.search,
+        controls,
         _root: root,
         _guard: guard,
     }

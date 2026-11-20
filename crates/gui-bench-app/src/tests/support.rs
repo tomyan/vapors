@@ -62,3 +62,17 @@ pub fn click(mounted: &Mounted, point: [f32; 2]) {
     Document::pointer_released(&mounted.document, point);
     refresh(mounted);
 }
+
+/// The centre of the `nth` element of `class`.
+pub fn centre_of(mounted: &Mounted, class: &str, nth: usize) -> [f32; 2] {
+    let doc = mounted.document.borrow();
+    let [x, y, w, h] = rect(&doc, by_class(&doc, class)[nth]);
+    [x + w / 2.0, y + h / 2.0]
+}
+
+/// The text of every element of `class`, in document order.
+pub fn texts(mounted: &Mounted, class: &str) -> Vec<String> {
+    let doc = mounted.document.borrow();
+    let nodes = by_class(&doc, class);
+    nodes.into_iter().map(|node| text(&doc, node)).collect()
+}
