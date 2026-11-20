@@ -16,7 +16,7 @@ let feed: Vec<usize> = (0..rows).collect();
 
 <style>
 /* The scroll container with the framework's defaults: padding 24, 16 between blocks (12 between messages). */
-.content { flex: 1; min-height: 0; box-sizing: border-box; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.content { flex: 1; min-height: 0; box-sizing: border-box; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
 .kpis { flex: none; display: flex; gap: 16px; }
 .row2 { flex: none; display: flex; gap: 16px; }
 .feed { flex: none; display: flex; flex-direction: column; gap: 12px; }

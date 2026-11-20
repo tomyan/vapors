@@ -223,7 +223,8 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 }
 
 /// How far box `index` scrolls on each axis: its content's extent past
-/// its padding box. Taffy 0.15's scrollable overflow leaves out the end
+/// its padding box, on the axes that scroll (`auto`, `scroll`; a
+/// `hidden` or `clip` axis has none). Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
 /// counts, so the larger of the two is taken.
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
@@ -234,11 +235,17 @@ fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
         layout.size.width - border.left - border.right,
         layout.size.height - border.top - border.bottom,
     ];
-    [
+    let reach = [
         layout.scroll_width().max(end[0] + padding.right - inner[0]),
         layout
             .scroll_height()
             .max(end[1] + padding.bottom - inner[1]),
+    ];
+    let overflow = boxes[index].style.overflow;
+    let scrolls = |axis: taffy::Overflow| axis == taffy::Overflow::Scroll;
+    [
+        if scrolls(overflow.x) { reach[0] } else { 0.0 },
+        if scrolls(overflow.y) { reach[1] } else { 0.0 },
     ]
 }
 

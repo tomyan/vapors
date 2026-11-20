@@ -11,9 +11,7 @@ use crate::rows::basics::{element, text};
 
 /// A scroller of rows (the body), each row a horizontal scroller of
 /// four 200 px cells: 800 px of cells in a 640 px row. Both axes are
-/// `auto`: vapors refuses axes that differ (`overflow-x: auto;
-/// overflow-y: hidden`), and the 20 px cells leave nothing to scroll
-/// down.
+/// `auto`, and the 20 px cells leave nothing to scroll down.
 pub const NESTED_SCROLLERS: Shape = Shape {
     css: ".scroller { display: flex; height: 24px; overflow: auto; } \
           .cell { flex-shrink: 0; width: 200px; height: 20px; }",
