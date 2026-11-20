@@ -31,6 +31,8 @@ pub(crate) struct Used {
     /// `z-index` where it applies (a positioned box, or a flex or grid
     /// item), `None` for auto and where it does not.
     pub(crate) z_index: Option<i32>,
+    /// `accent-color`, `None` for `auto` (a switch's checked track).
+    pub(crate) accent: Option<Color>,
     /// How its thumb is drawn, when it scrolls.
     pub(crate) scrollbar: super::Scrollbar,
     /// How its track and thumb are drawn, when it is a range (3-E3a).
@@ -117,6 +119,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
+        accent: super::accent::accent(&mut reader),
         layout,
         inline,
         text,
@@ -161,6 +164,7 @@ impl Used {
             inline,
             z_index,
             scrollbar,
+            accent,
             parts,
             svg,
         } = self;
@@ -175,6 +179,7 @@ impl Used {
             ("inline", *inline == other.inline),
             ("z_index", *z_index == other.z_index),
             ("scrollbar", *scrollbar == other.scrollbar),
+            ("accent", *accent == other.accent),
             ("parts", *parts == other.parts),
             ("svg", *svg == other.svg),
         ]

@@ -24,6 +24,9 @@ pub(crate) fn paint(
     let (Some(true), &Content::Element(node)) = (layout_box.checked, &layout_box.content) else {
         return;
     };
+    if layout_box.switch {
+        return; // a switch draws a track and a knob (`switch.rs`)
+    }
     let used = &input.used[&node];
     if !used.visible {
         return;

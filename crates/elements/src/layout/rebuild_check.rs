@@ -67,6 +67,7 @@ fn same_paint(fresh: &LayoutBox, kept: &LayoutBox) -> bool {
         && fresh.surface == kept.surface
         && fresh.range == kept.range
         && fresh.checked == kept.checked
+        && fresh.switch == kept.switch
         && fresh.text_field == kept.text_field
         && fresh.text_marks == kept.text_marks
 }

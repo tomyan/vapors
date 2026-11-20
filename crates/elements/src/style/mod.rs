@@ -2,6 +2,7 @@
 //! cascade, computed for every element; then what each computed value
 //! means to layout, text and paint.
 
+mod accent;
 mod box_align;
 mod box_style;
 mod cursor;
@@ -18,7 +19,7 @@ mod honoured_check;
 mod inline;
 pub(crate) mod outline;
 mod overflow;
-mod parts;
+pub(crate) mod parts;
 mod position;
 mod rust_sheets;
 mod scene_appearance;

@@ -48,6 +48,7 @@ pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
     "shadowrootclonable",
     "shadowrootdelegatesfocus",
     "shadowrootserializable",
+    "switch",
     "truespeed",
     "typemustmatch",
 ];

@@ -137,6 +137,7 @@ impl Document {
         }
         let implicit = match (self.tag(node)?, self.attribute(node, "type")) {
             ("input", _) if self.is_text_input(node) => "textbox",
+            ("input", Some("checkbox")) if self.is_switch(node) => "switch",
             ("input", Some("checkbox")) => "checkbox",
             ("input", Some("range")) => "slider",
             ("input", Some("number")) => "spinbutton",

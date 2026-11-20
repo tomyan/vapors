@@ -49,6 +49,22 @@ pub(crate) fn input_refusal(element: &Element) -> Option<String> {
     input_type_refusal(element)
         .or_else(|| value_property_refusal(element))
         .or_else(|| scrub_refusal(element))
+        .or_else(|| switch_refusal(element))
+}
+
+/// `switch` is a checkbox's attribute; on another input it would draw
+/// nothing, so it is refused naming the type.
+fn switch_refusal(element: &Element) -> Option<String> {
+    if !element.attributes.contains_key("switch") || is_type(element, "checkbox") {
+        return None;
+    }
+    let kind = element
+        .attributes
+        .get("type")
+        .map_or("text", String::as_str);
+    Some(format!(
+        "<input type=\"{kind}\" switch> is refused: `switch` makes a checkbox a switch and means nothing on a {kind} input; use type=\"checkbox\" or remove `switch` (cargo test -p vapors-elements --test tests switch_refused)"
+    ))
 }
 
 /// `data-scrub` is a number field's: empty for the default px per

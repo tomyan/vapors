@@ -119,6 +119,17 @@ fn a_less_common_boolean_attribute_is_refused_from_an_expression() {
 }
 
 #[test]
+fn the_switch_attribute_is_boolean_so_switch_false_and_an_expression_are_refused() {
+    // When
+    let literal = refusal_with_flag("<input type=\"checkbox\" switch=\"false\" />");
+    let expr = refusal_with_flag("<input type=\"checkbox\" switch={flag.get()} />");
+
+    // Then
+    assert!(literal.contains("`switch=\"false\"` is on"), "{literal}");
+    assert!(expr.contains("`switch={..}` would always be on"), "{expr}");
+}
+
+#[test]
 fn an_attribute_given_twice_in_other_case_is_refused() {
     // When
     let err = refusal_with_flag("<div title=\"a\" Title=\"b\"></div>");

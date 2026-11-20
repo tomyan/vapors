@@ -74,7 +74,7 @@ fn thumb_rect(content: BoxRect, parts: Parts, fraction: f64) -> BoxRect {
 }
 
 /// A filled rect with fully rounded ends, snapped to device pixels.
-fn push_round(
+pub(crate) fn push_round(
     out: &mut Painting,
     rect: BoxRect,
     color: vapors_scene::Color,
