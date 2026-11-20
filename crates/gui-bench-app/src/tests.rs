@@ -6,4 +6,6 @@ mod content_rows;
 mod controls_behaviour;
 mod filter_rows;
 mod layout;
+mod menu;
+mod pages;
 mod support;

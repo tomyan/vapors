@@ -1,11 +1,16 @@
 <script>
+use crate::controls::Controls;
 use crate::dashboard::{EXPORT_LABEL, PAGE_TITLE, SEARCH_PLACEHOLDER, USER_INITIALS};
 let (title, placeholder, export, initials) = (PAGE_TITLE, SEARCH_PLACEHOLDER, EXPORT_LABEL, USER_INITIALS);
 #[prop] let search: Signal<String> = Signal::new(String::new());
+#[prop] let controls: Controls = Controls::unbound();
+let controls = controls.bound("Topbar");
+let menu: Signal<bool> = controls.menu;
+let toggle_menu = move || menu.update(|open| *open = !*open);
 </script>
 
 <style>
-/* Positions are the spec's window x minus the sidebar's 240. The live switch (x 976) and the menu are s3's. */
+/* Positions are the spec's window x minus the sidebar's 240. The live switch (x 976) is a later slice's. */
 .topbar { position: relative; flex: none; height: 64px; box-sizing: border-box; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }
 .title { position: absolute; left: 24px; top: 0; height: 63px; display: flex; align-items: center; font-size: 20px; font-weight: 600; color: #111827; }
 .search { display: flex; position: absolute; left: 436px; top: 14px; width: 280px; height: 36px; }
@@ -21,6 +26,6 @@ let (title, placeholder, export, initials) = (PAGE_TITLE, SEARCH_PLACEHOLDER, EX
     <input class="search-input" type="text" aria-label={placeholder} bind:value={search} />
     {if search.get().is_empty()}<div class="placeholder">{placeholder}</div>{/if}
   </div>
-  <button class="export">{export}</button>
+  <button class="export" onclick={toggle_menu}>{export}</button>
   <div class="avatar">{initials}</div>
 </div>

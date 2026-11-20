@@ -1,32 +1,30 @@
-//! The window of the `app` scenario, and the refusal for what a later
-//! slice builds.
+//! The window of the `app` scenario, and the refusal for the `list`
+//! scenario, which a later slice builds.
 
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
 use crate::controls::Controls;
-use crate::dashboard::{KPIS, NAV_ITEMS, Page, WINDOW, page};
+use crate::dashboard::{KPIS, WINDOW};
 use std::{cell::RefCell, rc::Rc};
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_platform::WindowOptions;
-use vapors_signals::{Effect, Signal};
+use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
 /// Opens the window for `scenario`; the `list` scenario is refused, naming
-/// the slice and the command that works. The `app` scenario's `--rows`
-/// count sizes the orders and messages pages, which s1b and s2 build: the
-/// sidebar shows none, so the count has nothing to size yet.
+/// the slice and the command that works. `--rows` sizes the messages feed.
 pub fn run(scenario: Scenario) -> Result<(), String> {
     match scenario {
         Scenario::List { .. } => Err(not_built("the `list` scenario")),
-        Scenario::App { .. } => open(scenario.title()),
+        Scenario::App { count } => open(scenario.title(), count),
     }
 }
 
-/// The refusal for something slice s3 builds.
+/// The refusal for something a later slice builds.
 pub fn not_built(what: &str) -> String {
     format!(
-        "{what} is not built yet: s3 (docs/decisions/2026-11-19-gui-bench.md); run `vapors-bench --scenario app` for the overview page"
+        "{what} is not built yet: s3b (docs/decisions/2026-11-19-gui-bench.md); run `vapors-bench --scenario app` for the dashboard"
     )
 }
 
@@ -40,30 +38,20 @@ pub struct Mounted {
     #[allow(dead_code)] // read by the tests, which read the chart's and the filters' state
     pub controls: Controls,
     _root: BenchApp,
-    _guard: Effect,
 }
 
-/// Mounts the dashboard into a fresh document; `on_unbuilt` gets the nav
-/// item whenever one whose page a later slice builds becomes active.
-pub fn mount_with(on_unbuilt: impl Fn(usize) + 'static) -> Mounted {
+/// Mounts the dashboard into a fresh document, with `rows` messages.
+pub fn mount(rows: usize) -> Mounted {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
     let body = document.borrow().body();
     let controls = Controls::new();
-    let root = BenchApp::mount(&document, body, BenchAppProps { controls });
-    let active = root.active;
-    let guard = Effect::named("unbuilt page", move || {
-        let item = active.get();
-        if page(item) != Page::Overview {
-            on_unbuilt(item);
-        }
-    });
+    let root = BenchApp::mount(&document, body, BenchAppProps { rows, controls });
     Mounted {
         document,
-        active,
+        active: root.active,
         search: root.search,
         controls,
         _root: root,
-        _guard: guard,
     }
 }
 
@@ -74,16 +62,8 @@ pub fn spark_heights(k: usize) -> Vec<(usize, u32)> {
     heights.enumerate().collect()
 }
 
-/// The refusal for a click on a nav item whose page s3 builds: the message
-/// on stderr and a non-zero exit, as a missing page must not look built.
-fn exit_unbuilt(item: usize) {
-    let what = format!("the {} page", NAV_ITEMS[item]);
-    eprintln!("vapors-bench: {}", not_built(&what));
-    std::process::exit(2);
-}
-
-fn open(title: &str) -> Result<(), String> {
-    let mounted = mount_with(exit_unbuilt);
+fn open(title: &str, rows: usize) -> Result<(), String> {
+    let mounted = mount(rows);
     let app = ElementsApp::new(Rc::clone(&mounted.document));
     let failure = app.failure();
     vapors_platform::run(options(title), app).map_err(|error| error.to_string())?;

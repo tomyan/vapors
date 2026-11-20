@@ -1,9 +1,7 @@
-//! What the top bar and the cards do, and the refusal of pages s3 builds,
+//! What the top bar and the cards do,
 //! through vapors' test drivers.
 use super::support::*;
-use crate::app::{mount_with, not_built};
 use crate::dashboard::*;
-use std::{cell::RefCell, rc::Rc};
 use vapors_elements::{Document, TextEdit};
 
 pub(super) fn centre_of(mounted: &crate::app::Mounted, class: &str, nth: usize) -> [f32; 2] {
@@ -97,22 +95,4 @@ fn the_content_scrolls_when_it_holds_more_than_the_window() {
         .expect("a property")
         .to_css();
     assert_eq!(overflow, "auto");
-}
-
-#[test]
-fn a_click_on_a_page_s3_builds_reports_it_and_the_overview_does_not() {
-    // Given
-    let refused = Rc::new(RefCell::new(Vec::new()));
-    let log = Rc::clone(&refused);
-    let mounted = mount_with(move |item| log.borrow_mut().push(item));
-    refresh(&mounted);
-    assert!(refused.borrow().is_empty(), "the overview is built");
-
-    // When
-    click(&mounted, centre_of(&mounted, "item", 1));
-    click(&mounted, centre_of(&mounted, "item", 0));
-
-    // Then
-    assert_eq!(*refused.borrow(), [1]);
-    assert!(not_built("the Orders page").contains("not built yet: s3"));
 }

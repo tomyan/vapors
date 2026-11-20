@@ -1,5 +1,5 @@
 //! Finding the dashboard's elements and reading their boxes.
-use crate::app::{Mounted, mount_with};
+use crate::app::{Mounted, mount};
 use crate::dashboard::WINDOW;
 use vapors_dom::NodeId;
 use vapors_elements::{Document, Viewport};
@@ -8,7 +8,15 @@ pub type Rect = [f32; 4];
 
 /// The dashboard mounted and laid out at the spec's window size.
 pub fn laid_out() -> Mounted {
-    let mounted = mount_with(|_| {});
+    with_rows(FEED_ROWS)
+}
+
+/// Messages of the feed the tests mount.
+pub const FEED_ROWS: usize = 6;
+
+/// The dashboard with `rows` messages, mounted and laid out.
+pub fn with_rows(rows: usize) -> Mounted {
+    let mounted = mount(rows);
     refresh(&mounted);
     mounted
 }
