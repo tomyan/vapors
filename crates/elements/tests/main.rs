@@ -233,6 +233,8 @@ mod svg_route;
 mod svg_scope;
 mod svg_shape_refusals;
 mod svg_size;
+mod switch;
+mod switch_refused;
 mod tab_focusability;
 mod text_bridge;
 mod text_field;

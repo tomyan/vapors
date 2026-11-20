@@ -77,6 +77,18 @@ input[type=checkbox] {
   background-color: #ffffff;
 }
 
+/* A switch (`switch.rs`): a checkbox of 2.25em by 1.25em (the brief's
+   numbers, as Chromium and Safari have it; unchecked against them
+   offline), drawn as a track and a knob, so no border, background or
+   radius of its own. */
+input[type=checkbox][switch] {
+  width: 2.25em;
+  height: 1.25em;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+
 /* A number field (3-E3c) and a text field (E6a, `input` without a type
    is one): Chromium's padding, with a vapors look (a
    1px grey border, white, square: a rounded clip is refused); its text

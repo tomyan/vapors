@@ -21,10 +21,39 @@ fn css(color: u32) -> String {
     format!("rgb({r} {g} {b})")
 }
 
+/// The compare switch's painted track and knob: the quads inside its box.
+fn switch_quads(mounted: &Mounted) -> Vec<vapors_scene::Quad> {
+    let doc = mounted.document.borrow();
+    let scene = doc.painted().expect("laid out").scene().to_scene();
+    let (right, bottom) = (SWITCH_X + SWITCH_WIDTH, SWITCH_Y + SWITCH_HEIGHT);
+    let inside = |q: &vapors_scene::Quad| {
+        q.rect.left >= SWITCH_X
+            && q.rect.top >= SWITCH_Y
+            && q.rect.right <= right
+            && q.rect.bottom <= bottom
+    };
+    let quads = scene.items().iter();
+    quads
+        .filter_map(|i| match i {
+            vapors_scene::Item::Quad(q) if inside(q) => Some(*q),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The track's colour.
+fn track(mounted: &Mounted) -> vapors_scene::Color {
+    switch_quads(mounted)[0].background
+}
+
+fn rgb(color: u32) -> vapors_scene::Color {
+    let [_, r, g, b] = color.to_be_bytes();
+    vapors_scene::Color::from_rgba8(r, g, b, 255)
+}
+
 /// The left edge of the compare switch's knob.
 fn knob_x(mounted: &Mounted) -> f32 {
-    let doc = mounted.document.borrow();
-    rect(&doc, by_class(&doc, "knob")[0])[0]
+    switch_quads(mounted)[1].rect.left
 }
 
 fn prev_count(mounted: &Mounted) -> usize {
@@ -80,8 +109,8 @@ fn every_series_shows_every_bar_and_previous_bar_at_the_specs_height() {
 fn the_compare_switch_adds_the_previous_period_and_narrows_the_bars() {
     // Given
     let mounted = laid_out();
-    let off = paint(&mounted, "switch", 0, "background-color");
-    assert_eq!(off, css(SWITCH_OFF));
+    let off = track(&mounted);
+    assert_eq!(off, rgb(SWITCH_OFF));
     assert_eq!(prev_count(&mounted), 0);
     assert_eq!(knob_x(&mounted), SWITCH_X + 2.0);
 
@@ -89,10 +118,7 @@ fn the_compare_switch_adds_the_previous_period_and_narrows_the_bars() {
     click(&mounted, centre_of(&mounted, "switch", 0));
 
     // Then
-    assert_eq!(
-        paint(&mounted, "switch", 0, "background-color"),
-        css(PRIMARY)
-    );
+    assert_eq!(track(&mounted), rgb(PRIMARY));
     assert_rows(&mounted.document.borrow(), &bars(0, true));
     assert_eq!(knob_x(&mounted), SWITCH_X + SWITCH_WIDTH - 2.0 - 18.0);
 
@@ -103,7 +129,7 @@ fn the_compare_switch_adds_the_previous_period_and_narrows_the_bars() {
     assert_rows(&mounted.document.borrow(), &bars(0, false));
     assert_eq!(prev_count(&mounted), 0);
     assert_eq!(knob_x(&mounted), SWITCH_X + 2.0);
-    assert_eq!(paint(&mounted, "switch", 0, "background-color"), off);
+    assert_eq!(track(&mounted), off);
 }
 
 #[test]

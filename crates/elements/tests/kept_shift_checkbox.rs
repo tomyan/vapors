@@ -1,7 +1,8 @@
 //! A checked checkbox's mark is placed from its content box by a
 //! fraction of its size, which a shift does not check, so a moved
 //! checked checkbox is painted again; an unchecked one shifts
-//! (`kept_shift.rs`, IU3 3c-3e).
+//! (`kept_shift.rs`, IU3 3c-3e). A switch's knob is placed so too, so
+//! a moved switch is painted again either way.
 
 use crate::support;
 
@@ -11,7 +12,7 @@ use vapors_elements::Document;
 
 /// A column with a spacer above one checkbox; moving the spacer's
 /// height moves the checkbox by whole pixels.
-fn column(checked: bool) -> (Document, vapors_dom::NodeId) {
+fn column(checked: bool, switch: bool) -> (Document, vapors_dom::NodeId) {
     let mut doc = document();
     let body = doc.body();
     let spacer = element(&mut doc, body, "div", "");
@@ -19,6 +20,9 @@ fn column(checked: bool) -> (Document, vapors_dom::NodeId) {
     doc.set_attribute(input, "type", "checkbox");
     if checked {
         doc.set_attribute(input, "checked", "");
+    }
+    if switch {
+        doc.set_attribute(input, "switch", "");
     }
     doc.set_attribute(spacer, "style", "height: 10px;");
     doc.add_stylesheet(
@@ -29,8 +33,8 @@ fn column(checked: bool) -> (Document, vapors_dom::NodeId) {
     (doc, spacer)
 }
 
-fn counts_after_moving(checked: bool) -> (usize, usize) {
-    let (mut doc, spacer) = column(checked);
+fn counts_after_moving(checked: bool, switch: bool) -> (usize, usize) {
+    let (mut doc, spacer) = column(checked, switch);
     doc.update(viewport(100.0, 100.0)).expect("updates");
     doc.set_attribute(spacer, "style", "height: 38px;");
     doc.update(viewport(100.0, 100.0)).expect("updates");
@@ -41,7 +45,7 @@ fn counts_after_moving(checked: bool) -> (usize, usize) {
 #[test]
 fn a_moved_checked_checkbox_is_painted_again() {
     // When
-    let (painted, shifted) = counts_after_moving(true);
+    let (painted, shifted) = counts_after_moving(true, false);
 
     // Then: the spacer and the checkbox
     assert_eq!((painted, shifted), (2, 0));
@@ -50,8 +54,19 @@ fn a_moved_checked_checkbox_is_painted_again() {
 #[test]
 fn a_moved_unchecked_checkbox_is_shifted() {
     // When
-    let (painted, shifted) = counts_after_moving(false);
+    let (painted, shifted) = counts_after_moving(false, false);
 
     // Then: the spacer painted, the checkbox shifted
     assert_eq!((painted, shifted), (1, 1));
+}
+
+#[test]
+fn a_moved_switch_is_painted_again_checked_or_not() {
+    for checked in [true, false] {
+        // When: its knob is placed by a fraction of its height
+        let (painted, shifted) = counts_after_moving(checked, true);
+
+        // Then: the spacer and the switch
+        assert_eq!((painted, shifted), (2, 0), "checked: {checked}");
+    }
 }

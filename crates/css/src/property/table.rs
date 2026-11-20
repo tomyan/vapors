@@ -55,6 +55,7 @@ pub(super) const CURSOR: &str = "auto | default | none | pointer | text | move |
 
 /// Longhands a to g, sorted by name; `table_rest` has the rest.
 pub(super) const FIRST_HALF: &[PropertyDef] = &[
+    def("accent-color", true, "auto", "auto | <color>"),
     def("align-content", false, "normal", ALIGN_CONTENT),
     def("align-items", false, "normal", ALIGN),
     def("align-self", false, "auto", SELF),

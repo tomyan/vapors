@@ -18,6 +18,7 @@ pub(crate) enum Content {
     Vacant,
 }
 
+#[allow(clippy::struct_excessive_bools)] // independent facts about one box, each read by paint
 /// One box: its content, Taffy style, children, and Taffy's results.
 pub(crate) struct LayoutBox {
     pub(crate) content: Content,
@@ -54,6 +55,8 @@ pub(crate) struct LayoutBox {
     pub(crate) range: Option<crate::range::Range>,
     /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
     pub(crate) checked: Option<bool>,
+    /// Whether that checkbox is a switch (`switch.rs`).
+    pub(crate) switch: bool,
     /// Whether the element is a text or number field (E6a, 3-E3c),
     /// whose text origin paint keeps for the pointer.
     pub(crate) text_field: bool,
@@ -83,6 +86,7 @@ impl LayoutBox {
             surface: None,
             range: None,
             checked: None,
+            switch: false,
             text_field: false,
             text_marks: None,
             kept: false,

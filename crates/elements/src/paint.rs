@@ -166,6 +166,7 @@ pub(crate) fn paint_box(
     crate::surfaces::paint(layout_box, rect, input, out);
     crate::range_paint::paint(layout_box, rect, input, out);
     crate::checkbox_paint::paint(layout_box, rect, input, out);
+    crate::switch::paint(layout_box, rect, input, out);
     crate::text_paint::paint(boxes, rects, index, input, out);
 }
 

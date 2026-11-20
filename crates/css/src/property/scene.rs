@@ -169,7 +169,7 @@ const MOTION: &str = "
 
 /// The box model, text and layout longhands (section 3, first row).
 const BOX_MODEL: &str = "
-    align-content align-items align-self aspect-ratio background-color
+    accent-color align-content align-items align-self aspect-ratio background-color
     border-bottom-color border-bottom-left-radius border-bottom-right-radius
     border-bottom-style border-bottom-width border-left-color border-left-style
     border-left-width border-right-color border-right-style border-right-width

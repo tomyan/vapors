@@ -39,9 +39,9 @@ pub(crate) struct Shift {
 
 impl Shift {
     /// The shift of `part`, slot `slot`'s kept paint of `layout_box`;
-    /// none for a checked checkbox, whose mark is placed from the
-    /// content box by a fraction of its size that `snaps_by` does not
-    /// check.
+    /// none for a checked checkbox or a switch, whose mark or knob is
+    /// placed from the content box by a fraction of its size that
+    /// `snaps_by` does not check.
     pub(crate) fn of_box(
         slot: usize,
         part: &KeptBox,
@@ -49,7 +49,7 @@ impl Shift {
         from: BoxFrom,
         scale: f32,
     ) -> Option<Self> {
-        if layout_box.checked == Some(true) {
+        if layout_box.checked == Some(true) || layout_box.switch {
             return None;
         }
         let edges = |at| [at, crate::clip::content_box(layout_box, at)];

@@ -127,6 +127,11 @@ pub(super) fn element_box(source: &Source<'_>, node: NodeId) -> (LayoutBox, Opti
     own.surface = crate::surfaces::name(source.arena, node).map(Into::into);
     own.range = range;
     own.checked = checked;
+    own.switch = source
+        .arena
+        .get(node, "build")
+        .element()
+        .is_some_and(crate::switch::is_switch);
     let field_text = super::field_box::fill(source, node, &mut own);
     (own, field_text)
 }

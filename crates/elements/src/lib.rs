@@ -100,6 +100,7 @@ mod lane_decline;
 mod lay_out_text;
 mod layout;
 mod link;
+mod switch;
 mod viewport_signals;
 pub use link::{Navigation, Opened};
 mod media_checks;

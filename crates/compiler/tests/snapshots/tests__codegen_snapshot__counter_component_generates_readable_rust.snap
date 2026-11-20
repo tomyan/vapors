@@ -1,5 +1,6 @@
 ---
 source: crates/compiler/tests/codegen_snapshot.rs
+assertion_line: 16
 expression: code
 ---
 // Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
@@ -19,12 +20,12 @@ pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
 static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elements::__wisp::dom::KeyWinners {
     sheets: &[
-        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0xdc8e_bd1d_38e9_4209),
+        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0x8eda_9c93_9284_8c8f),
         (vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
     ],
     base: &[
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(12),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(13),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
@@ -34,23 +35,13 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(13),
-            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
-                rule: vapors_elements::__wisp::dom::RuleRef {
-                    sheet: 0,
-                    rule: 60,
-                },
-                declaration: 3,
-            },
-        },
-        vapors_elements::__wisp::dom::BaseWinner {
             property: vapors_elements::__wisp::dom::PropertyRef::Longhand(14),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 4,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -70,7 +61,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 3,
+                declaration: 4,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -160,7 +151,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 4,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -180,7 +171,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 3,
+                declaration: 4,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -194,13 +185,13 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(31),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(29),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 1,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -210,25 +201,25 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 6,
+                declaration: 1,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(37),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(33),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 0,
+                declaration: 6,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(82),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(38),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
-                    sheet: 1,
-                    rule: 0,
+                    sheet: 0,
+                    rule: 60,
                 },
                 declaration: 0,
             },
@@ -263,15 +254,25 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                 declaration: 0,
             },
         },
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(86),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
     ],
     conditional: &[
         vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
-            rule: 68,
+            rule: 69,
         },
         vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
-            rule: 69,
+            rule: 70,
         },
     ],
     blocked_by: &[],
