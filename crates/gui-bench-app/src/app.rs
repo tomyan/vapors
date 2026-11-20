@@ -4,7 +4,7 @@
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
 use crate::controls::Controls;
-use crate::dashboard::{KPIS, WINDOW};
+use crate::dashboard::{KPIS, Order, WINDOW, arranged, visible};
 use std::{cell::RefCell, rc::Rc};
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
@@ -60,6 +60,21 @@ pub fn mount(rows: usize) -> Mounted {
 pub fn spark_heights(k: usize) -> Vec<(usize, u32)> {
     let heights = KPIS[k].spark.iter().map(|height| *height as u32);
     heights.enumerate().collect()
+}
+
+/// The orders the table shows, as indices into the data: the visible ones
+/// (`visible`), arranged by `arranged`.
+#[allow(clippy::cast_possible_truncation)] // an order number is 10200 + its index
+pub fn order_ids(base: &[Order], shown: [bool; 4], search: &str, sorted: bool) -> Vec<usize> {
+    let kept: Vec<Order> = base
+        .iter()
+        .filter(|o| visible(o, &shown, search))
+        .cloned()
+        .collect();
+    arranged(kept, sorted)
+        .iter()
+        .map(|o| (o.number - 10200) as usize)
+        .collect()
 }
 
 fn open(title: &str, rows: usize) -> Result<(), String> {
