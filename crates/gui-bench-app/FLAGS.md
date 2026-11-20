@@ -1,6 +1,6 @@
 # Parts built by hand (`IDIOMS.md` rule 5)
 
-Part, what vapors lacks, the smallest framework change. The window, the sidebar and the metric cards are plain elements and CSS.
+Part, what vapors lacks, the smallest framework change. The window, the sidebar, the metric cards, the page switch and the messages feed are plain elements and CSS.
 
 | Part | What vapors lacks | The smallest change |
 |---|---|---|
@@ -11,5 +11,7 @@ Part, what vapors lacks, the smallest framework change. The window, the sidebar 
 | compare switch | vapors has no switch: `<input type=checkbox>` is the one toggle part, and its box and mark are not a track and a knob. The filter card builds it from a `div` track, a `div` knob and an `onclick`, with the `on` class for the state. | A `switch` part (a checkbox restyled as a track and knob, role `switch`) in `crates/elements`. |
 | chart bar heights | Same gap as the sparkline: no computed style. The 72 bars of the three series, and their previous-period bars, are 72 rules `.sN .slot:nth-child(i) .cur` / `.prev` with the spec's heights written out (the layout test holds each to `bar_height` and `previous_height`); the series and compare state are classes of the plot. | A per-element `style:height={..}` directive that the style key admits. |
 | status checkbox look | The user-agent sheet gives an `input` `display: inline-block`, laid out only as a flex item, so each checkbox sits in a flex row (as the search input does). | Lay an inline-block input out outside flex and grid (`docs/F2c.md`). |
+| export menu | vapors has no menu or popover (`docs/F2c.md` defers `dialog`/popover). `ExportMenu` is an absolutely placed `div` of items, after the content so it paints over it, open by a signal that the button toggles; no light dismiss. | A popover part anchored to its button with a layer above the content. |
+| message avatar colours | No computed style (as the sparkline). The 8 avatar colours are 8 classes, toggled by the author's colour index. | `style:background-color={..}`. |
 
 Not a missing part, a compiler gap met on the way: the compiler allows `clippy::needless_pass_by_value` on a generated `mount_before` only when every prop is a signal or memo, so a component whose props are `Copy` but not signals (`Controls`, `usize`) trips it. `main.rs` allows it crate-wide, with the reason. The smallest change: derive the allowance from the props' types, or take `props` by reference. Also: a `#[prop]` always has a default, so `Controls::unbound()` is the default and `Controls::bound(who)` refuses it loudly; the smallest change is a required `#[prop]`.

@@ -1,7 +1,7 @@
 //! vapors under gui-bench: one window per run that shows the scenario the
 //! command line names (`docs/decisions/2026-11-19-gui-bench.md`). Slice
 //! s1 builds the window and the sidebar (s1b the top bar and the cards, s2
-//! the chart and the filters, s2b the orders); the rest follows in s3 (see
+//! the chart and the filters, s2b the orders); the rest follows in s3 and s3b (see
 //! `FLAGS.md` for parts built by hand).
 
 #![allow(

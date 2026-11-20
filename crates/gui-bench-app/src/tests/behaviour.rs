@@ -128,11 +128,11 @@ fn the_window_is_borderless_1280_by_800_with_the_runners_app_id() {
 }
 
 #[test]
-fn the_list_scenario_is_refused_naming_s3() {
+fn the_list_scenario_is_refused_naming_s3b() {
     // When
     let list = run(Scenario::List { count: 10 }).unwrap_err();
 
     // Then
     assert_eq!(list, not_built("the `list` scenario"));
-    assert!(list.contains("s3") && list.contains("vapors-bench --scenario app"));
+    assert!(list.contains("s3b") && list.contains("vapors-bench --scenario app"));
 }
