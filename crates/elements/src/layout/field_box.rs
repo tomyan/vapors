@@ -19,5 +19,9 @@ pub(super) fn fill(source: &Source<'_>, node: NodeId, field: &mut LayoutBox) -> 
         .as_ref()
         .filter(|(at, _)| *at == node)
         .map(|(_, marks)| marks.clone());
-    Some(crate::text_field::editor_text(element))
+    let text = crate::text_field::editor_text(element);
+    if text.is_empty() {
+        field.placeholder = crate::placeholder::text_of(element);
+    }
+    Some(text)
 }
