@@ -6,6 +6,8 @@ mod content_rows;
 mod controls_behaviour;
 mod filter_rows;
 mod layout;
+mod live_behaviour;
+mod live_rows;
 mod menu;
 mod order_parts;
 mod order_rows;

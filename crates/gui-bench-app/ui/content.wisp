@@ -25,7 +25,7 @@ let feed: Vec<usize> = (0..rows).collect();
 <div class="content">
   {if page(active.get()) == Page::Overview}
   <div class="kpis">
-    {for k in cards.clone() key=k}<KpiCard index={k.get()} label={KPIS[k.get()].label.to_string()} delta={KPIS[k.get()].delta.to_string()} up={KPIS[k.get()].up} />{/for}
+    {for k in cards.clone() key=k}<KpiCard index={k.get()} label={KPIS[k.get()].label.to_string()} delta={KPIS[k.get()].delta.to_string()} up={KPIS[k.get()].up} controls={controls} />{/for}
   </div>
   <div class="row2">
     <ChartCard controls={controls} />
