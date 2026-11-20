@@ -6,6 +6,7 @@ use crate::empty_page::{EmptyPage, EmptyPageProps};
 use crate::filter_card::{FilterCard, FilterCardProps};
 use crate::kpi_card::{KpiCard, KpiCardProps};
 use crate::message_card::{MessageCard, MessageCardProps};
+use crate::orders_card::{OrdersCard, OrdersCardProps};
 #[prop] let controls: Controls = Controls::unbound();
 #[prop] let active: Signal<usize> = Signal::new(0);
 #[prop] let rows: usize = 0;
@@ -31,6 +32,7 @@ let feed: Vec<usize> = (0..rows).collect();
     <ChartCard controls={controls} />
     <FilterCard controls={controls} />
   </div>
+  <OrdersCard controls={controls} count={rows} />
   {else}
   {if page(active.get()) == Page::Messages}
   <div class="feed">

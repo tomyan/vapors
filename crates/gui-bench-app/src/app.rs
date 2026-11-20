@@ -4,8 +4,8 @@
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
 use crate::controls::Controls;
-use crate::dashboard::{KPIS, WINDOW};
-use std::{cell::RefCell, rc::Rc};
+use crate::dashboard::{KPIS, Order, WINDOW, arranged, visible};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_platform::WindowOptions;
@@ -60,6 +60,26 @@ pub fn mount(rows: usize) -> Mounted {
 pub fn spark_heights(k: usize) -> Vec<(usize, u32)> {
     let heights = KPIS[k].spark.iter().map(|height| *height as u32);
     heights.enumerate().collect()
+}
+
+/// The orders the table shows, as indices into `base`: the visible ones
+/// (`visible`), arranged by `arranged`. An order's index is its place in
+/// `base`, found by its number, so no rule of numbering is repeated here.
+pub fn order_ids(base: &[Order], shown: [bool; 4], search: &str, sorted: bool) -> Vec<usize> {
+    let place: HashMap<u32, usize> = base
+        .iter()
+        .enumerate()
+        .map(|(i, o)| (o.number, i))
+        .collect();
+    let kept: Vec<Order> = base
+        .iter()
+        .filter(|o| visible(o, &shown, search))
+        .cloned()
+        .collect();
+    arranged(kept, sorted)
+        .iter()
+        .map(|o| place[&o.number])
+        .collect()
 }
 
 fn open(title: &str, rows: usize) -> Result<(), String> {
