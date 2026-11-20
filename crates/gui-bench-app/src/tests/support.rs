@@ -70,3 +70,18 @@ pub fn click(mounted: &Mounted, point: [f32; 2]) {
     Document::pointer_released(&mounted.document, point);
     refresh(mounted);
 }
+
+/// A `0xAARRGGBB` colour as vapors prints it.
+pub fn css(color: u32) -> String {
+    let [_, r, g, b] = color.to_be_bytes();
+    format!("rgb({r} {g} {b})")
+}
+
+/// The computed `property` of the `nth` element with class `class`, as CSS.
+pub fn paint(mounted: &Mounted, class: &str, nth: usize, property: &str) -> String {
+    let doc = mounted.document.borrow();
+    let style = doc
+        .computed_style(by_class(&doc, class)[nth])
+        .expect("styled");
+    style.get_by_name(property).expect("a property").to_css()
+}
