@@ -1,6 +1,7 @@
 //! The spec's rectangles against the boxes vapors' layout gives at 1280x800.
 #![allow(clippy::cast_precision_loss)] // indexes and counts are small
 use super::support::*;
+use super::{chart_rows, content_rows, filter_rows};
 use crate::dashboard::*;
 
 /// A box to find (name, class, nth of that class) and what is pinned of
@@ -57,7 +58,28 @@ fn sidebar_rows() -> Vec<Row> {
 }
 
 fn table() -> Vec<Row> {
-    [sidebar_rows(), nav_rows(), super::content_rows::rows()].concat()
+    [
+        sidebar_rows(),
+        nav_rows(),
+        content_rows::rows(),
+        chart_rows::rows(),
+        chart_rows::bars(0, false),
+        filter_rows::rows(),
+    ]
+    .concat()
+}
+
+/// Asserts every pinned side of every row, naming the misses.
+pub(super) fn assert_rows(doc: &vapors_elements::Document, rows: &[Row]) {
+    let misses: Vec<String> = rows
+        .iter()
+        .filter_map(|Row(name, class, nth, want)| {
+            let got = rect(doc, by_class(doc, class)[*nth]);
+            let off = (0..4).any(|side| want[side].is_some_and(|w| (w - got[side]).abs() > 0.01));
+            off.then(|| format!("{name}: want {want:?}, got {got:?}"))
+        })
+        .collect();
+    assert!(misses.is_empty(), "{misses:#?}");
 }
 
 #[test]
@@ -66,18 +88,8 @@ fn every_box_is_where_the_spec_puts_it() {
     let mounted = laid_out();
     let doc = mounted.document.borrow();
 
-    // When
-    let misses: Vec<String> = table()
-        .iter()
-        .filter_map(|Row(name, class, nth, want)| {
-            let got = rect(&doc, by_class(&doc, class)[*nth]);
-            let off = (0..4).any(|side| want[side].is_some_and(|w| (w - got[side]).abs() > 0.01));
-            off.then(|| format!("{name}: want {want:?}, got {got:?}"))
-        })
-        .collect();
-
     // Then
-    assert!(misses.is_empty(), "{misses:#?}");
+    assert_rows(&doc, &table());
 }
 
 #[test]
@@ -94,10 +106,21 @@ fn the_table_covers_every_box_it_names() {
         let found = by_class(&doc, class).len();
         assert_eq!(named, found, "{class}");
     }
-    assert_eq!(
-        table().len(),
-        6 + 3 * NAV_ITEMS.len() + super::content_rows::rows().len()
-    );
+    let groups = [
+        (sidebar_rows().len(), 6),
+        (nav_rows().len(), 3 * NAV_ITEMS.len()),
+        (content_rows::rows().len(), 6 + KPI_COUNT * (4 + SPARK_BARS)),
+        (
+            chart_rows::rows().len(),
+            4 + SEGMENTS.len() + GRID_LINES.len(),
+        ),
+        (chart_rows::bars(0, false).len(), CHART_BARS),
+        (filter_rows::rows().len(), 6 + 2 * Status::ALL.len()),
+    ];
+    for (got, want) in groups {
+        assert_eq!(got, want);
+    }
+    assert_eq!(table().len(), groups.iter().map(|g| g.1).sum::<usize>());
 }
 
 #[test]
