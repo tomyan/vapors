@@ -18,6 +18,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[],
     style: Some("width: 50px"),
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

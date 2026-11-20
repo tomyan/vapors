@@ -130,6 +130,7 @@ static DIV_KEY: vapors_dom::StyleKey = vapors_dom::StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

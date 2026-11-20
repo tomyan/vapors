@@ -40,6 +40,9 @@ pub struct StyleKey {
     /// ([`StyleKey::shape_refusal`]). Listeners, bindings and
     /// expression attributes are not attributes the key carries.
     pub attributes: &'static [(&'static str, &'static str)],
+    /// The properties the template binds with `style:<property>={expr}`,
+    /// each once ([`StyleKey::shape_refusal`]); a tree refuses any other.
+    pub bound: &'static [crate::BoundProperty],
     /// What the compiler worked out about the key's cascade, or why it
     /// did not.
     pub winners: crate::Winners,
