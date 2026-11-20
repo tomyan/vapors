@@ -1,5 +1,5 @@
 //! Finding the dashboard's elements and reading their boxes.
-use crate::app::{Mounted, mount};
+use crate::app::{Mounted, mount_with};
 use crate::dashboard::WINDOW;
 use vapors_dom::NodeId;
 use vapors_elements::{Document, Viewport};
@@ -8,7 +8,7 @@ pub type Rect = [f32; 4];
 
 /// The dashboard mounted and laid out at the spec's window size.
 pub fn laid_out() -> Mounted {
-    let mounted = mount();
+    let mounted = mount_with(|_| {});
     refresh(&mounted);
     mounted
 }
@@ -52,4 +52,13 @@ pub fn text(doc: &Document, node: NodeId) -> String {
         out += &text(doc, child);
     }
     out
+}
+
+/// A click: the pointer moves onto `point`, presses and releases, and the
+/// document lays out again.
+pub fn click(mounted: &Mounted, point: [f32; 2]) {
+    Document::pointer_moved(&mounted.document, point);
+    Document::pointer_pressed(&mounted.document, point);
+    Document::pointer_released(&mounted.document, point);
+    refresh(mounted);
 }

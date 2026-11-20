@@ -6,17 +6,22 @@ use crate::dashboard::*;
 /// A box to find (name, class, nth of that class) and what is pinned of
 /// it: `x`, `y`, width, height, each or none.
 #[derive(Clone)]
-struct Row(String, &'static str, usize, [Option<f32>; 4]);
+pub(super) struct Row(
+    pub String,
+    pub &'static str,
+    pub usize,
+    pub [Option<f32>; 4],
+);
 
-fn row(name: String, class: &'static str, nth: usize, want: [Option<f32>; 4]) -> Row {
+pub(super) fn row(name: String, class: &'static str, nth: usize, want: [Option<f32>; 4]) -> Row {
     Row(name, class, nth, want)
 }
 
-fn at(x: f32, y: f32, w: f32, h: f32) -> [Option<f32>; 4] {
+pub(super) fn at(x: f32, y: f32, w: f32, h: f32) -> [Option<f32>; 4] {
     [Some(x), Some(y), Some(w), Some(h)]
 }
 
-fn from_x(x: f32) -> [Option<f32>; 4] {
+pub(super) fn from_x(x: f32) -> [Option<f32>; 4] {
     [Some(x), None, None, None]
 }
 
@@ -52,7 +57,7 @@ fn sidebar_rows() -> Vec<Row> {
 }
 
 fn table() -> Vec<Row> {
-    [sidebar_rows(), nav_rows()].concat()
+    [sidebar_rows(), nav_rows(), super::content_rows::rows()].concat()
 }
 
 #[test]
@@ -82,12 +87,17 @@ fn the_table_covers_every_box_it_names() {
     let doc = mounted.document.borrow();
 
     // Then: a class the table names exists once per row naming it
-    for (class, rows) in [("item", 1), ("icon", 1), ("nav-label", 1), ("logo", 1)] {
-        let named = table().iter().filter(|row| row.1 == class).count();
+    let rows = table();
+    let classes: std::collections::BTreeSet<_> = rows.iter().map(|row| row.1).collect();
+    for class in classes {
+        let named = rows.iter().filter(|row| row.1 == class).count();
         let found = by_class(&doc, class).len();
-        assert_eq!(named, found, "{class}: {rows}");
+        assert_eq!(named, found, "{class}");
     }
-    assert_eq!(table().len(), 6 + 3 * NAV_ITEMS.len());
+    assert_eq!(
+        table().len(),
+        6 + 3 * NAV_ITEMS.len() + super::content_rows::rows().len()
+    );
 }
 
 #[test]
