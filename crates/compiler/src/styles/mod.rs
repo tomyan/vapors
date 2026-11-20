@@ -8,6 +8,7 @@
 //! parents; at a component's root, inside a snippet, or under a
 //! component tag it is variable, since the mount site decides.
 
+mod bound;
 mod facts;
 mod others;
 mod report;

@@ -22,6 +22,9 @@ pub(crate) struct KeyParts<'e> {
     pub(crate) toggles: Vec<&'e str>,
     /// The literal `style` text.
     pub(crate) style: Option<&'e str>,
+    /// The `style:` bindings' properties, in template order; none for a
+    /// component tag, which refuses them at parse.
+    pub(crate) bound: Vec<vapors_dom::BoundProperty>,
     /// Every other literal attribute, in template order; none for a
     /// component tag, whose other attributes are props.
     pub(crate) attributes: Vec<(&'e str, &'e str)>,
@@ -38,12 +41,25 @@ pub(crate) fn key_parts<'e>(
         classes: literal_classes(source, keyed.attributes)?,
         toggles: key_directives(source, keyed)?,
         style: key_style(source, keyed)?,
+        bound: key_bound(source, keyed)?,
         attributes: if keyed.carries_attributes {
             fixed_attributes(keyed.attributes)
         } else {
             Vec::new()
         },
     })
+}
+
+/// The properties of `keyed`'s `style:` bindings.
+fn key_bound(
+    source: &Source,
+    keyed: &Keyed<'_>,
+) -> Result<Vec<vapors_dom::BoundProperty>, CompileError> {
+    if !keyed.carries_attributes {
+        return Ok(Vec::new());
+    }
+    let bindings = super::style_binding::bindings(source, keyed.attributes)?;
+    Ok(bindings.into_iter().map(|(property, _)| property).collect())
 }
 
 /// The literal `style`; `style={..}` is refused here, where it would

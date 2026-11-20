@@ -54,7 +54,7 @@ pub const BOOLEAN_ATTRIBUTES: &[&str] = &[
 ];
 
 /// The directive prefixes an element takes.
-const DIRECTIVES: &[&str] = &["bind:", "class:"];
+const DIRECTIVES: &[&str] = &["bind:", "class:", "style:"];
 
 /// Refuses `attribute` on an element when it would not mean what it says.
 pub(super) fn refuse_misleading(
@@ -106,7 +106,7 @@ fn refuse_unknown_directive(source: &Source, attribute: &Attribute) -> Result<()
     Err(source.error(
         attribute.offset,
         format!(
-            "`{name}` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked`, `bind:this` and `class:name={{bool}}`; a listener is `onclick={{handler}}`, with no colon"
+            "`{name}` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked`, `bind:this`, `class:name={{bool}}` and `style:property={{expr}}`; a listener is `onclick={{handler}}`, with no colon"
         ),
     ))
 }

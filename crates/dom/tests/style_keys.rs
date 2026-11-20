@@ -17,6 +17,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[],
     style: Some("height: 24px"),
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -28,6 +29,7 @@ static PLAIN: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -144,6 +146,7 @@ static ROW_AGAIN: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[],
     style: Some("height: 24px"),
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

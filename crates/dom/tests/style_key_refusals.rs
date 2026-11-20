@@ -16,6 +16,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked", "wide"],
     attributes: &[("title", "a row"), ("aria-hidden", "true")],
     style: Some("height: 24px"),
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -27,6 +28,7 @@ static PLAIN: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

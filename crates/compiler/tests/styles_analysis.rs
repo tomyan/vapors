@@ -210,3 +210,63 @@ fn the_report_names_each_element_its_rules_and_its_declared_properties() {
         assert!(text.contains(line), "missing {line:?} in:\n{text}");
     }
 }
+
+const BAR_STYLE: &str = "<script>\nlet h: Signal<f32> = Signal::new(4.0);\n</script>\n<style>\n.bar { height: 5px; width: 2px }\n</style>\n";
+
+#[test]
+fn a_bound_property_is_a_variable_winner_and_the_others_stay_constant() {
+    // Given: the same rule, with and without the binding
+    let plain = analysed(&format!("{BAR_STYLE}<div class=\"bar\"></div>"));
+    let bound = analysed(&format!(
+        "{BAR_STYLE}<div class=\"bar\" style:height={{h.get()}}></div>"
+    ));
+
+    // Then: only `height` loses its constant winner
+    let (height, width) = (id("height"), id("width"));
+    assert!(matches!(
+        plain.elements[0].winners.longhands[height],
+        Winner::Constant { .. }
+    ));
+    let winners = &bound.elements[0].winners;
+    assert!(matches!(
+        winners.longhands[height],
+        Winner::Variable { base: Some(_), .. }
+    ));
+    assert!(matches!(winners.longhands[width], Winner::Constant { .. }));
+    assert_eq!(
+        bound.elements[0].resolved[height],
+        Resolved::Variable("a style: binding")
+    );
+    assert_eq!(bound.elements[0].resolved[width], Resolved::Constant);
+    assert_eq!(bound.elements[0].facts.bound.len(), 1);
+}
+
+#[test]
+fn a_bound_property_nobody_declares_is_variable_too() {
+    // When
+    let analysis = analysed(&format!(
+        "{BAR_STYLE}<div class=\"bar\" style:top={{h.get()}}></div>"
+    ));
+
+    // Then
+    let winner = &analysis.elements[0].winners.longhands[id("top")];
+    assert!(
+        matches!(winner, Winner::Variable { base: None, .. }),
+        "{winner:?}"
+    );
+}
+
+#[test]
+fn an_inherited_bound_colour_is_variable_for_the_children_too() {
+    // When
+    let analysis = analysed(
+        "<script>\nlet c: Signal<Rgba> = Signal::new(Rgba::rgb(1, 2, 3));\n</script>\n<div style:color={c.get()}><span></span></div>",
+    );
+
+    // Then
+    let color = id("color");
+    assert!(matches!(
+        analysis.elements[1].resolved[color],
+        Resolved::Variable(_)
+    ));
+}

@@ -47,6 +47,7 @@ mod codegen_required_props;
 mod codegen_snapshot;
 mod codegen_snippet_refusals;
 mod codegen_snippets;
+mod codegen_style_bindings;
 mod codegen_style_key;
 mod codegen_style_key_limits;
 mod codegen_text;

@@ -26,6 +26,7 @@ impl Emitter<'_> {
             self.emit_attribute(element, &var, attribute)?;
         }
         self.emit_class_directives(&element.attributes, &var)?;
+        self.emit_style_bindings(&element.attributes, &var)?;
         self.emit_nodes(&element.children, &Place::child_of(&var))?;
         // once the element is whole, so what reads the signal sees it built
         (element.attributes.iter())
@@ -44,6 +45,7 @@ impl Emitter<'_> {
             AttributeKind::BindThis
             | AttributeKind::ClassDirective(_)
             | AttributeKind::Class
+            | AttributeKind::StyleBinding(_)
             | AttributeKind::Style
             | AttributeKind::Literal(_) => Ok(()),
             AttributeKind::Scope => Err(self.source.error(

@@ -25,6 +25,9 @@ pub(crate) struct ShareKey {
     pub(crate) states: States,
     /// Which `class:` directives are on.
     pub(crate) toggles: u64,
+    /// The declarations of the element's `style:` bindings, in property
+    /// order: one style per distinct value, the key and its winners shared.
+    pub(crate) bound: Box<[String]>,
     /// The element's attributes any sheet selects by name, with values.
     pub(crate) attributes: Box<[(String, String)]>,
 }

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::{Call, Kind, RecordingDom};
-use crate::{Dom, Handler, NodeId, PropertyValue, StyleKey};
+use crate::{BoundProperty, BoundValue, Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 impl Dom for RecordingDom {
     fn create_element(&mut self, tag: &str) -> NodeId {
@@ -12,6 +12,7 @@ impl Dom for RecordingDom {
             tag: tag.into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            bound: BTreeMap::new(),
             key: None,
         });
         self.calls.push(Call::CreateElement {
@@ -39,6 +40,17 @@ impl Dom for RecordingDom {
                     .collect(),
             }),
             Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
+        }
+    }
+
+    fn bind_style(&mut self, node: NodeId, property: BoundProperty, value: BoundValue) {
+        match self.bind(node, property, value) {
+            Ok(()) => self.calls.push(Call::BindStyle {
+                node,
+                property,
+                value,
+            }),
+            Err(refusal) => self.refuse(node, format!("bind_style: {refusal}")),
         }
     }
 

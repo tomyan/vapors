@@ -55,12 +55,12 @@ fn a_boolean_attribute_name_is_matched_ignoring_case() {
 #[test]
 fn a_colon_named_attribute_that_is_not_a_directive_is_refused() {
     // When
-    let err = refusal_with_flag("<div style:color={flag.get()}></div>");
+    let err = refusal_with_flag("<div foo:color={flag.get()}></div>");
 
     // Then
     assert_eq!(
         err,
-        "counter.wisp:4:6: `style:color` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked`, `bind:this` and `class:name={bool}`; a listener is `onclick={handler}`, with no colon"
+        "counter.wisp:4:6: `foo:color` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked`, `bind:this`, `class:name={bool}` and `style:property={expr}`; a listener is `onclick={handler}`, with no colon"
     );
 }
 

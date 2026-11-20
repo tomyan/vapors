@@ -34,6 +34,7 @@ mod a11y_tree;
 mod arena;
 mod bidi;
 mod blocks;
+mod bound_style;
 mod canvas;
 mod chain;
 mod changed_slots;
@@ -251,6 +252,7 @@ pub use tags::{LATER as LATER_TAGS, SUPPORTED as SUPPORTED_TAGS};
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
 pub use update_counts::UpdateCounts;
+pub use vapors_dom::Rgba;
 pub use viewport_signals::{
     Orientation, PrimaryInput, Size, orientation, set_primary_input, set_viewport_size,
     viewport_size,

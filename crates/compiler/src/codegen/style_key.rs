@@ -138,14 +138,15 @@ impl Emitter<'_> {
             .map(|(name, value)| format!("({name:?}, {value:?})"))
             .collect();
         Ok(format!(
-            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
+            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], bound: &[{}], winners: {winners} }}",
             keyed.tag,
             quoted(&parts.classes),
             quoted(&parts.toggles),
             parts
                 .style
                 .map_or("None".to_owned(), |text| format!("Some({text:?})")),
-            attributes.join(", ")
+            attributes.join(", "),
+            super::style_binding::bound_literal(&parts.bound)
         ))
     }
 }

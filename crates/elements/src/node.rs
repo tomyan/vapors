@@ -30,6 +30,9 @@ pub(crate) struct Element {
     /// The calls refused on it, each naming the site and the fix
     /// (`dom_keyed`); every update refuses while it is in the tree.
     pub(crate) refused: Vec<String>,
+    /// The declarations `style:` bindings made, in property order: the
+    /// element's own slots, read as inline style (`bound_style`).
+    pub(crate) bound: Vec<(vapors_dom::BoundProperty, String)>,
 }
 
 impl Element {
@@ -43,6 +46,7 @@ impl Element {
             key: None,
             toggles: 0,
             refused: Vec::new(),
+            bound: Vec::new(),
         }
     }
 

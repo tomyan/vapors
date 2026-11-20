@@ -3,7 +3,9 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use vapors_dom::{CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey};
+use vapors_dom::{
+    BoundProperty, BoundValue, CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey,
+};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
@@ -30,6 +32,14 @@ impl Dom for Document {
             Ok(Some(class)) => self.write_attribute(node, "class", &class),
             Ok(None) => {}
             Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
+        }
+    }
+
+    fn bind_style(&mut self, node: NodeId, property: BoundProperty, value: BoundValue) {
+        match self.bound_style(node, property, value) {
+            Ok(Some(style)) => self.write_attribute(node, "style", &style),
+            Ok(None) => {}
+            Err(refusal) => self.refuse(node, format!("bind_style: {refusal}")),
         }
     }
 
