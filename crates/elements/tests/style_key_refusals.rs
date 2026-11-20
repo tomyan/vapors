@@ -20,6 +20,7 @@ static ROW: StyleKey = StyleKey {
     toggles: &["marked"],
     attributes: &[("title", "a row")],
     style: Some("width: 50px"),
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -31,6 +32,7 @@ static TWICE: StyleKey = StyleKey {
     toggles: &["on", "on"],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

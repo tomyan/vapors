@@ -3,7 +3,9 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use vapors_dom::{CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey};
+use vapors_dom::{
+    BoundProperty, BoundValue, CompiledSheet, Dom, Handler, NodeId, PropertyValue, StyleKey,
+};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
@@ -31,6 +33,20 @@ impl Dom for Document {
             Ok(None) => {}
             Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
         }
+    }
+
+    fn bind_style(&mut self, node: NodeId, property: BoundProperty, value: BoundValue) {
+        // A declared relaxation (decision 2026-11-20-style-bindings,
+        // Status): the compiler emits no binding yet, so a tree refuses
+        // every call, loudly, until the next slice gives `Document` the
+        // per-element slot, the cascade read and the share key.
+        let site = self
+            .style_key(node)
+            .map_or("an unkeyed element", |key| key.site);
+        let why = format!(
+            "bind_style({property:?}, {value:?}) on {site}: `Document` does not apply style bindings yet (the next slice of decision 2026-11-20-style-bindings)"
+        );
+        self.refuse(node, why);
     }
 
     fn style_key(&self, node: NodeId) -> Option<&'static StyleKey> {

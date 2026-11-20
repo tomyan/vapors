@@ -40,6 +40,11 @@ pub enum Call {
         name: String,
         value: PropertyValue,
     },
+    BindStyle {
+        node: NodeId,
+        property: crate::BoundProperty,
+        value: crate::BoundValue,
+    },
     ToggleClasses {
         node: NodeId,
         toggles: Vec<(String, bool)>,

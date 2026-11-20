@@ -137,8 +137,12 @@ impl Emitter<'_> {
         let attributes: Vec<String> = (parts.attributes.iter())
             .map(|(name, value)| format!("({name:?}, {value:?})"))
             .collect();
+        // `bound: &[]` is a declared relaxation (decision
+        // 2026-11-20-style-bindings): the compiler does not parse `style:`
+        // yet, so every key lists none and `bind_style` refuses all calls
+        // on it. Retired by the compiler slice that emits the listed properties.
         Ok(format!(
-            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
+            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], bound: &[], winners: {winners} }}",
             keyed.tag,
             quoted(&parts.classes),
             quoted(&parts.toggles),
