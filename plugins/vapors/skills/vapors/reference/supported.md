@@ -37,7 +37,7 @@ Any other lowercase tag is refused. The compiler's words:
 
 `<input type>` values the tree builds: `range`, `checkbox`, `number`, `text`; an `input` with no `type` is `text`.
 
-These HTML boolean attributes are on by being present, so the compiler refuses them from an expression (`disabled={..}`); write the literal on an element inside `{if}`, or use `bind:checked`: `allowfullscreen`, `alpha`, `async`, `autofocus`, `autoplay`, `checked`, `compact`, `controls`, `declare`, `default`, `defer`, `disablepictureinpicture`, `disableremoteplayback`, `disabled`, `formnovalidate`, `hidden`, `inert`, `ismap`, `itemscope`, `loop`, `multiple`, `muted`, `nomodule`, `noresize`, `noshade`, `novalidate`, `nowrap`, `open`, `playsinline`, `readonly`, `required`, `reversed`, `selected`, `shadowrootclonable`, `shadowrootdelegatesfocus`, `shadowrootserializable`, `truespeed`, `typemustmatch`.
+These HTML boolean attributes are on by being present, so the compiler refuses them from an expression (`disabled={..}`); write the literal on an element inside `{if}`, or use `bind:checked`: `allowfullscreen`, `alpha`, `async`, `autofocus`, `autoplay`, `checked`, `compact`, `controls`, `declare`, `default`, `defer`, `disablepictureinpicture`, `disableremoteplayback`, `disabled`, `formnovalidate`, `hidden`, `inert`, `ismap`, `itemscope`, `loop`, `multiple`, `muted`, `nomodule`, `noresize`, `noshade`, `novalidate`, `nowrap`, `open`, `playsinline`, `readonly`, `required`, `reversed`, `selected`, `shadowrootclonable`, `shadowrootdelegatesfocus`, `shadowrootserializable`, `switch`, `truespeed`, `typemustmatch`.
 
 ## Events
 
@@ -49,6 +49,7 @@ The parser's table: each property, whether it inherits, and its grammar. Custom 
 
 | Property | Inherited | Grammar |
 |---|---|---|
+| `accent-color` | yes | `auto \| <color>` |
 | `align-content` | no | `normal \| stretch \| center \| start \| end \| flex-start \| flex-end \| space-between \| space-around \| space-evenly` |
 | `align-items` | no | `normal \| stretch \| center \| start \| end \| flex-start \| flex-end \| baseline` |
 | `align-self` | no | `auto \| normal \| stretch \| center \| start \| end \| flex-start \| flex-end \| baseline` |
