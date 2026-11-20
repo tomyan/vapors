@@ -1,9 +1,8 @@
 <script>
 use crate::controls::Controls;
 use crate::dashboard::Status;
-#[prop] let controls: Controls = Controls::unbound();
+#[prop] let controls: Controls;
 #[prop] let index: usize = 0;
-let controls = controls.bound("FilterRow");
 let checked: Signal<bool> = controls.shown[index];
 let label = Status::ALL[index].label().to_string();
 </script>

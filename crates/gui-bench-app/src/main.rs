@@ -8,10 +8,6 @@
     clippy::missing_panics_doc,
     reason = "a generated mount of MessageCard panics on a colour outside AVATAR_COLORS, as it must, and the generated function has no doc to put `# Panics` in"
 )]
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "a generated mount takes its props by value, and the compiler allows that lint only when every prop is a signal or memo: the Controls prop is Copy but not one (crates/compiler/src/codegen/allowances.rs)"
-)]
 
 mod app;
 #[allow(clippy::all, clippy::pedantic, dead_code)] // vendored unchanged; docs/gui-bench/spec/NOTICE.md

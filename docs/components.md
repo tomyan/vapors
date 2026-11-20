@@ -47,6 +47,7 @@ when the component mounts. Some `let` forms have a special meaning:
 | `let count: Signal<i32> = Signal::new(0);` | a public field `count: Signal<i32>` on the component struct. The signal is created with `Signal::named("count", ..)`, so refusals name it. |
 | `let doubled: Memo<i32> = Memo::new(..);` | a public field, like a signal |
 | `#[prop] let label: String = "Count".into();` | a field of `CounterProps`, with that value as its default |
+| `#[prop] let controls: Controls;` | a required prop: no default, a field `controls: Required<Controls>` (`Required::Missing` in `Default`). See "Required props" |
 | `let increment = move \|\| ..;` | a handler. A closure with no parameters is called without the event, in the script or inline in the template. |
 | `use crate::todo_item::{TodoItem, TodoItemProps};` | brings a child component into scope for its tag |
 | `#[dispatcher(pick)] let events;` | a `vapors_dom::Dispatcher` for the component's own events (doc 03, "A component's own events"); at most one, with no other attribute on that `let` |
@@ -348,6 +349,35 @@ per-property binding is still being decided. Today a 3D scene's
 `transform={Signal::derived(move || ..)}` on a scene tag is the way to
 move things every frame (`docs/scene3d.md`).
 
+## Required props
+
+A `#[prop]` declared without a default is required: the parent must pass
+it, as when a default would be wrong (a shared `Controls`, where a
+private copy would split the state).
+
+- A tag in the same crate that omits it is refused at the tag, naming
+  the file and line, the component and the prop, and where the
+  component declares it.
+- A tag the compiler cannot check (a component of another crate: its
+  props are unchecked) reaches the mount, which panics naming the
+  component, the prop and its declaration; it never fills a default.
+  `Required::take` (`vapors_dom::Required`) does it.
+- The field is `Required<T>`, `Missing` in `Default`. A checked tag
+  wraps what it passes in `Required::Given`; Rust code that builds the
+  props struct writes `Required::Given(v)` (or `v.into()`). A tag the
+  compiler cannot check does not wrap, so it cannot pass a required
+  prop yet: that stays a rustc error at the props struct, until the
+  compiler reads another crate's props (the unchecked-props gap above).
+- The script reads the prop as its plain type `T`, as any prop.
+- A prop with no type is still refused.
+
+## Lints
+
+A generated `mount_before` takes its props by value and moves them
+whole into a one-element tuple before destructuring, so
+`clippy::needless_pass_by_value` never fires, whatever the props' types
+(`Copy` ones included): no component needs an allowance of its own.
+
 ## Read-only props
 
 A prop typed `ReadSignal<T>` gives the child read access only: it has
@@ -532,10 +562,10 @@ depend on facts it cannot see, such as whether a captured binding is
 such lint is allowed on the one generated `let` that trips it, with
 its reason in the attribute. A hole's expression is bound by its own
 statement first, so the allowance never covers code the user wrote.
-Lints in the user's script and expressions are still reported. Two
-allowances sit on `mount_before` because they judge the function
-itself: its length, which follows the template's size, and an empty
-props struct taken by value. Generated node names need none: each is
+Lints in the user's script and expressions are still reported. One
+allowance sits on `mount_before` because it judges the function
+itself: its length, which follows the template's size; props taken by
+value need none (see "Lints" above). Generated node names need none: each is
 a stem and a counter, and the counters share one width per component
 (`text03` and `text13` in a template of more than ten names), so
 clippy's `similar_names` never sees two that differ by an inserted

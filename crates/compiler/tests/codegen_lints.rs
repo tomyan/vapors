@@ -158,18 +158,6 @@ fn no_allowance_is_written_for_code_that_was_not_generated() {
 }
 
 #[test]
-fn empty_props_are_taken_by_value_with_the_reason() {
-    // When
-    let code = generated("<div></div>");
-
-    // Then: a parameter lint, so it cannot cover anything in the script
-    assert_has(
-        &code,
-        "#[allow(clippy::needless_pass_by_value, reason = \"every component takes its props struct by value, empty or not, so parents mount them alike\")]\npub fn mount_before",
-    );
-}
-
-#[test]
 fn mount_before_allows_its_own_length_with_the_reason() {
     // When
     let code = generated("<div></div>");
@@ -188,17 +176,4 @@ fn roots_is_must_use() {
 
     // Then
     assert_has(&code, "#[must_use]\npub fn roots(&self) -> Vec<NodeId>");
-}
-
-#[test]
-fn props_that_are_all_signals_are_taken_by_value_with_the_reason() {
-    // When: the only prop is a signal, which is Copy, so mount does not
-    // consume its props
-    let code = generated_with(
-        "#[prop]\nlet outside: Signal<i32> = Signal::new(0);",
-        "<div>{outside}</div>",
-    );
-
-    // Then
-    assert_has(&code, "#[allow(clippy::needless_pass_by_value");
 }

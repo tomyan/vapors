@@ -83,6 +83,7 @@ pub(crate) fn header_imports(bound: &[&str]) -> String {
                 "Event",
                 "NodeId",
                 "PropertyValue",
+                "Required",
                 "Root",
                 "SCOPE_ATTRIBUTE",
                 "Snippet",

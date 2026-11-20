@@ -29,7 +29,7 @@ impl Emitter<'_> {
                 tag.name
             )));
         }
-        self.check_props(tag);
+        let required = self.check_props(tag).unwrap_or_default();
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
@@ -54,6 +54,10 @@ impl Emitter<'_> {
             fields.push(self.emit_children(&rest, &var)?);
         }
         self.snippets.truncate(outer);
+        let fields = fields
+            .iter()
+            .map(|f| given(f, &required))
+            .collect::<Vec<_>>();
         self.line(Allowance::NeedlessUpdate.attribute());
         self.line(format!("let {var}_props = {}Props {{", tag.name));
         self.indent(1);
@@ -113,6 +117,21 @@ impl Emitter<'_> {
             ));
         }
         binding
+    }
+}
+
+/// A props field line `name: value,` wrapped as `Required::Given(value)`
+/// when `name` is a required prop of the component.
+fn given(field: &str, required: &[String]) -> String {
+    let wrapped = field
+        .split_once(": ")
+        .filter(|(name, _)| required.iter().any(|r| r == name));
+    match wrapped {
+        Some((name, value)) => {
+            let value = value.trim_end().trim_end_matches(',');
+            format!("{name}: Required::Given({value}),")
+        }
+        None => field.to_owned(),
     }
 }
 

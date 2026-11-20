@@ -3,8 +3,7 @@ use crate::controls::Controls;
 use crate::dashboard::{EXPORT_LABEL, PAGE_TITLE, SEARCH_PLACEHOLDER, USER_INITIALS};
 let (title, placeholder, export, initials) = (PAGE_TITLE, SEARCH_PLACEHOLDER, EXPORT_LABEL, USER_INITIALS);
 #[prop] let search: Signal<String> = Signal::new(String::new());
-#[prop] let controls: Controls = Controls::unbound();
-let controls = controls.bound("Topbar");
+#[prop] let controls: Controls;
 let menu: Signal<bool> = controls.menu;
 let toggle_menu = move || menu.update(|open| *open = !*open);
 </script>

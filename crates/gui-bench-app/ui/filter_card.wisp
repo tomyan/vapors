@@ -2,8 +2,7 @@
 use crate::controls::Controls;
 use crate::dashboard::{APPLY_LABEL, COMPARE_LABEL, FILTERS_TITLE, RESET_LABEL};
 use crate::filter_row::{FilterRow, FilterRowProps};
-#[prop] let controls: Controls = Controls::unbound();
-let controls = controls.bound("FilterCard");
+#[prop] let controls: Controls;
 let (title, compare_label, reset_label, apply_label) = (FILTERS_TITLE, COMPARE_LABEL, RESET_LABEL, APPLY_LABEL);
 let compare = controls.compare;
 let rows: Vec<usize> = (0..4).collect();

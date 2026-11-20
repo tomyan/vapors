@@ -24,6 +24,7 @@ mod listener;
 mod listener_result;
 mod modifiers;
 pub mod recording;
+mod required;
 mod roots;
 mod scene_hits;
 mod snippet;
@@ -43,6 +44,7 @@ pub use key_winners::{
 pub use listener::{Handler, Listener};
 pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
 pub use modifiers::Modifiers;
+pub use required::Required;
 pub use roots::{BlockNodes, Root, current_nodes};
 pub use scene_hits::{HitAsk, HitSource};
 pub use snippet::{Args, DynDom, Renderable, Snippet};

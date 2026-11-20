@@ -8,7 +8,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
 use vapors_elements::__wisp::dom::{
-    Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
+    Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Required, Root,
+    SCOPE_ATTRIBUTE, Snippet,
 };
 #[allow(unused_imports)]
 use vapors_signals::{Effect, Memo, Owner, ReadSignal, Signal};
@@ -319,10 +320,6 @@ impl Counter {
         clippy::too_many_lines,
         reason = "mount_before builds the whole template, so its length follows the template's size"
     )]
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
-    )]
     pub fn mount_before<D: Dom + ?Sized + 'static>(
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
@@ -332,7 +329,7 @@ impl Counter {
     where
         Rc<RefCell<D>>: DynDom,
     {
-        let CounterProps {} = props;
+        let (CounterProps {},) = (props,);
         dom.borrow_mut()
             .add_style(
                 vapors_elements::__wisp::dom::CompiledSheet::__compiled(

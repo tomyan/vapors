@@ -18,7 +18,6 @@ pub struct Controls {
     pub shown: [Signal<bool>; 4],
     /// Whether the export menu is open.
     pub menu: Signal<bool>,
-    bound: bool,
 }
 
 impl Controls {
@@ -30,26 +29,7 @@ impl Controls {
             series: Signal::named("series", 0),
             shown: Status::ALL.map(|status| Signal::named(status.label(), true)),
             menu: Signal::named("menu", false),
-            bound: true,
         }
-    }
-
-    /// The default of a `controls` prop nobody passed; `bound` refuses it.
-    pub fn unbound() -> Self {
-        Controls {
-            bound: false,
-            ..Controls::new()
-        }
-    }
-
-    /// `self` for the component `who`, which refuses an omitted prop: a
-    /// private copy of the signals would split the shared state.
-    pub fn bound(self, who: &str) -> Self {
-        assert!(
-            self.bound,
-            "{who} was mounted without `controls={{controls}}`: pass the shared `Controls` (crates/gui-bench-app/src/controls.rs), or the filters and the chart would each get private state"
-        );
-        self
     }
 
     /// "Reset": checks every status, turns compare off, selects the first
@@ -61,16 +41,5 @@ impl Controls {
             self.series.set(0);
             self.search.set(String::new());
         });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Controls;
-
-    #[test]
-    #[should_panic(expected = "without `controls={controls}`")]
-    fn an_omitted_controls_prop_is_refused() {
-        Controls::unbound().bound("Probe");
     }
 }

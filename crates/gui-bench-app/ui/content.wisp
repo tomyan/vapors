@@ -6,10 +6,9 @@ use crate::empty_page::{EmptyPage, EmptyPageProps};
 use crate::filter_card::{FilterCard, FilterCardProps};
 use crate::kpi_card::{KpiCard, KpiCardProps};
 use crate::message_card::{MessageCard, MessageCardProps};
-#[prop] let controls: Controls = Controls::unbound();
+#[prop] let controls: Controls;
 #[prop] let active: Signal<usize> = Signal::new(0);
 #[prop] let rows: usize = 0;
-let controls = controls.bound("Content");
 let cards: Vec<usize> = (0..KPI_COUNT).collect();
 let feed: Vec<usize> = (0..rows).collect();
 </script>

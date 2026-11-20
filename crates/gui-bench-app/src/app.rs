@@ -45,7 +45,14 @@ pub fn mount(rows: usize) -> Mounted {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
     let body = document.borrow().body();
     let controls = Controls::new();
-    let root = BenchApp::mount(&document, body, BenchAppProps { rows, controls });
+    let root = BenchApp::mount(
+        &document,
+        body,
+        BenchAppProps {
+            rows,
+            controls: controls.into(),
+        },
+    );
     Mounted {
         document,
         active: root.active,

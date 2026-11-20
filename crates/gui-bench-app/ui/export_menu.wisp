@@ -1,8 +1,8 @@
 <script>
 use crate::controls::Controls;
 use crate::dashboard::MENU_ITEMS;
-#[prop] let controls: Controls = Controls::unbound();
-let menu: Signal<bool> = controls.bound("ExportMenu").menu;
+#[prop] let controls: Controls;
+let menu: Signal<bool> = controls.menu;
 // An item does nothing but close the menu.
 let close = move || menu.set(false);
 let items: Vec<(usize, String)> = MENU_ITEMS.iter().enumerate().map(|(i, label)| (i, (*label).to_string())).collect();
