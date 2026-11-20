@@ -50,6 +50,7 @@ pub(crate) fn input_refusal(element: &Element) -> Option<String> {
         .or_else(|| value_property_refusal(element))
         .or_else(|| scrub_refusal(element))
         .or_else(|| switch_refusal(element))
+        .or_else(|| placeholder_refusal(element))
 }
 
 /// `switch` is a checkbox's attribute; on another input it would draw
@@ -58,12 +59,31 @@ fn switch_refusal(element: &Element) -> Option<String> {
     if !element.attributes.contains_key("switch") || is_type(element, "checkbox") {
         return None;
     }
-    let kind = element
-        .attributes
-        .get("type")
-        .map_or("text", String::as_str);
+    let kind = type_name(element);
     Some(format!(
         "<input type=\"{kind}\" switch> is refused: `switch` makes a checkbox a switch and means nothing on a {kind} input; use type=\"checkbox\" or remove `switch` (cargo test -p vapors-elements --test tests switch_refused)"
+    ))
+}
+
+/// A `placeholder` on an input of a type that takes none (HTML,
+/// 4.10.5.1: it applies to text, search, url, tel, email, password
+/// and number), named by its type; Chromium ignores it there, which
+/// would hide a field the author meant to show a hint.
+fn placeholder_refusal(element: &Element) -> Option<String> {
+    element.attributes.get("placeholder")?;
+    if crate::placeholder::takes_placeholder(element) {
+        return None;
+    }
+    let kind = type_name(element);
+    Some(format!(
+        "<input type=\"{kind}\" placeholder=..> has a placeholder, which an input of type {kind} does not take (a text or number field does); remove the attribute, or change the type. Reproduce with `cargo test -p vapors-elements --test tests placeholder`"
+    ))
+}
+
+/// The `type` attribute as written, `text` when absent.
+fn type_name(element: &Element) -> &str {
+    element.attributes.get("type").map_or("text", String::as_str)
+}
     ))
 }
 
