@@ -8,6 +8,7 @@
 - [gpu-surface.md](gpu-surface.md): gpu-surfaces
 - [hold-button.md](hold-button.md): `HoldButton`
 - [icons.md](icons.md): inline SVG icons
+- [placeholder.md](placeholder.md): `<input placeholder>` and `::placeholder`
 - [RACER_PLAN.md](RACER_PLAN.md): the homepage racer
 - [scene3d.md](scene3d.md): the 3D scene, its renderer and components
 - [text.md](text.md): text

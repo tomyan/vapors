@@ -17,6 +17,16 @@ impl Document {
             .map_or_else(String::new, collapsed)
     }
 
+    /// The placeholder an input shows while empty, as its description
+    /// (`docs/placeholder.md`), whether or not it is empty now: the
+    /// hint stays the field's description once it has a value. Never
+    /// its name: that is the label's, `aria-label`'s or the title's.
+    fn ax_placeholder(&self, node: NodeId) -> Option<String> {
+        let element = self.arena.get(node, "a11y").element()?;
+        let text = crate::placeholder::text_of(element)?;
+        Some(text.trim_ascii().to_owned()).filter(|text| !text.is_empty())
+    }
+
     /// `node`'s accessible name and description, one lookup of the
     /// name before its title serving both; the description is `None`
     /// for none.
@@ -35,7 +45,8 @@ impl Document {
         // ASCII trim as `collapsed`: Chromium keeps a no-break space at
         // either end (titles.events, `nbspdesc`)
         let description = Some(title.trim_ascii().to_owned())
-            .filter(|description| !before_title.is_empty() && !description.is_empty());
+            .filter(|description| !before_title.is_empty() && !description.is_empty())
+            .or_else(|| self.ax_placeholder(node));
         (name_or(before_title, title), description)
     }
 }
