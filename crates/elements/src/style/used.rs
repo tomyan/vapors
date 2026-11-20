@@ -142,7 +142,7 @@ impl Used {
     /// `overflow` is `hidden` or `clip`: descendants are cut off at the
     /// padding box.
     pub(crate) fn clips(&self) -> bool {
-        self.layout.overflow.x != taffy::Overflow::Visible
+        super::overflow::clips(&self.layout)
     }
 
     /// The first field in which `self` and `other` differ, for the
@@ -185,7 +185,7 @@ impl Used {
 
     /// `overflow` is `scroll` or `auto`: a scroll container.
     pub(crate) fn scrolls(&self) -> bool {
-        self.layout.overflow.x == taffy::Overflow::Scroll
+        super::overflow::scrolls(&self.layout)
     }
 }
 

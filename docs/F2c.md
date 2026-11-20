@@ -824,8 +824,12 @@ differs from the plan.
     viewport (CSS Overflow 3 section 3.3). touche's shell sets
     `overflow: hidden` on `body`.
   - Hits are cut to the clip.
-  - Refused: `scroll` and `auto` (S9); axes that differ; a clip with a
-    `border-radius`; overflow on an inline element.
+  - Axes are per axis (`docs/overflow-axes.md`): any pair of `visible`,
+    `hidden`, `clip`, `auto` and `scroll`, computed as CSS Overflow 3
+    section 3.1 says.
+  - Refused: `clip` beside `visible` (a one-axis clip); `scroll` and
+    `auto` on the viewport; a clip with a `border-radius`; overflow on
+    an inline element.
 - **Clips in the renderer.** The scene keeps each item's clip, and a
   batch ends where the clip changes. `Rect::scissor` rounds the clip to
   whole pixels inside the target. `Target` and `RenderTarget` gain

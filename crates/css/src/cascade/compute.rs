@@ -74,6 +74,7 @@ pub(crate) fn style(
         values.push(value);
     }
     super::font_weight::resolve_relative(&mut values, parent);
+    super::overflow::resolve_pair(&mut values);
     let positions = winners
         .longhands
         .iter()

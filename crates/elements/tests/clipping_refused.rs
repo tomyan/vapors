@@ -8,7 +8,7 @@ use vapors_dom::Dom;
 #[test]
 fn what_overflow_cannot_do_yet_is_refused_naming_it() {
     let cases = [
-        ("overflow-x: hidden; overflow-y: visible;", "overflow-y"),
+        ("overflow-x: clip; overflow-y: visible;", "overflow-y"),
         ("overflow: hidden; border-radius: 4px;", "border-radius"),
     ];
     for (css, named) in cases {
