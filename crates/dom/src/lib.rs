@@ -13,6 +13,7 @@
 
 mod appearance;
 pub mod blocks;
+mod bound_style;
 mod class_names;
 mod compiled_sheet;
 mod dispatcher;
@@ -32,6 +33,7 @@ mod style_key_refusals;
 mod window_listeners;
 
 pub use appearance::{Appearance, AppearanceSink};
+pub use bound_style::{BoundProperty, BoundValue, Rgba};
 pub use class_names::class_names;
 pub use compiled_sheet::CompiledSheet;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
@@ -107,6 +109,12 @@ pub trait Dom: Listeners {
     /// Refuses a name the key does not list, and an element created
     /// without a key, naming the fix.
     fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]);
+    /// Binds `property` of a keyed element to `value`
+    /// (`style:<property>={expr}`): an inline declaration of the
+    /// element's own. Refuses a property the node's key does not list,
+    /// a node without a key and a value outside the property's domain
+    /// ([`BoundProperty::declaration`]), changing nothing.
+    fn bind_style(&mut self, node: NodeId, property: BoundProperty, value: BoundValue);
     /// The key `node` was created from; `None` for an element made by
     /// [`Dom::create_element`] and for a text node.
     fn style_key(&self, node: NodeId) -> Option<&'static StyleKey>;

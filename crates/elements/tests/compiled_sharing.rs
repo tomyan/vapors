@@ -56,6 +56,7 @@ fn key_blocked_by(other: &'static str, blocked_by: &'static [u8]) -> &'static St
         toggles: &[],
         attributes: &[],
         style: None,
+        bound: &[],
         winners: Winners::Compiled(winners),
     }))
 }

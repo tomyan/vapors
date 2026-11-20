@@ -101,7 +101,7 @@ fn a_component_tags_key_has_no_winners_as_its_props_type_decides_its_tag() {
     // Then
     assert_has(
         &code,
-        "attributes: &[], winners: vapors_elements::__wisp::dom::Winners::ComponentTag }",
+        "attributes: &[], bound: &[], winners: vapors_elements::__wisp::dom::Winners::ComponentTag }",
     );
 }
 

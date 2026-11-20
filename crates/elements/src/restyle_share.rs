@@ -157,6 +157,7 @@ impl Document {
                 .map_or(0, |p| Rc::as_ptr(&p) as usize),
             states: ElementRef::new(&self.arena, node).states(),
             toggles: data.toggles,
+            bound: data.bound.iter().map(|(_, text)| text.clone()).collect(),
             attributes: self.selected_attributes(&data.attributes),
         }
     }

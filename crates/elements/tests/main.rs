@@ -50,6 +50,7 @@ mod a_href;
 mod a_href_link_rule;
 mod a_href_modifiers;
 mod a_href_path;
+mod bound_style;
 mod button_wrap;
 mod calc_failures;
 mod checkbox;

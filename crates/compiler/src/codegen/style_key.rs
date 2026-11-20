@@ -138,7 +138,7 @@ impl Emitter<'_> {
             .map(|(name, value)| format!("({name:?}, {value:?})"))
             .collect();
         Ok(format!(
-            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], winners: {winners} }}",
+            "vapors_elements::__wisp::dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}], bound: &[], winners: {winners} }}",
             keyed.tag,
             quoted(&parts.classes),
             quoted(&parts.toggles),

@@ -20,7 +20,7 @@ fn an_element_is_created_from_its_key_with_site_scope_tag_classes_and_style() {
     // Then: the <div> is at line 4, column 1 of counter.wisp
     assert_has(
         &code,
-        "static KEY_DIV0: vapors_elements::__wisp::dom::StyleKey = vapors_elements::__wisp::dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\"), attributes: &[(\"title\", \"t\")], winners: vapors_elements::__wisp::dom::Winners::Compiled(&WINNERS_DIV0) };",
+        "static KEY_DIV0: vapors_elements::__wisp::dom::StyleKey = vapors_elements::__wisp::dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\"), attributes: &[(\"title\", \"t\")], bound: &[], winners: vapors_elements::__wisp::dom::Winners::Compiled(&WINNERS_DIV0) };",
     );
     assert_has(
         &code,
