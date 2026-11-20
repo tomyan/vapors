@@ -3,6 +3,7 @@
 //! `Copy` struct so a component takes them as one prop.
 
 use crate::dashboard::Status;
+use crate::live::Live;
 use vapors_signals::{Signal, batch};
 
 /// The shared signals of the overview page.
@@ -18,6 +19,8 @@ pub struct Controls {
     pub shown: [Signal<bool>; 4],
     /// Whether the export menu is open.
     pub menu: Signal<bool>,
+    /// The live switch, its tick and its spinner.
+    pub live: Live,
 }
 
 impl Controls {
@@ -29,6 +32,7 @@ impl Controls {
             series: Signal::named("series", 0),
             shown: Status::ALL.map(|status| Signal::named(status.label(), true)),
             menu: Signal::named("menu", false),
+            live: Live::new(),
         }
     }
 
