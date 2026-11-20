@@ -7,5 +7,8 @@ mod controls_behaviour;
 mod filter_rows;
 mod layout;
 mod menu;
+mod order_parts;
+mod order_rows;
+mod orders_behaviour;
 mod pages;
 mod support;
