@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::{Call, Kind, RecordingDom};
-use crate::{Dom, Handler, NodeId, PropertyValue, StyleKey};
+use crate::{BoundProperty, BoundValue, Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 impl Dom for RecordingDom {
     fn create_element(&mut self, tag: &str) -> NodeId {
@@ -39,6 +39,25 @@ impl Dom for RecordingDom {
                     .collect(),
             }),
             Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
+        }
+    }
+
+    fn bind_style(&mut self, node: NodeId, property: BoundProperty, value: BoundValue) {
+        let declared = match &self.record(node).kind {
+            Kind::Element {
+                key: Some((key, _)),
+                ..
+            } => key.bound_declaration(property, value),
+            Kind::Element { tag, .. } => Err(crate::unkeyed_binding_refusal(tag)),
+            Kind::Text(_) => Err(crate::unkeyed_binding_refusal("text node")),
+        };
+        match declared {
+            Ok(_) => self.calls.push(Call::BindStyle {
+                node,
+                property,
+                value,
+            }),
+            Err(refusal) => self.refuse(node, format!("bind_style: {refusal}")),
         }
     }
 

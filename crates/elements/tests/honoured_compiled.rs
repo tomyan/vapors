@@ -54,6 +54,7 @@ fn spinner_key() -> &'static StyleKey {
         toggles: &[],
         attributes: &[],
         style: None,
+        bound: &[],
         winners: Winners::Compiled(winners),
     }))
 }

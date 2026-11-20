@@ -285,6 +285,7 @@ static KEY_BUTTON0: vapors_elements::__wisp::dom::StyleKey = vapors_elements::__
     toggles: &[],
     style: None,
     attributes: &[],
+    bound: &[],
     winners: vapors_elements::__wisp::dom::Winners::Compiled(&WINNERS_BUTTON0),
 };
 /// What a parent passes to [`Counter::mount`]; each prop has a default.

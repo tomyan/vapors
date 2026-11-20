@@ -16,6 +16,7 @@ fn key(classes: &'static [&'static str], toggles: &'static [&'static str]) -> St
         toggles,
         attributes: &[],
         style: None,
+        bound: &[],
         winners: vapors_dom::Winners::Unanalysed,
     }
 }
@@ -137,6 +138,7 @@ static TWICE: StyleKey = StyleKey {
     toggles: &["on", "on"],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 

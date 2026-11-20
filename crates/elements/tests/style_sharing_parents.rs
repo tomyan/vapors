@@ -22,6 +22,7 @@ static PARENT: StyleKey = StyleKey {
     toggles: &["on"],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -33,6 +34,7 @@ static CHILD: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
@@ -44,6 +46,7 @@ static BUTTON: StyleKey = StyleKey {
     toggles: &[],
     attributes: &[],
     style: None,
+    bound: &[],
     winners: vapors_dom::Winners::Unanalysed,
 };
 
