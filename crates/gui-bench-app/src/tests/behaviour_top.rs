@@ -6,13 +6,13 @@ use crate::dashboard::*;
 use std::{cell::RefCell, rc::Rc};
 use vapors_elements::{Document, TextEdit};
 
-fn centre_of(mounted: &crate::app::Mounted, class: &str, nth: usize) -> [f32; 2] {
+pub(super) fn centre_of(mounted: &crate::app::Mounted, class: &str, nth: usize) -> [f32; 2] {
     let doc = mounted.document.borrow();
     let [x, y, w, h] = rect(&doc, by_class(&doc, class)[nth]);
     [x + w / 2.0, y + h / 2.0]
 }
 
-fn texts(mounted: &crate::app::Mounted, class: &str) -> Vec<String> {
+pub(super) fn texts(mounted: &crate::app::Mounted, class: &str) -> Vec<String> {
     let doc = mounted.document.borrow();
     by_class(&doc, class)
         .into_iter()

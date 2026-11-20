@@ -2,10 +2,13 @@
 use crate::sidebar::{Sidebar, SidebarProps};
 use crate::topbar::{Topbar, TopbarProps};
 use crate::content::{Content, ContentProps};
-// The active nav item, the first at startup; the search text, which the
-// orders (s2) filter by.
+use crate::controls::Controls;
+// The active nav item, the first at startup; the controls the chart, the
+// filters and the search input share.
 let active: Signal<usize> = Signal::new(0);
-let search: Signal<String> = Signal::new(String::new());
+#[prop] let controls: Controls = Controls::unbound();
+let controls = controls.bound("BenchApp");
+let search: Signal<String> = controls.search;
 </script>
 
 <style>
@@ -18,6 +21,6 @@ let search: Signal<String> = Signal::new(String::new());
   <Sidebar active={active} />
   <div class="main">
     <Topbar search={search} />
-    <Content />
+    <Content controls={controls} />
   </div>
 </div>
