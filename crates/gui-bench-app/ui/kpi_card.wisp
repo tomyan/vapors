@@ -5,7 +5,7 @@ use crate::dashboard::kpi_value;
 #[prop] let label: String = String::new();
 #[prop] let delta: String = String::new();
 #[prop] let up: bool = false;
-// The tick is 0 until s3's live switch runs.
+// The tick is 0 until a later slice's live switch runs.
 let tick: Signal<u64> = Signal::new(0);
 let bars = spark_heights(index);
 </script>

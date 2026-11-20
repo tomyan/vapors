@@ -16,6 +16,8 @@ pub struct Controls {
     pub series: Signal<usize>,
     /// Whether the status `Status::ALL[k]` shows, by `k`.
     pub shown: [Signal<bool>; 4],
+    /// Whether the export menu is open.
+    pub menu: Signal<bool>,
     bound: bool,
 }
 
@@ -27,6 +29,7 @@ impl Controls {
             compare: Signal::named("compare", false),
             series: Signal::named("series", 0),
             shown: Status::ALL.map(|status| Signal::named(status.label(), true)),
+            menu: Signal::named("menu", false),
             bound: true,
         }
     }

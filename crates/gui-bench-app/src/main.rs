@@ -1,9 +1,13 @@
 //! vapors under gui-bench: one window per run that shows the scenario the
 //! command line names (`docs/decisions/2026-11-19-gui-bench.md`). Slice
 //! s1 builds the window and the sidebar (s1b the top bar and the cards, s2
-//! the chart and the filters, s2b the orders); the rest follows in s3 (see
+//! the chart and the filters, s2b the orders); the rest follows in s3b (see
 //! `FLAGS.md` for parts built by hand).
 
+#![allow(
+    clippy::missing_panics_doc,
+    reason = "a generated mount of MessageCard panics on a colour outside AVATAR_COLORS, as it must, and the generated function has no doc to put `# Panics` in"
+)]
 #![allow(
     clippy::needless_pass_by_value,
     reason = "a generated mount takes its props by value, and the compiler allows that lint only when every prop is a signal or memo: the Controls prop is Copy but not one (crates/compiler/src/codegen/allowances.rs)"
