@@ -7,7 +7,7 @@
 //! vertex (a bowtie, the points of an even-odd star) each wedge is its
 //! own.
 
-use crate::mesh::{MeshCorner, outward_normal};
+use crate::mesh::{MeshCorner, length, outward_normal, twice_area};
 use crate::mesh_edges::{EdgeTriangles, edge_key};
 use crate::mesh_wedge::{Bound, outline_corner};
 
@@ -83,7 +83,7 @@ impl Fans<'_> {
             let users = &self.edges[&edge_key(v, other)];
             if users.len() == 1 {
                 let bound = Bound {
-                    normal: self.outward(t, v, other),
+                    normal: self.bound_normal(t, v, other),
                     far: self.vertices[other as usize],
                 };
                 return Side {
@@ -120,6 +120,25 @@ impl Fans<'_> {
         corner[opposite(corner, v, other)]
     }
 
+    /// The outward normal of the outline edge `v`-`other` of triangle
+    /// `t`. A sliver (`is_sliver`) has no side of its own to lean away
+    /// from, so it takes the side across its other edge `v`-`x`: that
+    /// neighbour's normal there, away from the neighbour, points on past
+    /// the sliver. With no neighbour (the other edge is outline too)
+    /// the sliver's own answer stands.
+    fn bound_normal(&self, t: usize, v: u32, other: u32) -> [f32; 2] {
+        let x = self.third(t, v, other);
+        let users = &self.edges[&edge_key(v, x)];
+        match users.iter().find(|&&u| u != t) {
+            Some(&neighbour) if is_sliver(self.points(t)) => self.outward(neighbour, v, x),
+            _ => self.outward(t, v, other),
+        }
+    }
+
+    fn points(&self, t: usize) -> [[f32; 2]; 3] {
+        self.corners[t].map(|i| self.vertices[i as usize])
+    }
+
     /// The outward normal of edge `v`-`other` of triangle `t`.
     fn outward(&self, t: usize, v: u32, other: u32) -> [f32; 2] {
         let corner = self.corners[t];
@@ -127,6 +146,20 @@ impl Fans<'_> {
         outward_normal(points, opposite(corner, v, other))
     }
 }
+
+/// Whether a triangle's width is rounding noise against its length
+/// (twice its area under `SLIVER` of its longest edge squared): lyon's
+/// flattened arc ends a hair off the point it was told, and the
+/// sliver beside the outline then has a coin toss for its third
+/// corner's side.
+fn is_sliver(points: [[f32; 2]; 3]) -> bool {
+    let [a, b, c] = points;
+    let longest = length(a, b).max(length(b, c)).max(length(c, a));
+    twice_area(points).abs() <= SLIVER * longest * longest
+}
+
+/// The most a sliver's width is of its length.
+const SLIVER: f32 = 1e-6;
 
 /// The index of `corner`'s vertex that is neither `v` nor `other`.
 fn opposite(corner: [u32; 3], v: u32, other: u32) -> usize {

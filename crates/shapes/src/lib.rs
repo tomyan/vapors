@@ -19,6 +19,8 @@ mod mesh_check;
 mod mesh_edges;
 mod mesh_normals;
 mod mesh_slivers;
+#[cfg(test)]
+mod mesh_spinner_tests;
 mod mesh_wedge;
 mod path;
 mod path_lex;

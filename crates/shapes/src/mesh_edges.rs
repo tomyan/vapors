@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::mesh::{MeshTriangle, twice_area};
+use crate::mesh::{MeshTriangle, length, twice_area};
 use crate::mesh_normals::corner_wedges;
 use crate::mesh_slivers::check_slivers;
 
@@ -47,19 +47,52 @@ pub fn mesh_triangles(vertices: &[[f32; 2]], indices: &[u32]) -> Result<Vec<Mesh
         .collect())
 }
 
-/// `indices` with each vertex replaced by the first at a bit-equal
-/// position: lyon's stroker re-creates a closed subpath's start
-/// vertices, and the edge across the stroke there, under two pairs of
-/// indices, would count as two outline edges and draw a seam. The
-/// tessellator does not read the stroke advancement the copies are for.
+/// `indices` with each vertex replaced by the first within `WELD` of
+/// it (bit-equal included): lyon's stroker re-creates a closed
+/// subpath's start vertices, and the edge across the stroke there,
+/// under two pairs of indices, would count as two outline edges and
+/// draw a seam; its flattened arc ends a rounding step off the point
+/// it was told (a closed path's start), leaving a sliver whose edge of
+/// that length has a noise for a direction. The tessellator does not
+/// read the stroke advancement the copies are for.
 fn welded(vertices: &[[f32; 2]], indices: &[u32]) -> Vec<u32> {
-    let mut first = HashMap::with_capacity(vertices.len());
+    let mut cells: HashMap<[i64; 2], Vec<u32>> = HashMap::with_capacity(vertices.len());
     let canonical: Vec<u32> = (0u32..)
         .zip(vertices)
-        .map(|(i, p)| *first.entry(p.map(|c| (c + 0.0).to_bits())).or_insert(i))
+        .map(|(i, p)| {
+            let first = first_within(vertices, &cells, *p);
+            first.unwrap_or_else(|| {
+                cells.entry(cell(*p)).or_default().push(i);
+                i
+            })
+        })
         .collect();
     indices.iter().map(|&i| canonical[i as usize]).collect()
 }
+
+/// The grid cell of `p`, `WELD` wide.
+#[allow(clippy::cast_possible_truncation)] // a cell index of a finite coordinate
+fn cell(p: [f32; 2]) -> [i64; 2] {
+    p.map(|c| (c / WELD).floor() as i64)
+}
+
+/// The first kept vertex within `WELD` of `p`, looking in its cell and
+/// the eight round it.
+fn first_within(
+    vertices: &[[f32; 2]],
+    cells: &HashMap<[i64; 2], Vec<u32>>,
+    p: [f32; 2],
+) -> Option<u32> {
+    let [x, y] = cell(p);
+    let near = (x - 1..=x + 1).flat_map(|x| (y - 1..=y + 1).map(move |y| [x, y]));
+    let kept = near.filter_map(|key| cells.get(&key)).flatten();
+    kept.copied()
+        .find(|&j| length(vertices[j as usize], p) <= WELD)
+}
+
+/// How close two vertices are to be one: a few steps of an `f32` at a
+/// dashboard's coordinates, which no real edge is as short as.
+const WELD: f32 = 1e-5;
 
 fn positions(vertices: &[[f32; 2]], corner: [u32; 3]) -> [[f32; 2]; 3] {
     corner.map(|i| vertices[i as usize])
