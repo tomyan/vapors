@@ -13,7 +13,8 @@ use crate::segment::Segment;
 /// its radius per 90 degrees; lyon's own `arc_to` goes through 45
 /// degree quadratics, 0.31% of the radius out, which no tolerance
 /// bounds). An arc starts at the builder's current position, which a
-/// close moves to the subpath's start, as SVG's pen does.
+/// close moves to the subpath's start, as SVG's pen does, and ends at
+/// its end point exactly.
 pub(crate) fn lyon_path(segments: &[Segment]) -> Path {
     let mut builder = Path::svg_builder();
     for segment in segments {
@@ -68,9 +69,16 @@ fn arc_as_cubics(
             sweep,
         },
     };
-    arc.for_each_cubic_bezier(&mut |c: &CubicBezierSegment<f32>| {
-        builder.cubic_bezier_to(c.ctrl1, c.ctrl2, c.to);
-    });
+    let mut cubics = Vec::new();
+    arc.for_each_cubic_bezier(&mut |c: &CubicBezierSegment<f32>| cubics.push(*c));
+    // the last cubic ends on the circle, up to 3e-4 from the arc's end;
+    // SVG ends the arc at its end exactly, and a close or the next
+    // segment meets it there rather than across a sliver
+    let last = cubics.len().saturating_sub(1);
+    for (k, c) in cubics.iter().enumerate() {
+        let to = if k == last { lyon(to) } else { c.to };
+        builder.cubic_bezier_to(c.ctrl1, c.ctrl2, to);
+    }
 }
 
 #[cfg(test)]

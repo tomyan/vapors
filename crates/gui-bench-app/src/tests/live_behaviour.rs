@@ -14,6 +14,17 @@ fn clock(mounted: &crate::app::Mounted, millis: u64) {
     refresh(mounted);
 }
 
+/// The `d` of the spinner's path in the document.
+fn spinner_text(mounted: &crate::app::Mounted) -> String {
+    let doc = mounted.document.borrow();
+    let paths: Vec<_> = doc
+        .elements()
+        .into_iter()
+        .filter(|n| doc.tag(*n) == Some("path"))
+        .collect();
+    doc.attribute(paths[0], "d").expect("a path").to_owned()
+}
+
 fn values(tick: u64) -> Vec<String> {
     (0..KPI_COUNT).map(|k| kpi_value(k, tick)).collect()
 }
@@ -111,15 +122,7 @@ fn the_spinner_in_the_document_turns_with_the_clock() {
     clock(&mounted, 100);
 
     // When
-    let path = |mounted: &crate::app::Mounted| {
-        let doc = mounted.document.borrow();
-        let paths: Vec<_> = doc
-            .elements()
-            .into_iter()
-            .filter(|n| doc.tag(*n) == Some("path"))
-            .collect();
-        doc.attribute(paths[0], "d").expect("a path").to_owned()
-    };
+    let path = spinner_text;
     clock(&mounted, 200);
     let before = path(&mounted);
     clock(&mounted, 300);
@@ -127,4 +130,35 @@ fn the_spinner_in_the_document_turns_with_the_clock() {
     // Then
     assert_ne!(path(&mounted), before);
     assert_eq!(path(&mounted), spinner_path(Duration::from_millis(200)));
+}
+
+/// The saved clock times of the spinner and the paths it makes then.
+const SAVED: &str = include_str!("../../../shapes/tests/fixtures/spinner_paths.tsv");
+
+#[test]
+fn the_saved_spinner_paths_are_what_the_spinner_generates() {
+    // Given, When, Then: every row of the fixture `vapors-shapes` tessellates
+    for line in SAVED.lines() {
+        let (ms, path) = line.split_once('\t').expect("a millisecond, a tab, a path");
+        let ms = ms.parse().expect("milliseconds");
+        assert_eq!(spinner_path(Duration::from_millis(ms)), path, "{ms} ms");
+    }
+}
+
+#[test]
+fn the_document_lays_out_the_spinner_at_the_clock_times_that_were_refused() {
+    // Given: the switch on
+    let mounted = laid_out();
+    click(&mounted, SWITCH);
+    clock(&mounted, 100);
+
+    // When, Then: the spinner's clock (counted from the first frame, at
+    // 100 ms) at times of the fixture, every refresh lays the document out
+    for ms in [44, 46, 57, 61, 62, 64, 70, 757] {
+        clock(&mounted, 100 + SPINNER_PERIOD_MS * 2 + ms);
+        assert_eq!(
+            spinner_text(&mounted),
+            spinner_path(Duration::from_millis(ms))
+        );
+    }
 }
