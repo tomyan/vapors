@@ -49,3 +49,23 @@ fn an_arc_after_a_close_starts_at_the_subpaths_start() {
         );
     }
 }
+
+#[test]
+fn an_arc_ends_exactly_at_its_end_point() {
+    // Given: the spinner's closing arc at 62 ms, whose last cubic ends
+    // 4e-4 from (11.007, -1.380) on the circle
+    let data = "M3.178 1.892 A6 6 0 0 1 11.007 -1.380";
+    let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
+
+    // When
+    let last = lyon_path(path.segments())
+        .iter()
+        .filter_map(|event| match event {
+            PathEvent::Cubic { to, .. } => Some(to),
+            _ => None,
+        })
+        .last();
+
+    // Then
+    assert_eq!(last, Some(LyonPoint::new(11.007, -1.380)));
+}
