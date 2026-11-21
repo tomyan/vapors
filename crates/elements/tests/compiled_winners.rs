@@ -64,6 +64,7 @@ fn key_in(own: SheetRef, rule: u32, hash: u64) -> &'static StyleKey {
         toggles: &["x"],
         attributes: &[],
         style: None,
+        bound: &[],
         winners: Winners::Compiled(winners),
     }))
 }

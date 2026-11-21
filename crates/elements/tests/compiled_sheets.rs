@@ -26,6 +26,7 @@ const fn key(winners: &'static KeyWinners) -> StyleKey {
         toggles: &[],
         attributes: &[],
         style: None,
+        bound: &[],
         winners: Winners::Compiled(winners),
     }
 }

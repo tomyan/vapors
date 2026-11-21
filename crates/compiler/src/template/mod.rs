@@ -9,6 +9,7 @@ mod elements;
 mod entities;
 mod holes;
 mod snippets;
+mod style_bindings;
 mod text;
 pub(crate) mod vocabulary;
 mod window;

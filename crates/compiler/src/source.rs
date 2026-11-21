@@ -25,6 +25,14 @@ impl Source {
         (line, col)
     }
 
+    /// The command that reproduces a refusal, for messages.
+    pub fn check_hint(&self) -> String {
+        format!(
+            "check with `cargo run -p vapors-compiler --bin wisp-check -- {}`",
+            self.path
+        )
+    }
+
     /// `line:col` of an offset, for messages that point elsewhere.
     pub fn describe(&self, offset: usize) -> String {
         let (line, col) = self.position(offset);

@@ -35,6 +35,9 @@ pub struct ElementFacts {
     pub expression_attributes: Vec<String>,
     /// The literal `style`'s declarations.
     pub inline: Vec<Declaration>,
+    /// The properties its `style:` bindings set at run time, which no
+    /// declaration here can fix.
+    pub bound: Vec<vapors_dom::BoundProperty>,
 }
 
 impl ElementFacts {
@@ -61,6 +64,7 @@ impl ElementFacts {
                 .collect(),
             expression_attributes: expression_names(element),
             inline,
+            bound: parts.bound,
         })
     }
 

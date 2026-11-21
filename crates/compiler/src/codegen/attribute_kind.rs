@@ -12,6 +12,8 @@ pub(crate) enum AttributeKind<'a> {
     BindThis,
     /// `class:name={bool}`: a directive the key lists as a toggle.
     ClassDirective(&'a str),
+    /// `style:property={expr}`: a typed binding the key lists.
+    StyleBinding(&'a str),
     /// `class="..."`: the key's literal classes.
     Class,
     /// `style="..."`: the key's literal style.
@@ -36,6 +38,9 @@ pub(crate) fn kind(attribute: &Attribute) -> AttributeKind<'_> {
     }
     if let Some(directive) = name.strip_prefix("class:") {
         return AttributeKind::ClassDirective(directive);
+    }
+    if let Some(property) = name.strip_prefix("style:") {
+        return AttributeKind::StyleBinding(property);
     }
     if name.eq_ignore_ascii_case("class") {
         return AttributeKind::Class;

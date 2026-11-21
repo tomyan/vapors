@@ -42,6 +42,7 @@ mod shell_sheet;
 mod snippet_list;
 mod snippet_params;
 mod snippets;
+mod style_binding;
 pub(crate) mod style_key;
 mod syn_map;
 mod tag_path;

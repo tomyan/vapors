@@ -40,6 +40,11 @@ pub enum Call {
         name: String,
         value: PropertyValue,
     },
+    BindStyle {
+        node: NodeId,
+        property: crate::BoundProperty,
+        value: crate::BoundValue,
+    },
     ToggleClasses {
         node: NodeId,
         toggles: Vec<(String, bool)>,
@@ -96,6 +101,8 @@ enum Kind {
         tag: String,
         attributes: BTreeMap<String, String>,
         properties: BTreeMap<String, PropertyValue>,
+        /// The declarations `bind_style` made, by property.
+        bound: BTreeMap<crate::BoundProperty, String>,
         /// The template's key, for an element made by
         /// `create_keyed_element`, and which of its directives are on.
         key: Option<(&'static StyleKey, u64)>,
@@ -135,6 +142,7 @@ impl RecordingDom {
             tag: "root".into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            bound: BTreeMap::new(),
             key: None,
         });
         dom

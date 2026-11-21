@@ -5,6 +5,7 @@
 use vapors_css::analysis::{Constancy, Sheet, SheetId, Winner, analyse as analyse_key};
 use vapors_css::ast::Stylesheet;
 
+use super::bound::{bind_winners, bound_longhands};
 use super::{ElementFacts, ElementStyles, Parent, Resolved};
 use crate::CompileError;
 use crate::ast::Node;
@@ -65,11 +66,18 @@ impl Walker<'_> {
                 own: index < self.own,
             })
             .collect();
-        let winners = facts
+        let mut winners = facts
             .with_key(|key| analyse_key(&sheets, key, &facts.inline))
             .map_err(|message| self.source.error(element.offset, message))?;
+        let bound = bound_longhands(&facts);
+        bind_winners(&mut winners.longhands, &bound);
         let resolved = (winners.longhands.iter().enumerate())
-            .map(|(index, winner)| self.resolve(winner, parent, |p| p.resolved[index]))
+            .map(|(index, winner)| {
+                if bound.contains(&index) {
+                    return Resolved::Variable("a style: binding");
+                }
+                self.resolve(winner, parent, |p| p.resolved[index])
+            })
             .collect();
         let resolved_custom = (winners.custom.iter())
             .map(|(name, winner)| {

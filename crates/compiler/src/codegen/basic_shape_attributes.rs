@@ -53,6 +53,7 @@ fn refuse_kind(source: &Source, tag: &str, attribute: &Attribute) -> Result<(), 
         | AttributeKind::Class
         | AttributeKind::Style => !takes,
         AttributeKind::ClassDirective(_)
+        | AttributeKind::StyleBinding(_)
         | AttributeKind::Binding(_)
         | AttributeKind::Listener(_) => true,
         AttributeKind::BindThis | AttributeKind::Scope => false,

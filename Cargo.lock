@@ -3027,6 +3027,7 @@ dependencies = [
  "quote",
  "syn 3.0.9",
  "vapors-css",
+ "vapors-dom",
  "vapors-shapes",
 ]
 

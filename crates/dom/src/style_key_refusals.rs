@@ -67,7 +67,8 @@ impl StyleKey {
             .or_else(|| self.malformed_name())
             .or_else(|| self.repeated_directive())
             .or_else(|| self.directive_also_literal())
-            .or_else(|| self.attribute_misplaced())?;
+            .or_else(|| self.attribute_misplaced())
+            .or_else(|| self.repeated_binding())?;
         Some(format!(
             "the StyleKey of <{}> at {} {problem}",
             self.tag, self.site

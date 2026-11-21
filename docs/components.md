@@ -114,6 +114,22 @@ the one difference from the brief in this slice.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.
+- **Style bindings:** `style:height={expr}` sets one CSS property of
+  an element from a value the page computes: a bar's height, an
+  avatar's colour. The property is written after the colon, as a
+  literal; `expr` is a signal read, a memo or a plain value of the type
+  the property fixes: a px `f32` for `width`, `height`, `top`, `left`,
+  `margin-*` and `padding-*`, a `vapors_elements::Rgba` for
+  `background-color` and `color`. The binding wins over the sheet, as
+  an inline style does, and each property is bound once. Elements that
+  differ only in a bound value share one style record (1,000 bars of
+  12 heights are 12 styles); a changed value restyles that element
+  alone and asks layout only what the property needs (a colour, none).
+  A value outside the property's domain (NaN or infinity anywhere, a
+  negative `width`, `height` or `padding-*`) is refused loudly naming
+  the element, never clamped, and the element keeps its last valid
+  value. A binding is for elements, not component tags. Decision:
+  `docs/decisions/2026-11-20-style-bindings.md`.
 - **Bindings:** `bind:value={signal}` on `input`, `textarea` and
   `select`, and `bind:checked={signal}` on a checkbox or radio. The
   signal sets the property, and the control's event (`input`, or
@@ -149,7 +165,7 @@ the one difference from the brief in this slice.
   plain tag needs a `use` in the script. Attributes become props, and unset props take their
   defaults. `bind:value={s}` on a component passes the signal itself.
   `class`, `class:name={bool}` and `style` on a component tag are not
-  props: the tag gets a style key as an element does, passed as the
+  props (`style:property={expr}` is refused there): the tag gets a style key as an element does, passed as the
   generated prop `anchor: Some(&KEY)`, with the tag its props type
   declares (`CardProps::ANCHOR_TAG`), and the component creates its
   one anchor element from it (`Dom::create_keyed_element`); the
@@ -437,10 +453,15 @@ The compiler refuses:
   literal (`class="name"`) or toggled (`class:name={condition}`), and
   declarations go in the `<style>` section
   (`docs/decisions/2026-11-11-analysable-sources.md`);
-- an element attribute named with `:` other than the `bind:` and
-  `class:` directives (`style:x` and `on:click` included; a listener
-  is `onclick`), and a `class:` directive with a quoted value or a
+- an element attribute named with `:` other than the `bind:`, `class:`
+  and `style:` directives (`on:click` included; a listener is
+  `onclick`), and a `class:` directive with a quoted value or a
   name other than letters, digits, `-` and `_`;
+- a `style:` binding of a property that is not bindable (the message
+  lists those that are), with a computed name (`style:{name}`), on a
+  component tag, with a quoted value or a literal of a type the property
+  cannot take (`style:height={4}`, an integer), or the same property
+  twice on one element;
 - `bind:` on an element that is not a control, on a property other than
   `value` or `checked`, or together with a handler for the same event;
 - a `data-wisp` attribute, which is reserved for the style scope (see

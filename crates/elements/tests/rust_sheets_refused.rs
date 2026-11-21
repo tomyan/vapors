@@ -26,6 +26,7 @@ const fn key(winners: Winners) -> StyleKey {
         toggles: &[],
         attributes: &[],
         style: None,
+        bound: &[],
         winners,
     }
 }

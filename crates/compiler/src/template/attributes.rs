@@ -38,7 +38,12 @@ impl Parser<'_> {
     /// A component tag's attribute with a `:` other than `bind:` or
     /// `class:` (which toggles the component's anchor element) would
     /// become a prop with a colon in its name.
-    pub fn refuse_component_directives(&self, attributes: &Attributes) -> Result<(), CompileError> {
+    pub fn refuse_component_directives(
+        &self,
+        tag: &str,
+        attributes: &Attributes,
+    ) -> Result<(), CompileError> {
+        self.refuse_style_bindings_on_component(tag, attributes)?;
         let Some(attribute) = attributes.iter().find(|attribute| {
             attribute.name.contains(':')
                 && !["bind:", "class:"]
@@ -62,6 +67,9 @@ impl Parser<'_> {
         attribute: Attribute,
     ) -> Result<(), CompileError> {
         if (attributes.iter()).any(|given| given.name.eq_ignore_ascii_case(&attribute.name)) {
+            if attribute.name.starts_with("style:") {
+                return Err(self.bound_twice(&attribute.name, attribute.offset));
+            }
             return Err(self.error(
                 attribute.offset,
                 format!("attribute `{}` is given twice: keep one", attribute.name),
@@ -100,6 +108,9 @@ impl Parser<'_> {
         let name = self
             .read_while(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'))
             .to_string();
+        if name == "style:" {
+            return Err(self.computed_style_property(offset));
+        }
         if name.is_empty() {
             let found = self.peek().unwrap_or(' ');
             return Err(self.error(

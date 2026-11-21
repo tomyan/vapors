@@ -63,11 +63,10 @@ pub fn mount(rows: usize) -> Mounted {
     }
 }
 
-/// The heights of metric card `k`'s sparkline bars, in whole px, by bar.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // the spec's heights are whole, 14 to 44
-pub fn spark_heights(k: usize) -> Vec<(usize, u32)> {
-    let heights = KPIS[k].spark.iter().map(|height| *height as u32);
-    heights.enumerate().collect()
+/// The heights of metric card `k`'s sparkline bars, in px, by bar: the
+/// card binds each as `style:height`.
+pub fn spark_heights(k: usize) -> Vec<(usize, f32)> {
+    KPIS[k].spark.iter().copied().enumerate().collect()
 }
 
 /// The orders the table shows, as indices into `base`: the visible ones

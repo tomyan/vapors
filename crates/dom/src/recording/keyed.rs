@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 
 use super::{Call, Kind, RecordingDom};
-use crate::{NodeId, StyleKey};
+use crate::{BoundProperty, BoundValue, NodeId, StyleKey};
 
 impl RecordingDom {
     /// An element of `key`'s tag with the key's attributes, no
@@ -22,6 +22,7 @@ impl RecordingDom {
             tag: key.tag.into(),
             attributes,
             properties: BTreeMap::new(),
+            bound: BTreeMap::new(),
             key: Some((key, 0)),
         }
     }
@@ -44,6 +45,43 @@ impl RecordingDom {
         *mask = key.toggled(*mask, toggles)?;
         attributes.insert("class".into(), key.class_attribute(*mask));
         Ok(())
+    }
+
+    /// Keeps the declaration `value` makes and rewrites `style` from the
+    /// key's literal text and every bound declaration in property order.
+    ///
+    /// # Errors
+    /// A node that is not a keyed element, a property the key does not
+    /// list, or a value its domain refuses; nothing changes.
+    pub(super) fn bind(
+        &mut self,
+        node: NodeId,
+        property: BoundProperty,
+        value: BoundValue,
+    ) -> Result<(), String> {
+        let Kind::Element {
+            attributes,
+            bound,
+            key: Some((key, _)),
+            ..
+        } = &mut self.record_mut(node).kind
+        else {
+            return Err(crate::unkeyed_binding_refusal(&self.describe(node)));
+        };
+        bound.insert(property, key.bound_declaration(property, value)?);
+        let all = key
+            .style
+            .into_iter()
+            .chain(bound.values().map(String::as_str));
+        attributes.insert("style".into(), all.collect::<Vec<_>>().join("; "));
+        Ok(())
+    }
+
+    fn describe(&self, node: NodeId) -> String {
+        match &self.record(node).kind {
+            Kind::Element { tag, .. } => format!("<{tag}>"),
+            Kind::Text(_) => "a text node".to_owned(),
+        }
     }
 
     /// Records `refusal` as a call on `node` when the test expects
