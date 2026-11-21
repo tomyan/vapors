@@ -128,3 +128,44 @@ fn the_spinner_in_the_document_turns_with_the_clock() {
     assert_ne!(path(&mounted), before);
     assert_eq!(path(&mounted), spinner_path(Duration::from_millis(200)));
 }
+
+#[test]
+fn the_shapes_spinner_fixture_is_the_paths_the_spinner_makes_at_its_clock() {
+    // Given: the fixture vapors-shapes builds every line of
+    let fixture = include_str!("../../../shapes/fixtures/spinner_paths.txt");
+
+    // Then: each line is the path at its millisecond of the clock
+    for line in fixture.lines() {
+        let (ms, d) = line.split_once(' ').expect("`<ms> <d>` per line");
+        let at = Duration::from_millis(ms.parse().expect("milliseconds"));
+        assert_eq!(spinner_path(at), d, "{ms} ms");
+    }
+}
+
+#[test]
+fn the_document_lays_out_the_spinner_at_every_fixture_angle() {
+    // Given: the switch on, the clock at its first frame
+    let mounted = laid_out();
+    click(&mounted, SWITCH);
+    clock(&mounted, 1000);
+    let fixture = include_str!("../../../shapes/fixtures/spinner_paths.txt");
+    let mut times: Vec<u64> = fixture
+        .lines()
+        .map(|line| line.split(' ').next().expect("ms").parse().expect("ms"))
+        .collect();
+    times.sort_unstable();
+
+    // When: each frame lays out (a refused shape would panic in `refresh`)
+    for ms in times {
+        clock(&mounted, 1000 + ms);
+
+        // Then
+        let doc = mounted.document.borrow();
+        let path = doc
+            .elements()
+            .into_iter()
+            .find(|n| doc.tag(*n) == Some("path"));
+        let d = doc.attribute(path.expect("a path"), "d").expect("d");
+        assert_eq!(d, spinner_path(Duration::from_millis(1000 + ms)), "{ms} ms");
+    }
+}
