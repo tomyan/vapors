@@ -1,7 +1,8 @@
 //! The UI thread's side: winit's window. It draws the tick the
-//! application thread last showed, forwards Space as a toggle, and wakes
-//! only for the application thread's frame wakes: every frame returns
-//! `Next::Wait`, or `Next::Exit` once `--check` has judged.
+//! application thread last showed, sends `Toggle` for Space or the
+//! script's request, and wakes only for the application thread's frame
+//! wakes: every frame returns `Next::Wait`, or `Next::Exit` once `--check`
+//! has judged or the application thread refused.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -14,26 +15,27 @@ use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_scene::Color;
 
 use crate::app_side::{Live, ToApp, make};
-use crate::check::{latencies, problems};
-use crate::record::{Shared, lock};
+use crate::check::{REPRODUCE, latencies, problems};
+use crate::record::{Drawn, Shared, lock};
 
 pub struct Window {
     app: Option<AppThread<ToApp>>,
     record: Shared,
     shown: Arc<AtomicU64>,
     check: bool,
-    /// Whether `--check` passed, once judged; read by `main`.
+    /// Whether the run passed, once known; read by `main`.
     outcome: Rc<Cell<Option<bool>>>,
-    /// Why the application thread could not start, shown at the next frame.
+    /// Why the application thread refused, shown at the next frame.
     refused: Option<String>,
 }
 
 impl Window {
     pub fn new(check: bool, outcome: Rc<Cell<Option<bool>>>) -> Self {
+        let (record, shown) = (Shared::default(), Arc::default());
         Window {
             app: None,
-            record: Shared::default(),
-            shown: Arc::default(),
+            record,
+            shown,
             check,
             outcome,
             refused: None,
@@ -53,48 +55,88 @@ impl Window {
             Ok(app) => self.app = Some(app),
             Err(error) => self.refused = Some(error.to_string()),
         }
-        self.send(ToApp::Started);
+        self.send(ToApp::Started, platform);
+    }
+
+    /// Sends `message`; a refusal is shown by the next frame, asked for here.
+    fn send(&mut self, message: ToApp, platform: &Platform) {
+        let sent = self.app.as_ref().map(|app| app.send(message));
+        if let Some(Err(error)) = sent {
+            self.refused = Some(error.to_string());
+        }
         if self.refused.is_some() {
-            // a frame to show the refusal and exit; none otherwise, so Live
-            // off draws nothing
             platform.request_redraw();
         }
     }
 
-    fn send(&mut self, message: ToApp) {
-        if let Some(Err(error)) = self.app.as_ref().map(|app| app.send(message)) {
-            self.refused = Some(error.to_string());
+    /// The turns so far, and a `Toggle` for each toggle the script asked.
+    fn serve_requests(&mut self) -> bool {
+        let asked = std::mem::take(&mut lock(&self.record).requests);
+        let Some(app) = self.app.as_ref().filter(|_| asked > 0) else {
+            return false;
+        };
+        lock(&self.record).turns.push(app.turns());
+        for _ in 0..asked {
+            if let Err(error) = app.send(ToApp::Toggle) {
+                self.refused = Some(error.to_string());
+            }
         }
+        true
     }
 
     /// Stops the application thread and judges the record.
     fn judge(&mut self) -> bool {
         let app = self.app.take().expect("judged once, after the start");
         let id = app.thread_id();
-        let mut found = app
+        lock(&self.record).turns.push(app.turns());
+        let mut found: Vec<String> = app
             .stop()
             .err()
-            .map(|e| vec![e.to_string()])
-            .unwrap_or_default();
+            .map(|e| e.to_string())
+            .into_iter()
+            .collect();
         let record = lock(&self.record);
         found.extend(problems(&record, id));
-        let latency = latencies(&record);
-        let (ticks, frames) = (record.ticks.len(), record.frames.len());
+        summary(&record);
         drop(record);
-        let median = latency.get(latency.len() / 2);
-        println!(
-            "live_timer: {ticks} ticks, {frames} frames, tick to frame median {median:?} max {:?}",
-            latency.last()
-        );
         for problem in &found {
             eprintln!("live_timer --check: {problem}");
         }
+        if !found.is_empty() {
+            eprintln!("live_timer --check: {REPRODUCE}");
+        }
         found.is_empty()
+    }
+
+    fn draw(&self, frame: &Frame<'_>, request: bool) {
+        let shown = self.shown.load(Ordering::SeqCst);
+        let shade = u8::try_from(shown % 2 * 120 + 40).unwrap_or(40);
+        clear(frame, Color::from_rgba8(shade, shade, 60, 255));
+        let mut record = lock(&self.record);
+        record.ui_thread.get_or_insert(std::thread::current().id());
+        record.frames.push(Drawn {
+            at: Instant::now(),
+            shown,
+            request,
+        });
     }
 }
 
+fn summary(record: &crate::record::Record) {
+    let mut waits = latencies(record);
+    waits.sort();
+    println!(
+        "live_timer: {} ticks, {} frames, tick to frame median {:?} max {:?}, turns {:?}",
+        record.ticks.len(),
+        record.frames.len(),
+        waits.get(waits.len() / 2),
+        waits.last(),
+        record.turns
+    );
+}
+
 impl App for Window {
-    fn event(&mut self, event: Event, _platform: &Platform) {
+    fn event(&mut self, event: Event, platform: &Platform) {
         if let Event::Key {
             key,
             pressed: true,
@@ -103,24 +145,20 @@ impl App for Window {
         } = event
             && key == " "
         {
-            self.send(ToApp::Toggle);
+            self.send(ToApp::Toggle, platform);
         }
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        let shade = u8::try_from(self.shown.load(Ordering::SeqCst) % 2 * 120 + 40).unwrap_or(40);
-        clear(frame, Color::from_rgba8(shade, shade, 60, 255));
+        // the end wake's frame, like a request's, is drawn for the script
+        let finished = lock(&self.record).finished();
+        let request = self.serve_requests() || finished;
+        self.draw(frame, request);
         if let Some(refused) = self.refused.take() {
-            eprintln!("live_timer: the application thread refused: {refused}");
+            eprintln!("live_timer: the application thread refused: {refused}; {REPRODUCE}");
             self.outcome.set(Some(false));
             return Next::Exit;
         }
-        let finished = {
-            let mut record = lock(&self.record);
-            record.ui_thread.get_or_insert(std::thread::current().id());
-            record.frames.push(Instant::now());
-            record.finished()
-        };
         if self.check && finished {
             let passed = self.judge();
             self.outcome.set(Some(passed));

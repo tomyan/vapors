@@ -1,9 +1,7 @@
-//! The application thread's side: the handlers, the Live switch and,
-//! with `--check`, the script that drives it. App-authored code, so all
-//! of it runs on the application thread.
+//! The application thread's side: the handler and the Live switch, and
+//! with `--check` the script. App-authored code, so all of it runs on the
+//! application thread.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -13,17 +11,17 @@ use vapors_platform::Waker;
 use vapors_signals::{Deadline, Owner, spawn};
 
 use crate::TICK;
-use crate::record::{Phase, Shared, lock};
+use crate::record::{Shared, lock};
 
 /// What the UI thread sends.
 pub enum ToApp {
-    /// The window is up: the first message, from the UI thread.
+    /// The window is up: the first message.
     Started,
-    /// Space was pressed.
+    /// Space was pressed, or the script asked.
     Toggle,
 }
 
-/// What both the handler and the script reach.
+/// What the handler reaches.
 pub struct Live {
     pub record: Shared,
     /// The tick the window shows, read by the UI thread.
@@ -35,31 +33,29 @@ pub struct Live {
 
 /// Builds the app side on the application thread: its handler, and with
 /// `check` the script.
-pub fn make(live: Live, check: bool) -> impl FnMut(ToApp) {
-    let live = Rc::new(RefCell::new(live));
+pub fn make(mut live: Live, check: bool) -> impl FnMut(ToApp) {
     if check {
-        let script = Rc::clone(&live);
+        let (record, waker) = (Arc::clone(&live.record), live.waker.clone());
         // Deadline::User: the script ends itself; the watchdog bounds it
-        spawn(Deadline::User, crate::script::run(script));
+        spawn(Deadline::User, crate::script::run(record, waker));
     }
     move |message| {
-        let record = Rc::clone(&live);
-        lock(&record.borrow().record)
+        lock(&live.record)
             .handlers
             .push(std::thread::current().id());
         if let ToApp::Toggle = message {
-            toggle(&live);
+            toggle(&mut live);
         }
     }
 }
 
 /// Switches Live: on spawns the interval under a new owner, off
 /// disposes that owner, which drops the interval and its timer.
-pub fn toggle(live: &Rc<RefCell<Live>>) {
-    let mut live = live.borrow_mut();
+fn toggle(live: &mut Live) {
+    let on = live.running.is_none();
     lock(&live.record)
-        .handlers
-        .push(std::thread::current().id());
+        .toggles
+        .push((Instant::now(), std::thread::current().id(), on));
     if let Some(owner) = live.running.take() {
         owner.dispose();
         return;
@@ -84,17 +80,10 @@ async fn ticks((record, shown, waker): (Shared, Arc<AtomicU64>, Waker)) -> Resul
     interval.tick().await;
     loop {
         interval.tick().await;
-        shown.fetch_add(1, Ordering::SeqCst);
         lock(&record)
             .ticks
             .push((Instant::now(), std::thread::current().id()));
+        shown.fetch_add(1, Ordering::SeqCst);
         waker.wake().map_err(|closed| closed.to_string())?;
     }
-}
-
-/// Marks the start of `phase`.
-pub fn mark(live: &Rc<RefCell<Live>>, phase: Phase) {
-    lock(&live.borrow().record)
-        .phases
-        .push((phase, Instant::now()));
 }

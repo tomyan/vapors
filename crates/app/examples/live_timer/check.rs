@@ -1,143 +1,98 @@
-//! The judgement of `--check`: every rule the record breaks, by name.
-//! Empty when the run is right.
+//! The judgement of `--check`: every rule the record breaks, each naming
+//! its fix. Empty when the run is right.
 
 use std::thread::ThreadId;
-use std::time::{Duration, Instant};
 
-use crate::TICK;
-use crate::record::{Phase, Record};
-
-/// The fewest ticks the `On` phase must show.
-const MIN_TICKS: usize = 5;
+use crate::record::Record;
 
 /// Every broken rule, given the application thread's id.
 pub fn problems(record: &Record, app: ThreadId) -> Vec<String> {
-    let mut found = Vec::new();
-    threads(record, app, &mut found);
-    let Some(phases) = Phases::of(record) else {
+    let mut found = threads(record, app);
+    let Some(window) = Window::of(record) else {
         found.push(format!(
-            "the script's phases are incomplete: {:?}",
-            record.phases
+            "the run is incomplete (phases {:?}, toggles {}); fix: the script or the toggle path",
+            record
+                .phases
+                .iter()
+                .map(|(phase, _)| phase)
+                .collect::<Vec<_>>(),
+            record.toggles.len()
         ));
         return found;
     };
-    idle(record, &phases, &mut found);
-    ticking(record, &phases, &mut found);
+    found.extend(crate::check_idle::problems(record, &window));
+    found.extend(crate::check_ticks::problems(record, &window));
     found
 }
 
-fn threads(record: &Record, app: ThreadId, found: &mut Vec<String>) {
+/// The run's boundaries: the script's marks and the handler's toggles.
+pub struct Window {
+    pub off: std::time::Instant,
+    pub stall: std::time::Instant,
+    /// When the handler switched Live on, then off.
+    pub on_at: std::time::Instant,
+    pub off_at: std::time::Instant,
+}
+
+impl Window {
+    fn of(record: &Record) -> Option<Window> {
+        use crate::record::Phase;
+        let (on_at, off_at) = record.switched()?;
+        record.at(Phase::End)?;
+        Some(Window {
+            off: record.at(Phase::Off)?,
+            stall: record.at(Phase::Stall)?,
+            on_at,
+            off_at,
+        })
+    }
+}
+
+fn threads(record: &Record, app: ThreadId) -> Vec<String> {
+    let mut found = Vec::new();
     match record.ui_thread {
-        None => found.push("no frame recorded the UI thread".to_owned()),
-        Some(ui) if ui == app => found.push("the UI and the application thread are one".to_owned()),
+        None => found.push("no frame recorded the UI thread; fix: the window's frame".to_owned()),
+        Some(ui) if ui == app => found
+            .push("the UI and the application thread are one; fix: AppThread::start".to_owned()),
         Some(_) => {}
     }
-    let off = |ids: &mut dyn Iterator<Item = ThreadId>| ids.filter(|id| *id != app).count();
-    let handlers = off(&mut record.handlers.iter().copied());
-    if record.handlers.is_empty() || handlers > 0 {
-        found.push(format!(
-            "{handlers} of {} handlers ran off the application thread",
-            record.handlers.len()
-        ));
+    let toggles = record.toggles.iter().map(|(_, id, _)| *id);
+    let ticks = record.ticks.iter().map(|(_, id)| *id);
+    for (what, ids, least) in [
+        ("handlers", record.handlers.clone(), 3),
+        ("toggles", toggles.collect(), 2),
+        ("tick continuations", ticks.collect(), 1),
+    ] {
+        found.extend(off_thread(what, &ids, least, app));
     }
-    let ticks = off(&mut record.ticks.iter().map(|(_, id)| *id));
-    if ticks > 0 {
-        found.push(format!(
-            "{ticks} of {} tick continuations ran off the application thread",
-            record.ticks.len()
-        ));
-    }
+    found
 }
 
-pub struct Phases {
-    pub on: Instant,
-    pub stall: Instant,
-    pub off_again: Instant,
-    pub end: Instant,
-    pub off: Instant,
+/// A problem when fewer than `least` ran, or any ran off `app`.
+fn off_thread(what: &str, ids: &[ThreadId], least: usize, app: ThreadId) -> Option<String> {
+    let off = ids.iter().filter(|id| **id != app).count();
+    (ids.len() < least || off > 0).then(|| {
+        format!(
+            "{off} of {} {what} ran off the application thread, at least {least} expected; \
+             fix: send them through AppThread",
+            ids.len()
+        )
+    })
 }
 
-impl Phases {
-    fn of(record: &Record) -> Option<Phases> {
-        Some(Phases {
-            off: record.at(Phase::Off)?,
-            on: record.at(Phase::On)?,
-            stall: record.at(Phase::Stall)?,
-            off_again: record.at(Phase::OffAgain)?,
-            end: record.at(Phase::End)?,
-        })
-    }
-}
+/// How to run the check again.
+pub const REPRODUCE: &str =
+    "reproduce: xvfb-run -a cargo run -p vapors-app --example live_timer -- --check";
 
-fn between(times: impl Iterator<Item = Instant>, from: Instant, to: Instant) -> usize {
-    times.filter(|at| *at > from && *at < to).count()
-}
-
-/// Live off: no frames and no ticks, after one tick's grace for a tick
-/// already on its way when Live went off.
-fn idle(record: &Record, phases: &Phases, found: &mut Vec<String>) {
-    let frames = record.frames.iter().copied();
-    let off_frames = between(frames.clone(), phases.off, phases.on);
-    let settled = phases.off_again + TICK;
-    let again_frames = between(frames, settled, phases.end);
-    let again_ticks = between(
-        record.ticks.iter().map(|(at, _)| *at),
-        phases.off_again,
-        phases.end,
-    );
-    if off_frames + again_frames + again_ticks > 0 {
-        found.push(format!(
-            "with Live off: {off_frames} frames before it went on, {again_frames} frames and \
-             {again_ticks} ticks after it went off"
-        ));
-    }
-}
-
-/// Live on: enough ticks, a frame for each within one, and no burst
-/// after the stall.
-fn ticking(record: &Record, phases: &Phases, found: &mut Vec<String>) {
-    let ticks: Vec<Instant> = record.ticks.iter().map(|(at, _)| *at).collect();
-    let on_ticks = between(ticks.iter().copied(), phases.on, phases.off_again);
-    let on_frames = between(
-        record.frames.iter().copied(),
-        phases.on,
-        phases.off_again + TICK,
-    );
-    if on_ticks < MIN_TICKS {
-        found.push(format!(
-            "{on_ticks} ticks with Live on, fewer than {MIN_TICKS}"
-        ));
-    }
-    if on_frames.abs_diff(on_ticks) > 1 {
-        found.push(format!(
-            "{on_frames} frames for {on_ticks} ticks with Live on"
-        ));
-    }
-    let burst = ticks
-        .windows(2)
-        .filter(|w| w[0] > phases.stall && w[1] - w[0] < TICK / 2)
-        .count();
-    if burst > 0 {
-        found.push(format!(
-            "{burst} ticks less than {:?} after the one before, after the stall",
-            TICK / 2
-        ));
-    }
-}
-
-/// The time from each tick to the first frame after it.
-pub fn latencies(record: &Record) -> Vec<Duration> {
-    let mut found: Vec<Duration> = record
+/// Each tick's time to the first frame showing it, in tick order.
+pub fn latencies(record: &Record) -> Vec<std::time::Duration> {
+    record
         .ticks
         .iter()
-        .filter_map(|(tick, _)| {
-            record
-                .frames
-                .iter()
-                .find(|frame| *frame >= tick)
-                .map(|f| *f - *tick)
+        .zip(1_u64..)
+        .filter_map(|((tick, _), shown)| {
+            let frame = record.frames.iter().find(|frame| frame.shown >= shown)?;
+            Some(frame.at.saturating_duration_since(*tick))
         })
-        .collect();
-    found.sort();
-    found
+        .collect()
 }

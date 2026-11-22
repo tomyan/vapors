@@ -17,6 +17,8 @@
 
 mod app_side;
 mod check;
+mod check_idle;
+mod check_ticks;
 mod record;
 mod script;
 mod ui;
@@ -31,8 +33,9 @@ use vapors_platform::{WindowOptions, run};
 /// The Live interval (the gui-bench dashboard's `LIVE_INTERVAL_MS`).
 pub const TICK: Duration = Duration::from_millis(100);
 
-/// How long `--check` may take: its script is 3.35 s and the window's
-/// start under Xvfb about 1 s (measured below); 15 s is a hang.
+/// How long `--check` may take. Ten runs took 3.67 to 3.73 s from launch
+/// to exit (Xvfb, llvmpipe, 2026-11-22): the script's 3.35 s and the
+/// window's start. 15 s is reached only by a hang.
 const CHECK_DEADLINE: Duration = Duration::from_secs(15);
 
 fn main() -> ExitCode {
@@ -54,8 +57,8 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     match (check, outcome.get()) {
-        (false, _) | (true, Some(true)) => ExitCode::SUCCESS,
-        _ => ExitCode::FAILURE,
+        (_, Some(false)) | (true, None) => ExitCode::FAILURE,
+        _ => ExitCode::SUCCESS,
     }
 }
 
@@ -64,7 +67,9 @@ fn watchdog() {
     std::thread::spawn(|| {
         std::thread::sleep(CHECK_DEADLINE);
         eprintln!(
-            "live_timer --check: did not finish within {CHECK_DEADLINE:?}; fix: the phase that hung, from the last ticks printed"
+            "live_timer --check: did not finish within {CHECK_DEADLINE:?}; fix: the phase \
+             that hung; {}",
+            check::REPRODUCE
         );
         std::process::exit(1);
     });
