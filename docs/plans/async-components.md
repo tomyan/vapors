@@ -664,3 +664,27 @@ the document today.
   here are measured by the harness `perf-finish-line.md` builds
   (`vapors-perf --scaling`, `idle_fps`). If that harness changes shape
   before this plan starts, section 12's rows are re-read against it.
+
+## 15. The async scheduling proof: sequence and status
+
+The proof (ordinary `.await` in an owner-scoped task awaiting a host
+timer; the same component source on desktop and web; idle draws
+nothing; one visible update; unmount during the wait; late wake; error
+path) is built from the rows above, in this order, each its own
+reviewed PR. Nothing is claimed exercised until its row lands and its
+check runs; the host integrations exercised are listed here as they are.
+
+| Slice | Content | Host integrations exercised |
+|---|---|---|
+| T1a (this PR) | `vapors_signals`: `spawn`, `Task`, `Deadline` (carried, not judged), `run_ready`, `set_wake_hook`; tasks on `OwnerNode`, dropped in `Released::finish`. Tests: a self-waking future, no poll before a wake, disposal before the first poll and before completion, an `Err` naming the site, refusals (no hook, second hook, inside a batch or flush) | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
+| T2 | `App::woken`, hook installed by `ElementsApp`, a frame only on change, `idle_fps` case | Desktop |
+| T3 | Deadlines judged on a stepped clock, `request_frame_at` | Desktop |
+| Timer | A host timer future (`Instant`-free on wasm; tokio optional and not a dependency of the proof): native thread or loop timer, web `setTimeout` through `JsFuture` | Desktop, web |
+| W1 | `task` demo, page contract, hop latency in `docs/web.md`; the same component source on both | Web (and desktop for the shared source) |
+| Mobile | The same contract on Android and iOS, evidence reported separately for each; none exists yet | Android, iOS: not started |
+| C1, C2, S1 | Compiler `{await}`, then top-level script `await`: its semantics checked by a compile-and-run fixture once B1 and the compiler boundary exist. It is not a blocking mount and has no benchmark-only syntax | None |
+
+Left open by T1a: the `!Send` negative check of the task future
+(section 13, T1); `run_ready` refusing by effect name (`Runtime::computing`);
+the spawn `Instant` and `now` argument, added with T3 because
+`Instant::now` is unavailable on wasm and the clock must be supplied.
