@@ -111,9 +111,15 @@ pub trait Phases {
     fn input_time(&mut self) -> Duration {
         Duration::ZERO
     }
+    /// The time polls of woken tasks took since the last frame: tasks
+    /// are polled on the wake, before any frame (`App::tasks_woken`), so this
+    /// is the Tasks phase's time beside what `tasks` itself takes.
+    fn tasks_time(&mut self) -> Duration {
+        Duration::ZERO
+    }
     /// Input work in the frame itself (none yet).
     fn input(&mut self, _now: Instant) {}
-    /// Woken futures (2-S2).
+    /// Tasks work in the frame itself (none: they are polled on the wake).
     fn tasks(&mut self, _now: Instant) {}
     /// Running transitions sampled (2-S3).
     fn tick(&mut self, _now: Instant) {}
@@ -153,13 +159,21 @@ pub fn run_frame(
         let _span = tracing::trace_span!("frame phase", phase = phase.name()).entered();
         let started = clock.now();
         let result = run_phase(phases, phase, now, &times);
-        times.0[phase as usize] = clock.now().saturating_duration_since(started);
-        if phase == Phase::Input {
-            times.0[Phase::Input as usize] += phases.input_time();
-        }
+        times.0[phase as usize] =
+            clock.now().saturating_duration_since(started) + spent_between_frames(phases, phase);
         result.map_err(|message| FrameError { phase, message })?;
     }
     Ok(times)
+}
+
+/// The phase's work done as it arrived, before the frame: handlers for
+/// Input, polls on a wake for Tasks.
+fn spent_between_frames(phases: &mut impl Phases, phase: Phase) -> Duration {
+    match phase {
+        Phase::Input => phases.input_time(),
+        Phase::Tasks => phases.tasks_time(),
+        _ => Duration::ZERO,
+    }
 }
 
 fn run_phase(

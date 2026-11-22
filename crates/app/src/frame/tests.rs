@@ -206,3 +206,29 @@ fn the_input_phase_holds_the_time_handlers_took_since_the_last_frame() {
     // Then: no input work in the frame itself, so the handlers' time alone
     assert_eq!(times.of(Phase::Input), Duration::from_millis(5));
 }
+
+#[test]
+fn the_tasks_phase_holds_the_time_polls_took_since_the_last_frame() {
+    // Given: polls on wakes that took 3 ms between frames (async plan 3.3)
+    struct Polled(Recorded<'static>);
+    impl Phases for Polled {
+        fn tasks_time(&mut self) -> Duration {
+            Duration::from_millis(3)
+        }
+        fn update(&mut self, now: Instant) -> Result<(), String> {
+            self.0.update(now)
+        }
+        fn draw(&mut self, now: Instant) -> Result<(), String> {
+            self.0.draw(now)
+        }
+    }
+    let clock: &'static Stepped = Box::leak(Box::new(Stepped::new()));
+    let mut phases = Polled(recorded(clock, None));
+
+    // When
+    let times = run_frame(&mut phases, clock.now(), clock).expect("the frame runs");
+
+    // Then: the polls' time is the Tasks phase's, and not the Input phase's
+    assert_eq!(times.of(Phase::Tasks), Duration::from_millis(3));
+    assert_eq!(times.of(Phase::Input), Duration::ZERO);
+}

@@ -174,10 +174,15 @@ wakes to find its channel still empty). The rule "idle does nothing"
 needs the poll before the frame:
 
 1. A future's waker pushes the task and calls the hook; the hook
-   calls `Platform`'s `Waker::wake`, which posts `Message::Wake`.
-2. The handler delivers it as a new `App` method, `fn woken(&mut self,
-   platform: &Platform)`, default body `platform.request_redraw()` (what
-   happens today, so every existing app is unchanged). `ElementsApp`
+   calls the waker from `Platform::task_waker`, whose wake posts
+   `Message::Wake(Wake::Tasks)`. Every other waker (`Platform::waker`:
+   surfaces, pastes, GPU error scopes, an app's own) posts
+   `Message::Wake(Wake::Frame)`, which still asks for a frame without
+   reaching the app (`crates/platform/src/waker.rs`, `deliver`).
+2. The handler delivers a task wake as a new `App` method,
+   `fn tasks_woken(&mut self, platform: &Platform)`, default body
+   `platform.request_redraw()`, so an app that installs no hook is
+   unchanged. An app that wraps another forwards it. `ElementsApp`
    overrides it: `run_ready(now)`, then `request_redraw` only if
    `Document::take_changed()` (`crates/elements/src/document.rs:112`)
    says the tree changed, or a task completed or failed (its refusal
@@ -542,7 +547,7 @@ checked against what it found.
 | PR | Content | Accepted when | Depends on | Parallel with |
 |---|---|---|---|---|
 | T1 | `vapors_signals`: `spawn`, `Task`, the arena, the ready list, `run_ready`, the wake hook; tasks on `OwnerNode`, dropped in `Released::finish`; `Deadline` as a type carried but not yet judged | The executor tests in section 12; a task's drop at disposal proven by a future that would have written a signal; the `!Send` of the task future asserted with a negative impl check, which design 02's threading oracle asks for the graph's types and is not built yet | none | C1 |
-| T2 | `App::woken`, `ElementsApp` installing the hook, `run_ready` on a wake, a frame only on change; `Phase::Tasks` time; `idle_fps` case | 0 frames in 3 s with a pending task natively; 1 frame per task that changes the tree; the wake-without-change case 0 frames | T1 | C1 |
+| T2 | `App::tasks_woken`, `ElementsApp` installing the hook, `run_ready` on a wake, a frame only on change; `Phase::Tasks` time; `idle_fps` case | 0 frames in 3 s with a pending task natively; 1 frame per task that changes the tree; the wake-without-change case 0 frames | T1 | C1 |
 | T3 | Deadlines judged: `earliest_deadline`, `Platform::request_frame_at`, the handler's `WaitUntil` after an event, the refusal message | The stepped-clock tests; the frame at the deadline pinned; the work-first rule proven by a task that completes exactly at the deadline | T2 | C1, W1 |
 | W1 | The `task` demo on the web page and its page-contract case; `JsFuture` through the executor; hop latency recorded | `web-idle-frames.sh` 0 with a pending task; 1 frame per resolution; latency in `docs/web.md` | T2 | T3 |
 | C1 | Compiler: parse `{await}`, `{then}`, `{catch}`, `within=`; the AST node; refusals with positions; no emission yet (a refusal "await blocks are parsed and not yet built" at generation, so nothing half-works) | `wisp-check` cases for every refusal; the parse pinned by AST tests | none | T1 to T3 |
@@ -614,7 +619,9 @@ Recommendation: (a): it makes Q6's rule hold by shape rather than by a
 lint, and it carries the deadline. 01 is updated by the PR that builds
 R1.
 
-**D8. The `App::woken` method.** (a) A new trait method with the
+**D8. The `App::tasks_woken` method** (built as `tasks_woken`, called
+only for the task hook's wakes; a frame wake still bypasses the app).
+(a) A new trait method with the
 default `request_redraw`, so every app keeps today's one-frame-per-wake
 and `ElementsApp` opts into the poll-first path. (b) The handler polls
 through a hook the platform owns, no trait change. Recommendation:
@@ -651,7 +658,7 @@ the document today.
   thread per test thread and must not assume an empty executor.
 - **Re-entrancy.** A task polled from inside a handler's `batch` would
   write mid-flush; `run_ready` refuses inside a batch or flush
-  (section 3.2). The one caller is `App::woken`, which runs between
+  (section 3.2). The one caller is `App::tasks_woken`, which runs between
   events; the refusal is for a future mistake, proven by a test that
   calls it inside an effect.
 - **The hidden page.** A deadline judged late (D4 (a)) means a user who
@@ -674,11 +681,12 @@ exercised until its row lands and its check runs.
 |---|---|---|
 | T1a-1 | `vapors_signals`: `spawn` (calls the wake hook; refused with no hook or a disposed owner), `Task::deadline`, `Deadline` (carried; nothing enforces it until T3), `run_ready`, `set_wake_hook`; tasks dropped with their owner | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
 | Timer (controlled clock, part) | `crates/signals/tests/tasks_interval.rs` with a test-only `Clock` (`tests/common/clock.rs`): the Live loop is an ordinary `.await` in an owner-scoped task over the merged spawn, wake hook and `run_ready`. Proven: 100 ms tick shows the value; a late tick shows the current value once and re-arms a full period on (no burst, this dashboard's policy only); disposal cancels pending work even with a wake queued, leaving no armed timer; re-enable arms exactly one fresh timer. No new public API | None: manual clock only. No desktop, web, Android or iOS run |
-| T2, T3, host Timer, W1, Mobile, C1, C2, S1 | Not started | None |
+| T2 | `Platform::task_waker` posts `Wake::Tasks`, delivered to `App::tasks_woken`; `Platform::waker`'s wakes still ask for a frame without reaching the app. `ElementsApp::new` installs the executor's wake hook once per thread; a wake polls `run_ready` before any frame and asks for a frame only when the document changed or a task ended (completed or failed, its `Err` reported naming its spawn site). `Phase::Tasks` holds the polls' time since the last frame. `OneScene`, `Racer` and the app examples that wrap an `ElementsApp` forward `tasks_woken`. Proven: `crates/app/tests/elements_app_tasks.rs`, `crates/platform/src/waker_tests.rs`, the wrapper tests in `vapors-racer` and `vapors-one-scene`, each broken and restored | Desktop (Linux, Xvfb, llvmpipe): `idle_fps` `task-pending` 0 frames in 3 s, `task-quiet` 0 frames over 5 wakes, `task-change` 5 frames over 6 wakes (exits 1 with fewer than 2 wakes); `surface_gradient --check` unchanged. No web, Android or iOS run |
+| T3, host Timer, W1, Mobile, C1, C2, S1 | Not started | None |
 
 Still open after the Timer part: the host-neutral deadline hook
 (`earliest_deadline`, `Platform::request_frame_at`, a browser timer on
-the web), redraw only on a visible change, the dashboard's Live switch
+the web), the dashboard's Live switch
 wired to it, the Chromium comparison, idle wake and frame counts on
 desktop and web, the Android and iOS contract runs, and the "Test iOS
 host" workflow (a `.github` change for the lead).

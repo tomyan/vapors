@@ -206,6 +206,10 @@ impl App for Checked {
         next
     }
 
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.app.tasks_woken(platform);
+    }
+
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);
         self.act_if_asked();

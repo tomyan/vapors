@@ -54,7 +54,10 @@ cargo run -p vapors-app --example demo -- hello
 cargo xtask screenshot demo target/hello.png -- hello
                           the same under Xvfb, held to demos/hello.pixels
 cargo run -p vapors-app --example idle_fps -- hello|counter|image
-                          frames drawn in 3 s idle, natively (0 when it redraws on change)
+                          frames drawn in 3 s idle, natively (0 when it redraws on change);
+                          task-pending|task-quiet|task-change: a spawned task never woken,
+                          woken every 500 ms writing nothing, and writing a shown count
+                          (0, 0 and 1 frame per wake; the waking cases exit 1 under 2 wakes)
 scripts/web-idle-frames.sh target/web <new dir>
                           the same on the built page in headless Chromium
 xvfb-run -a cargo run -p vapors-platform --example wake_window

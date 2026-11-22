@@ -219,6 +219,9 @@ impl App for Racer {
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);
     }
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.app.tasks_woken(platform);
+    }
 }
 mod drawing;
 #[cfg(test)]

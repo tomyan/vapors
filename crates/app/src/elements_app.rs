@@ -50,6 +50,9 @@ pub struct ElementsApp {
     last_times: Option<FrameTimes>,
     /// Time spent handling events since the last frame: the Input phase.
     input_spent: Duration,
+    /// Time spent polling tasks on wakes since the last frame: the
+    /// Tasks phase (`elements_app_tasks.rs`).
+    tasks_spent: Duration,
     /// Why the last frame asked for the next (`elements_app_decision.rs`).
     decision: FrameDecision,
     /// The first frame's time: the frame clock's epoch.
@@ -83,6 +86,8 @@ impl ElementsApp {
     pub fn new(document: Rc<RefCell<Document>>) -> Self {
         // a listener's `Err` (`vapors_dom::ListenerResult`) is shown
         vapors_dom::set_error_report("vapors_platform::report_error", report_error);
+        // a spawned task's wake reaches the loop (`elements_app_tasks.rs`)
+        tasks::install_hook();
         document
             .borrow_mut()
             .set_shortcut_modifier(shortcut_modifier());
@@ -99,6 +104,7 @@ impl ElementsApp {
             frame_times: None,
             last_times: None,
             input_spent: Duration::ZERO,
+            tasks_spent: Duration::ZERO,
             decision: FrameDecision::default(),
             clock_epoch: None,
             hosting: None,
@@ -181,10 +187,15 @@ impl App for ElementsApp {
     }
 
     fn drawn(&mut self, platform: &Platform) {
+        tasks::keep_waker(platform);
         self.surfaces.keep_waker(platform);
         self.surfaces.give_waker(self.painter.as_mut());
         self.mirror_text_field(platform);
         self.hand_ax_update(platform);
+    }
+
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.poll_on_wake(platform);
     }
 }
 
@@ -232,6 +243,8 @@ pub use preparing::Preparing;
 // For the root `gpu_` test module (the tier split needs a gpu_ id).
 #[cfg(test)]
 pub(crate) use surfaces::give_one_loop_waker_to;
+#[path = "elements_app_tasks.rs"]
+mod tasks;
 #[cfg(test)]
 #[path = "elements_app_tests.rs"]
 mod tests;

@@ -27,6 +27,10 @@ impl Phases for AppFrame<'_, '_> {
         std::mem::take(&mut self.app.input_spent)
     }
 
+    fn tasks_time(&mut self) -> Duration {
+        std::mem::take(&mut self.app.tasks_spent)
+    }
+
     fn update(&mut self, _now: Instant) -> Result<(), String> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)

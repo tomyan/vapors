@@ -4,13 +4,21 @@
 //! `wake` posts a message to the loop, which asks the window for a frame;
 //! wakes before that frame draw it once. Natively the waker is `Send`, as
 //! the loop's proxy is; on the web there is one thread.
+//!
+//! The task hook's waker ([`Platform::task_waker`](crate::Platform::task_waker))
+//! posts a wake of its own kind, [`Wake::Tasks`], which the loop hands to
+//! [`App::tasks_woken`](crate::App::tasks_woken) rather than answering
+//! with a frame (`docs/plans/async-components.md` section 3.3). Every
+//! other waker's wake is [`Wake::Frame`] and still asks for a frame
+//! without reaching the app.
 
 use std::sync::Arc;
 
 use winit::event_loop::EventLoopProxy;
 
+use crate::Platform;
 use crate::redraw::RedrawFlag;
-use crate::window::Message;
+use crate::window::{App, Message};
 
 /// Why a wake asked for no frame: the event loop has ended, so the
 /// window and its app are gone.
@@ -31,19 +39,40 @@ pub struct Waker {
     target: Target,
 }
 
+/// What a wake posted to the loop asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Wake {
+    /// A frame: surfaces, pastes, GPU error scopes, and an app's own waker.
+    Frame,
+    /// The app's woken tasks polled; the app asks for a frame if they
+    /// changed something.
+    Tasks,
+}
+
+/// The loop's answer to a posted wake.
+pub(crate) fn deliver(wake: Wake, app: &mut dyn App, platform: &Platform) {
+    match wake {
+        Wake::Frame => platform.request_redraw(),
+        Wake::Tasks => app.tasks_woken(platform),
+    }
+}
+
 #[derive(Clone)]
 enum Target {
-    /// The window's loop.
-    Loop(EventLoopProxy<Message>),
-    /// A detached platform's redraw flag, read back by
-    /// [`Platform::take_redraw_request`](crate::Platform::take_redraw_request).
+    /// The window's loop, and the kind of wake posted to it.
+    Loop(EventLoopProxy<Message>, Wake),
+    /// A detached platform's flag, read back by
+    /// [`Platform::take_redraw_request`](crate::Platform::take_redraw_request)
+    /// for a frame waker, or
+    /// [`Platform::take_task_wake`](crate::Platform::take_task_wake) for
+    /// a task waker.
     Detached(Arc<RedrawFlag>),
 }
 
 impl Waker {
-    pub(crate) fn for_loop(proxy: EventLoopProxy<Message>) -> Self {
+    pub(crate) fn for_loop(proxy: EventLoopProxy<Message>, wake: Wake) -> Self {
         Self {
-            target: Target::Loop(proxy),
+            target: Target::Loop(proxy, wake),
         }
     }
 
@@ -61,7 +90,9 @@ impl Waker {
     /// the caller says so if its work needed one.
     pub fn wake(&self) -> Result<(), LoopClosed> {
         match &self.target {
-            Target::Loop(proxy) => proxy.send_event(Message::Wake).map_err(|_| LoopClosed),
+            Target::Loop(proxy, wake) => proxy
+                .send_event(Message::Wake(*wake))
+                .map_err(|_| LoopClosed),
             Target::Detached(flag) => {
                 flag.raise();
                 Ok(())

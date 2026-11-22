@@ -136,6 +136,10 @@ impl App for Shot {
         self.app.event(event, platform);
     }
 
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.app.tasks_woken(platform);
+    }
+
     /// The app's own answer, so a change that asks for no frame is not
     /// hidden: after the first frame the inputs (clicks and wheels) are
     /// made and the app says whether they changed anything; the
