@@ -10,7 +10,7 @@ correctness phases of gates in separate worktrees can overlap, while
 the steps whose results depend on the machine being quiet still run
 alone.
 
-Status: decided (Tom, 2026-11-22, through the lead); in progress.
+Status: decided (Tom, 2026-11-22, through the lead); implemented in one PR, the three slices below together.
 
 ## Inventory
 
@@ -165,6 +165,13 @@ longest gate measured, gate 270's 2,885 s, rounded up to the hour
 (`quiet_lock::LONGEST`); past it the gate refuses, naming the holder
 and the command to rerun.
 
+### Names
+
+Each share names itself in a marker beside the lock, `<who>.<pid>`
+(`ci`, `gate` or `test`), so a waiter says what it waits for. An xtask
+built before this change reads `ci.` markers only: it waits on a gate's
+or a test run's share all the same (the flock), without naming it.
+
 ### Crash recovery
 
 All flocks are freed by the kernel when their process exits. The quiet
@@ -200,6 +207,14 @@ The order when switching from shared to exclusive is: release the
 share, take the quiet lock, then the turn and `gate.lock` exclusive.
 Taking the quiet lock while holding the share would deadlock two gates
 both switching (each waiting on the other's share or quiet hold).
+
+### A ci run beside a gate in its own worktree
+
+Before, a ci run waited for any gate on the machine, its own
+worktree's included. Now a ci or test run in a gate's worktree waits
+only for the gate's exclusive steps; during its shared steps the two
+build into the same `target/`, which cargo's own lock on the build
+directory serialises.
 
 ### Not changed (open questions in the PR)
 

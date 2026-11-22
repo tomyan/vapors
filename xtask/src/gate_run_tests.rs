@@ -161,7 +161,13 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
     // When
     let reporter = crate::report::Reporter::new(false);
     let ran = crate::run_tmp::around("gate", &base, |tmp| {
-        let code = run_in(&[step], &output, Wrap::SwitchedOff, &reporter, tmp);
+        let code = run_in(
+            &[step],
+            (&output, Wrap::SwitchedOff),
+            &reporter,
+            tmp,
+            &mut |_| Ok(()),
+        );
         assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
         code
     });

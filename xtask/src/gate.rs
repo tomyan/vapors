@@ -10,8 +10,10 @@
 //! that must be clean at the commit its pin file names) are read before
 //! and after, and any change, or an unreadable state, fails the gate.
 //! Locally every job runs in this one worktree, one after another; CI
-//! gives each job a fresh runner. One gate runs at a time on the
-//! machine (`gate_lock`).
+//! gives each job a fresh runner. One gate runs at a time in a worktree
+//! (`gate_worktree_lock`); gates in other worktrees go beside it, each
+//! step holding the machine shared or alone as `[gate.shared]` and
+//! `[gate.exclusive]` say (`gate_hold`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -21,6 +23,7 @@ use std::process::{Command, ExitCode};
 pub(crate) mod floor;
 
 use crate::config::Config;
+use crate::gate_hold::StepHolds;
 use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::gate_run::{Wrap, pass_lines};
 use crate::report::Reporter;
@@ -40,18 +43,21 @@ pub fn run(reporter: &Reporter) -> ExitCode {
     crate::priority::enter_gate();
     let worktree =
         std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let _lock = match floor::begin(&worktree) {
+    let begun = floor::before().and_then(|()| crate::gate_worktree_lock::take_here(&worktree));
+    let _lock = match begun {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
     let prepared = Config::load()
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
-    let (steps, before, siblings, output, wrap) = match prepared {
+    let ((steps, mut holds), before, siblings, output, wrap) = match prepared {
         Ok(prepared) => prepared,
         Err(why) => return refuse(&why),
     };
-    let code = crate::gate_run::run(&steps, &output, wrap, reporter);
+    let code = crate::gate_run::run(&steps, (&output, wrap), reporter, &mut |step| {
+        holds.before(step)
+    });
     if code != ExitCode::SUCCESS {
         return code;
     }
@@ -76,7 +82,7 @@ fn refuse(why: &str) -> ExitCode {
 type Pinned = Vec<(String, String)>;
 
 /// What the gate runs, and how.
-type Prepared = (Vec<PlannedStep>, State, Pinned, PathBuf, Wrap);
+type Prepared = ((Vec<PlannedStep>, StepHolds), State, Pinned, PathBuf, Wrap);
 
 /// The plan, the state before (a clean tree), the pinned siblings, and
 /// the `GITHUB_OUTPUT` file, emptied.
@@ -100,7 +106,8 @@ fn prepare(config: &Config) -> Result<Prepared, String> {
         read: &read,
     };
     let planned = plan(&workflow, &sources).map_err(|why| format!("{WORKFLOW}: {why}"))?;
-    Ok((planned, before, siblings, output_file()?, wrap))
+    let holds = StepHolds::new(config, &planned)?;
+    Ok(((planned, holds), before, siblings, output_file()?, wrap))
 }
 
 /// The gate passes only a commit: a tree with changes is refused.

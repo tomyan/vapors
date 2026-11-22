@@ -5,6 +5,11 @@
 //! a file under target/, as CI gives one, and the run's TMPDIR, and runs
 //! with `/dev/dri` hidden, as on CI (`gate_sandbox.rs`). Each step's
 //! line is followed by the machine's load at its start and end.
+//!
+//! Before each step the gate takes the hold it needs (`gate_hold.rs`).
+//! The time spent waiting for it is added back to the job's clock, so a
+//! wait never uses up the job's `timeout-minutes`; a hold that cannot be
+//! had fails the gate before the step runs.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -19,26 +24,36 @@ use crate::steps::Step;
 mod sandbox;
 pub use sandbox::{Wrap, wrap as sandbox_wrap};
 
+/// Takes the hold a step needs before it runs.
+pub type HoldFor<'a> = &'a mut dyn FnMut(&PlannedStep) -> Result<(), String>;
+
 /// Run `planned`, each step with this run's own TMPDIR (`run_tmp`) and
-/// as `wrap` says; `output` is the `GITHUB_OUTPUT` file.
-pub fn run(planned: &[PlannedStep], output: &Path, wrap: Wrap, reporter: &Reporter) -> ExitCode {
-    crate::run_tmp::around_temp_dir("gate", |tmp| run_in(planned, output, wrap, reporter, tmp))
+/// as `wrap` says, after `hold` takes what it needs; `output` is the
+/// `GITHUB_OUTPUT` file.
+pub fn run(
+    planned: &[PlannedStep],
+    (output, wrap): (&Path, Wrap),
+    reporter: &Reporter,
+    hold: HoldFor<'_>,
+) -> ExitCode {
+    crate::run_tmp::around_temp_dir("gate", |tmp| {
+        run_in(planned, (output, wrap), reporter, tmp, hold)
+    })
 }
 
 fn run_in(
     planned: &[PlannedStep],
-    output: &Path,
-    wrap: Wrap,
+    (output, wrap): (&Path, Wrap),
     reporter: &Reporter,
     tmp: &Path,
+    hold: HoldFor<'_>,
 ) -> ExitCode {
     let started = Instant::now();
     let mut job: Option<(&str, Instant)> = None;
     let mut passed = 0;
     for planned_step in planned {
-        let job_started = match job {
-            Some((name, at)) if name == planned_step.job => at,
-            _ => Instant::now(),
+        let Some(job_started) = held_for(planned_step, job, hold) else {
+            break;
         };
         job = Some((&planned_step.job, job_started));
         let mut step = crate::run_tmp::with_tmpdir(step_for(planned_step, output, wrap), tmp);
@@ -57,6 +72,28 @@ fn run_in(
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+/// Take `step`'s hold; when its job's clock started, moved on by the
+/// wait so the wait is not counted, or now for a job's first step. None
+/// when the hold cannot be had, said as the gate's failure.
+fn held_for(
+    step: &PlannedStep,
+    job: Option<(&str, Instant)>,
+    hold: HoldFor<'_>,
+) -> Option<Instant> {
+    let asked = Instant::now();
+    if let Err(why) = hold(step) {
+        println!(
+            "FAIL gate: {}: its hold: {why}; then rerun `cargo xtask gate`",
+            step.name
+        );
+        return None;
+    }
+    match job {
+        Some((name, at)) if name == step.job => Some(at + asked.elapsed()),
+        _ => Some(Instant::now()),
     }
 }
 
@@ -104,3 +141,7 @@ pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
 #[cfg(test)]
 #[path = "gate_run_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gate_run_hold_tests.rs"]
+mod hold_tests;

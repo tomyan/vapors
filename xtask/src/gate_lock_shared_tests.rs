@@ -106,7 +106,7 @@ fn a_stale_gate_holder_is_removed_and_not_named() {
 fn a_ci_holder_is_named_with_how_long_it_has_held_its_share() {
     let dir = lock_dir("shared-age");
     let _ci = acquire_shared(&dir, "/w/ci", BRIEF).expect("ci");
-    let holders = ci_holders(&dir);
+    let holders = share_holders(&dir);
     let start = format!("ci in /w/ci (pid {}) for ", std::process::id());
     assert!(
         holders.len() == 1 && holders[0].starts_with(&start) && holders[0].ends_with(" s"),
@@ -127,7 +127,7 @@ fn a_marker_older_than_its_process_names_a_reused_pid_and_is_left_out() {
     .expect("marker");
 
     // Then
-    assert_eq!(ci_holders(&dir), Vec::<String>::new());
+    assert_eq!(share_holders(&dir), Vec::<String>::new());
 }
 
 /// Wait until another holder has `gate.turn`: poll its lock, rather than

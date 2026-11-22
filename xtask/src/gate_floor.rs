@@ -34,21 +34,6 @@ pub struct Free {
     pub bytes: u64,
 }
 
-/// The locks a gate holds for its run.
-pub type Locks = (Option<crate::quiet_lock::Quiet>, crate::gate_lock::Held);
-
-/// Take the quiet lock, so no new ci or test run starts, then the gate
-/// lock for `worktree`, then check the floors and the load wait; both
-/// are held until the returned guards are dropped.
-pub fn begin(worktree: &str) -> Result<Locks, String> {
-    let quiet = crate::quiet_wait::for_gate(worktree)?;
-    let held = crate::gate_lock::dir()
-        .and_then(|dir| crate::gate_lock::acquire(&dir, worktree, crate::gate_lock::WAIT))?;
-    before()?;
-    crate::load_wait::before("gate")?;
-    Ok((quiet, held))
-}
-
 /// Refuse when the temp dir or target/ is under its floor.
 ///
 /// # Errors

@@ -1,8 +1,10 @@
-//! One gate at a time on the machine. The gate holds an exclusive lock on
-//! `~/.cache/factory/gate.lock` for its whole run, and writes who holds it
-//! to `gate.holder` beside it. The lock is the open file's, so it is freed
-//! when the gate exits, however it exits. A second gate waits, printing
-//! who holds the lock, and fails once its deadline passes.
+//! One exclusive holder at a time on the machine: a gate's exclusive
+//! steps (`gate_hold.rs`), and `cargo xtask quiet`'s drain, hold an
+//! exclusive lock on `~/.cache/factory/gate.lock` and write who holds it
+//! to `gate.holder` beside it; shares (`gate_lock_shared.rs`) wait for
+//! it. The lock is the open file's, so it is freed when its holder exits,
+//! however it exits. A second taker waits, printing who holds the lock,
+//! and fails once its deadline passes.
 
 use std::fs::{File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
@@ -160,7 +162,7 @@ fn taken(dir: &Path, file: File, turn: File, worktree: &str) -> Result<Held, Str
 /// ago it started, and each ci run with a live `ci.<pid>` marker.
 fn holder(dir: &Path) -> String {
     let mut holders: Vec<String> = gate_holder(dir).into_iter().collect();
-    holders.extend(crate::gate_lock_shared::ci_holders(dir));
+    holders.extend(crate::gate_lock_shared::share_holders(dir));
     if holders.is_empty() {
         return "held, by nobody that says so".to_owned();
     }
