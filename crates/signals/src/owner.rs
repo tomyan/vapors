@@ -4,6 +4,7 @@
 use crate::guard::Restore;
 use crate::node::{Cleanup, Compute, NodeId, OwnerId, ValueCell};
 use crate::runtime::{Runtime, with_runtime};
+use crate::task::TaskId;
 
 /// A scope that owns the nodes created while it is current. Disposing
 /// it disposes its child owners, its nodes and runs its cleanups.
@@ -86,12 +87,14 @@ pub(crate) struct Released {
     values: Vec<ValueCell>,
     computes: Vec<Compute>,
     cleanups: Vec<Cleanup>,
+    tasks: Vec<TaskId>,
 }
 
 impl Released {
     fn finish(self) {
         drop(self.computes);
         drop(self.values);
+        drop(crate::executor::remove_all(&self.tasks));
         for cleanup in self.cleanups {
             cleanup();
         }
@@ -119,6 +122,7 @@ fn collect_owner(runtime: &mut Runtime, id: OwnerId, keep: bool, released: &mut 
     released
         .cleanups
         .extend(std::mem::take(&mut owner.cleanups));
+    released.tasks.extend(std::mem::take(&mut owner.tasks));
     for child in children.into_iter().rev() {
         collect_owner(runtime, child, false, released);
     }
