@@ -210,15 +210,7 @@ impl Chromium {
             .env("TMPDIR", tmp)
             // Its own process group, so the deadline kills what it starts.
             .process_group(0)
-            .args([
-                "--headless=new",
-                "--no-sandbox",
-                "--hide-scrollbars",
-                &format!("--force-device-scale-factor={scale}"),
-                // Fonts load after first paint; give the page settled time.
-                "--virtual-time-budget=5000",
-                &format!("--window-size={width},{height}"),
-            ])
+            .args(super::render_flags(width, height, scale))
             .stderr(Stdio::piped());
         contain_cache(&mut command, tmp)?;
         Ok(command)
