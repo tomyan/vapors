@@ -157,15 +157,10 @@ fn a_count_past_2_to_the_53_is_refused() {
 }
 
 #[test]
+#[should_panic(expected = "6004799503160661 rows of 3 px")]
 fn a_count_whose_f64_product_rounds_to_an_f32_is_not_taken_as_exact() {
-    // Given: (2^54 - 1) / 3 rows of 3 px make 2^54 - 1 px, which an f64
-    // rounds to 2^54, an f32; the true height is none
-    let window = Window::new(3.0, 60.0, 1);
-    let rows = ((1_usize << 54) - 1) / 3;
-
-    // When
-    let held = std::panic::catch_unwind(|| window.px(rows));
-
-    // Then: refused, as 2^24 + 1 rows of 3 px below it are
-    assert!(held.is_err(), "{rows} rows of 3 px held");
+    // (2^54 - 1) / 3 rows of 3 px make 2^54 - 1 px, which an f64 rounds to
+    // 2^54, an f32; the true height is none, and 2^24 + 1 rows of 3 px
+    // below it are refused too
+    let _ = Window::new(3.0, 60.0, 1).px(((1_usize << 54) - 1) / 3);
 }
