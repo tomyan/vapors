@@ -69,7 +69,23 @@ fn a_million_rows_of_52_px_is_an_exact_height() {
 }
 
 #[test]
-#[should_panic(expected = "cannot hold exactly")]
+fn a_decimal_row_height_is_accepted_at_a_few_rows() {
+    // When: 33.3 has no exact f32, and neither do 3 or 1,000 of it
+    let (three, thousand) = (
+        Window::new(33.3, 60.0, 1).px(3),
+        Window::new(33.3, 60.0, 1).px(1000),
+    );
+
+    // Then: each within 1/128 px of the exact height
+    assert!((f64::from(three) - 99.9).abs() <= 1.0 / 128.0, "{three}");
+    assert!(
+        (f64::from(thousand) - 33_300.0).abs() <= 1.0 / 128.0,
+        "{thousand}"
+    );
+}
+
+#[test]
+#[should_panic(expected = "more than 1/128")]
 fn a_height_an_f32_cannot_hold_is_refused() {
     let _ = Window::new(0.1, 60.0, 1).px(16_777_217);
 }

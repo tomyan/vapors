@@ -32,8 +32,9 @@ tall as the rows above the first that exists, then the rows. Inside it:
 
 Refused, naming the prop: a `row_height` that is not a positive finite
 number (the default, 0, is refused at mount), a negative or non-finite
-`height`, and a content or spacer height an `f32` cannot hold exactly
-(it would put rows off their pixel). A million rows of 52 px are exact.
+`height`, and a content or spacer height an `f32` holds only to more
+than 1/128 px (it would put rows off their pixel). A million rows of
+52 px are exact; a decimal row height such as 33.3 rounds by far less.
 
 Every prop has a default, because a tag from another crate cannot pass
 a required prop yet (`docs/components.md`, "Required props").

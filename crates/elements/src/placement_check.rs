@@ -86,7 +86,12 @@ impl Fresh {
 /// offset alone, as placement puts it. Composing the fresh rects from
 /// there keeps the kept arithmetic, so the two agree to the bit, and a
 /// box 52,000,000 px down keeps its half pixels; an absolute f32 rect
-/// with the lane's offset taken off afterwards would not.
+/// with the lane's offset taken off afterwards would not. This side of
+/// the check therefore holds a framed child's place in its frame to
+/// placement's own arithmetic, not to Taffy's: its lane start and its
+/// container's place are held to Taffy by the on-page comparison
+/// (`placement_check_page.rs`, `lane_offset`), to whole device pixels,
+/// which catches any wrong start, since framing requires whole starts.
 fn in_lane_frame(kept: &Placement, lanes: &Lanes, slot: usize) -> Option<f32> {
     let framed = slot < kept.framed.len() && kept.framed[slot];
     framed.then(|| lanes.relative(kept.up[slot], slot))

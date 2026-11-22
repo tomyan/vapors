@@ -3,8 +3,9 @@
 //! rows is 52,000,000 px, where an f32 steps by 4 px). A lane whose
 //! children start `FRAMED_DEPTH` down frames them however few
 //! (`layout/lane.rs`), so each row's boxes are placed in its own frame
-//! near zero and shifted in f64; the debug placement check composes its
-//! fresh rects in f64 too (`layout::placed`).
+//! near zero and shifted in f64; the debug placement check composes a
+//! framed child's fresh rect from its place in its frame, as placement
+//! does (`layout::placed`'s `framed`).
 
 use crate::support::{document, element};
 use vapors_dom::NodeId;
@@ -84,8 +85,8 @@ fn many_rows_52_million_px_down_keep_their_half_pixel_boxes() {
 }
 
 #[test]
-fn a_few_rows_near_the_top_are_placed_as_before() {
-    // Given: shallow enough that the lane is not framed
+fn a_few_rows_near_the_top_keep_their_half_pixel_boxes() {
+    // Given: rows above FRAMED_DEPTH, where an f32 holds the half pixels
     let page = page(4, 52.0 * 96.0);
 
     // Then

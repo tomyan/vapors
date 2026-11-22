@@ -55,35 +55,41 @@ impl Window {
         first.saturating_sub(self.overscan).min(end)..end
     }
 
-    /// How tall `rows` rows are, in px.
+    /// How tall `rows` rows are, in px, within `MAX_ROUNDING` of the
+    /// exact product.
     ///
     /// # Panics
-    /// When that height is not exactly an `f32`: layout would place the
+    /// When the nearest `f32` is further off: layout would place the
     /// rows below it off their pixel.
     #[must_use]
-    #[allow(
-        clippy::float_cmp,
-        reason = "exactness is the question: a rounded height misplaces rows"
-    )]
     pub fn px(&self, rows: usize) -> f32 {
         #[allow(
             clippy::cast_precision_loss,
-            reason = "checked below: the f32 must equal the exact product"
+            reason = "checked below: the f32 must lie within MAX_ROUNDING of the exact product"
         )]
         let exact = rows as f64 * f64::from(self.row_height);
         #[allow(
             clippy::cast_possible_truncation,
-            reason = "checked below: the f32 must equal the exact product"
+            reason = "checked below: the f32 must lie within MAX_ROUNDING of the exact product"
         )]
         let px = exact as f32;
+        let off = (f64::from(px) - exact).abs();
         assert!(
-            f64::from(px) == exact,
-            "VirtualList: {rows} rows of {} px is {exact} px, which an f32 layout cannot hold exactly; use fewer rows or a row height with fewer significant bits (cargo test -p vapors-components virtual_window)",
+            off <= MAX_ROUNDING,
+            "VirtualList: {rows} rows of {} px is {exact} px, which an f32 layout holds only to {off} px (more than 1/128); use fewer rows or a row height with fewer significant bits (cargo test -p vapors-components virtual_window)",
             self.row_height
         );
         px
     }
 }
+
+/// How far a height may round from the exact product of rows and row
+/// height: 1/128 px, the resolution below which an f32 corner still
+/// resolves a box (the elements crate frames a lane past 65,536 px for
+/// the same reason). Paint snaps to device pixels, so an error this
+/// small moves nothing; a height of 33.3 px rounds by about 1e-6 at
+/// three rows, and must not be refused.
+const MAX_ROUNDING: f64 = 1.0 / 128.0;
 
 /// `rows` rounded by `round` to a row index, saturating at `usize::MAX`.
 fn whole_rows(rows: f32, round: fn(f32) -> f32) -> usize {
