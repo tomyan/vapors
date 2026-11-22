@@ -111,6 +111,18 @@ the one difference from the brief in this slice.
   (`n += 1`, `&mut n`) is refused, naming the binding. Events bubble.
   `event.stop_propagation()` and `event.prevent_default()` work as in
   the DOM.
+- **Scroll:** `onscroll={handler}` on a scroll container (`overflow:
+  auto` or `scroll`) hears `scroll` once per frame, before the frame's
+  update, when its offset has changed since its last `scroll`: by wheel,
+  touch, fling, `Document::scroll_to`, a press's scroll into view, or an
+  update clamping the offset to content that shrank. A scroll that leaves
+  the offset where it was (a `scroll_to` the same offset, a wheel at the
+  end of the range, a scroll and its reverse in one frame) fires none.
+  `event.scroll_offset()` is `Some([x, y])`, the offset in CSS pixels;
+  a change the handler makes is drawn in the same frame. It does not
+  bubble, as an element's `scroll` does not in the DOM. A host that runs
+  its own frames calls `Document::settle_scroll` before each update;
+  until it does, `Document::take_changed` answers true.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.

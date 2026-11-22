@@ -5,13 +5,14 @@ use crate::{Capture, Modifiers, NodeId, Pointer};
 /// An event delivered to a listener. The payload fields are set by
 /// the kind of event: `input` and `change` carry `value`, and on a
 /// range or number input the value as a number too; `change` on a
-/// checkbox carries `checked`.
+/// checkbox carries `checked`; `scroll` carries the container's offset.
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     name: String,
     value: Option<String>,
     value_number: Option<f64>,
     checked: Option<bool>,
+    scroll_offset: Option<[f32; 2]>,
     propagation_stopped: bool,
     default_prevented: bool,
     pointer: Option<Pointer>,
@@ -77,6 +78,21 @@ impl Event {
     pub fn with_checked(mut self, checked: bool) -> Event {
         self.checked = Some(checked);
         self
+    }
+
+    /// Attaches the scroll container's offset, on a `scroll`.
+    #[must_use]
+    pub fn with_scroll_offset(mut self, offset: [f32; 2]) -> Event {
+        self.scroll_offset = Some(offset);
+        self
+    }
+
+    /// The scroll container's offset (CSS px, x then y; the DOM's
+    /// `scrollLeft` and `scrollTop` of the target) on a `scroll`; `None`
+    /// on any other event.
+    #[must_use]
+    pub fn scroll_offset(&self) -> Option<[f32; 2]> {
+        self.scroll_offset
     }
 
     /// Attaches where a pointer event happened.
