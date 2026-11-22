@@ -89,6 +89,7 @@ impl Runtime {
             children: Vec::new(),
             nodes: Vec::new(),
             cleanups: Vec::new(),
+            tasks: Vec::new(),
         });
         let id = OwnerId { index, generation };
         if let Some(parent) = parent.and_then(|parent| self.owner_mut(parent)) {

@@ -664,3 +664,25 @@ the document today.
   here are measured by the harness `perf-finish-line.md` builds
   (`vapors-perf --scaling`, `idle_fps`). If that harness changes shape
   before this plan starts, section 12's rows are re-read against it.
+
+## 15. The async scheduling proof: status
+
+Built from the rows above, each its own reviewed PR; nothing is claimed
+exercised until its row lands and its check runs.
+
+| Slice | Content | Host integrations exercised |
+|---|---|---|
+| T1a-1 | `vapors_signals`: `spawn` (calls the wake hook; refused with no hook or a disposed owner), `Task::deadline`, `Deadline` (carried; nothing enforces it until T3), `run_ready`, `set_wake_hook`; tasks dropped with their owner | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
+| T2, T3, Timer, W1, Mobile, C1, C2, S1 | Not started | None |
+
+Left open by T1a-1, for T1a-2: `run_ready` inside a batch or an effect
+flush is not refused; a zero `Measured` deadline is accepted; an
+unowned task cannot be stopped; two wakes before a run poll twice.
+For T1a-3: a panicking poll leaves its slot behind, never polled again,
+and drops the woken tasks not yet polled until their next wake.
+
+Left open by T1a: the `!Send` negative check of the task future
+(section 13, T1); `run_ready` refusing by effect name; `run_ready` on a
+thread other than the spawning one returns nothing (the executor is
+thread-local, not asserted); the spawn `now` argument, added with T3
+(`Instant::now` is unavailable on wasm).
