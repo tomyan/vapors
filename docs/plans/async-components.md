@@ -673,7 +673,15 @@ exercised until its row lands and its check runs.
 | Slice | Content | Host integrations exercised |
 |---|---|---|
 | T1a-1 | `vapors_signals`: `spawn` (calls the wake hook; refused with no hook or a disposed owner), `Task::deadline`, `Deadline` (carried; nothing enforces it until T3), `run_ready`, `set_wake_hook`; tasks dropped with their owner | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
-| T2, T3, Timer, W1, Mobile, C1, C2, S1 | Not started | None |
+| Timer (controlled clock, part) | `crates/signals/tests/tasks_interval.rs` with a test-only `Clock` (`tests/common/clock.rs`): the Live loop is an ordinary `.await` in an owner-scoped task over the merged spawn, wake hook and `run_ready`. Proven: 100 ms tick shows the value; a late tick shows the current value once and re-arms a full period on (no burst, this dashboard's policy only); disposal cancels pending work even with a wake queued, leaving no armed timer; re-enable arms exactly one fresh timer. No new public API | None: manual clock only. No desktop, web, Android or iOS run |
+| T2, T3, host Timer, W1, Mobile, C1, C2, S1 | Not started | None |
+
+Still open after the Timer part: the host-neutral deadline hook
+(`earliest_deadline`, `Platform::request_frame_at`, a browser timer on
+the web), redraw only on a visible change, the dashboard's Live switch
+wired to it, the Chromium comparison, idle wake and frame counts on
+desktop and web, the Android and iOS contract runs, and the "Test iOS
+host" workflow (a `.github` change for the lead).
 
 Left open by T1a-1, for T1a-2: `run_ready` inside a batch or an effect
 flush is not refused; a zero `Measured` deadline is accepted; an
