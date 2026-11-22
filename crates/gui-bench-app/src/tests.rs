@@ -1,6 +1,8 @@
 //! Tests: the dashboard laid out headless at the spec window size.
 mod behaviour;
 mod behaviour_top;
+mod chart_heights;
+mod chart_oracle;
 mod chart_rows;
 mod content_rows;
 mod controls_behaviour;
