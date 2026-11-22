@@ -83,6 +83,19 @@ jobs:
         run: cargo xtask lint
       - name: wasm lint
         run: cargo xtask wasm
+      # The unit tier launches Chromium (gui-bench-app's chart oracle) and
+      # counts instructions (vapors-perf's mount tests), as the gpu job's
+      # tier does; the same two setups as there. Without them the first
+      # unit run to finish since 2026-11-12 (run 45076354761) failed three
+      # chart tests at the 20 s screenshot deadline on the runner's cold
+      # first launch, and five mount tests on perf_event_paranoid 4.
+      - name: warm headless Chromium
+        run: cargo run -p vapors-text --example warm_chromium
+      - name: allow user-space perf events
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - name: user-space perf events are allowed
+        run: |
+          test "$(cat /proc/sys/kernel/perf_event_paranoid)" -le 2 || { echo "::error::kernel.perf_event_paranoid is $(cat /proc/sys/kernel/perf_event_paranoid), above 2; fix: set kernel.perf_event_paranoid to 1 with sysctl, as root"; exit 1; }
       - name: unit
         run: cargo xtask test --tier unit
       # bwrap making a user namespace: run here and in the gate, never in
