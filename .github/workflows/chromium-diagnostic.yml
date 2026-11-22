@@ -1,0 +1,48 @@
+# DIAGNOSTIC (draft PR, not for main): text_line_box_paint at 2x passes on
+# Debian with Chromium 155 and with the pinned 157 build, byte-identical,
+# and fails on this runner with the same 157 build. This records the
+# runner's side of scripts/chromium-diagnostic.sh, for the pinned build
+# and for the runner's own /usr/bin/chromium (the original failing case,
+# kept as the control), to compare with the same script's Debian record.
+name: chromium-diagnostic
+
+on:
+  pull_request:
+
+jobs:
+  record:
+    if: ${{ github.head_ref == 'diag/chromium-text-placement' }}
+    runs-on: ubuntu-24.04 # as ci.yml's gpu job
+    # A cold build of vapors-elements-corpus's gpu tests and two runs of
+    # one test; no measurement yet, and this job is not kept.
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      VAPORS_GPU_ADAPTER: llvmpipe
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install lavapipe
+        uses: ./.github/actions/apt-install
+        with:
+          packages: mesa-vulkan-drivers vulkan-tools
+          mesa-major: 25
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
+      - name: install pinned tools (the pinned Chromium among them)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo xtask setup --ci
+      - name: record the runner's stack
+        run: scripts/chromium-diagnostic.sh target/chromium-diagnostic
+      - name: print the record
+        if: ${{ !cancelled() }}
+        run: |
+          cd target/chromium-diagnostic
+          for f in machine.txt pinned/browser.txt control/browser.txt pinned/libraries.txt control/libraries.txt; do echo "######## $f"; cat "$f"; done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: ${{ !cancelled() }}
+        with:
+          name: chromium-diagnostic
+          path: target/chromium-diagnostic/

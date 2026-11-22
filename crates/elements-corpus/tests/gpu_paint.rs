@@ -109,11 +109,26 @@ fn check_placement(name: &str, scale: u32) {
     let theirs = chromiums("placement", name, scale, "");
     let doc = laid_out(&fixture, scale);
     let ours = ours(&doc.borrow(), scale);
+    // DIAGNOSTIC (scripts/chromium-diagnostic.sh): both images and our adapter.
+    if let Some(out) = std::env::var_os("PLACEMENT_OUT") {
+        let out = PathBuf::from(out);
+        let info = gpu().adapter.get_info();
+        eprintln!(
+            "PLACEMENT vapors adapter {} | driver {} {} | backend {:?}",
+            info.name, info.driver, info.driver_info, info.backend
+        );
+        write_png(&out.join(format!("{name}_{scale}x_vapors.png")), &ours).expect("png");
+        write_png(&out.join(format!("{name}_{scale}x_chromium.png")), &theirs).expect("png");
+    }
     let regions = regions(&doc.borrow(), scale);
     let (ours, theirs) = (
         placement::inked(&ours, &regions),
         placement::inked(&theirs, &regions),
     );
+    if std::env::var_os("PLACEMENT_OUT").is_some() {
+        eprintln!("PLACEMENT vapors bounds {ours:?}");
+        eprintln!("PLACEMENT chromium bounds {theirs:?}");
+    }
     let off: Vec<String> = ours
         .iter()
         .zip(&theirs)

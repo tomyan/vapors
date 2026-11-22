@@ -203,6 +203,10 @@ impl Chromium {
             ])
             .stderr(Stdio::piped());
         contain_cache(&mut command, tmp)?;
+        // DIAGNOSTIC (scripts/chromium-diagnostic.sh): the exact launch.
+        if std::env::var_os("VAPORS_CHROMIUM_TRACE").is_some() {
+            eprintln!("CHROMIUM command: {command:?}");
+        }
         Ok(command)
     }
 

@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>chromium diagnostic</title></head>
+<body><script>
+// The graphics backend Chromium composites and rasterizes with, as WebGL
+// names it, and the scale and agent it reports. Read by --dump-dom.
+const gl = document.createElement('canvas').getContext('webgl');
+const debug = gl && gl.getExtension('WEBGL_debug_renderer_info');
+document.body.textContent = JSON.stringify({
+  webgl_vendor: debug ? gl.getParameter(debug.UNMASKED_VENDOR_WEBGL) : null,
+  webgl_renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : null,
+  webgl_version: gl ? gl.getParameter(gl.VERSION) : null,
+  device_pixel_ratio: window.devicePixelRatio,
+  user_agent: navigator.userAgent,
+});
+</script></body></html>
