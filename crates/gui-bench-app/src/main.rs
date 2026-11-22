@@ -18,6 +18,7 @@ mod controls;
 #[allow(clippy::all, clippy::pedantic, dead_code)] // vendored unchanged; docs/gui-bench/spec/NOTICE.md
 #[path = "../../../docs/gui-bench/spec/dashboard.rs"]
 mod dashboard;
+mod data_colours;
 mod live;
 mod order_parts;
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));

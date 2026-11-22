@@ -173,7 +173,7 @@ fn a_narrower_window_makes_the_cards_taller() {
 #[test]
 fn every_avatar_has_the_background_of_its_colour() {
     // Given
-    assert_eq!(AVATAR_COLORS.len(), 8, "the CSS holds .c0 to .c7");
+    assert_eq!(AVATAR_COLORS.len(), 8, "the palette binds 8 colours");
     let mounted = with_rows(AVATAR_COLORS.len() + 1);
     nav(&mounted, MESSAGES_ITEM);
 

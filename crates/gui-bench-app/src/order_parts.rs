@@ -1,5 +1,5 @@
 //! What an order row's classes are picked by, and the refusals when an
-//! order has no class: the row's CSS has 4 pill classes, 8 avatar classes
+//! order has no class or colour: the row has 4 pill classes, an avatar palette
 //! and a fill bound to a 0..=100 percentage (`FLAGS.md`).
 use crate::dashboard::{AVATAR_COLORS, Order, Status};
 
@@ -18,7 +18,7 @@ pub fn parts(order: &Order) -> (usize, usize, u32) {
     let colour = AVATAR_COLORS
         .iter()
         .position(|c| *c == order.avatar)
-        .expect("avatar colour not in AVATAR_COLORS: add its class to ui/order_row.wisp (cargo test -p gui-bench-app order_parts)");
+        .expect("avatar colour not in AVATAR_COLORS: add it to the spec palette read by src/data_colours.rs (cargo test -p gui-bench-app order_parts)");
     let status = pill(order.status.filter_row());
     let progress = order.progress;
     assert!(
