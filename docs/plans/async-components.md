@@ -14,6 +14,13 @@ was run for this plan.
 > `docs/plans/desktop-app-thread.md` records what that overrides here
 > (section 1's sixth "Decided" bullet, section 3.3's poll on the winit
 > thread, section 4's arming, T3) and the decisions it needs first.
+>
+> Web runtime decided (Tom, 2026-11-22): by default, app code, browser
+> timers, network continuations and the UI all run on the browser's
+> main thread, as sections 3.3 and 4 and W1 describe. A dedicated Web
+> Worker is optional, and is built only if measurements justify it.
+> Desktop keeps the dedicated Tokio application thread and the winit
+> UI thread.
 
 What this plan adds to `docs/design/01-reactivity-async.md` (2026-10-25,
 decided with `QUESTIONS.md` Q3, Q5 and Q6) and
@@ -693,13 +700,15 @@ exercised until its row lands and its check runs.
 | T1a-1 | `vapors_signals`: `spawn` (calls the wake hook; refused with no hook or a disposed owner), `Task::deadline`, `Deadline` (carried; nothing enforces it until T3), `run_ready`, `set_wake_hook`; tasks dropped with their owner | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
 | Timer (controlled clock, part) | `crates/signals/tests/tasks_interval.rs` with a test-only `Clock` (`tests/common/clock.rs`): the Live loop is an ordinary `.await` in an owner-scoped task over the merged spawn, wake hook and `run_ready`. Proven: 100 ms tick shows the value; a late tick shows the current value once and re-arms a full period on (no burst, this dashboard's policy only); disposal cancels pending work even with a wake queued, leaving no armed timer; re-enable arms exactly one fresh timer. No new public API | None: manual clock only. No desktop, web, Android or iOS run |
 | T2 | `Platform::task_waker` posts `Wake::Tasks`, delivered to `App::tasks_woken`; `Platform::waker`'s wakes still ask for a frame without reaching the app. `ElementsApp::new` installs the executor's wake hook once per thread; a wake polls `run_ready` before any frame and asks for a frame only when the document changed or a task ended (completed or failed, its `Err` reported naming its spawn site). `Phase::Tasks` holds the polls' time since the last frame. `OneScene`, `Racer` and the app examples that wrap an `ElementsApp` forward `tasks_woken`. Proven: `crates/app/tests/elements_app_tasks.rs`, `crates/platform/src/waker_tests.rs`, the wrapper tests in `vapors-racer` and `vapors-one-scene`, each broken and restored | Desktop (Linux, Xvfb, llvmpipe): `idle_fps` `task-pending` 0 frames in 3 s, `task-quiet` 0 frames over 5 wakes, `task-change` 5 frames over 6 wakes (exits 1 with fewer than 2 wakes); `surface_gradient --check` unchanged. No web, Android or iOS run |
-| L1 (takes the host Timer row), L2, L3 (replaces T3), W0, W1, Mobile, C1, C2, S1 | Not started. L1 to L3 and W0 are in `desktop-app-thread.md`; L1 is the next slice, waiting on that plan's decisions AT2 to AT5 | None |
+| L1a | The desktop application thread with no window (`desktop-app-thread.md`): in draft #602, not merged | None until it merges |
+| L1b, L2, L3 (replaces T3), W1, Mobile, C1, C2, S1 | Not started. L1b to L3 are in `desktop-app-thread.md`; W1 runs on the browser's main thread (the web decision above) | None |
 
 Still open after T2: the application thread (L1a in progress, L1b next), the dashboard's
 Live switch on it (L2, which needs that plan's frame description, F1; frames are prepared, submitted and presented on the application thread by default, awaiting measurement), task deadlines on a Tokio
 timer (L3), the Chromium comparison, idle wake and frame counts on the
-web, the Web Worker as the web's application thread (W0, proposed and
-not validated), the Android and iOS contract runs after parity, and
+web (W1, on the browser's main thread; a Web Worker only if
+measurements justify it), the Android and iOS contract runs after
+parity, and
 the "Test iOS host" workflow (a `.github` change for the lead).
 
 Docs handoff for T2 (merged as ba482514, #599): the mechanism is in

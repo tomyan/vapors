@@ -30,8 +30,11 @@ L1a or L1b.
 - Winit deadlines (`ControlFlow::WaitUntil`, `Next::WaitUntil`, or a
   planned `Platform::request_frame_at`) are not used to time
   background application tasks.
-- Web: a Web Worker as the application thread is proposed and not
-  validated.
+- Web (Tom, 2026-11-22): by default, app code, browser timers,
+  network continuations and the UI all run on the browser's main
+  thread. A dedicated Web Worker is optional, and is built only if
+  measurements justify it. Desktop keeps the dedicated Tokio
+  application thread and the winit UI thread.
 - Mobile comes after desktop and web parity.
 - Rendering default (Tom, 2026-11-22): frames are prepared, submitted
   and presented on the Tokio application thread, and winit handles
@@ -186,8 +189,8 @@ today's code, read at ba482514:
 | The surface texture, acquired and presented | `crates/platform/src/surface_texture.rs:42` | Tied to wherever presentation runs; not `Send` on the web | Acquired and presented by the consumer |
 | The winit window | `crates/platform/src/handler.rs` | Winit's, on the UI thread | Stays on the UI thread in both placements |
 
-Platform constraints that stay: the web has one thread until W0
-validates a worker, and wgpu's types are not `Send` there, so the web
+Platform constraints that stay: the web runs on the browser's main
+thread by default (section 1), and wgpu's types are not `Send` there, so the web
 consumes on the preparing thread. A compile-time check asserts that the
 description is `Send` on native targets only.
 
@@ -270,5 +273,5 @@ value, so AT6, AT7 and the rendering default do not change it.
 | L2 | The dashboard's Live switch on the application thread: the switch's handler and the tick there, frames prepared, submitted and presented there (the default), a frame per tick, 0 frames with Live off, held to Chromium's page; a live resize checked on each desktop available | L1, F1 |
 | Default judged | After parity: sustained scrolling of a million orders, p99 input-to-visible latency and missed frames, with presentation on the application thread and on the UI thread through the same frame description; a live resize correct in both | Parity, F1 |
 | L3 (replaces T3) | Task deadlines judged on the application thread with a Tokio timer for the earliest deadline, the work polled before the judgement; the refusal message; no `request_frame_at` | L1a |
-| W0 | A Web Worker as the application thread: a spike that validates or rejects it (WebGPU, input forwarding, the hop's latency) | L1 |
-| Mobile | After desktop and web parity | L2, W0 |
+| Web worker (optional) | Only if measurements on the browser's main thread justify it: a Web Worker for app code, with WebGPU, input forwarding and the hop's latency measured | Measurements that justify it |
+| Mobile | After desktop and web parity | L2, W1 |
