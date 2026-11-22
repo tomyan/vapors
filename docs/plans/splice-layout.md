@@ -863,6 +863,19 @@ Lane frames are lighter than scroll frames:
   keeps today's placement for its children (correct, O(rows after)),
   counted as a decline, `LaneFramePixel`; a lane whose framing flips
   has its children placed and their clips redone, O(children), rare.
+- Which lanes frame: one of `FRAMED_CHILDREN` (32) children or more,
+  and since virtual list V3 (`docs/plans/virtual-list.md`) also a
+  smaller one any of whose children starts `FRAMED_DEPTH` (65,536 CSS
+  px) or more down its scroll frame (`layout/lane.rs`). Placement keeps
+  rects in f32 scroll-frame coordinates, where at 2^25 px an f32 steps
+  by 4 px: a virtual list's few rows under a spacer 52,000,000 px tall
+  placed their pills on a 4 px grid. Framed, each row's boxes sit near
+  zero in its own frame, and the frame's shift is the lane start in
+  f64. The debug placement check composes its fresh rects as placement
+  does, a framed lane child from its place in its own frame
+  (`layout::placed`'s `framed`), and no longer takes the lane offset off
+  an absolute f32 rect afterwards, which lost the fractions it checks. A deep lane that declines (`LaneFramePixel`) is still
+  placed in f32: wrong by fractions of a pixel, and not reported.
 - A lane with a scroll container inside one of its children is framed
   too (4e; until 4e it was a counted decline, `LaneFrameScroller`).
   Real pages put scrollers in rows: the touche shell does, and so does
