@@ -59,6 +59,7 @@ pub(crate) struct OwnerNode {
     pub children: Vec<OwnerId>,
     pub nodes: Vec<NodeId>,
     pub cleanups: Vec<Cleanup>,
+    pub tasks: Vec<crate::task::TaskId>,
 }
 
 pub(crate) struct Slot<T> {
