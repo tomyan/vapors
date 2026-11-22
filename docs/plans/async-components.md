@@ -695,8 +695,8 @@ exercised until its row lands and its check runs.
 | T2 | `Platform::task_waker` posts `Wake::Tasks`, delivered to `App::tasks_woken`; `Platform::waker`'s wakes still ask for a frame without reaching the app. `ElementsApp::new` installs the executor's wake hook once per thread; a wake polls `run_ready` before any frame and asks for a frame only when the document changed or a task ended (completed or failed, its `Err` reported naming its spawn site). `Phase::Tasks` holds the polls' time since the last frame. `OneScene`, `Racer` and the app examples that wrap an `ElementsApp` forward `tasks_woken`. Proven: `crates/app/tests/elements_app_tasks.rs`, `crates/platform/src/waker_tests.rs`, the wrapper tests in `vapors-racer` and `vapors-one-scene`, each broken and restored | Desktop (Linux, Xvfb, llvmpipe): `idle_fps` `task-pending` 0 frames in 3 s, `task-quiet` 0 frames over 5 wakes, `task-change` 5 frames over 6 wakes (exits 1 with fewer than 2 wakes); `surface_gradient --check` unchanged. No web, Android or iOS run |
 | L1 (takes the host Timer row), L2, L3 (replaces T3), W0, W1, Mobile, C1, C2, S1 | Not started. L1 to L3 and W0 are in `desktop-app-thread.md`; L1 is the next slice, waiting on that plan's decisions AT2 to AT5 | None |
 
-Still open after T2: the application thread (L1), the dashboard's
-Live switch on it (L2, which needs that plan's frame description, F1, and a first rendering placement, AT1, which Tom deferred), task deadlines on a Tokio
+Still open after T2: the application thread (L1a in progress, L1b next), the dashboard's
+Live switch on it (L2, which needs that plan's frame description, F1; frames are prepared, submitted and presented on the application thread by default, awaiting measurement), task deadlines on a Tokio
 timer (L3), the Chromium comparison, idle wake and frame counts on the
 web, the Web Worker as the web's application thread (W0, proposed and
 not validated), the Android and iOS contract runs after parity, and

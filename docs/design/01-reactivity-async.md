@@ -146,7 +146,7 @@ unmounting the root, because the rule here is that failure is loud.
 
 ### 6. Where futures run
 
-> Overridden on desktop by Tom's decision of 2026-11-22: app-authored code, including handlers and every continuation after an `.await`, runs on a dedicated application thread with Tokio timers and IO, and winit owns the UI thread. Frame preparation moves with app code; where submission and presentation run is deferred, and either is supported through an owned frame description (`docs/plans/desktop-app-thread.md`, section 4 and 4a). This section is rewritten when F1 lands.
+> Overridden on desktop by Tom's decision of 2026-11-22: app-authored code, including handlers and every continuation after an `.await`, runs on a dedicated application thread with Tokio timers and IO, and winit owns the UI thread. Frame preparation moves with app code; by default frames are also submitted and presented on the application thread (chosen, awaiting measurement), with UI-thread presentation kept available through an owned frame description (`docs/plans/desktop-app-thread.md`, section 4 and 4a). This section is rewritten when F1 lands.
 
 All futures that touch signals run on the UI thread's executor, which
 is part of the scheduler (area 2): one task queue drained in the frame
