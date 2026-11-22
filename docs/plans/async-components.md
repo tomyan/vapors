@@ -696,7 +696,7 @@ exercised until its row lands and its check runs.
 | L1 (takes the host Timer row), L2, L3 (replaces T3), W0, W1, Mobile, C1, C2, S1 | Not started. L1 to L3 and W0 are in `desktop-app-thread.md`; L1 is the next slice, waiting on that plan's decisions AT2 to AT5 | None |
 
 Still open after T2: the application thread (L1), the dashboard's
-Live switch on it (L2, which needs that plan's AT1), task deadlines on a Tokio
+Live switch on it (L2, which needs that plan's frame description, F1, and a first rendering placement, AT1, which Tom deferred), task deadlines on a Tokio
 timer (L3), the Chromium comparison, idle wake and frame counts on the
 web, the Web Worker as the web's application thread (W0, proposed and
 not validated), the Android and iOS contract runs after parity, and
@@ -712,7 +712,7 @@ tutorial and examples have no async content, so T2 changes nothing
 there. No bulletin documents were found in vapors, the site, touche or
 the lead's checkouts. Design 01 rule 6, design 02 "Threading" and
 `threading.md` carry a note that the 2026-11-22 decision overrides
-them; they are rewritten once AT1 is answered.
+them; they are rewritten when F1 lands.
 
 Left open by T1a-1, for T1a-2: `run_ready` inside a batch or an effect
 flush is not refused; a zero `Measured` deadline is accepted; an
