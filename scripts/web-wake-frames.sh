@@ -125,7 +125,7 @@ counts=$(sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p' "$work/wake.dom" 2>/
 took=$(( $(date +%s) - started ))
 case $counts in
   "idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2") echo "wake: $counts ($version, ${took} s)"; rm -rf "$work"; exit 0 ;;
-  '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
+  '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s), or its launch could not start (any reason is above); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
   *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2" >&2 ;;
 esac
 echo "  the page's console and Chrome's last lines:" >&2

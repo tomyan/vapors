@@ -67,7 +67,7 @@ pub fn browser_profile() -> Step {
         "browser profile",
         "scripts/browser-profile-check.sh",
         &[],
-        "each FAIL line names the guard and what happened; fix scripts/browser.sh or the page check it names",
+        "each FAIL line names the guard and what happened; fix scripts/browser.sh or the page check it names; reproduce: scripts/browser-profile-check.sh",
     );
     step.deadline = Some(std::time::Duration::from_mins(1));
     step

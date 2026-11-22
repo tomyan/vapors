@@ -81,7 +81,7 @@ for demo in $demos; do
   in_profile launch_idle "$demo" || true
   count=$(sed -n 's#.*<pre id="idle">\([^<]*\)</pre>.*#\1#p' "$work/idle.dom" 2>/dev/null) || true
   case $count in
-    '') echo "$demo: no count; the page never reported" >&2; missing=1; continue ;;
+    '') echo "$demo: no count; the page never reported, or its launch could not start (any reason is above)" >&2; missing=1; continue ;;
     refused:*) echo "$demo: $count" >&2; missing=1; continue ;;
   esac
   echo "$demo: $count frames in 3 s idle"

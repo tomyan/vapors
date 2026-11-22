@@ -467,7 +467,7 @@ console() {
 # check <page> <#status pattern> <#error: absent | hidden | pattern> [query] [directory]
 check() {
   started=$(date +%s)
-  dom=$(dump "$1" "${4:-}" "${5:-}") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  dom=$(dump "$1" "${4:-}" "${5:-}") || { fail "$1: $chrome exited non-zero or passed 60 s, or its profile could not be removed (named above)"; console "$1"; return; }
   took=$(( $(date +%s) - started ))
   status_tag=$(printf '%s' "$dom" | grep -o '<p id="status"[^>]*>[^<]*</p>' || true)
   status=$(printf '%s' "$status_tag" | sed 's#<[^>]*>##g')
@@ -560,7 +560,7 @@ printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #ad
 # focused <page> <start> <after>: the key's element and fate before and
 # after a press on #status (focus_steps).
 focused() {
-  dom=$(dump "$1") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  dom=$(dump "$1") || { fail "$1: $chrome exited non-zero or passed 60 s, or its profile could not be removed (named above)"; console "$1"; return; }
   held "$1" || return
   start=$(printf '%s' "$dom" | sed -n 's#.*data-focus-start="\([^"]*\)".*#\1#p')
   after=$(printf '%s' "$dom" | sed -n 's#.*data-focus-after="\([^"]*\)".*#\1#p')
@@ -587,7 +587,7 @@ drawn=$(printf '%s' "$dom" | sed -n 's#.*data-frames="\([0-9]*\)".*#\1#p')
 # its canvas (see vaporsOverlaps), or fails with <fix>; and nothing but
 # the demo bar outside it (vaporsOutside).
 overlap() {
-  dom=$(dump "$1" "$2") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  dom=$(dump "$1" "$2") || { fail "$1: $chrome exited non-zero or passed 60 s, or its profile could not be removed (named above)"; console "$1"; return; }
   held "$1" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1: HTML over the canvas: [${found:-not measured}]"
@@ -611,9 +611,9 @@ for demo in $demos one-scene index; do
   overlap "$demo-overlap" "$(query "$demo")" none "an element that may paint or take pointer events lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open), move it off the canvas, or give it opacity 0 and pointer-events none"
 done
 overlap overlap-refused '?demo=hello' "$refused" "vaporsOverlaps accepts or refuses the wrong elements; fix the rule in $0"
-dom=$(dump image-bar '?demo=image') || fail "image-bar: $chrome exited non-zero or passed 60 s"
+dom=$(dump image-bar '?demo=image') || fail "image-bar: $chrome exited non-zero or passed 60 s, or its profile could not be removed (named above)"
 held image-bar && bar_rules image-bar "$dom"
-dom=$(dump demo-bar '?demo=hello') || fail "demo-bar: $chrome exited non-zero or passed 60 s"
+dom=$(dump demo-bar '?demo=hello') || fail "demo-bar: $chrome exited non-zero or passed 60 s, or its profile could not be removed (named above)"
 held demo-bar || true
 bar_links=$(printf '%s' "$dom" | grep -o 'data-bar="[^"]*"' | sed 's#data-bar="\(.*\)"#\1#')
 stepped=$(printf '%s' "$dom" | grep -o 'data-stepped="[^"]*"' | sed 's#data-stepped="\(.*\)"#\1#')

@@ -75,15 +75,41 @@ expiry_profile() {
   }
 }
 
+# Seconds in_profile waits, after the launch's command returns, for any
+# process still carrying --user-data-dir=<profile> (Chromium's children
+# do) before killing it. Measured: none was left when the browser itself
+# exited, in 5 of 5 --dump-dom launches of Chromium 155 here (2026-11-22);
+# 2 s is the Rust launcher's stderr grace (chromium_process.rs).
+PROFILE_SETTLE_S=${PROFILE_SETTLE_S:-2}
+
+# settle_profile: waits up to PROFILE_SETTLE_S for the processes still
+# carrying $profile to end, then kills and names any left.
+settle_profile() {
+  settle_steps=$(awk -v s="$PROFILE_SETTLE_S" 'BEGIN { printf "%d", s * 20 }')
+  while pgrep -f -- "--user-data-dir=$profile" >/dev/null; do
+    if [ "$settle_steps" -le 0 ]; then
+      echo "processes of the browser launch still running ${PROFILE_SETTLE_S} s after it, killed so its profile can be removed: $(pgrep -f -- "--user-data-dir=$profile" | tr '\n' ' '); reproduce: pgrep -af -- '--user-data-dir=$profile'" >&2
+      pkill -KILL -f -- "--user-data-dir=$profile" || true
+      sleep 0.1
+      return
+    fi
+    settle_steps=$((settle_steps - 1))
+    sleep 0.05
+  done
+}
+
 # in_profile <command...>: runs the command with $profile naming a new
-# expiry profile, removes the profile after, and returns the command's
-# status. A profile that cannot be removed is named and the script (or
-# the subshell it runs in) exits 1. A launch that is killed leaves its
+# expiry profile, then (settle_profile) waits for the launch's processes,
+# removes the profile and returns the command's status. A profile that
+# cannot be removed is named and the shell it runs in exits 1: the script
+# when called directly, only a $(...) subshell when called in one, whose
+# caller then sees a non-zero status. A launch that is killed leaves its
 # profile for the retention job.
 in_profile() {
   profile=$(expiry_profile) || return 1
   in_profile_status=0
   "$@" || in_profile_status=$?
+  settle_profile
   if ! rm -rf -- "$profile" 2>/dev/null || [ -e "$profile" ]; then
     echo "the browser profile $profile could not be removed; fix: remove it by hand (the retention job removes it after its expiry date otherwise); reproduce: rm -r '$profile'" >&2
     exit 1

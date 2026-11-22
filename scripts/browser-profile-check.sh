@@ -9,6 +9,9 @@
 # Usage: scripts/browser-profile-check.sh
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
+# The removal-failure case relies on a directory mode of 500 stopping its
+# owner deleting inside it, which root ignores.
+[ "$(id -u)" != 0 ] || { echo "FAIL run as a normal user, not root: root removes a mode-500 directory, so the removal-failure case cannot be made; reproduce: id -u" >&2; exit 1; }
 work=$(mktemp -d)
 trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf "$work"' EXIT
 failed=0
@@ -37,7 +40,7 @@ made=$(XDG_CACHE_HOME=relative HOME="$work/home" expiry_profile) || fail "expiry
 if XDG_CACHE_HOME= HOME=relative expiry_profile >/dev/null 2>"$work/err"; then
   fail "expiry_profile made a profile with neither XDG_CACHE_HOME nor HOME absolute"
 fi
-grep -q XDG_CACHE_HOME "$work/err" && grep -q HOME "$work/err" || fail "the refusal does not name XDG_CACHE_HOME and HOME: $(cat "$work/err")"
+grep -q XDG_CACHE_HOME "$work/err" && grep -q "nor HOME" "$work/err" || fail "the refusal does not name XDG_CACHE_HOME and HOME: $(cat "$work/err")"
 
 # in_profile: the command sees $profile made, it is gone after, and the
 # command's status is returned.
@@ -60,6 +63,21 @@ status=0
 [ "$status" = 1 ] || fail "in_profile exited $status, not 1, when the profile could not be removed"
 grep -q "$work/cache/chromium-headless/expires-" "$work/err" || fail "the removal failure does not name the profile: $(cat "$work/err")"
 
+# A process of the launch that outlives it (Chromium's children carry
+# --user-data-dir=<profile>): waited for up to PROFILE_SETTLE_S, then
+# killed and named, before the profile is removed.
+linger() { (exec -a "fake-chromium --user-data-dir=$profile" sleep "$1") & echo $! >"$work/linger.pid"; }
+PROFILE_SETTLE_S=0.5 XDG_CACHE_HOME="$work/settle" in_profile linger 0.2 2>"$work/err" || fail "in_profile failed for a child that ended within the deadline: $(cat "$work/err")"
+[ ! -s "$work/err" ] || fail "in_profile reported a child that ended within the deadline: $(cat "$work/err")"
+status=0
+PROFILE_SETTLE_S=0.3 XDG_CACHE_HOME="$work/settle" in_profile linger 30 2>"$work/err" || status=$?
+pid=$(cat "$work/linger.pid")
+sleep 0.1
+if kill -0 "$pid" 2>/dev/null; then fail "in_profile left process $pid, still carrying its profile, running"; kill "$pid"; fi
+grep -q "still running" "$work/err" || fail "in_profile did not name the process it killed: $(cat "$work/err")"
+[ "$status" = 0 ] || fail "in_profile returned $status after killing a leftover process of a command that exited 0"
+[ -z "$(ls "$work/settle/chromium-headless")" ] || fail "in_profile left a profile: $(ls "$work/settle/chromium-headless")"
+
 # A root that cannot be made: refused naming it, the command not run.
 touch "$work/file"
 rm -f "$work/seen"
@@ -73,22 +91,33 @@ grep -q "$work/file/chromium-headless" "$work/err" || fail "the refusal does not
 rust=$(sed -n 's/^const RETENTION_DAYS: u64 = \([0-9]*\);$/\1/p' "$here/../crates/text/src/comparison/chromium_profile.rs")
 [ -n "$rust" ] && [ "$rust" = "$PROFILE_RETENTION_DAYS" ] || fail "PROFILE_RETENTION_DAYS ($PROFILE_RETENTION_DAYS, scripts/browser.sh) differs from RETENTION_DAYS (${rust:-not found}, crates/text/src/comparison/chromium_profile.rs)"
 
-# Every headless launch in the page checks is in a function that passes
-# --user-data-dir="$profile" and is only ever called through in_profile.
-for script in check-page-contract.sh web-idle-frames.sh web-wake-frames.sh; do
-  launches=$(awk '/^[a-z_]+\(\) \{/ { fn = $1; sub(/\(\)/, "", fn) } /^\}/ { fn = "" }
-    /"\$chrome" --headless/ { print (fn == "" ? "-" : fn) }' "$here/$script" | sort -u)
-  [ -n "$launches" ] || fail "$script: no headless launch found"
-  for fn in $launches; do
-    [ "$fn" != - ] || { fail "$script: a headless launch outside a function"; continue; }
-    body=$(awk -v fn="$fn" '$0 ~ "^" fn "\\(\\) \\{" { on = 1 } on { print } on && /^\}/ { exit }' "$here/$script")
-    grep -qF -- '--user-data-dir="$profile"' <<<"$body" || fail "$script: $fn launches the browser without --user-data-dir=\"\$profile\""
-    calls=$(grep -nwE -- "$fn" "$here/$script" | grep -vE "^[0-9]+:$fn\(\) \{" | grep -vE "^[0-9]+:\s*#" || true)
-    [ -n "$calls" ] || fail "$script: $fn is never called"
-    while IFS= read -r call; do
-      [ -z "$call" ] || grep -qE "in_profile $fn( |$)" <<<"$call" || fail "$script: $fn called without in_profile: $call"
-    done <<<"$calls"
-  done
-done
+# Every headless browser launch in scripts/*.sh (a command, its
+# backslash-continued lines joined, naming --headless) is in a function
+# that passes --user-data-dir="$profile" in that command and is only ever
+# called through in_profile.
+# Relaxed: web-text-input.sh keeps its own $work/profile until slice 6 of
+# the expiry-profile plan (PLAN in the retention project) moves it;
+# remove it from this list then.
+relaxed=" web-text-input.sh "
+for script in "$here"/*.sh; do
+  name=$(basename "$script")
+  case $relaxed in *" $name "*) continue ;; esac
+  [ "$name" != browser-profile-check.sh ] || continue
+  awk -v file="$name" '
+    /^[A-Za-z_][A-Za-z0-9_]*\(\) \{/ { fn = $1; sub(/\(\).*/, "", fn) }
+    { line = (cont ? line " " : "") $0; start = cont ? start : NR; cont = /\\$/ }
+    !cont { if (line !~ /^[ \t]*#/ && line ~ /--headless/) print file ":" start ":" (fn == "" ? "-" : fn) ":" (index(line, "--user-data-dir=\"$profile\"") ? "flag" : "none"); line = "" }
+    /^\}/ { fn = "" }' "$script"
+done >"$work/launches"
+while IFS=: read -r name line fn flag; do
+  [ "$fn" != - ] || { fail "$name:$line: a headless launch outside a function"; continue; }
+  [ "$flag" = flag ] || fail "$name:$line: $fn launches the browser without --user-data-dir=\"\$profile\" in that command"
+  calls=$(grep -nwE -- "$fn" "$here/$name" | grep -vE "^[0-9]+:$fn\(\) \{" | grep -vE "^[0-9]+:\s*#" || true)
+  [ -n "$calls" ] || fail "$name: $fn is never called"
+  while IFS= read -r call; do
+    [ -z "$call" ] || grep -qE "in_profile $fn( |$)" <<<"$call" || fail "$name: $fn called without in_profile: $call"
+  done <<<"$calls"
+done <"$work/launches"
+[ -s "$work/launches" ] || fail "no headless launch found in scripts/*.sh; the scan is broken"
 
 exit "$failed"
