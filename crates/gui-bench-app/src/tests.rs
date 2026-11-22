@@ -6,6 +6,8 @@ mod chart_oracle;
 mod chart_rows;
 mod content_rows;
 mod controls_behaviour;
+mod data_colours;
+mod data_colours_oracle;
 mod filter_rows;
 mod layout;
 mod live_behaviour;
