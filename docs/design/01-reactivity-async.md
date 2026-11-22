@@ -146,6 +146,8 @@ unmounting the root, because the rule here is that failure is loud.
 
 ### 6. Where futures run
 
+> Overridden on desktop by Tom's decision of 2026-11-22: app-authored code, including handlers and every continuation after an `.await`, runs on a dedicated application thread with Tokio timers and IO, and winit owns the UI thread. What else moves is open; see `docs/plans/desktop-app-thread.md`, AT1. This section is rewritten once AT1 is answered.
+
 All futures that touch signals run on the UI thread's executor, which
 is part of the scheduler (area 2): one task queue drained in the frame
 loop between input and update. There is no multi-threaded executor

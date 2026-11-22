@@ -20,6 +20,8 @@ take owned data in and give owned data out, and wake the loop through
 `Waker`. Where this plan says more than that page, it says so; where it
 would differ, section 6 asks.
 
+> Overridden on desktop by Tom's decision of 2026-11-22: app-authored code, including handlers and every continuation after an `.await`, runs on a dedicated application thread with Tokio timers and IO, and winit owns the UI thread. What else moves is open; see `docs/plans/desktop-app-thread.md`, AT1. The rule above and this plan are rewritten once AT1 is answered.
+
 Binding rules it is written under: runtime performance first (an
 edit's cost flat in page size; idle does nothing); no API whose effect
 the compiler's analysis cannot see

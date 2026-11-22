@@ -7,6 +7,14 @@ here is built. Read from the code at 90d1c8a (vapors main, 2026-11-12)
 and touche main at ea2bb08. Line counts per PR are estimates. No build
 was run for this plan.
 
+> Desktop threading changed (Tom, 2026-11-22): app-authored code,
+> including handlers and every continuation after an `.await`, runs on
+> a dedicated application thread with Tokio timers and IO; winit owns
+> the UI thread, and winit deadlines do not time background tasks.
+> `docs/plans/desktop-app-thread.md` records what that overrides here
+> (section 1's sixth "Decided" bullet, section 3.3's poll on the winit
+> thread, section 4's arming, T3) and the decisions it needs first.
+
 What this plan adds to `docs/design/01-reactivity-async.md` (2026-10-25,
 decided with `QUESTIONS.md` Q3, Q5 and Q6) and
 `docs/design/02-scheduler-frame-threading.md`: the shapes as code
@@ -240,8 +248,11 @@ pub enum Deadline {
   deadline wins, touche's `within` rule (`runtime/timer.rs`: "The work
   is polled first, so work that is already done wins over a zero
   limit").
-- Arming: a deadline needs a frame at its time if nothing else
-  happens. `ElementsApp::next_after_frame`
+- Arming (withdrawn for desktop, 2026-11-22: a task's deadline is
+  timed by a Tokio timer on the application thread, L3 in
+  `desktop-app-thread.md`; what follows is kept as written): a
+  deadline needs a frame at its time if nothing else happens.
+  `ElementsApp::next_after_frame`
   (`crates/app/src/elements_app_decision.rs`) already returns
   `Next::WaitUntil` for the tooltip's deadline; it takes the earlier of
   that and `earliest_deadline()`. A task spawned from a handler that
@@ -548,7 +559,7 @@ checked against what it found.
 |---|---|---|---|---|
 | T1 | `vapors_signals`: `spawn`, `Task`, the arena, the ready list, `run_ready`, the wake hook; tasks on `OwnerNode`, dropped in `Released::finish`; `Deadline` as a type carried but not yet judged | The executor tests in section 12; a task's drop at disposal proven by a future that would have written a signal; the `!Send` of the task future asserted with a negative impl check, which design 02's threading oracle asks for the graph's types and is not built yet | none | C1 |
 | T2 | `App::tasks_woken`, `ElementsApp` installing the hook, `run_ready` on a wake, a frame only on change; `Phase::Tasks` time; `idle_fps` case | 0 frames in 3 s with a pending task natively; 1 frame per task that changes the tree; the wake-without-change case 0 frames | T1 | C1 |
-| T3 | Deadlines judged: `earliest_deadline`, `Platform::request_frame_at`, the handler's `WaitUntil` after an event, the refusal message | The stepped-clock tests; the frame at the deadline pinned; the work-first rule proven by a task that completes exactly at the deadline | T2 | C1, W1 |
+| T3 | Withdrawn as written (2026-11-22): winit deadlines do not time tasks. Replaced by L3 in `desktop-app-thread.md`: deadlines judged on the application thread with a Tokio timer for `earliest_deadline`, the refusal message, no `Platform::request_frame_at` | A paused Tokio clock: a task past its deadline refused naming its site and duration; the work-first rule proven by a task that completes exactly at the deadline | L1, AT2 of `desktop-app-thread.md` | C1, W1 |
 | W1 | The `task` demo on the web page and its page-contract case; `JsFuture` through the executor; hop latency recorded | `web-idle-frames.sh` 0 with a pending task; 1 frame per resolution; latency in `docs/web.md` | T2 | T3 |
 | C1 | Compiler: parse `{await}`, `{then}`, `{catch}`, `within=`; the AST node; refusals with positions; no emission yet (a refusal "await blocks are parsed and not yet built" at generation, so nothing half-works) | `wisp-check` cases for every refusal; the parse pinned by AST tests | none | T1 to T3 |
 | C2 | `vapors_dom::blocks::awaiting` and the emission; `expressions_in` for the block; the counter-style snapshot | The `RecordingDom` sequences in section 12; unmount while pending; the second-future rule | T3, C1 | R1 |
@@ -682,14 +693,26 @@ exercised until its row lands and its check runs.
 | T1a-1 | `vapors_signals`: `spawn` (calls the wake hook; refused with no hook or a disposed owner), `Task::deadline`, `Deadline` (carried; nothing enforces it until T3), `run_ready`, `set_wake_hook`; tasks dropped with their owner | None: unit tests with a manual waker. No desktop, web, Android or iOS run |
 | Timer (controlled clock, part) | `crates/signals/tests/tasks_interval.rs` with a test-only `Clock` (`tests/common/clock.rs`): the Live loop is an ordinary `.await` in an owner-scoped task over the merged spawn, wake hook and `run_ready`. Proven: 100 ms tick shows the value; a late tick shows the current value once and re-arms a full period on (no burst, this dashboard's policy only); disposal cancels pending work even with a wake queued, leaving no armed timer; re-enable arms exactly one fresh timer. No new public API | None: manual clock only. No desktop, web, Android or iOS run |
 | T2 | `Platform::task_waker` posts `Wake::Tasks`, delivered to `App::tasks_woken`; `Platform::waker`'s wakes still ask for a frame without reaching the app. `ElementsApp::new` installs the executor's wake hook once per thread; a wake polls `run_ready` before any frame and asks for a frame only when the document changed or a task ended (completed or failed, its `Err` reported naming its spawn site). `Phase::Tasks` holds the polls' time since the last frame. `OneScene`, `Racer` and the app examples that wrap an `ElementsApp` forward `tasks_woken`. Proven: `crates/app/tests/elements_app_tasks.rs`, `crates/platform/src/waker_tests.rs`, the wrapper tests in `vapors-racer` and `vapors-one-scene`, each broken and restored | Desktop (Linux, Xvfb, llvmpipe): `idle_fps` `task-pending` 0 frames in 3 s, `task-quiet` 0 frames over 5 wakes, `task-change` 5 frames over 6 wakes (exits 1 with fewer than 2 wakes); `surface_gradient --check` unchanged. No web, Android or iOS run |
-| T3, host Timer, W1, Mobile, C1, C2, S1 | Not started | None |
+| L1 (takes the host Timer row), L2, L3 (replaces T3), W0, W1, Mobile, C1, C2, S1 | Not started. L1 to L3 and W0 are in `desktop-app-thread.md`; L1 is the next slice, waiting on that plan's decisions AT2 to AT5 | None |
 
-Still open after the Timer part: the host-neutral deadline hook
-(`earliest_deadline`, `Platform::request_frame_at`, a browser timer on
-the web), the dashboard's Live switch
-wired to it, the Chromium comparison, idle wake and frame counts on
-desktop and web, the Android and iOS contract runs, and the "Test iOS
-host" workflow (a `.github` change for the lead).
+Still open after T2: the application thread (L1), the dashboard's
+Live switch on it (L2, which needs that plan's AT1), task deadlines on a Tokio
+timer (L3), the Chromium comparison, idle wake and frame counts on the
+web, the Web Worker as the web's application thread (W0, proposed and
+not validated), the Android and iOS contract runs after parity, and
+the "Test iOS host" workflow (a `.github` change for the lead).
+
+Docs handoff for T2 (merged as ba482514, #599): the mechanism is in
+section 3.3 and D8, and its proof and measured idle counts are in the
+T2 row above and in #599's description, which also records the review
+and the gate. `CLAUDE.md` lists the `idle_fps` task cases. The site
+(`~/projects/vapors-site`) is pinned to vapors 40f410f7 (2026-11-18,
+`src/lib/content/framework.json`), before T1 and T2, and its guide,
+tutorial and examples have no async content, so T2 changes nothing
+there. No bulletin documents were found in vapors, the site, touche or
+the lead's checkouts. Design 01 rule 6, design 02 "Threading" and
+`threading.md` carry a note that the 2026-11-22 decision overrides
+them; they are rewritten once AT1 is answered.
 
 Left open by T1a-1, for T1a-2: `run_ready` inside a batch or an effect
 flush is not refused; a zero `Measured` deadline is accepted; an
