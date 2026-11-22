@@ -24,6 +24,35 @@ pub(super) fn launch_tmp() -> Result<tempfile::TempDir, ChromiumError> {
         })
 }
 
+/// Contain `command`'s disk cache in `tmp`, the launch's own directory:
+/// `XDG_CACHE_HOME` and `--disk-cache-dir` both name `tmp/cache`, so
+/// nothing lands in the caller's `~/.cache` and it goes with `tmp`.
+///
+/// # Errors
+///
+/// [`ChromiumError::Failed`] when the directory cannot be made.
+pub(super) fn contain_cache(
+    command: &mut std::process::Command,
+    tmp: &std::path::Path,
+) -> Result<(), ChromiumError> {
+    let cache = tmp.join("cache");
+    std::fs::create_dir(&cache).map_err(|e| {
+        ChromiumError::Failed(format!(
+            "a disk cache for it at {}: {e}. Fix: free space or inodes under {}",
+            cache.display(),
+            std::env::temp_dir().display()
+        ))
+    })?;
+    command
+        .env("XDG_CACHE_HOME", &cache)
+        .arg(format!("--disk-cache-dir={}", cache.display()));
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "chromium_tmp_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "chromium_cache_tests.rs"]
+mod cache_tests;
