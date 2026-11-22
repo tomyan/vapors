@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
+use super::chromium_process::{DEADLINE, check_size, drain, finish, remove_stale};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
 use super::png_file::read_png;
@@ -16,19 +16,11 @@ use super::png_file::read_png;
 /// Environment variable naming the browser binary, overriding the search.
 pub const CHROMIUM_ENV: &str = "VAPORS_CHROMIUM";
 
-/// Binary names tried on `PATH`, in order.
-const CANDIDATES: [&str; 4] = [
-    "chromium",
-    "chromium-browser",
-    "google-chrome",
-    "google-chrome-stable",
-];
-
 /// Why Chromium could not be used.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChromiumError {
-    /// No binary found.
-    NotFound,
+    /// The pinned build is not installed at this path, and no override.
+    NotFound(PathBuf),
     /// It ran and failed, or produced the wrong thing.
     Failed(String),
 }
@@ -36,11 +28,12 @@ pub enum ChromiumError {
 impl fmt::Display for ChromiumError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotFound => write!(
+            Self::NotFound(pinned) => write!(
                 f,
-                "no Chromium found: tried {} on PATH. Fix: install chromium, or set {CHROMIUM_ENV} \
-                 to the browser binary.",
-                CANDIDATES.join(", ")
+                "the pinned Chromium is not installed at {}. Fix: cargo xtask setup (it installs \
+                 [downloads] chromium from .config/tools.toml), or set {CHROMIUM_ENV} to a browser \
+                 binary for a diagnosis by hand.",
+                pinned.display()
             ),
             Self::Failed(message) => write!(f, "chromium: {message}"),
         }
@@ -57,26 +50,25 @@ pub struct Chromium {
 }
 
 impl Chromium {
-    /// `VAPORS_CHROMIUM`, else the first candidate on `PATH`.
+    /// `VAPORS_CHROMIUM`, else the pinned build (`chromium_pin.rs`), the
+    /// same binary on every machine. No browser on `PATH` is used.
     ///
     /// # Errors
     ///
-    /// [`ChromiumError::NotFound`], naming what was tried and the fix.
+    /// [`ChromiumError::NotFound`] when the pinned build is not installed,
+    /// naming its path and the fix.
     pub fn find() -> Result<Self, ChromiumError> {
-        if let Some(binary) = std::env::var_os(CHROMIUM_ENV) {
-            return Ok(Self {
-                binary: PathBuf::from(binary),
-                deadline: DEADLINE,
-            });
-        }
-        CANDIDATES
-            .iter()
-            .find_map(|name| on_path(name))
-            .map(|binary| Self {
-                binary,
-                deadline: DEADLINE,
-            })
-            .ok_or(ChromiumError::NotFound)
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        let binary = super::chromium_pin::resolve(
+            std::env::var_os(CHROMIUM_ENV),
+            home.as_deref(),
+            Path::is_file,
+        )
+        .map_err(ChromiumError::NotFound)?;
+        Ok(Self {
+            binary,
+            deadline: DEADLINE,
+        })
     }
 
     /// Screenshot `html` at `width` by `height` CSS pixels at `scale`
