@@ -58,3 +58,19 @@ pub fn shifted_down(image: &Rgba) -> Rgba {
     data.extend_from_slice(&image.data[..image.data.len() - row]);
     Rgba { data, ..*image }
 }
+
+/// `image` moved right one column, its left column white: every glyph a
+/// device pixel further right.
+pub fn shifted_right(image: &Rgba) -> Rgba {
+    let row = (image.width * 4) as usize;
+    let data = image
+        .data
+        .chunks(row)
+        .flat_map(|line| {
+            [255, 255, 255, 255]
+                .into_iter()
+                .chain(line[..row - 4].iter().copied())
+        })
+        .collect();
+    Rgba { data, ..*image }
+}

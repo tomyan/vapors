@@ -36,6 +36,7 @@ pub mod paint_check;
 pub mod paint_reference;
 mod paint_reference_capture;
 mod paint_reference_inputs;
+mod sha256;
 pub mod web_input;
 
 /// Mounts a fixture's component into `parent`.

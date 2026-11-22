@@ -14,7 +14,8 @@ use vapors_text::comparison::{Rgba, read_png};
 
 use crate::oracle::fixtures_dir;
 pub use crate::paint_reference_capture::capture;
-pub use crate::paint_reference_inputs::{expected, pinned, sha256};
+pub use crate::paint_reference_inputs::{expected, pinned};
+use crate::sha256::sha256;
 
 /// The paint fixtures' window, in CSS pixels: the live screenshots' and
 /// the saved references'.
@@ -103,6 +104,12 @@ fn stale(manifest: &Map<String, Value>, expected: &Map<String, Value>) -> Result
             Some(saved) => format!("`{field}` is {saved}, now {now}"),
         })
         .collect();
+    found.extend(
+        UNCHECKED
+            .iter()
+            .filter(|field| !manifest.contains_key(**field))
+            .map(|field| format!("no `{field}` (recorded, not compared)")),
+    );
     found.extend(
         manifest
             .keys()

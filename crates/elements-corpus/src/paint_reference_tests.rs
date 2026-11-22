@@ -189,32 +189,37 @@ fn a_png_of_another_size_than_the_manifests_is_refused() {
 }
 
 #[test]
-fn the_pin_read_here_is_the_build_vapors_text_launches() {
-    // Given
-    let version = pinned("version").expect("pinned");
+fn a_manifest_that_lacks_a_field_the_tree_holds_is_refused_naming_it() {
+    // Given: a manifest captured before `flags` was recorded
+    let dir = scratch();
+    let mut saved = fields();
+    saved.remove("flags");
+    saved_into(dir.path(), &saved, &image());
 
     // When
-    let launched = vapors_text::comparison::pinned_binary(Path::new("/home"));
+    let refused = check(dir.path(), "tiny", 1, &fields()).expect_err("refused");
 
     // Then
-    let expected = format!("/home/.local/share/factory/chromium-{version}/");
     assert!(
-        launched.to_string_lossy().starts_with(&expected),
-        "{launched:?}, {expected}"
+        refused.contains("stale: no `flags` (now [\"--headless=new\"])"),
+        "{refused}"
     );
 }
 
 #[test]
-fn the_trees_fields_record_the_pinned_browser_and_its_render_flags() {
+fn a_manifest_without_its_capture_host_is_refused() {
+    // Given
+    let dir = scratch();
+    saved_into(dir.path(), &fields(), &image());
+    let path = dir.path().join("tiny_1x.json");
+    let text = std::fs::read_to_string(&path).expect("manifest");
+    let mut manifest: Map<String, Value> = serde_json::from_str(&text).expect("json");
+    manifest.remove("host");
+    std::fs::write(&path, serde_json::to_string(&manifest).expect("json")).expect("write");
+
     // When
-    let fields = expected("text_line_box_paint", 2).expect("fields");
+    let refused = check(dir.path(), "tiny", 1, &fields()).expect_err("refused");
 
     // Then
-    let flags = vapors_text::comparison::render_flags(WIDTH, HEIGHT, 2.0);
-    assert_eq!(fields["flags"], json!(flags));
-    assert_eq!(
-        fields["browser"]["version"],
-        json!(pinned("version").expect("pinned"))
-    );
-    assert_eq!(fields["fonts"].as_object().map(Map::len), Some(2));
+    assert!(refused.contains("no `host`"), "{refused}");
 }

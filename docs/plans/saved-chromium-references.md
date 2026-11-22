@@ -62,11 +62,28 @@ and every other fixture would stay live until later slices.
 Tests:
 
 - unit (`paint_reference` in vapors-elements-corpus): a missing manifest,
-  a missing PNG, each stale field, and a PNG hash mismatch are each
-  refused with the file, field and command; a matching manifest gives the
-  decoded image; the pin read from tools.toml is `chromium_pin`'s.
+  a missing PNG, each stale field, a field the manifest lacks, a missing
+  `host`, an unrecognised field, and a PNG of another hash or size are
+  each refused with the file, field and command; a matching manifest
+  gives the decoded image; the pin read from tools.toml is
+  `chromium_pin`'s; a capture of a fixture that is not a paint fixture,
+  or at scale 0, is refused before any browser starts.
 - gpu: the two 2x tests of `text_line_box_paint` pass from the saved
-  reference; the shifted reference is refused.
+  reference; the reference moved one device row down, or one device
+  column right, is refused.
+
+Known limits, from review:
+
+- A capture checks the sha256 of the Chromium executable only. A copy of
+  the pinned executable beside other `.pak` or `.so` files would be
+  accepted. Rendering inputs outside the page (system fallback fonts,
+  fontconfig) are recorded only in `host`, which is not compared.
+- The corpus parses `[downloads] chromium.*` itself, mirroring
+  `chromium_pin::pinned_field`. A test holds the version it reads to
+  `chromium_pin::pinned_binary`. Making `pinned_field` public in #610
+  would leave one parser.
+- `sha256` waits on `sha256sum` without a deadline, as xtask's does; it
+  reads a file or a pipe this process has already closed.
 
 ## Next slices (to replan after R1)
 
