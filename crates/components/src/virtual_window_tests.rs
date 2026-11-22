@@ -142,3 +142,16 @@ fn a_negative_window_height_is_refused() {
 fn a_negative_offset_is_refused() {
     let _ = small().rows(-1.0, 20);
 }
+
+#[test]
+#[should_panic(expected = "2 rows of 340282350000000000000000000000000000000 px")]
+fn a_height_past_the_largest_f32_is_refused() {
+    // Two rows of the largest f32 overflow to infinity
+    let _ = Window::new(f32::MAX, 60.0, 1).px(2);
+}
+
+#[test]
+#[should_panic(expected = "past 2^53")]
+fn a_count_past_2_to_the_53_is_refused() {
+    let _ = Window::new(1.0, 60.0, 1).px((1 << 53) + 1);
+}

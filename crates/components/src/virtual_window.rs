@@ -66,6 +66,10 @@ impl Window {
     #[must_use]
     pub fn px(&self, rows: usize) -> f32 {
         assert!(
+            rows <= MAX_ROWS,
+            "VirtualList: {rows} rows is past 2^53, where a row count has no exact f64 and the height cannot be checked; use fewer rows (cargo test -p vapors-components virtual_window)"
+        );
+        assert!(
             self.holds(rows),
             "VirtualList: {rows} rows of {} px reach {} px, where an f32 places a row only to {} px (more than 1/128); use fewer rows, or a row height with a short binary fraction (33.25 or 33.5, not 33.3) (cargo test -p vapors-components virtual_window)",
             self.row_height,
@@ -80,19 +84,24 @@ impl Window {
     /// the largest odd count's does (a product's odd part is its count's
     /// odd part times the row height's mantissa), or half the f32 step
     /// at `rows`' height, the most any product up to it rounds, is
-    /// within the bound. Both only fail more as `rows` rises.
+    /// within the bound. Both only fail more as `rows` rises, as does the
+    /// height overflowing an f32, which never holds.
     fn holds(&self, rows: usize) -> bool {
         let largest_odd = if rows.is_multiple_of(2) {
             rows.saturating_sub(1)
         } else {
             rows
         };
-        self.exact(largest_odd) || self.half_step(rows) <= MAX_ROUNDING
+        let finite = narrow(self.product(rows)).is_finite();
+        finite && (self.exact(largest_odd) || self.half_step(rows) <= MAX_ROUNDING)
     }
 
     /// The exact height of `rows` rows.
     fn product(&self, rows: usize) -> f64 {
-        #[allow(clippy::cast_precision_loss, reason = "a row count is far below 2^53")]
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "`px` refuses a count past MAX_ROWS, 2^53, before any product"
+        )]
         let count = rows as f64;
         count * f64::from(self.row_height)
     }
@@ -119,6 +128,10 @@ impl Window {
 /// exact edge lies within 1/128 px of a snapping boundary; a height of
 /// 33.3 px rounds by about 1e-6 at three rows and is not refused.
 const MAX_ROUNDING: f64 = 1.0 / 128.0;
+
+/// The most rows `Window::px` checks: 2^53, the last count an f64 holds
+/// exactly, so every product it forms is the exact one rounded once.
+const MAX_ROWS: usize = 1 << 53;
 
 /// `px` to the nearest f32.
 fn narrow(px: f64) -> f32 {
