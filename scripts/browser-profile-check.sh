@@ -75,8 +75,16 @@ pid=$(cat "$work/linger.pid")
 sleep 0.1
 if kill -0 "$pid" 2>/dev/null; then fail "in_profile left process $pid, still carrying its profile, running"; kill "$pid"; fi
 grep -q "still running" "$work/err" || fail "in_profile did not name the process it killed: $(cat "$work/err")"
-[ "$status" = 0 ] || fail "in_profile returned $status after killing a leftover process of a command that exited 0"
+[ "$status" = 1 ] || fail "in_profile returned $status, not 1, after killing a leftover process of a command that exited 0"
 [ -z "$(ls "$work/settle/chromium-headless")" ] || fail "in_profile left a profile: $(ls "$work/settle/chromium-headless")"
+
+# A profile path with regex metacharacters is still matched literally.
+status=0
+PROFILE_SETTLE_S=0.3 XDG_CACHE_HOME="$work/c[a]che+" in_profile linger 30 2>"$work/err" || status=$?
+pid=$(cat "$work/linger.pid")
+sleep 0.1
+if kill -0 "$pid" 2>/dev/null; then fail "in_profile missed process $pid under a profile path with [ ] +"; kill "$pid"; fi
+[ "$status" = 1 ] || fail "in_profile returned $status under a profile path with [ ] +: $(cat "$work/err")"
 
 # A root that cannot be made: refused naming it, the command not run.
 touch "$work/file"
@@ -91,10 +99,15 @@ grep -q "$work/file/chromium-headless" "$work/err" || fail "the refusal does not
 rust=$(sed -n 's/^const RETENTION_DAYS: u64 = \([0-9]*\);$/\1/p' "$here/../crates/text/src/comparison/chromium_profile.rs")
 [ -n "$rust" ] && [ "$rust" = "$PROFILE_RETENTION_DAYS" ] || fail "PROFILE_RETENTION_DAYS ($PROFILE_RETENTION_DAYS, scripts/browser.sh) differs from RETENTION_DAYS (${rust:-not found}, crates/text/src/comparison/chromium_profile.rs)"
 
-# Every headless browser launch in scripts/*.sh (a command, its
-# backslash-continued lines joined, naming --headless) is in a function
-# that passes --user-data-dir="$profile" in that command and is only ever
-# called through in_profile.
+# Every headless browser launch in scripts/*.sh is in a function that
+# passes --user-data-dir="$profile" in that command and is only ever
+# called through in_profile. A command is a line with its backslash
+# continuations joined and a trailing " # ..." comment removed, split at
+# ; && || and |; a launch is a command naming --headless.
+# Limits: only *.sh is scanned (scripts/chromium-focus-fixup.mjs keeps its
+# own $work/profile until slice 6, like web-text-input.sh below); a
+# function ends at a "}" in column one, so one closed by an indented "}"
+# is blamed for the next top-level launch (still a failure).
 # Relaxed: web-text-input.sh keeps its own $work/profile until slice 6 of
 # the expiry-profile plan (PLAN in the retention project) moves it;
 # remove it from this list then.
@@ -106,7 +119,15 @@ for script in "$here"/*.sh; do
   awk -v file="$name" '
     /^[A-Za-z_][A-Za-z0-9_]*\(\) \{/ { fn = $1; sub(/\(\).*/, "", fn) }
     { line = (cont ? line " " : "") $0; start = cont ? start : NR; cont = /\\$/ }
-    !cont { if (line !~ /^[ \t]*#/ && line ~ /--headless/) print file ":" start ":" (fn == "" ? "-" : fn) ":" (index(line, "--user-data-dir=\"$profile\"") ? "flag" : "none"); line = "" }
+    !cont {
+      if (line !~ /^[ \t]*#/) {
+        sub(/[ \t]+#.*$/, "", line)
+        n = split(line, cmds, /;|&&|\|\||\|/)
+        for (i = 1; i <= n; i++) if (cmds[i] ~ /--headless/)
+          print file ":" start ":" (fn == "" ? "-" : fn) ":" (index(cmds[i], "--user-data-dir=\"$profile\"") ? "flag" : "none")
+      }
+      line = ""
+    }
     /^\}/ { fn = "" }' "$script"
 done >"$work/launches"
 while IFS=: read -r name line fn flag; do

@@ -76,22 +76,35 @@ expiry_profile() {
 }
 
 # Seconds in_profile waits, after the launch's command returns, for any
-# process still carrying --user-data-dir=<profile> (Chromium's children
-# do) before killing it. Measured: none was left when the browser itself
-# exited, in 5 of 5 --dump-dom launches of Chromium 155 here (2026-11-22);
-# 2 s is the Rust launcher's stderr grace (chromium_process.rs).
+# process still carrying the profile's path (Chromium's children name it
+# in --user-data-dir=) before killing it. Measured with Chromium 155 here
+# (2026-11-22): none was left after 5 normal --dump-dom exits nor after 5
+# exits on TERM (what `timeout` sends); after a KILL of the browser
+# process its 9 children were gone within 103 to 173 ms (3 runs). 2 s is
+# about 12 times the worst.
 PROFILE_SETTLE_S=${PROFILE_SETTLE_S:-2}
 
-# settle_profile: waits up to PROFILE_SETTLE_S for the processes still
-# carrying $profile to end, then kills and names any left.
+# profile_processes: lists (pgrep -af) the processes naming $profile, its
+# path matched literally; status 1 when there are none. A pgrep error
+# stops the script, so a broken search is never read as "none left".
+profile_processes() {
+  profile_pattern=$(printf '%s' "$profile" | sed 's/[][\.*^$+?(){}|]/\\&/g')
+  pgrep -af -- "$profile_pattern"
+  profile_search=$?
+  [ "$profile_search" -le 1 ] || { echo "pgrep failed ($profile_search) searching for processes of the browser profile $profile; fix: check pgrep (procps) works; reproduce: pgrep -af -- '$profile_pattern'" >&2; exit 1; }
+  return "$profile_search"
+}
+
+# settle_profile: waits up to PROFILE_SETTLE_S for the processes naming
+# $profile to end; any left are listed, killed, and the status is 1.
 settle_profile() {
   settle_steps=$(awk -v s="$PROFILE_SETTLE_S" 'BEGIN { printf "%d", s * 20 }')
-  while pgrep -f -- "--user-data-dir=$profile" >/dev/null; do
+  while left=$(profile_processes); do
     if [ "$settle_steps" -le 0 ]; then
-      echo "processes of the browser launch still running ${PROFILE_SETTLE_S} s after it, killed so its profile can be removed: $(pgrep -f -- "--user-data-dir=$profile" | tr '\n' ' '); reproduce: pgrep -af -- '--user-data-dir=$profile'" >&2
-      pkill -KILL -f -- "--user-data-dir=$profile" || true
-      sleep 0.1
-      return
+      echo "processes of the browser launch still running ${PROFILE_SETTLE_S} s after it, killed so its profile can be removed: $(printf '%s' "$left" | tr '\n' ';'); fix: find why the browser's processes outlived it; reproduce: run the check again" >&2
+      printf '%s\n' "$left" | awk '{print $1}' | xargs -r kill -KILL 2>/dev/null || true
+      sleep 0.2
+      return 1
     fi
     settle_steps=$((settle_steps - 1))
     sleep 0.05
@@ -100,7 +113,8 @@ settle_profile() {
 
 # in_profile <command...>: runs the command with $profile naming a new
 # expiry profile, then (settle_profile) waits for the launch's processes,
-# removes the profile and returns the command's status. A profile that
+# removes the profile and returns the command's status (1 if it had to
+# kill processes the launch left behind). A profile that
 # cannot be removed is named and the shell it runs in exits 1: the script
 # when called directly, only a $(...) subshell when called in one, whose
 # caller then sees a non-zero status. A launch that is killed leaves its
@@ -109,7 +123,7 @@ in_profile() {
   profile=$(expiry_profile) || return 1
   in_profile_status=0
   "$@" || in_profile_status=$?
-  settle_profile
+  settle_profile || [ "$in_profile_status" -ne 0 ] || in_profile_status=1
   if ! rm -rf -- "$profile" 2>/dev/null || [ -e "$profile" ]; then
     echo "the browser profile $profile could not be removed; fix: remove it by hand (the retention job removes it after its expiry date otherwise); reproduce: rm -r '$profile'" >&2
     exit 1
