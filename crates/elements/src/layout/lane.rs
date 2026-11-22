@@ -20,6 +20,13 @@ use crate::lane_decline::LaneDecline;
 /// page's list has thousands, a row's cells a handful.
 pub(super) const FRAMED_CHILDREN: usize = 32;
 
+/// How far down its scroll frame a lane's children may start before it
+/// frames them whatever their number (`Lane::framing`): 2^16 CSS px,
+/// below which an f32 corner resolves 1/128 px; past it a child's
+/// boxes, placed in the scroll frame, lose fractions of a pixel (at 2^25
+/// an f32 steps by 4 px; a million 52 px rows reach 52,000,000).
+pub(super) const FRAMED_DEPTH: f64 = 65_536.0;
+
 /// One container's lane.
 #[derive(Debug)]
 pub(crate) struct Lane<K: LaneKind> {
@@ -160,14 +167,27 @@ impl<K: LaneKind> Lane<K> {
     }
 
     /// Whether the children can be frames of their own; `None` for a
-    /// lane of fewer than `FRAMED_CHILDREN` children, which keeps its
+    /// lane of fewer than `FRAMED_CHILDREN` children none of which starts
+    /// `FRAMED_DEPTH` down its scroll frame, which keeps its
     /// children placed as before: placing a few costs little, and every
     /// framed lane is worked out once per update (`paint_frames.rs`), so
     /// framing the small lanes too (a cell holding its text is one)
     /// would cost O(rows) per update again.
     pub(super) fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
-        let framable = self.has_written() && self.handles.len() >= FRAMED_CHILDREN;
+        let many = self.handles.len() >= FRAMED_CHILDREN;
+        let framable = self.has_written() && (many || self.reaches_depth(origin));
         framable.then(|| self.facts.framable(self.tree.gap, origin, scale))
+    }
+
+    /// Whether a child starts `FRAMED_DEPTH` or more down the scroll
+    /// frame, the container's content at `origin`: such a lane frames
+    /// its children however few, so their boxes are placed in frames of
+    /// their own, near zero, and shifted in f64. Read only for a lane of
+    /// fewer than `FRAMED_CHILDREN`, so the scan of its starts is short.
+    fn reaches_depth(&self, origin: f64) -> bool {
+        let starts = self.handles.values().map(|&handle| self.tree.start(handle));
+        let last = starts.fold(0.0, f64::max);
+        origin + self.facts.top + last >= FRAMED_DEPTH
     }
 
     /// The children whose box or overflow meets `from..=to`, CSS pixels
