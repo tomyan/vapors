@@ -1,0 +1,99 @@
+use super::Window;
+
+/// 20 px rows in a 60 px window, one row of overscan.
+fn small() -> Window {
+    Window::new(20.0, 60.0, 1)
+}
+
+#[test]
+fn at_the_top_the_rows_in_the_window_and_the_overscan_below_exist() {
+    // When
+    let rows = small().rows(0.0, 20);
+
+    // Then: rows 0..3 fill the window, row 3 is the overscan
+    assert_eq!(rows, 0..4);
+}
+
+#[test]
+fn a_row_partly_in_view_at_either_end_exists_with_overscan_beyond_it() {
+    // When: 105..165 shows part of row 5, rows 6 and 7, and part of row 8
+    let rows = small().rows(105.0, 20);
+
+    // Then
+    assert_eq!(rows, 4..10);
+}
+
+#[test]
+fn at_the_end_the_rows_stop_at_the_count() {
+    // When: the 340 px range's end shows rows 17..20
+    let rows = small().rows(340.0, 20);
+
+    // Then
+    assert_eq!(rows, 16..20);
+}
+
+#[test]
+fn an_offset_past_the_rows_gives_none() {
+    // When: the keys shrank under an offset the next clamp has not reached
+    let rows = small().rows(340.0, 5);
+
+    // Then
+    assert!(rows.is_empty());
+}
+
+#[test]
+fn no_rows_give_no_range() {
+    assert_eq!(small().rows(0.0, 0), 0..0);
+}
+
+#[test]
+fn the_range_is_as_long_at_a_million_rows_as_at_twenty() {
+    // Given
+    let window = Window::new(52.0, 756.0, 4);
+
+    // When
+    let deep = window.rows(26_000_000.0, 1_000_000);
+
+    // Then: 15 rows touch a 756 px window at a row edge, 4 on each side
+    assert_eq!(deep.len(), 15 + 8);
+}
+
+#[test]
+fn heights_are_rows_times_the_row_height() {
+    assert_eq!(small().px(7), 140.0);
+}
+
+#[test]
+fn a_million_rows_of_52_px_is_an_exact_height() {
+    assert_eq!(Window::new(52.0, 756.0, 4).px(1_000_000), 52_000_000.0);
+}
+
+#[test]
+#[should_panic(expected = "cannot hold exactly")]
+fn a_height_an_f32_cannot_hold_is_refused() {
+    let _ = Window::new(0.1, 60.0, 1).px(16_777_217);
+}
+
+#[test]
+#[should_panic(expected = "row_height is 0")]
+fn a_zero_row_height_is_refused() {
+    let _ = Window::new(0.0, 60.0, 1);
+}
+
+#[test]
+#[should_panic(expected = "row_height is NaN")]
+fn a_nan_row_height_is_refused() {
+    let _ = Window::new(f32::NAN, 60.0, 1);
+}
+
+#[test]
+#[should_panic(expected = "height is -1")]
+fn a_negative_window_height_is_refused() {
+    let _ = Window::new(20.0, -1.0, 1);
+}
+
+#[test]
+#[should_panic(expected = "not a clamped offset")]
+fn a_negative_offset_is_refused() {
+    let _ = small().rows(-1.0, 20);
+}
