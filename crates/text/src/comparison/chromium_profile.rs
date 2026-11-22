@@ -96,7 +96,7 @@ pub(super) fn launch_profile(
     let cannot = |e: std::io::Error| {
         ChromiumError::Failed(format!(
             "a profile for it under {}: {e}. Fix: make that directory writable, or free \
-             space. Reproduce: mkdir -p {0} && touch {0}/probe && rm {0}/probe",
+             space. Reproduce: mkdir -p '{0}' && touch '{0}/probe' && rm '{0}/probe'",
             root.display()
         ))
     };
@@ -113,10 +113,12 @@ pub(super) fn launch_profile(
 ///
 /// The removal runs after the launch has returned, by which time `finish`
 /// has seen Chromium's stderr close. Its other processes inherit that
-/// stderr, so none is still writing to the profile, unless its 2 s grace
-/// ran out, and then the removal's own failure is reported. 20 real
-/// launches in a row on 2026-11-22 (`warm_chromium`) all succeeded and left
-/// no profile.
+/// stderr, so none is still writing to the profile. If its 2 s grace runs
+/// out after a good exit, `finish` returns without killing what is still
+/// running: the removal may then fail (reported), or succeed and a late
+/// write recreate the directory unreported; the retention job removes such
+/// a directory after its expiry date. 20 real launches in a row on
+/// 2026-11-22 (`warm_chromium`) all succeeded and left no profile.
 ///
 /// # Errors
 ///
@@ -147,7 +149,7 @@ fn remove_profile(profile: tempfile::TempDir) -> Result<(), ChromiumError> {
     profile.close().map_err(|e| {
         ChromiumError::Failed(format!(
             "its profile {} could not be removed: {e}. Fix: remove it by hand; the daily \
-             retention job removes it after its expiry date otherwise. Reproduce: rm -r {0}",
+             retention job removes it after its expiry date otherwise. Reproduce: rm -r '{0}'",
             path.display()
         ))
     })
