@@ -36,6 +36,11 @@ impl Offsets {
         self.by_node.get(&node).map(|offset| offset.at)
     }
 
+    /// Each scroll container and its offset, in no order.
+    pub(crate) fn each(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
+        self.by_node.iter().map(|(node, offset)| (*node, offset.at))
+    }
+
     /// The offset of `node` and how far it can go, if it scrolls.
     pub(crate) fn state(&self, node: NodeId) -> Option<([f32; 2], [f32; 2])> {
         self.by_node

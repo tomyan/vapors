@@ -93,7 +93,8 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
 
 /// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b;
 /// keys and focus, 3-E2a; a range's value, 3-E3a; a text field's
-/// selection, E6a; the second click in a row, for touché's card).
+/// selection, E6a; the second click in a row, for touché's card; a
+/// scroll container's offset, virtual list V1).
 pub const FIRED: &[&str] = &[
     "click",
     "dblclick",
@@ -113,6 +114,7 @@ pub const FIRED: &[&str] = &[
     "change",
     "selectionchange",
     "paste",
+    "scroll",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.

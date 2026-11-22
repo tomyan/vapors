@@ -8,6 +8,7 @@ use crate::support;
 use support::drive::{log, node, shared, target};
 use support::roles_page::{button, labelled, page};
 use support::{document, viewport};
+use vapors_dom::Dom;
 use vapors_elements::{AxError, Document};
 
 /// A list 48 px tall scrolling six buttons 24 px tall, `B1` to `B6`.
@@ -41,6 +42,27 @@ fn a_press_scrolls_a_node_outside_its_container_into_view_then_clicks() {
     // Then: centring B6 asks 108 px, the list goes as far as 96
     assert_eq!(*events.borrow(), ["click"]);
     assert_eq!(doc.borrow().scroll_offset(list), Some([0.0, 96.0]));
+}
+
+#[test]
+fn a_press_that_scrolls_its_node_into_view_owes_the_container_a_scroll() {
+    // Given: a scroll listener on the list
+    let (page, list) = list_page();
+    let doc = shared(page);
+    let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let into = std::rc::Rc::clone(&heard);
+    doc.borrow_mut().listen(
+        list,
+        "scroll",
+        Box::new(move |e: &mut vapors_dom::Event| into.borrow_mut().push(e.scroll_offset())),
+    );
+
+    // When: the press scrolls B6 into view, then the frame settles
+    Document::ax_press(&doc, &target("button", "B6")).expect("pressed");
+    Document::settle_scroll(&doc);
+
+    // Then: one scroll, at the offset the press left
+    assert_eq!(*heard.borrow(), [Some([0.0, 96.0])]);
 }
 
 #[test]

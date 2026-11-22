@@ -202,6 +202,7 @@ mod scroll;
 mod scroll_axes;
 mod scroll_axes_layout;
 mod scroll_chain;
+mod scroll_event;
 mod scroll_frames;
 mod scroll_offsets;
 mod scroll_range_kept;

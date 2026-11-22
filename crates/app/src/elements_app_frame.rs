@@ -35,6 +35,9 @@ impl Phases for AppFrame<'_, '_> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
+        // the scroll each container owes, once per frame before style
+        // and layout, as Chromium's "run the scroll steps" (virtual list V1)
+        Document::settle_scroll(&self.app.document);
         self.app.update_and_settle(self.frame)?;
         // the fixup's blur and the rehover under a resting pointer are
         // changes the update did not see; one more update shows them,
