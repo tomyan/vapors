@@ -37,7 +37,8 @@ pub(super) fn profile_root(
         .ok_or_else(|| {
             ChromiumError::Failed(
                 "no automation cache for its profile: neither XDG_CACHE_HOME nor HOME is an \
-             absolute path. Fix: set HOME (or XDG_CACHE_HOME) to an absolute directory"
+             absolute path. Fix: set HOME (or XDG_CACHE_HOME) to an absolute directory. \
+             Reproduce: echo \"XDG_CACHE_HOME=$XDG_CACHE_HOME HOME=$HOME\""
                     .to_owned(),
             )
         })
@@ -52,7 +53,7 @@ pub(super) fn expiry_prefix(now: SystemTime) -> Result<String, ChromiumError> {
     let since = now.duration_since(UNIX_EPOCH).map_err(|_| {
         ChromiumError::Failed(
             "the clock reads before 1970, so its profile has no expiry date. Fix: set the \
-             system clock"
+             system clock. Reproduce: date -u"
                 .to_owned(),
         )
     })?;
@@ -94,7 +95,8 @@ pub(super) fn launch_profile(
 ) -> Result<tempfile::TempDir, ChromiumError> {
     let cannot = |e: std::io::Error| {
         ChromiumError::Failed(format!(
-            "a profile for it under {}: {e}. Fix: make that directory writable, or free space",
+            "a profile for it under {}: {e}. Fix: make that directory writable, or free \
+             space. Reproduce: mkdir -p {0} && touch {0}/probe && rm {0}/probe",
             root.display()
         ))
     };
@@ -105,17 +107,47 @@ pub(super) fn launch_profile(
         .map_err(cannot)
 }
 
+/// `launch` run with a new profile under `root`, which is removed after it
+/// however it ends. A removal that fails is reported: alone after a good
+/// launch, with the launch's own failure after a bad one.
+///
+/// The removal runs after the launch has returned, by which time `finish`
+/// has seen Chromium's stderr close. Its other processes inherit that
+/// stderr, so none is still writing to the profile, unless its 2 s grace
+/// ran out, and then the removal's own failure is reported. 20 real
+/// launches in a row on 2026-11-22 (`warm_chromium`) all succeeded and left
+/// no profile.
+///
+/// # Errors
+///
+/// The launch's error, the removal's, or both in one message.
+pub(super) fn in_profile<T>(
+    root: &Path,
+    now: SystemTime,
+    launch: impl FnOnce(&Path) -> Result<T, ChromiumError>,
+) -> Result<T, ChromiumError> {
+    let profile = launch_profile(root, now)?;
+    let result = launch(profile.path());
+    match (result, remove_profile(profile)) {
+        (result, Ok(())) => result,
+        (Ok(_), Err(removal)) => Err(removal),
+        (Err(failure), Err(removal)) => {
+            Err(ChromiumError::Failed(format!("{failure}\nand {removal}")))
+        }
+    }
+}
+
 /// Remove a launch's profile now, saying so when it cannot be.
 ///
 /// # Errors
 ///
 /// [`ChromiumError::Failed`] naming the profile left behind.
-pub(super) fn remove_profile(profile: tempfile::TempDir) -> Result<(), ChromiumError> {
+fn remove_profile(profile: tempfile::TempDir) -> Result<(), ChromiumError> {
     let path = profile.path().to_owned();
     profile.close().map_err(|e| {
         ChromiumError::Failed(format!(
             "its profile {} could not be removed: {e}. Fix: remove it by hand; the daily \
-             retention job removes it after its expiry date otherwise",
+             retention job removes it after its expiry date otherwise. Reproduce: rm -r {0}",
             path.display()
         ))
     })

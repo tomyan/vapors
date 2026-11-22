@@ -9,7 +9,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
-use super::chromium_profile::{launch_profile, profile_root, remove_profile};
+use super::chromium_profile::{in_profile, profile_root};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
 use super::png_file::read_png;
@@ -110,11 +110,24 @@ impl Chromium {
         size: [u32; 2],
         scale: u32,
     ) -> Result<Rgba, ChromiumError> {
-        let [width, height] = size;
         remove_stale(png)?;
         let tmp = launch_tmp()?;
-        let profile = launch_profile(&self.profiles, std::time::SystemTime::now())?;
-        let mut child = self.spawn(html, png, [tmp.path(), profile.path()], size, scale)?;
+        in_profile(&self.profiles, std::time::SystemTime::now(), |profile| {
+            self.shoot_in(html, png, [tmp.path(), profile], size, scale)
+        })
+    }
+
+    /// One screenshot with `dirs` as its `[TMPDIR, profile]`.
+    fn shoot_in(
+        &self,
+        html: &Path,
+        png: &Path,
+        dirs: [&Path; 2],
+        size: [u32; 2],
+        scale: u32,
+    ) -> Result<Rgba, ChromiumError> {
+        let [width, height] = size;
+        let mut child = self.spawn(html, png, dirs, size, scale)?;
         let stderr = drain(
             child
                 .stderr
@@ -127,7 +140,6 @@ impl Chromium {
                 "exited with {status}:\n{stderr}"
             )));
         }
-        remove_profile(profile)?;
         let image = read_png(png).map_err(ChromiumError::Failed)?;
         check_size(&image, png, [width * scale, height * scale])?;
         Ok(image)
@@ -149,9 +161,21 @@ impl Chromium {
         scale: f64,
     ) -> Result<String, ChromiumError> {
         let tmp = launch_tmp()?;
-        let profile = launch_profile(&self.profiles, std::time::SystemTime::now())?;
+        in_profile(&self.profiles, std::time::SystemTime::now(), |profile| {
+            self.dump_in(html, [tmp.path(), profile], [width, height], scale)
+        })
+    }
+
+    /// One `--dump-dom` with `dirs` as its `[TMPDIR, profile]`.
+    fn dump_in(
+        &self,
+        html: &Path,
+        dirs: [&Path; 2],
+        [width, height]: [u32; 2],
+        scale: f64,
+    ) -> Result<String, ChromiumError> {
         let mut child = self
-            .command([tmp.path(), profile.path()], width, height, scale)?
+            .command(dirs, width, height, scale)?
             .arg("--dump-dom")
             .arg(format!("file://{}", html.display()))
             .stdout(Stdio::piped())
@@ -170,7 +194,6 @@ impl Chromium {
                 "exited with {status}:\n{stderr}"
             )));
         }
-        remove_profile(profile)?;
         Ok(stdout)
     }
 

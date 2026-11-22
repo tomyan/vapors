@@ -49,6 +49,14 @@ fn launched_profile(record: &Path, root: &Path) -> PathBuf {
         [true, true, true, true, false, true, true, false, true, true],
         "{name}"
     );
+    let id = date
+        .get(10..)
+        .and_then(|rest| rest.strip_prefix('-'))
+        .unwrap_or("");
+    assert!(
+        id.len() >= 6 && id.chars().all(|c| c.is_ascii_alphanumeric()),
+        "{name}"
+    );
     assert_eq!(
         fields[1],
         "there",
@@ -101,6 +109,30 @@ fn a_profile_that_cannot_be_removed_after_a_good_launch_is_refused_naming_it() {
         .status();
     assert!(unlock.expect("chmod").success());
     let error = result.expect_err("refused").to_string();
+    assert!(error.contains(&profile.display().to_string()), "{error}");
+}
+
+#[test]
+fn a_profile_that_cannot_be_removed_after_a_failed_launch_is_named_with_the_failure() {
+    let dir = tempfile::tempdir().expect("scratch");
+    let record = dir.path().join("record");
+    let lock = "mkdir \"$p/locked\" && touch \"$p/locked/f\" && chmod 500 \"$p/locked\"";
+    let chromium = recording(dir.path(), &record, 1, lock);
+    let shot = chromium.screenshot(
+        &dir.path().join("p.html"),
+        &dir.path().join("p.png"),
+        10,
+        10,
+        1,
+    );
+    let profile = launched_profile(&record, &chromium.profiles);
+    let unlock = Command::new("chmod")
+        .arg("755")
+        .arg(profile.join("locked"))
+        .status();
+    assert!(unlock.expect("chmod").success());
+    let error = shot.expect_err("refused").to_string();
+    assert!(error.contains("exited with"), "{error}");
     assert!(error.contains(&profile.display().to_string()), "{error}");
 }
 
