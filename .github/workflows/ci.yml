@@ -27,11 +27,15 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x (the job's worst without its apt step in the 37 runs to
-    # 2026-10-23, 185 s in run 39807737788, plus that step's worst with
-    # the cache, 13 s in run 39932437148). The uncached 1811 s install in
-    # run 39803408769 is excluded: it is the slow mirror the cache avoids.
-    timeout-minutes: 9
+    # DIAGNOSTIC CEILING, not a measured limit: no cold run has finished
+    # inside the old 9 minutes since 2026-11-12 (cancelled in unit, which
+    # also stops the cache save: runs 45067990897 and 45072756560). 25
+    # minutes lets one cold run finish and save its cache, so its time and
+    # a warm run's can be measured. Replaced in this PR by about 2.5x the
+    # measured worst before it merges. The old basis: 2.5x the job's worst
+    # in the 37 runs to 2026-10-23 (185 s, run 39807737788, plus 13 s for
+    # the apt step with its cache, run 39932437148).
+    timeout-minutes: 25
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
@@ -106,7 +110,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 25
         run: .github/scripts/report-timeout.sh
 
   web:
