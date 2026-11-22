@@ -10,6 +10,7 @@
 )]
 
 mod app;
+mod chart_bars;
 #[allow(clippy::all, clippy::pedantic, dead_code)] // vendored unchanged; docs/gui-bench/spec/NOTICE.md
 #[path = "../../../docs/gui-bench/spec/cli.rs"]
 mod cli;
