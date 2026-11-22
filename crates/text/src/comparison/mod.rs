@@ -10,6 +10,8 @@
 #[cfg(not(target_family = "wasm"))]
 mod chromium;
 #[cfg(not(target_family = "wasm"))]
+mod chromium_flags;
+#[cfg(not(target_family = "wasm"))]
 mod chromium_live;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_name;
@@ -31,6 +33,8 @@ mod spec;
 
 #[cfg(not(target_family = "wasm"))]
 pub use chromium::{Chromium, ChromiumError};
+#[cfg(not(target_family = "wasm"))]
+pub use chromium_flags::render_flags;
 #[cfg(not(target_family = "wasm"))]
 pub use chromium_live::Live;
 pub use composite::{GAP, compose, row_width};

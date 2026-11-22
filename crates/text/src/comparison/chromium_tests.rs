@@ -188,3 +188,29 @@ fn a_failed_screenshot_names_the_browser_it_launched() {
     // Then
     assert!(error.to_string().contains("/bin/false"), "{error}");
 }
+
+#[test]
+fn a_launch_passes_the_render_flags_first() {
+    // Given
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-chromium-flags-")
+        .tempdir();
+    let scratch = scratch.expect("a scratch directory under the temp dir");
+    let chromium = Chromium {
+        binary: std::path::PathBuf::from("/bin/false"),
+        deadline: std::time::Duration::from_secs(5),
+    };
+
+    // When
+    let command = chromium
+        .command(scratch.path(), 640, 400, 2.0)
+        .expect("a command");
+
+    // Then
+    let args: Vec<String> = command
+        .get_args()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    let flags = super::super::render_flags(640, 400, 2.0);
+    assert_eq!(args[..flags.len()], flags[..]);
+}
