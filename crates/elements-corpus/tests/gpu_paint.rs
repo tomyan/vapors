@@ -6,17 +6,24 @@
 //! x4) is written to `target/tmp/paint_<name>_<scale>x.png`.
 //! The rules are checked in `gpu_paint_rules`. Four pixels of touche's
 //! Mute icon at 1x (two in each of the two opaque rows) are compared with exact coverage instead
-//! (`paint_support/exact.rs`, declared there).
+//! (`paint_support/exact.rs`, declared there). Chromium's side of the
+//! fixtures and scales `saved::SAVED` lists is a committed saved
+//! reference, read without launching a browser and refused when stale
+//! (`vapors_elements_corpus::paint_reference`); every other is
+//! screenshotted live (`paint_support/saved.rs`).
 
 #[path = "paint_support/exact.rs"]
 mod exact;
 mod paint_support;
 #[path = "paint_support/placement.rs"]
 mod placement;
+#[path = "paint_support/saved.rs"]
+mod saved;
 
 use std::path::PathBuf;
 
-use paint_support::{HEIGHT, WIDTH, chromiums, image, laid_out, paint_fixtures, regions};
+use paint_support::{HEIGHT, WIDTH, image, laid_out, paint_fixtures, regions};
+use saved::theirs;
 use vapors_app::ScenePainter;
 use vapors_elements::Document;
 use vapors_elements_corpus::paint_check::compare;
@@ -102,29 +109,40 @@ fn assert_lanes_framed(name: &str, doc: &Document) {
 /// `name` at `scale` inks each element's region over the same rows and
 /// columns as Chromium (`placement.rs`).
 fn check_placement(name: &str, scale: u32) {
-    let fixture = paint_fixtures()
-        .into_iter()
-        .find(|f| f.name == name)
-        .expect("a paint fixture");
-    let theirs = chromiums("placement", name, scale, "");
-    let doc = laid_out(&fixture, scale);
-    let ours = ours(&doc.borrow(), scale);
-    let regions = regions(&doc.borrow(), scale);
-    let (ours, theirs) = (
-        placement::inked(&ours, &regions),
-        placement::inked(&theirs, &regions),
-    );
-    let off: Vec<String> = ours
-        .iter()
-        .zip(&theirs)
-        .filter(|(a, b)| a != b)
-        .map(|((label, a), (_, b))| format!("{label}: ours {a:?}, Chromium's {b:?}"))
-        .collect();
+    let theirs = theirs("placement", name, scale);
+    let off = placement_off(name, scale, &theirs);
     assert!(
         off.is_empty(),
         "{name} at {scale}x places ink elsewhere than Chromium: {}",
         off.join("; ")
     );
+}
+
+/// Each region of `name` at `scale` whose ink in vapors' paint spans
+/// other rows or columns than in `theirs`.
+fn placement_off(name: &str, scale: u32, theirs: &vapors_text::comparison::Rgba) -> Vec<String> {
+    let fixture = paint_fixtures()
+        .into_iter()
+        .find(|f| f.name == name)
+        .expect("a paint fixture");
+    let doc = laid_out(&fixture, scale);
+    let ours = ours(&doc.borrow(), scale);
+    placement::off(&ours, theirs, &regions(&doc.borrow(), scale))
+}
+
+/// The placement check refuses text a device row off Chromium's: the
+/// saved reference of `text_line_box_paint` at 2x, moved down one row.
+#[test]
+fn gpu_at_2x_placement_refuses_text_one_device_row_lower() {
+    // Given
+    let saved = vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
+        .unwrap_or_else(|why| panic!("{why}"));
+
+    // When
+    let off = placement_off("text_line_box_paint", 2, &placement::shifted_down(&saved));
+
+    // Then
+    assert!(!off.is_empty(), "text one device row lower is not refused");
 }
 
 fn check(name: &str, scale: u32) {
@@ -158,7 +176,7 @@ fn differences(name: &str, scale: u32) -> (Vec<String>, PathBuf) {
             panic!("{name} is not a paint fixture: remove its test in gpu_paint.rs")
         });
     // Given
-    let theirs = exact::with_exact_pixels(name, scale, chromiums("match", name, scale, ""));
+    let theirs = exact::with_exact_pixels(name, scale, theirs("match", name, scale));
     let doc = laid_out(&fixture, scale);
     assert_lanes_framed(name, &doc.borrow());
 
