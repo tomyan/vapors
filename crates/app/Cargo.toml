@@ -56,7 +56,7 @@ vapors-platform = { workspace = true, features = ["test-support"] }
 
 # The application thread's tests await Tokio's timer in their tasks
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["time", "sync"] }
 
 [lints]
 workspace = true

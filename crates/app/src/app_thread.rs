@@ -16,24 +16,48 @@ use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use body::{Body, Ready, Turn};
 pub use error::AppThreadError;
 
-/// How long `start` waits for the thread's runtime and app side. With an
-/// empty app side, 50 starts took 26 µs median and 123 µs at most (debug
-/// build, this machine, 2026-11-22, a probe test since removed); 5 s is
-/// reached only by an app side that hangs.
+/// How long `start` waits for the thread's runtime and the caller's app
+/// side. The floor is measured: with an empty app side, 50 starts took
+/// 26 µs median and 123 µs at most (debug build, this machine,
+/// 2026-11-22, a probe test not kept). The 5 s ceiling is a judgement: a
+/// real app side builds more, and no measured app side is near it yet.
+/// Re-measured with the first app side that builds a document (L1b).
 const START_DEADLINE: Duration = Duration::from_secs(5);
 
 /// How long `stop` waits for the thread to finish its turn and exit. The
-/// same 50 idle threads stopped in 16 µs median and 119 µs at most; 5 s
-/// is reached only by a handler or task that blocks the thread.
+/// floor: the same 50 idle threads stopped in 16 µs median and 119 µs at
+/// most. The 5 s ceiling is a judgement, as for `START_DEADLINE`.
 const STOP_DEADLINE: Duration = Duration::from_secs(5);
 
+/// The two waits. Apart from the constants so the unit tests can prove
+/// each deadline without waiting 5 s.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Deadlines {
+    pub(crate) start: Duration,
+    pub(crate) stop: Duration,
+}
+
+const DEADLINES: Deadlines = Deadlines {
+    start: START_DEADLINE,
+    stop: STOP_DEADLINE,
+};
+
 /// The application thread: send it messages, stop it to learn why it
-/// ended. Dropped without `stop`, it is asked to stop and not waited for.
+/// ended.
+///
+/// RELAXED: dropped without `stop`, it is asked to stop and neither
+/// waited for nor checked, so a panic it had is seen only on stderr, from
+/// the default panic hook. `Drop` cannot return the error, and blocking
+/// in a drop would need a deadline nobody hears about. The same holds for
+/// a thread whose app side missed `START_DEADLINE`: it is asked to stop
+/// and left. Retired when the desktop runner (L1b) owns the thread and
+/// calls `stop` when its loop ends, reporting the result.
 pub struct AppThread<M: Send + 'static> {
     sender: UnboundedSender<Turn<M>>,
     thread: Option<JoinHandle<()>>,
     turns: Arc<AtomicU64>,
     exited: mpsc::Receiver<()>,
+    stop_deadline: Duration,
 }
 
 impl<M: Send + 'static> AppThread<M> {
@@ -49,6 +73,15 @@ impl<M: Send + 'static> AppThread<M> {
         make: impl FnOnce() -> H + Send + 'static,
         report: fn(&str),
     ) -> Result<Self, AppThreadError> {
+        Self::start_within(make, report, DEADLINES)
+    }
+
+    /// `start`, with `deadlines` in place of the constants.
+    pub(crate) fn start_within<H: FnMut(M) + 'static>(
+        make: impl FnOnce() -> H + Send + 'static,
+        report: fn(&str),
+        deadlines: Deadlines,
+    ) -> Result<Self, AppThreadError> {
         let (sender, receiver) = unbounded_channel();
         let (ready, readied) = mpsc::channel();
         let (exit, exited) = mpsc::channel();
@@ -63,18 +96,23 @@ impl<M: Send + 'static> AppThread<M> {
             thread: Some(thread),
             turns,
             exited,
+            stop_deadline: deadlines.stop,
         };
-        app.wait_ready(&readied)
+        app.wait_ready(&readied, deadlines.start)
     }
 
-    fn wait_ready(mut self, readied: &mpsc::Receiver<Ready>) -> Result<Self, AppThreadError> {
-        match readied.recv_timeout(START_DEADLINE) {
+    fn wait_ready(
+        mut self,
+        readied: &mpsc::Receiver<Ready>,
+        deadline: Duration,
+    ) -> Result<Self, AppThreadError> {
+        match readied.recv_timeout(deadline) {
             Ok(Ok(())) => Ok(self),
             Ok(Err(runtime)) => Err(AppThreadError::Runtime(runtime)),
             Err(mpsc::RecvTimeoutError::Disconnected) => Err(self.join()),
             Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
                 what: "build the app side",
-                after: START_DEADLINE,
+                after: deadline,
             }),
         }
     }
@@ -106,6 +144,9 @@ impl<M: Send + 'static> AppThread<M> {
     }
 
     /// Asks the thread to stop after its current turn and waits for it.
+    /// Messages sent before it are handled first. Tasks still pending are
+    /// dropped with the thread, unpolled and unreported, as a disposed
+    /// owner's tasks are.
     ///
     /// # Errors
     /// [`AppThreadError::Panicked`] with the panic's message when a
@@ -114,10 +155,10 @@ impl<M: Send + 'static> AppThread<M> {
     pub fn stop(mut self) -> Result<(), AppThreadError> {
         // Err: the thread already ended; its join says why
         let _ = self.sender.send(Turn::Stop);
-        match self.exited.recv_timeout(STOP_DEADLINE) {
+        match self.exited.recv_timeout(self.stop_deadline) {
             Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
                 what: "stop",
-                after: STOP_DEADLINE,
+                after: self.stop_deadline,
             }),
             Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => match self.join() {
                 AppThreadError::Stopped => Ok(()),
@@ -150,3 +191,6 @@ impl<M: Send + 'static> Drop for AppThread<M> {
 mod body;
 #[path = "app_thread_error.rs"]
 mod error;
+#[cfg(test)]
+#[path = "app_thread_tests.rs"]
+mod tests;

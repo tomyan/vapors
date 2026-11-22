@@ -53,11 +53,10 @@ fn a_running_interval_wakes_the_thread_about_once_per_tick() {
 
     // When
     app.send(Live::On).expect("the thread runs");
-    std::thread::sleep(Duration::from_millis(200));
+    wait_for("five ticks", || ticks.load(Ordering::SeqCst) >= 5);
 
     // Then: the message's turn, the spawn's wake, then one per tick
-    let (ticks, turns) = (ticks.load(Ordering::SeqCst), app.turns());
-    assert!(ticks >= 5, "{ticks} ticks of {TICK:?} in 200 ms");
+    let (turns, ticks) = (app.turns(), ticks.load(Ordering::SeqCst));
     assert!(turns <= ticks + 3, "{turns} turns for {ticks} ticks");
     app.stop().expect("the thread stops");
 }

@@ -17,6 +17,7 @@ mod surface_input_page;
 mod app_thread;
 mod app_thread_failures;
 mod app_thread_timer;
+mod app_thread_wakes;
 mod elements_app_animation;
 mod elements_app_drag;
 mod elements_app_errors;

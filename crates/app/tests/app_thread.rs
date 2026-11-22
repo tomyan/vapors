@@ -4,8 +4,6 @@
 //! it takes no turns. Timings use the real clock with wide bounds:
 //! Tokio's paused clock advances by itself whenever the runtime is idle.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread::ThreadId;
 use std::time::{Duration, Instant};
@@ -88,6 +86,8 @@ fn a_continuation_after_a_timer_runs_on_the_application_thread() {
     app.stop().expect("the thread stops");
 }
 
+/// A 100 ms window: it catches a thread that spins or polls on a short
+/// timer, not one that wakes less often than that.
 #[test]
 fn with_nothing_pending_the_thread_takes_no_turns() {
     // Given: one message handled, nothing spawned
@@ -100,40 +100,5 @@ fn with_nothing_pending_the_thread_takes_no_turns() {
 
     // Then
     assert_eq!(app.turns(), 1, "an idle application thread woke");
-    app.stop().expect("the thread stops");
-}
-
-#[test]
-fn wakes_before_a_turn_cost_one_turn() {
-    // Given: a handler that spawns ten tasks, each waking the thread
-    let done = Arc::new(AtomicU64::new(0));
-    let counted = Arc::clone(&done);
-    let app = AppThread::start(
-        move || {
-            move |(): ()| {
-                for _ in 0..10 {
-                    let done = Arc::clone(&counted);
-                    // Deadline::User: a test task that ends on its first poll
-                    spawn(Deadline::User, async move {
-                        done.fetch_add(1, Ordering::SeqCst);
-                        Ok::<(), String>(())
-                    });
-                }
-            }
-        },
-        ignore,
-    )
-    .expect("the thread starts");
-
-    // When
-    app.send(()).expect("the thread runs");
-    wait_for("the ten tasks", || done.load(Ordering::SeqCst) == 10);
-
-    // Then: the message's turn and one turn for the ten wakes
-    assert_eq!(
-        app.turns(),
-        2,
-        "ten wakes before a turn cost more than one turn"
-    );
     app.stop().expect("the thread stops");
 }
