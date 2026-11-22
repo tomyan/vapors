@@ -19,6 +19,8 @@ work=${2:?usage: scripts/web-idle-frames.sh target/web <new or empty dir> [demo 
 shift 2
 demos=${*:-hello counter image}
 chrome=${CHROME:-chromium}
+# in_profile: each launch in its own expiry-named profile.
+. "$(dirname "$0")/browser.sh"
 [ -f "$web/index.html" ] || { echo "$web/index.html: missing; run cargo xtask web first" >&2; exit 1; }
 if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then echo "$work: not empty" >&2; exit 1; fi
 mkdir -p "$work"; cp "$web"/* "$work"/
@@ -65,12 +67,19 @@ for _ in $(seq 100); do [ -s "$work/port" ] && break; sleep 0.1; done
 port=$(cat "$work/port")
 icd=$(dirname "$(readlink -f "$(command -v "$chrome")")")/vk_swiftshader_icd.json
 [ -r "$icd" ] || icd=/usr/lib/chromium/vk_swiftshader_icd.json
+# One demo's DOM in $work/idle.dom, from a launch in its own profile, so a
+# profile it cannot remove stops the script.
+launch_idle() {
+  env -u DBUS_SESSION_BUS_ADDRESS VK_DRIVER_FILES="$icd" timeout 60 "$chrome" --headless=new --no-sandbox \
+    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
+    --window-size=640,400 --user-data-dir="$profile" \
+    --dump-dom "http://127.0.0.1:$port/idle.html?demo=$1" 2>/dev/null >"$work/idle.dom"
+}
 missing=0
 for demo in $demos; do
-  count=$(env -u DBUS_SESSION_BUS_ADDRESS VK_DRIVER_FILES="$icd" timeout 60 "$chrome" --headless=new --no-sandbox \
-    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
-    --window-size=640,400 --dump-dom "http://127.0.0.1:$port/idle.html?demo=$demo" 2>/dev/null \
-    | sed -n 's#.*<pre id="idle">\([^<]*\)</pre>.*#\1#p')
+  rm -f "$work/idle.dom"
+  in_profile launch_idle "$demo" || true
+  count=$(sed -n 's#.*<pre id="idle">\([^<]*\)</pre>.*#\1#p' "$work/idle.dom" 2>/dev/null) || true
   case $count in
     '') echo "$demo: no count; the page never reported" >&2; missing=1; continue ;;
     refused:*) echo "$demo: $count" >&2; missing=1; continue ;;

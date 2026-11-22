@@ -1,5 +1,6 @@
-# Sourced by the page checks (check-page-contract.sh, web-wake-frames.sh):
-# which browser runs them, and its own SwiftShader Vulkan driver.
+# Sourced by the page checks (check-page-contract.sh, web-wake-frames.sh,
+# web-idle-frames.sh): which browser runs them, its own SwiftShader Vulkan
+# driver, and the profile each launch runs in.
 # browser: $CHROME, else google-chrome, else chromium (the runner image
 # ships google-chrome).
 browser() {
@@ -44,3 +45,48 @@ vulkan_driver() {
   echo "$icd"
 }
 
+
+# Days a browser profile is kept after the UTC day it is made: the
+# automation cache's retention, the same as RETENTION_DAYS in
+# crates/text/src/comparison/chromium_profile.rs (scripts/
+# browser-profile-check.sh holds the two equal). The host's daily
+# retention job removes a profile on the day after its date, once its scan
+# finds no process using it.
+PROFILE_RETENTION_DAYS=8
+
+# expiry_profile: makes and prints a new directory
+# ${XDG_CACHE_HOME:-$HOME/.cache}/chromium-headless/expires-YYYY-MM-DD-<id>,
+# YYYY-MM-DD the UTC day PROFILE_RETENTION_DAYS from now. A launch given it
+# as --user-data-dir makes no profile of its own under
+# ~/.config/chromium-headless.
+expiry_profile() {
+  case ${XDG_CACHE_HOME:-} in
+    /*) cache=$XDG_CACHE_HOME ;;
+    *) case ${HOME:-} in
+         /*) cache=$HOME/.cache ;;
+         *) echo "no automation cache for a browser profile: neither XDG_CACHE_HOME nor HOME is an absolute path; fix: set HOME (or XDG_CACHE_HOME) to an absolute directory; reproduce: echo \"XDG_CACHE_HOME=\$XDG_CACHE_HOME HOME=\$HOME\"" >&2; return 1 ;;
+       esac ;;
+  esac
+  root=$cache/chromium-headless
+  expires=$(date -u -d "+$PROFILE_RETENTION_DAYS days" +%F) || { echo "date could not give the UTC day $PROFILE_RETENTION_DAYS days from now; fix: GNU date is needed; reproduce: date -u -d '+$PROFILE_RETENTION_DAYS days' +%F" >&2; return 1; }
+  mkdir -p -- "$root" 2>/dev/null && mktemp -d "$root/expires-$expires-XXXXXXXX" 2>/dev/null || {
+    echo "a browser profile under $root could not be made; fix: make that directory writable, or free space; reproduce: mkdir -p '$root' && mktemp -d '$root/expires-$expires-XXXXXXXX'" >&2
+    return 1
+  }
+}
+
+# in_profile <command...>: runs the command with $profile naming a new
+# expiry profile, removes the profile after, and returns the command's
+# status. A profile that cannot be removed is named and the script (or
+# the subshell it runs in) exits 1. A launch that is killed leaves its
+# profile for the retention job.
+in_profile() {
+  profile=$(expiry_profile) || return 1
+  in_profile_status=0
+  "$@" || in_profile_status=$?
+  if ! rm -rf -- "$profile" 2>/dev/null || [ -e "$profile" ]; then
+    echo "the browser profile $profile could not be removed; fix: remove it by hand (the retention job removes it after its expiry date otherwise); reproduce: rm -r '$profile'" >&2
+    exit 1
+  fi
+  return "$in_profile_status"
+}

@@ -4,7 +4,9 @@
 //! show within the first minute.
 
 pub use crate::step::Step;
-use crate::steps_checks::{builds, files, imports, layers, nightly, nightly_issues};
+use crate::steps_checks::{
+    browser_profile, builds, files, imports, layers, nightly, nightly_issues,
+};
 
 #[path = "steps_tiers.rs"]
 mod tiers;
@@ -210,6 +212,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         imports(),
         nightly(),
         nightly_issues(),
+        browser_profile(),
         deny(),
         clippy(),
         wasm(web_package),
@@ -240,6 +243,7 @@ pub fn lint() -> Vec<Step> {
         imports(),
         nightly(),
         nightly_issues(),
+        browser_profile(),
         clippy(),
     ]
 }

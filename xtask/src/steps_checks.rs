@@ -57,6 +57,22 @@ pub fn nightly_issues() -> Step {
     nightly_script("nightly issues", "scripts/nightly-scaling-issues-check.sh")
 }
 
+/// The page checks' browser profiles: scripts/browser.sh's
+/// `expiry_profile` and `in_profile`, the retention held equal to the Rust
+/// launcher's, and every headless launch in the page checks run in one. No
+/// browser and no build: it took 0.46 to 0.51 s here (2026-11-22); a minute is the
+/// other script checks' deadline.
+pub fn browser_profile() -> Step {
+    let mut step = Step::new(
+        "browser profile",
+        "scripts/browser-profile-check.sh",
+        &[],
+        "each FAIL line names the guard and what happened; fix scripts/browser.sh or the page check it names",
+    );
+    step.deadline = Some(std::time::Duration::from_mins(1));
+    step
+}
+
 /// A check script with a fake git and gh: no network, no build. They
 /// took 5 s and 2 s here (2026-11-13); a minute is over ten times that.
 fn nightly_script(name: &str, script: &str) -> Step {

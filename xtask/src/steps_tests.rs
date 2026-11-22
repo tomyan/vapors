@@ -22,6 +22,7 @@ fn ci_runs_fastest_checks_first() {
             "imports",
             "nightly",
             "nightly issues",
+            "browser profile",
             "deny",
             "clippy",
             "wasm",
@@ -110,6 +111,7 @@ fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
             "imports",
             "nightly",
             "nightly issues",
+            "browser profile",
             "clippy"
         ]
     );

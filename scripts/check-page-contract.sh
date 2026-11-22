@@ -393,11 +393,12 @@ sys.exit('the page server on port $port did not answer within 10 s')"
 # with the page's console, in $work/<page>.log. 60 s is the deadline:
 # Chromium 155 here dumps a page in under 2 s. No session bus: with one
 # and a portal that cannot start, every load waits 120 s (docs/web.md).
-dump() {
+dump() { in_profile launch_dump "$@"; }
+launch_dump() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
     --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
-    $budget --dump-dom "$(url "$@")" 2>"$work/$1.log"
+    --user-data-dir="$profile" $budget --dump-dom "$(url "$@")" 2>"$work/$1.log"
 }
 
 # The virtual time a dump gives the page; empty for a page dumped in real
@@ -413,11 +414,13 @@ url() {
 
 # The page as Chromium draws it, as $work/<page>.png, after the page's
 # own hold; its stderr in $work/<page>.log. The window is $size, `W,H`.
-shoot() {
+shoot() { in_profile launch_shoot "$@"; }
+launch_shoot() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
     --enable-features=Vulkan,WebGPU --window-size="$size" --enable-logging=stderr --v=0 \
-    --virtual-time-budget=8000 --screenshot="$work/$1.png" "$(url "$@")" 2>"$work/$1.log"
+    --user-data-dir="$profile" --virtual-time-budget=8000 --screenshot="$work/$1.png" \
+    "$(url "$@")" 2>"$work/$1.log"
 }
 
 # The r,g,b of the centre pixel of a PNG (8-bit RGB or RGBA, not
