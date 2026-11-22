@@ -6,6 +6,7 @@ use vapors_elements_corpus::oracle::fixtures_dir;
 use vapors_elements_corpus::{Fixture, all};
 
 /// The fixture's comment says 640x400 at 1x.
+#[allow(dead_code)] // the switch fixture is 800x100 and brings its own
 pub const VIEWPORT: Viewport = Viewport {
     width: 640.0,
     height: 400.0,
