@@ -135,14 +135,34 @@ fn placement_off(name: &str, scale: u32, theirs: &vapors_text::comparison::Rgba)
 #[test]
 fn gpu_at_2x_placement_refuses_text_one_device_row_lower() {
     // Given
-    let saved = vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
-        .unwrap_or_else(|why| panic!("{why}"));
+    let saved = saved_text_line_box_paint();
 
     // When
     let off = placement_off("text_line_box_paint", 2, &placement::shifted_down(&saved));
 
     // Then
     assert!(!off.is_empty(), "text one device row lower is not refused");
+}
+
+/// As above, a device column to the right.
+#[test]
+fn gpu_at_2x_placement_refuses_text_one_device_column_right() {
+    // Given
+    let saved = saved_text_line_box_paint();
+
+    // When
+    let off = placement_off("text_line_box_paint", 2, &placement::shifted_right(&saved));
+
+    // Then
+    assert!(
+        !off.is_empty(),
+        "text one device column to the right is not refused"
+    );
+}
+
+fn saved_text_line_box_paint() -> vapors_text::comparison::Rgba {
+    vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
+        .unwrap_or_else(|why| panic!("{why}"))
 }
 
 fn check(name: &str, scale: u32) {

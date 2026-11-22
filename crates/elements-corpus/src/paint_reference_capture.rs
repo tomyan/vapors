@@ -9,19 +9,31 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use vapors_text::comparison::Chromium;
 
+use crate::all;
 use crate::oracle::{write_fonts, write_images};
-use crate::paint_reference::{HEIGHT, WIDTH, references_dir, stem};
-use crate::paint_reference_inputs::{expected, page, pinned, sha256, sha256_file};
+use crate::paint_reference::{HEIGHT, WIDTH, references_dir, regenerate_command, stem};
+use crate::paint_reference_inputs::{expected, page, pinned};
+use crate::sha256::{sha256, sha256_file};
 
 /// Screenshots fixture `name` at `scale` with the pinned Chromium and
 /// writes its PNG and manifest under `fixtures/references/`; the PNG's
 /// path.
 ///
 /// # Errors
-/// When the Chromium found is not the pinned build (its sha256 differs
-/// from `.config/tools.toml`'s), the screenshot fails, or a file cannot
-/// be written.
+/// As [`capture_into`].
 pub fn capture(name: &str, scale: u32) -> Result<PathBuf, String> {
+    capture_into(&references_dir(), name, scale)
+}
+
+/// As [`capture`], writing into `dir`.
+///
+/// # Errors
+/// When `name` is not a paint fixture or `scale` is 0 (refused before
+/// any browser starts), the Chromium found is not the pinned build (its
+/// sha256 differs from `.config/tools.toml`'s), the screenshot fails, or
+/// a file cannot be written.
+pub fn capture_into(dir: &Path, name: &str, scale: u32) -> Result<PathBuf, String> {
+    refuse_unpaintable(name, scale)?;
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     refuse_unpinned(chromium.binary())?;
     let work = tempfile::Builder::new()
@@ -33,7 +45,28 @@ pub fn capture(name: &str, scale: u32) -> Result<PathBuf, String> {
     let mut manifest = expected(name, scale)?;
     manifest.insert("png_sha256".into(), json!(sha256(&bytes)?));
     manifest.insert("host".into(), json!(host()));
-    write(name, scale, &bytes, &Value::Object(manifest))
+    write(dir, name, scale, &bytes, &Value::Object(manifest))
+}
+
+/// Refuses what is not a paint fixture (a `/* paint` comment in its
+/// style, as the paint tests select them) at a scale of at least 1.
+fn refuse_unpaintable(name: &str, scale: u32) -> Result<(), String> {
+    if scale == 0 {
+        return Err(format!(
+            "scale 0 draws nothing; fix: give 1 or more, as `{}`",
+            regenerate_command(name, 2)
+        ));
+    }
+    let paint = all()
+        .into_iter()
+        .any(|f| f.name == name && f.style.contains("/* paint"));
+    if paint {
+        return Ok(());
+    }
+    Err(format!(
+        "{name} is not a paint fixture (no fixtures/{name}.wisp with `/* paint` in its style); \
+         fix: name one the paint tests compare"
+    ))
 }
 
 /// Refuses a browser other than the pinned build: a reference records
@@ -65,9 +98,14 @@ fn screenshot(chromium: &Chromium, work: &Path, name: &str, scale: u32) -> Resul
     Ok(png)
 }
 
-fn write(name: &str, scale: u32, png: &[u8], manifest: &Value) -> Result<PathBuf, String> {
-    let dir = references_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+fn write(
+    dir: &Path,
+    name: &str,
+    scale: u32,
+    png: &[u8],
+    manifest: &Value,
+) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let png_path = dir.join(format!("{}.png", stem(name, scale)));
     std::fs::write(&png_path, png).map_err(|e| format!("{}: {e}", png_path.display()))?;
     let text = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())? + "\n";
@@ -96,3 +134,7 @@ fn host() -> String {
     );
     format!("{os}, {kernel}")
 }
+
+#[cfg(test)]
+#[path = "paint_reference_capture_tests.rs"]
+mod tests;
