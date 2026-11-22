@@ -54,7 +54,7 @@ impl Chromium {
                 self.binary().display(),
                 self.version()
             )),
-            ChromiumError::NotFound => ChromiumError::NotFound,
+            ChromiumError::NotFound(pinned) => ChromiumError::NotFound(pinned),
         }
     }
 }
