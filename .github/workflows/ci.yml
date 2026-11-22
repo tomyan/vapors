@@ -53,7 +53,15 @@ jobs:
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that times out or fails still saves what it
+      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
@@ -199,7 +207,15 @@ jobs:
           case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device after installing lavapipe; fix: check the install step and mesa-major"; exit 1 ;; esac
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that times out or fails still saves what it
+      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
@@ -212,6 +228,17 @@ jobs:
       # COLD_START in crates/text/src/comparison/chromium_warm.rs.
       - name: warm headless Chromium
         run: cargo run -p vapors-text --example warm_chromium
+      # vapors-perf's instruction counts (gpu_mount_frames.rs, #428, added
+      # 2026-11-16) need user-space perf events: kernel.perf_event_paranoid 2
+      # or lower. The runner reports 4, so two gpu tests failed with
+      # "perf_event_open failed: Permission denied" (run 45067990897).
+      # The sysctl is runner setup ([gate.setup] in .config/factory.toml);
+      # the check after it runs in the local gate too.
+      - name: allow user-space perf events
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - name: user-space perf events are allowed
+        run: |
+          test "$(cat /proc/sys/kernel/perf_event_paranoid)" -le 2 || { echo "::error::kernel.perf_event_paranoid is $(cat /proc/sys/kernel/perf_event_paranoid), above 2; fix: set kernel.perf_event_paranoid to 1 with sysctl, as root"; exit 1; }
       - name: gpu tier
         run: cargo xtask test --tier gpu
       # The text comparison page: vapors-text beside headless Chrome (the

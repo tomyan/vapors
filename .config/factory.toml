@@ -128,6 +128,7 @@ chain_hops = "3"
 'echo "$(ls "$archives"/*.deb 2>/dev/null | wc -l) .debs kept for the cache"' = "apt install: how many .debs are cached"
 "rustup toolchain install && rustup show active-toolchain" = "the toolchain, from rust-toolchain.toml"
 "cargo xtask setup --ci" = "the pinned tools, installed once per machine"
+"sudo sysctl -w kernel.perf_event_paranoid=1" = "perf events for the gpu job's instruction counts: the runner's kernel setting, as root; the step's next line checks the value on every machine"
 
 [gate.actions]
 "actions/cache" = "restores the apt .debs on the runner; the apt steps are runner setup here"
