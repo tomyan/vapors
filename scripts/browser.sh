@@ -84,13 +84,14 @@ expiry_profile() {
 # about 12 times the worst.
 PROFILE_SETTLE_S=${PROFILE_SETTLE_S:-2}
 
-# profile_processes: lists (pgrep -af) the processes naming $profile, its
-# path matched literally; status 1 when there are none. A pgrep error
-# stops the script, so a broken search is never read as "none left".
+# profile_processes: sets $left to the processes naming $profile (pgrep
+# -af, its path matched literally); status 1 when there are none. Called in
+# the current shell, never in $(...), so a pgrep error stops the shell
+# in_profile runs in and a broken search is never read as "none left".
 profile_processes() {
   profile_pattern=$(printf '%s' "$profile" | sed 's/[][\.*^$+?(){}|]/\\&/g')
-  pgrep -af -- "$profile_pattern"
-  profile_search=$?
+  profile_search=0
+  left=$(pgrep -af -- "$profile_pattern") || profile_search=$?
   [ "$profile_search" -le 1 ] || { echo "pgrep failed ($profile_search) searching for processes of the browser profile $profile; fix: check pgrep (procps) works; reproduce: pgrep -af -- '$profile_pattern'" >&2; exit 1; }
   return "$profile_search"
 }
@@ -99,7 +100,7 @@ profile_processes() {
 # $profile to end; any left are listed, killed, and the status is 1.
 settle_profile() {
   settle_steps=$(awk -v s="$PROFILE_SETTLE_S" 'BEGIN { printf "%d", s * 20 }')
-  while left=$(profile_processes); do
+  while profile_processes; do
     if [ "$settle_steps" -le 0 ]; then
       echo "processes of the browser launch still running ${PROFILE_SETTLE_S} s after it, killed so its profile can be removed: $(printf '%s' "$left" | tr '\n' ';'); fix: find why the browser's processes outlived it; reproduce: run the check again" >&2
       printf '%s\n' "$left" | awk '{print $1}' | xargs -r kill -KILL 2>/dev/null || true

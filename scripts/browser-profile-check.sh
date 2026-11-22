@@ -86,6 +86,17 @@ sleep 0.1
 if kill -0 "$pid" 2>/dev/null; then fail "in_profile missed process $pid under a profile path with [ ] +"; kill "$pid"; fi
 [ "$status" = 1 ] || fail "in_profile returned $status under a profile path with [ ] +: $(cat "$work/err")"
 
+# A pgrep that fails (status 2) stops the shell in_profile runs in; it is
+# never read as "no process left".
+mkdir -p "$work/bin"
+printf '#!/bin/sh\necho "pgrep: broken (fake)" >&2\nexit 2\n' >"$work/bin/pgrep"
+chmod 755 "$work/bin/pgrep"
+status=0
+(PATH="$work/bin:$PATH" XDG_CACHE_HOME="$work/broken" in_profile true; echo "went on" >"$work/went-on") 2>"$work/err" || status=$?
+[ "$status" = 1 ] || fail "in_profile exited $status, not 1, when pgrep failed: $(cat "$work/err")"
+[ ! -e "$work/went-on" ] || fail "the shell went on after pgrep failed"
+grep -q "pgrep failed" "$work/err" || fail "the pgrep failure is not reported: $(cat "$work/err")"
+
 # A root that cannot be made: refused naming it, the command not run.
 touch "$work/file"
 rm -f "$work/seen"
@@ -108,6 +119,9 @@ rust=$(sed -n 's/^const RETENTION_DAYS: u64 = \([0-9]*\);$/\1/p' "$here/../crate
 # own $work/profile until slice 6, like web-text-input.sh below); a
 # function ends at a "}" in column one, so one closed by an indented "}"
 # is blamed for the next top-level launch (still a failure).
+# A quoted argument holding "|", ";", "&&" or " #" splits a correct launch,
+# which is then reported as missing the flag (a false failure, never a
+# false pass); none of today's launches has one.
 # Relaxed: web-text-input.sh keeps its own $work/profile until slice 6 of
 # the expiry-profile plan (PLAN in the retention project) moves it;
 # remove it from this list then.
