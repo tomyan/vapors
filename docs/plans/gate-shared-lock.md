@@ -10,7 +10,7 @@ correctness phases of gates in separate worktrees can overlap, while
 the steps whose results depend on the machine being quiet still run
 alone.
 
-Status: proposed. The decisions marked **to confirm** are open.
+Status: decided (Tom, 2026-11-22, through the lead); in progress.
 
 ## Inventory
 
@@ -96,44 +96,49 @@ the turn briefly before its share, so no new share starts once an
 exclusive taker is waiting. That is the mechanism ci runs and gates use
 today; this change reuses it for gates' own phases.
 
-### Which jobs take which **to confirm**
+### Which steps take which (Tom, 2026-11-22)
 
-The gate takes a hold per job, before the job's first step, so a lock
-wait never counts against the job's `timeout-minutes` (`gate_run.rs`
-starts the job's clock at its first step). A new table in
-`.config/factory.toml` names each job's hold with its reason:
+The gate takes a hold per step, before the step starts. Time spent
+waiting for a hold is added back to the job's `timeout-minutes` clock
+(`gate_run.rs` starts that clock at the job's first step), so a wait
+never uses up the job's budget. Two tables in `.config/factory.toml`
+name every step by its label, with the reason:
 
 ```
 [gate.shared]
-ci = "compiles and correctness checks; the unit tier's 60 s kill is its only deadline"
-
+"ci: lint" = "fmt and clippy: correctness, no deadline but the job's"
+...
 [gate.exclusive]
-web = "Chrome checks on frame timing and first-frame deadlines"
-gpu = "lavapipe on the CPU and Chrome under screenshot deadlines"
-window = "Xvfb windows counting frames per wake"
+"web: page contract in headless Chrome" = "first-frame and per-check deadlines in Chrome"
+...
 ```
 
-A job in neither table, or in both, refuses the gate before any step
-runs, naming the job and the table to add it to. When consecutive jobs
-take the same hold it is kept; when the hold changes, the old one is
-released first and the new one taken (a process cannot take
-`gate.lock` exclusive while it holds a share of it: flock treats its
-two open files as two owners). For today's workflow that is one
-change, shared for ci then exclusive for web, gpu and window: about
-408 s shared and 400 s exclusive in gate-603.
+A planned step in neither table, or in both, refuses the gate before
+any step runs, naming the step and the tables; so does an entry that
+names no planned step, or has an empty reason, as `[gate.setup]` and
+`[gate.actions]` refuse theirs. When consecutive steps take the same
+hold it is kept; when the hold changes, the old one is released first
+and the new one taken (a process cannot take `gate.lock` exclusive
+while it holds a share of it: flock treats its two open files as two
+owners). A run of consecutive shared steps is one share: an exclusive
+taker waiting meanwhile keeps new shares out, and waits for that run to
+end.
 
-The alternative is per step, with the wait time added back to the job's
-clock: trunk's 70 s would also overlap, at the cost of a table of 31
-step labels and a hold change inside the web job.
+Short correctness steps that sit between exclusive steps (the Mesa and
+Vulkan checks at the start of the gpu and window jobs, the clipboard
+check) are marked exclusive, with that as their reason: a shared hold
+there would give the machine up for under 4 s and queue the gate again
+behind every exclusive phase waiting. Warming Chromium is exclusive:
+it is there so the gpu tier's 20 s screenshot deadline holds. So
+today's workflow switches once, inside the web job: the trunk build is
+the last shared step (about 479 s shared and 330 s exclusive in
+gate-603).
 
-### Builders **to confirm**
+### Builders (Tom, 2026-11-22)
 
-A gate's shared phase builds on every thread at normal priority
-(`priority.rs`). Today at most three ci runs build at once
-(`gate_lock_slots.rs`: past three builders, throughput does not rise).
-Proposed: the gate's shared phase takes a ci slot too, so at most three
-builders of either kind run together. Without it, any number of gates'
-shared phases could overlap beside three ci runs.
+A gate's shared hold takes one of the three ci slots
+(`gate_lock_slots.rs`), so at most three builders of either kind build
+at once. Its exclusive hold takes none: it keeps every share out.
 
 ### Nested commands
 
@@ -143,18 +148,22 @@ gate therefore never waits on itself. The test for this drives the real
 `ci_shared::run` and `test` paths under `XTASK_GATE=1` while another
 process holds `gate.lock` exclusive.
 
-### `cargo xtask test`
+### `cargo xtask test` (Tom, 2026-11-22)
 
-Takes a share (no slot) after its quiet wait, so a gate's exclusive
+Takes a share (no slot) after its quiet wait, with the quiet re-check
+ci makes, so a gate's exclusive
 phase waits for test runs already going and keeps new ones out. This
 retires the declared limit in `quiet_wait.rs`.
 
-### Same worktree
+### Same worktree (Tom, 2026-11-22)
 
 The machine-wide lock today also keeps two gates out of one worktree
-(they would share `target/` and `target/gate/github_output`). Proposed:
-an exclusive flock on `target/gate/run.lock`, refused at once with the
-holder's pid when held.
+(they would share `target/` and `target/gate/github_output`). A gate
+first takes an exclusive flock on `target/gate/run.lock`, writing its
+owner line into it, and waits for it. The wait's deadline is the
+longest gate measured, gate 270's 2,885 s, rounded up to the hour
+(`quiet_lock::LONGEST`); past it the gate refuses, naming the holder
+and the command to rerun.
 
 ### Crash recovery
 
@@ -192,22 +201,26 @@ share, take the quiet lock, then the turn and `gate.lock` exclusive.
 Taking the quiet lock while holding the share would deadlock two gates
 both switching (each waiting on the other's share or quiet hold).
 
-### Not changed
+### Not changed (open questions in the PR)
 
-`cargo xtask scaling` takes no lock today and is out of this change;
-it could take the exclusive hold in a follow-up. The disk floor (30 GB,
-`gate_floor.rs`) was set for one gate at a time, about twice one
-gate's growth; two overlapping gates at the floor would leave about
-1 GB.
+- The disk floor (30 GB, `gate_floor.rs`) was set for one gate at a
+  time, about twice one gate's growth of 14.4 GB. Two gates overlapping
+  from the floor would leave about 1 GB.
+- `cargo xtask scaling`, a perf measurement, takes no lock today.
+- `~/.cache/factory` holds stale `ci.<pid>` markers and
+  `gate.holder.<pid>` temporary files from killed runs; harmless, since
+  every reader checks the owner's liveness.
 
 ## Slices
 
-1. A gate takes its hold per job from `[gate.shared]` and
-   `[gate.exclusive]`, refusing an unlisted job; the whole-run quiet
-   and exclusive holds go. Two-process tests: two shared holders
+1. A gate takes a hold per step from `[gate.shared]` and
+   `[gate.exclusive]`, refusing an unlisted step; its wait is added back
+   to the job's clock; the whole-run quiet and exclusive holds go; the
+   shared hold takes a ci slot. Two-process tests: two shared holders
    overlap; an exclusive taker waits for active shares; new shares wait
    while an exclusive taker waits or holds; a dead holder's lock is
-   recovered; an old-protocol whole-gate hold is respected; a nested
-   xtask in a gate does not wait on its gate.
+   recovered; two gates switching to exclusive at once both finish; an
+   old-protocol whole-gate hold is respected; a nested xtask in a gate
+   does not wait on its gate.
 2. `cargo xtask test` takes a share.
 3. The same-worktree guard.
