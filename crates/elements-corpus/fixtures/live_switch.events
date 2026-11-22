@@ -1,0 +1,19 @@
+# The live switch by mouse and keys. `live` is at x 736..776, y 21..43 and
+# off; `on` at x 600..640 and checked. Browser checkbox semantics are the oracle.
+listen pointerdown pointerup click input change keydown keyup focusin
+click 756 32                  a click toggles on, input and change after the click
+expect event pointerdown input#live
+expect event click input#live
+expect event input input#live
+expect event change input#live
+expect focus input#live
+expect checked input#live true
+key Space                     Space toggles it off on keyup
+expect event keyup input#live
+expect event change input#live
+expect checked input#live false
+key Enter                     Enter does nothing to a switch
+expect no event click
+expect checked input#live false
+key Tab                       Tab goes to the next control in the document, keyboard focus visible
+expect focus-visible input#on
