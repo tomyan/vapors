@@ -82,8 +82,10 @@ Known limits, from review:
   `chromium_pin::pinned_field`. A test holds the version it reads to
   `chromium_pin::pinned_binary`. Making `pinned_field` public in #610
   would leave one parser.
-- `sha256` waits on `sha256sum` without a deadline, as xtask's does; it
-  reads a file or a pipe this process has already closed.
+- `sha256` hands `sha256sum` a file as its stdin and waits at most 30 s
+  for it to exit, then kills it and refuses the hash. That is about seven
+  times the slowest measured run (`sha256.rs` `DEADLINE`). xtask's own
+  `download_install::sha256` still waits without a deadline.
 
 ## Next slices (to replan after R1)
 
