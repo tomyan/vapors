@@ -93,6 +93,7 @@ fixtures![
     outline_paint::OutlinePaint,
     paint_boxes::PaintBoxes,
     positioned::Positioned,
+    progress_fill::ProgressFill,
     range::Range,
     roles::Roles,
     scrolling::Scrolling,

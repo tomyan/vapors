@@ -146,20 +146,3 @@ fn every_pill_avatar_and_bar_has_the_colours_of_its_order() {
         assert_eq!(paint("order-row", "border-bottom-color"), css(ROW_RULE));
     }
 }
-
-#[test]
-fn every_fill_is_its_percentage_of_the_track() {
-    // Given: the first 101 orders
-    let mounted = with_rows(101);
-    let doc = mounted.document.borrow();
-
-    // Then: they carry every percentage, 0..=100, and each fill is its share
-    let mut seen: Vec<u32> = (0..101).map(|i| order(i).progress).collect();
-    seen.sort_unstable();
-    assert_eq!(seen, (0..=100).collect::<Vec<u32>>());
-    for i in 0..101 {
-        let [_, _, w, _] = rect(&doc, by_class(&doc, "fill")[i]);
-        let want = order(i).progress as f32 * PROGRESS_WIDTH / 100.0;
-        assert!((w - want).abs() < 0.01, "order {i}: {w} for {want}");
-    }
-}

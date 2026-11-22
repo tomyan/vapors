@@ -1,11 +1,11 @@
 //! What an order row's classes are picked by, and the refusals when an
 //! order has no class: the row's CSS has 4 pill classes, 8 avatar classes
-//! and 7 bit segments for a 0..=100 fill (`FLAGS.md`).
+//! and a fill bound to a 0..=100 percentage (`FLAGS.md`).
 use crate::dashboard::{AVATAR_COLORS, Order, Status};
 
 /// The pill classes `s0`.. in `order_row.wisp`.
 pub const PILLS: usize = 4;
-/// The highest percentage the 7 bit segments of the fill can show.
+/// The highest percentage: the fill is that share of its 120 px track.
 pub const FULL: u32 = 100;
 const _: () = assert!(
     Status::ALL.len() == PILLS,
@@ -23,7 +23,7 @@ pub fn parts(order: &Order) -> (usize, usize, u32) {
     let progress = order.progress;
     assert!(
         progress <= FULL,
-        "progress {progress} is not a percentage: the fill has 7 bit segments, 0..=100 only (cargo test -p gui-bench-app order_parts)"
+        "progress {progress} is not a percentage: the fill is a share of its track, 0..=100 only (cargo test -p gui-bench-app order_parts)"
     );
     (colour, status, progress)
 }
@@ -35,4 +35,11 @@ pub fn pill(index: usize) -> usize {
         "status {index} has no pill class: add s{index} to ui/order_row.wisp (cargo test -p gui-bench-app order_parts)"
     );
     index
+}
+
+/// The fill's width in px for a percentage `parts` has accepted: its share
+/// of the 120 px track.
+pub fn fill_width(progress: u32) -> f32 {
+    let percent = u8::try_from(progress).expect("a percentage from parts, 0..=100");
+    f32::from(percent) * 1.2
 }

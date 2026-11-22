@@ -1,11 +1,12 @@
 <script>
 use crate::dashboard::order;
-use crate::order_parts::parts;
+use crate::order_parts::{fill_width, parts};
 #[prop] let index: usize = 0;
 let found = order(index);
 let (number, name, initials, amount) = (found.number_text(), found.customer.clone(), found.initials.clone(), found.amount());
 // Refuses an order the CSS below has no class for (order_parts.rs).
 let (colour, status, progress) = parts(&found);
+let fill_width = fill_width(progress);
 let label = found.status.label().to_string();
 </script>
 
@@ -25,11 +26,8 @@ let label = found.status.label().to_string();
 .s0 { background-color: #dcfce7; color: #166534; } .s1 { background-color: #fef3c7; color: #92400e; }
 .s2 { background-color: #dbeafe; color: #1e40af; } .s3 { background-color: #fee2e2; color: #991b1b; }
 .track { position: relative; width: 120px; height: 6px; border-radius: 3px; background-color: #e5e7eb; }
-/* The fill is `progress` * 1.2 px: seven segments, one per bit of the percentage (FLAGS.md). */
-.fill { position: absolute; left: 0; top: 0; height: 6px; display: flex; border-radius: 3px; background-color: #4f46e5; }
-.b0, .b1, .b2, .b3, .b4, .b5, .b6 { height: 6px; width: 0; }
-.b0.on { width: 1.2px; } .b1.on { width: 2.4px; } .b2.on { width: 4.8px; } .b3.on { width: 9.6px; }
-.b4.on { width: 19.2px; } .b5.on { width: 38.4px; } .b6.on { width: 76.8px; }
+/* The fill is `progress` * 1.2 px wide, bound by style:width (FLAGS.md). */
+.fill { position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; background-color: #4f46e5; }
 </style>
 
 <div class="order-row">
@@ -39,8 +37,6 @@ let label = found.status.label().to_string();
     <span class="order-name">{name}</span>
   </div>
   <div class="cell c-status"><div class="pill" class:s0={status == 0} class:s1={status == 1} class:s2={status == 2} class:s3={status == 3}>{label}</div></div>
-  <div class="cell c-progress"><div class="track"><div class="fill">
-    <div class="b0" class:on={progress & 1 != 0}></div><div class="b1" class:on={progress & 2 != 0}></div><div class="b2" class:on={progress & 4 != 0}></div><div class="b3" class:on={progress & 8 != 0}></div><div class="b4" class:on={progress & 16 != 0}></div><div class="b5" class:on={progress & 32 != 0}></div><div class="b6" class:on={progress & 64 != 0}></div>
-  </div></div></div>
+  <div class="cell c-progress"><div class="track"><div class="fill" style:width={fill_width}></div></div></div>
   <div class="cell c-amount"><span class="order-amount">{amount}</span></div>
 </div>
