@@ -150,12 +150,14 @@ fn a_height_past_the_largest_f32_is_refused() {
     let _ = Window::new(f32::MAX, 60.0, 1).px(2);
 }
 
+#[cfg(target_pointer_width = "64")] // a count past 2^32
 #[test]
 #[should_panic(expected = "past 2^53")]
 fn a_count_past_2_to_the_53_is_refused() {
     let _ = Window::new(1.0, 60.0, 1).px((1 << 53) + 1);
 }
 
+#[cfg(target_pointer_width = "64")] // a count past 2^32
 #[test]
 #[should_panic(expected = "6004799503160661 rows of 3 px")]
 fn a_count_whose_f64_product_rounds_to_an_f32_is_not_taken_as_exact() {

@@ -66,7 +66,7 @@ impl Window {
     #[must_use]
     pub fn px(&self, rows: usize) -> f32 {
         assert!(
-            rows <= MAX_ROWS,
+            rows as u64 <= MAX_ROWS,
             "VirtualList: {rows} rows is past 2^53, where a row count has no exact f64 and the height cannot be checked; use fewer rows (cargo test -p vapors-components virtual_window)"
         );
         assert!(
@@ -135,8 +135,10 @@ impl Window {
 const MAX_ROUNDING: f64 = 1.0 / 128.0;
 
 /// The most rows `Window::px` checks: 2^53, the last count an f64 holds
-/// exactly, so every product it forms is the exact one rounded once.
-const MAX_ROWS: usize = 1 << 53;
+/// exactly, so every product it forms is the exact one rounded once. A
+/// `u64`, since a 32-bit `usize` (wasm32) cannot hold it; every count
+/// there is below it.
+const MAX_ROWS: u64 = 1 << 53;
 
 /// `px` to the nearest f32.
 fn narrow(px: f64) -> f32 {
