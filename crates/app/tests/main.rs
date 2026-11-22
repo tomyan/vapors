@@ -30,6 +30,7 @@ mod elements_app_surface_capture;
 mod elements_app_surface_input;
 mod elements_app_surface_input_state;
 mod elements_app_surfaces;
+mod elements_app_tasks;
 mod elements_app_text_field;
 mod elements_app_touch;
 mod elements_app_touch_axes;

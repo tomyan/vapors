@@ -16,7 +16,7 @@ use crate::file_kind::{self, FileKind};
 use crate::gpu_watch::GpuWatch;
 use crate::picker;
 use crate::redraw::RedrawFlag;
-use crate::waker::Waker;
+use crate::waker::{Wake, Waker};
 use crate::window::Message;
 use vapors_a11y::AxUpdate;
 
@@ -26,6 +26,9 @@ pub struct Platform {
     proxy: Option<EventLoopProxy<Message>>,
     gpu_watch: GpuWatch,
     redraw: Arc<RedrawFlag>,
+    /// A detached platform's task wakes (`task_waker`), apart from its
+    /// frames.
+    tasks_woken: Arc<RedrawFlag>,
     cursor: Cell<Option<Cursor>>,
     /// The focused text field the app last set, until the loop takes it.
     // set to no field (`Some(None)`) differs from not set (`None`)
@@ -57,6 +60,7 @@ impl Platform {
             proxy: None,
             gpu_watch: GpuWatch::default(),
             redraw: Arc::default(),
+            tasks_woken: Arc::default(),
             cursor: Cell::new(None),
             text_field: RefCell::new(None),
             ax_updates: RefCell::new(Vec::new()),
@@ -105,9 +109,31 @@ impl Platform {
     #[must_use]
     pub fn waker(&self) -> Waker {
         match &self.proxy {
-            Some(proxy) => Waker::for_loop(proxy.clone()),
+            Some(proxy) => Waker::for_loop(proxy.clone(), Wake::Frame),
             None => Waker::detached(Arc::clone(&self.redraw)),
         }
+    }
+
+    /// The waker for a task executor's wake hook: its wake reaches
+    /// [`App::tasks_woken`](crate::App::tasks_woken), which polls the
+    /// tasks and asks for a frame only if they changed something. A
+    /// detached platform's raises the request
+    /// [`take_task_wake`](Self::take_task_wake) reads, not a frame.
+    #[must_use]
+    pub fn task_waker(&self) -> Waker {
+        match &self.proxy {
+            // a loop's kind is checked by idle_fps task-quiet, which
+            // exits 1 when task wakes never poll the task
+            Some(proxy) => Waker::for_loop(proxy.clone(), Wake::Tasks),
+            None => Waker::detached(Arc::clone(&self.tasks_woken)),
+        }
+    }
+
+    /// Whether a detached platform's task waker woke since the last
+    /// call; clears it. For tests.
+    #[must_use]
+    pub fn take_task_wake(&self) -> bool {
+        self.tasks_woken.take()
     }
 
     /// Whether a frame was asked for since the last call; clears it.

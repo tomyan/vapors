@@ -135,6 +135,16 @@ pub trait App {
     /// depends on the frame's layout, such as the focused text field's
     /// caret area ([`Platform::set_text_field`]), goes here.
     fn drawn(&mut self, _platform: &Platform) {}
+    /// The task hook's waker ([`Platform::task_waker`]) woke the loop;
+    /// any other [`Waker`](crate::Waker)'s wake asks for a frame without
+    /// calling this. The default asks for a frame; an app that polls its
+    /// tasks here asks for one only when the poll changed something
+    /// (`docs/plans/async-components.md` section 3.3). An app that
+    /// wraps another forwards this, or the inner app's tasks are
+    /// never polled.
+    fn tasks_woken(&mut self, platform: &Platform) {
+        platform.request_redraw();
+    }
 }
 
 /// What the platform's own background work sends into the event loop.
@@ -156,8 +166,9 @@ pub(crate) enum Message {
     /// Sent so the loop stops now, not at the next frame, which a
     /// backgrounded tab may never draw.
     GpuStopped,
-    /// A [`Waker`](crate::Waker) asked for a frame from outside `event`.
-    Wake,
+    /// A [`Waker`](crate::Waker) woke the loop from outside `event`:
+    /// for a frame, or, from the task hook's, for the app's tasks.
+    Wake(crate::waker::Wake),
     /// Input from the page's own elements (the web's text input).
     #[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web has them
     Input(Event),

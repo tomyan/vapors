@@ -111,4 +111,8 @@ impl App for Alternating {
     fn drawn(&mut self, platform: &Platform) {
         self.inner.drawn(platform);
     }
+
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.inner.tasks_woken(platform);
+    }
 }

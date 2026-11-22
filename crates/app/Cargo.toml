@@ -27,6 +27,8 @@ vapors-dom.workspace = true
 vapors-platform.workspace = true
 vapors-elements.workspace = true
 vapors-shapes.workspace = true
+# the task executor's wake hook and run_ready (elements_app_tasks.rs)
+vapors-signals.workspace = true
 tracing.workspace = true
 
 # The loop's waker behind a std::task::Waker for GPU error scopes
@@ -38,7 +40,6 @@ send_wrapper = "=0.6.0"
 wasm-bindgen-futures = "0.4.79"
 
 [dev-dependencies]
-vapors-signals.workspace = true
 serde_json.workspace = true
 png.workspace = true
 vapors-demos.workspace = true

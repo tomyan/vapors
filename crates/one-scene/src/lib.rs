@@ -181,6 +181,10 @@ impl App for OneScene {
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);
     }
+
+    fn tasks_woken(&mut self, platform: &Platform) {
+        self.app.tasks_woken(platform);
+    }
 }
 
 /// Runs the example in a window (natively) or the page (on the web),

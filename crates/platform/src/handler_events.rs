@@ -62,7 +62,7 @@ impl ApplicationHandler<Message> for Handler {
             // A wake with nothing recorded cannot happen: the callbacks
             // record before they wake. Nothing to do if it ever did.
             Message::GpuStopped => {}
-            Message::Wake => self.platform.request_redraw(),
+            Message::Wake(wake) => crate::waker::deliver(wake, &mut *self.app, &self.platform),
             Message::Input(event) => {
                 self.platform.stamp(crate::Instant::now());
                 self.app.event(event, &self.platform);

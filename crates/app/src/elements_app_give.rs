@@ -97,6 +97,7 @@ impl ElementsApp {
     ) -> Result<Route, GiveError> {
         let started = Instant::now();
         self.one_hosting(hosting);
+        super::tasks::keep_waker(platform);
         self.surfaces.keep_waker(platform);
         let route = self.place(event, platform, hosting);
         self.follow_link(platform);

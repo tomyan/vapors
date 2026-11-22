@@ -173,3 +173,21 @@ fn inspection_status_is_one_json_object() {
     );
     assert!(status.ends_with(",\"targets\":{}}"), "{status}");
 }
+#[test]
+fn a_task_wake_reaches_the_hud_app_through_the_racer() {
+    // Given: a task spawned after the racer's ElementsApp installed the hook
+    let mut racer = Racer::new();
+    let polled = std::rc::Rc::new(std::cell::Cell::new(false));
+    let seen = std::rc::Rc::clone(&polled);
+    vapors_signals::spawn(vapors_signals::Deadline::User, async move {
+        seen.set(true);
+        Ok::<(), String>(())
+    });
+    // When
+    vapors_platform::App::tasks_woken(&mut racer, &vapors_platform::Platform::detached());
+    // Then: forwarded, or the task is never polled
+    assert!(
+        polled.get(),
+        "Racer::tasks_woken did not reach its ElementsApp"
+    );
+}
