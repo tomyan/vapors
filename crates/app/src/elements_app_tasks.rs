@@ -34,7 +34,13 @@ type Slot = Arc<Mutex<Loop>>;
 
 thread_local! {
     /// The slot of this thread's hook. Every app on the thread shares
-    /// it, as they share the thread's executor.
+    /// it, as they share the thread's executor. It keeps the first
+    /// platform's task waker and ignores later ones: one loop runs per
+    /// thread (natively `run` once per process, one page on the web),
+    /// and `run_ready` polls every task on the thread whichever app
+    /// spawned it, so a second loop on the thread could not tell its
+    /// tasks apart anyway. A platform that only reads the app's frame
+    /// requests, as the tests' second detached one does, is ignored.
     static SLOT: OnceCell<Slot> = const { OnceCell::new() };
 }
 
