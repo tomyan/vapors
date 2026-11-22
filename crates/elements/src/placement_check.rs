@@ -89,9 +89,12 @@ impl Fresh {
 /// with the lane's offset taken off afterwards would not. This side of
 /// the check therefore holds a framed child's place in its frame to
 /// placement's own arithmetic, not to Taffy's: its lane start and its
-/// container's place are held to Taffy by the on-page comparison
-/// (`placement_check_page.rs`, `lane_offset`), to whole device pixels,
-/// which catches any wrong start, since framing requires whole starts.
+/// container's place are held to Taffy only by the on-page comparison
+/// (`placement_check_page.rs`, `lane_offset`). RELAXED: that comparison
+/// is in f32, so it holds a start to whole device pixels only where an
+/// f32 resolves one, below 16,777,216 / scale CSS px; deeper, only to
+/// the f32 step there (4 px at 52,000,000 px), and a start wrong by less
+/// passes. An on-page comparison in f64 retires this.
 fn in_lane_frame(kept: &Placement, lanes: &Lanes, slot: usize) -> Option<f32> {
     let framed = slot < kept.framed.len() && kept.framed[slot];
     framed.then(|| lanes.relative(kept.up[slot], slot))

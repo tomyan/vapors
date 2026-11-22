@@ -103,6 +103,13 @@ page does not scroll in vapors).
 - A deep lane that declines framing (`LaneFramePixel`: a fractional
   start) is placed in f32, off by fractions of a pixel, and not
   reported.
+- The debug placement check's on-page comparison is in f32: below
+  16,777,216 / scale px it holds a framed lane's starts to whole device
+  pixels, deeper only to the f32 step there (4 px at 52,000,000 px).
+  Declared RELAXED at `placement_check.rs` `in_lane_frame`.
+- Follow-ups filed: #608 (judge depth framing on a deep page of small
+  lanes, such as a grid of cards) and #609 (`cargo xtask scaling` looks
+  for the judge binary under `./target`, not cargo's target directory).
 - The corpus event player (`crates/elements-corpus/src/events_vapors_act.rs`)
   neither settles scrolls nor hears a non-bubbling `scroll`; it refuses
   `wheel` today. Needed when wheel playback lands.

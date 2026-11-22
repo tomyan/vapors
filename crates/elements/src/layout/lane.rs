@@ -173,6 +173,14 @@ impl<K: LaneKind> Lane<K> {
     /// framed lane is worked out once per update (`paint_frames.rs`), so
     /// framing the small lanes too (a cell holding its text is one)
     /// would cost O(rows) per update again.
+    ///
+    /// RELAXED: a lane `framable` declines (`Err`: `LaneFramePixel` for a
+    /// fractional start or a scale that makes one, such as 52 px rows at
+    /// 1.1; `LaneFrameScrollingChild`) is placed in f32 scroll-frame
+    /// coordinates as before, a deep one off by up to 4 px at 52,000,000
+    /// px, and only counted as a decline (`Placed::unframed`), not
+    /// refused. Placement keeping deep rects exact without a lane frame
+    /// (f64 scroll-frame coordinates) retires this.
     pub(super) fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
         let many = self.handles.len() >= FRAMED_CHILDREN;
         let framable = self.has_written() && (many || self.reaches_depth(origin));
@@ -184,14 +192,6 @@ impl<K: LaneKind> Lane<K> {
     /// its children however few, so their boxes are placed in frames of
     /// their own, near zero, and shifted in f64. Read only for a lane of
     /// fewer than `FRAMED_CHILDREN`, so the scan of its starts is short.
-    ///
-    /// RELAXED: a deep lane that cannot frame (`framable` declines it,
-    /// `LaneFramePixel` for a fractional start or a scale that makes one,
-    /// such as 52 px rows at 1.1) is placed in f32 scroll-frame
-    /// coordinates as before, off by up to 4 px at 52,000,000 px, and
-    /// only counted as a decline (`Placed::unframed`), not refused.
-    /// Placement keeping deep rects exact without a lane frame (f64
-    /// scroll-frame coordinates) retires this.
     fn reaches_depth(&self, origin: f64) -> bool {
         let starts = self.handles.values().map(|&handle| self.tree.start(handle));
         let last = starts.fold(0.0, f64::max);

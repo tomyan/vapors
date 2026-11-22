@@ -55,31 +55,59 @@ impl Window {
         first.saturating_sub(self.overscan).min(end)..end
     }
 
-    /// How tall `rows` rows are, in px, within `MAX_ROUNDING` of the
-    /// exact product.
+    /// How tall `rows` rows are, in px.
     ///
     /// # Panics
-    /// When the nearest `f32` is further off: layout would place the
-    /// rows below it off their pixel.
+    /// When some count up to `rows` would round by more than
+    /// `MAX_ROUNDING` (`holds`): layout would place rows off their
+    /// pixel. Whether it panics depends on the count alone, rising: a
+    /// count that holds, held at mount as the content's height, holds
+    /// for every spacer height below it, so no scroll can panic.
     #[must_use]
     pub fn px(&self, rows: usize) -> f32 {
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "checked below: the f32 must lie within MAX_ROUNDING of the exact product"
-        )]
-        let exact = rows as f64 * f64::from(self.row_height);
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "checked below: the f32 must lie within MAX_ROUNDING of the exact product"
-        )]
-        let px = exact as f32;
-        let off = (f64::from(px) - exact).abs();
         assert!(
-            off <= MAX_ROUNDING,
-            "VirtualList: {rows} rows of {} px is {exact} px, which an f32 layout holds only to {off} px (more than 1/128); use fewer rows or a row height with fewer significant bits (cargo test -p vapors-components virtual_window)",
-            self.row_height
+            self.holds(rows),
+            "VirtualList: {rows} rows of {} px reach {} px, where an f32 places a row only to {} px (more than 1/128); use fewer rows, or a row height with a short binary fraction (33.25 or 33.5, not 33.3) (cargo test -p vapors-components virtual_window)",
+            self.row_height,
+            self.product(rows),
+            self.half_step(rows)
         );
-        px
+        narrow(self.product(rows))
+    }
+
+    /// Whether every count of rows up to `rows` has a height within
+    /// `MAX_ROUNDING` of exact: each product is exact, which holds when
+    /// the largest odd count's does (a product's odd part is its count's
+    /// odd part times the row height's mantissa), or half the f32 step
+    /// at `rows`' height, the most any product up to it rounds, is
+    /// within the bound. Both only fail more as `rows` rises.
+    fn holds(&self, rows: usize) -> bool {
+        let largest_odd = if rows.is_multiple_of(2) {
+            rows.saturating_sub(1)
+        } else {
+            rows
+        };
+        self.exact(largest_odd) || self.half_step(rows) <= MAX_ROUNDING
+    }
+
+    /// The exact height of `rows` rows.
+    fn product(&self, rows: usize) -> f64 {
+        #[allow(clippy::cast_precision_loss, reason = "a row count is far below 2^53")]
+        let count = rows as f64;
+        count * f64::from(self.row_height)
+    }
+
+    /// Whether `rows` rows' height is an f32 exactly.
+    #[allow(clippy::float_cmp, reason = "exactness is the question")]
+    fn exact(&self, rows: usize) -> bool {
+        f64::from(narrow(self.product(rows))) == self.product(rows)
+    }
+
+    /// Half the f32 step at `rows` rows' height: the most a height there
+    /// rounds.
+    fn half_step(&self, rows: usize) -> f64 {
+        let px = narrow(self.product(rows));
+        f64::from(px.next_up() - px) / 2.0
     }
 }
 
@@ -87,9 +115,20 @@ impl Window {
 /// height: 1/128 px, the resolution below which an f32 corner still
 /// resolves a box (the elements crate frames a lane past 65,536 px for
 /// the same reason). Paint snaps to device pixels, so an error this
-/// small moves nothing; a height of 33.3 px rounds by about 1e-6 at
-/// three rows, and must not be refused.
+/// small moves an edge by at most one device pixel, and only when the
+/// exact edge lies within 1/128 px of a snapping boundary; a height of
+/// 33.3 px rounds by about 1e-6 at three rows and is not refused.
 const MAX_ROUNDING: f64 = 1.0 / 128.0;
+
+/// `px` to the nearest f32.
+fn narrow(px: f64) -> f32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "a height `Window::holds` bounds, narrowed once"
+    )]
+    let narrowed = px as f32;
+    narrowed
+}
 
 /// `rows` rounded by `round` to a row index, saturating at `usize::MAX`.
 fn whole_rows(rows: f32, round: fn(f32) -> f32) -> usize {

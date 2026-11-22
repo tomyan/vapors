@@ -69,19 +69,48 @@ fn a_million_rows_of_52_px_is_an_exact_height() {
 }
 
 #[test]
-fn a_decimal_row_height_is_accepted_at_a_few_rows() {
-    // When: 33.3 has no exact f32, and neither do 3 or 1,000 of it
-    let (three, thousand) = (
-        Window::new(33.3, 60.0, 1).px(3),
-        Window::new(33.3, 60.0, 1).px(1000),
-    );
+fn a_decimal_row_height_is_accepted_up_to_7872_rows_of_33_3_px() {
+    // When: 33.3 px has no exact f32, and neither do most of its products
+    let window = Window::new(33.3, 60.0, 1);
+    let heights = [window.px(3), window.px(7_872)];
 
     // Then: each within 1/128 px of the exact height
-    assert!((f64::from(three) - 99.9).abs() <= 1.0 / 128.0, "{three}");
-    assert!(
-        (f64::from(thousand) - 33_300.0).abs() <= 1.0 / 128.0,
-        "{thousand}"
-    );
+    let exact = [3.0, 7_872.0].map(|rows| rows * f64::from(33.3_f32));
+    for (height, exact) in heights.iter().zip(exact) {
+        assert!(
+            (f64::from(*height) - exact).abs() <= 1.0 / 128.0,
+            "{height}"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "7873 rows of 33.3 px")]
+fn a_decimal_row_height_is_refused_from_7873_rows_of_33_3_px() {
+    // Where an f32 steps by 1/32 px: half that is past the 1/128 bound
+    let _ = Window::new(33.3, 60.0, 1).px(7_873);
+}
+
+#[test]
+#[should_panic(expected = "7874 rows of 33.3 px")]
+fn a_count_past_the_first_refused_is_refused_too() {
+    // 7,874 rows of 33.3 px happen to round by under 1/128 px, but 7,873
+    // do not: a content height of 7,874 rows would mount, and a scroll
+    // to row 7,873 would then panic
+    let _ = Window::new(33.3, 60.0, 1).px(7_874);
+}
+
+#[test]
+fn every_spacer_below_a_held_content_height_holds_too() {
+    // Given: the most rows of 33.3 px a list holds
+    let window = Window::new(33.3, 60.0, 1);
+    let _ = window.px(7_872);
+
+    // When: every spacer height a scroll can ask for, row by row
+    let spacers = (0..=7_872).map(|rows| window.px(rows));
+
+    // Then: none refused
+    assert_eq!(spacers.count(), 7_873);
 }
 
 #[test]

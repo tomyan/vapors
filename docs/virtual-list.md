@@ -32,9 +32,12 @@ tall as the rows above the first that exists, then the rows. Inside it:
 
 Refused, naming the prop: a `row_height` that is not a positive finite
 number (the default, 0, is refused at mount), a negative or non-finite
-`height`, and a content or spacer height an `f32` holds only to more
-than 1/128 px (it would put rows off their pixel). A million rows of
-52 px are exact; a decimal row height such as 33.3 rounds by far less.
+`height`, and a count of rows some count up to which an `f32` holds
+only to more than 1/128 px (it would put rows off their pixel). The
+refusal depends on the count alone and only rises with it, so a list
+whose content height holds at mount cannot be refused by a scroll. A
+million rows of 52 px are exact; 33.3 px rows hold up to 7,872 rows and
+are refused from 7,873 (33.25 or 33.5 px hold far more).
 
 Every prop has a default, because a tag from another crate cannot pass
 a required prop yet (`docs/components.md`, "Required props").
