@@ -92,8 +92,13 @@ impl Window {
         } else {
             rows
         };
+        // Only a count below 2^24 makes an exact product (its odd part
+        // times a mantissa of at least 1 must fit an f32's 24 bits), and
+        // below 2^24 the f64 product is the true one, so `exact` answers
+        // truly; a larger count's product rounds in f64 too.
+        let exact = largest_odd < 1 << 24 && self.exact(largest_odd);
         let finite = narrow(self.product(rows)).is_finite();
-        finite && (self.exact(largest_odd) || self.half_step(rows) <= MAX_ROUNDING)
+        finite && (exact || self.half_step(rows) <= MAX_ROUNDING)
     }
 
     /// The exact height of `rows` rows.

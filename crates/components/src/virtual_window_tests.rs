@@ -155,3 +155,17 @@ fn a_height_past_the_largest_f32_is_refused() {
 fn a_count_past_2_to_the_53_is_refused() {
     let _ = Window::new(1.0, 60.0, 1).px((1 << 53) + 1);
 }
+
+#[test]
+fn a_count_whose_f64_product_rounds_to_an_f32_is_not_taken_as_exact() {
+    // Given: (2^54 - 1) / 3 rows of 3 px make 2^54 - 1 px, which an f64
+    // rounds to 2^54, an f32; the true height is none
+    let window = Window::new(3.0, 60.0, 1);
+    let rows = ((1_usize << 54) - 1) / 3;
+
+    // When
+    let held = std::panic::catch_unwind(|| window.px(rows));
+
+    // Then: refused, as 2^24 + 1 rows of 3 px below it are
+    assert!(held.is_err(), "{rows} rows of 3 px held");
+}
