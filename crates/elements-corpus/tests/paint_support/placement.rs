@@ -38,3 +38,23 @@ fn extent(image: &Rgba, [left, top, right, bottom]: [u32; 4]) -> Extent {
     let xs = points.iter().map(|p| p.0);
     Some([ys.clone().min()?, ys.max()?, xs.clone().min()?, xs.max()?])
 }
+
+/// Each region whose ink spans other rows or columns in `ours` than in
+/// `theirs`, with both extents.
+pub fn off(ours: &Rgba, theirs: &Rgba, regions: &[Region]) -> Vec<String> {
+    inked(ours, regions)
+        .iter()
+        .zip(&inked(theirs, regions))
+        .filter(|(a, b)| a != b)
+        .map(|((label, a), (_, b))| format!("{label}: ours {a:?}, Chromium's {b:?}"))
+        .collect()
+}
+
+/// `image` moved down one row, its top row white: every glyph a device
+/// pixel lower.
+pub fn shifted_down(image: &Rgba) -> Rgba {
+    let row = (image.width * 4) as usize;
+    let mut data = vec![255; row];
+    data.extend_from_slice(&image.data[..image.data.len() - row]);
+    Rgba { data, ..*image }
+}

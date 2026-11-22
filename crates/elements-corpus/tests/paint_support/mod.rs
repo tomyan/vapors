@@ -17,8 +17,7 @@ use vapors_elements_corpus::{Fixture, all};
 use vapors_text::FontSystem;
 use vapors_text::comparison::{Chromium, Rgba};
 
-pub const WIDTH: u32 = 640;
-pub const HEIGHT: u32 = 400;
+pub use vapors_elements_corpus::paint_reference::{HEIGHT, WIDTH};
 
 pub fn paint_fixtures() -> Vec<Fixture> {
     let fixtures: Vec<Fixture> = all()

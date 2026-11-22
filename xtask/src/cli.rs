@@ -186,6 +186,14 @@ pub enum Command {
     },
     /// Check formatting and lints without running tests.
     Lint,
+    /// Capture a paint fixture's saved Chromium reference again with the
+    /// pinned Chromium, into crates/elements-corpus/fixtures/references/.
+    Reference {
+        /// The paint fixture, as `text_line_box_paint`.
+        fixture: String,
+        /// Device pixels per CSS pixel.
+        scale: u32,
+    },
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,
     /// Fail naming each file where ./xtask differs from <sibling>/xtask.

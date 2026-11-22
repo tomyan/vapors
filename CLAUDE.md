@@ -12,6 +12,11 @@ cargo xtask setup         install pinned tools ([downloads] fetched and verified
 cargo xtask ci            what CI runs: tools, fmt, clippy, wasm, unit, gpu; fastest first
 cargo xtask deny          cargo-deny by deny.toml: advisories, bans, licences, sources
 cargo xtask lint          fmt and clippy only
+cargo xtask reference <fixture> <scale>
+                          a paint fixture's saved Chromium reference captured again with
+                          the pinned Chromium, PNG and manifest, into
+                          crates/elements-corpus/fixtures/references/ (docs/plans/
+                          saved-chromium-references.md); look at it, then commit both
 cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
 cargo xtask web           trunk release build of the web package into target/web, with
                           brotli (.br) and gzip (.gz) copies of its wasm, js, css, html and json
