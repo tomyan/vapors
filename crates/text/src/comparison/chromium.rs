@@ -9,6 +9,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
+use super::chromium_profile::{launch_profile, profile_root, remove_profile};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
 use super::png_file::read_png;
@@ -54,29 +55,32 @@ pub struct Chromium {
     pub(super) binary: PathBuf,
     /// How long one screenshot may take before Chromium is killed.
     pub(super) deadline: Duration,
+    /// Where each launch's expiry-named profile is made.
+    pub(super) profiles: PathBuf,
 }
 
 impl Chromium {
-    /// `VAPORS_CHROMIUM`, else the first candidate on `PATH`.
+    /// `VAPORS_CHROMIUM`, else the first candidate on `PATH`. Its
+    /// profiles go in the automation cache ([`profile_root`]).
     ///
     /// # Errors
     ///
-    /// [`ChromiumError::NotFound`], naming what was tried and the fix.
+    /// [`ChromiumError::NotFound`], naming what was tried and the fix;
+    /// [`ChromiumError::Failed`] when there is no automation cache.
     pub fn find() -> Result<Self, ChromiumError> {
-        if let Some(binary) = std::env::var_os(CHROMIUM_ENV) {
-            return Ok(Self {
-                binary: PathBuf::from(binary),
-                deadline: DEADLINE,
-            });
-        }
-        CANDIDATES
-            .iter()
-            .find_map(|name| on_path(name))
-            .map(|binary| Self {
-                binary,
-                deadline: DEADLINE,
-            })
-            .ok_or(ChromiumError::NotFound)
+        let binary = match std::env::var_os(CHROMIUM_ENV) {
+            Some(binary) => PathBuf::from(binary),
+            None => CANDIDATES
+                .iter()
+                .find_map(|name| on_path(name))
+                .ok_or(ChromiumError::NotFound)?,
+        };
+        let profiles = profile_root(std::env::var_os("XDG_CACHE_HOME"), std::env::var_os("HOME"))?;
+        Ok(Self {
+            binary,
+            deadline: DEADLINE,
+            profiles,
+        })
     }
 
     /// Screenshot `html` at `width` by `height` CSS pixels at `scale`
@@ -109,7 +113,8 @@ impl Chromium {
         let [width, height] = size;
         remove_stale(png)?;
         let tmp = launch_tmp()?;
-        let mut child = self.spawn(html, png, tmp.path(), size, scale)?;
+        let profile = launch_profile(&self.profiles, std::time::SystemTime::now())?;
+        let mut child = self.spawn(html, png, [tmp.path(), profile.path()], size, scale)?;
         let stderr = drain(
             child
                 .stderr
@@ -122,6 +127,7 @@ impl Chromium {
                 "exited with {status}:\n{stderr}"
             )));
         }
+        remove_profile(profile)?;
         let image = read_png(png).map_err(ChromiumError::Failed)?;
         check_size(&image, png, [width * scale, height * scale])?;
         Ok(image)
@@ -143,8 +149,9 @@ impl Chromium {
         scale: f64,
     ) -> Result<String, ChromiumError> {
         let tmp = launch_tmp()?;
+        let profile = launch_profile(&self.profiles, std::time::SystemTime::now())?;
         let mut child = self
-            .command(tmp.path(), width, height, scale)?
+            .command([tmp.path(), profile.path()], width, height, scale)?
             .arg("--dump-dom")
             .arg(format!("file://{}", html.display()))
             .stdout(Stdio::piped())
@@ -163,6 +170,7 @@ impl Chromium {
                 "exited with {status}:\n{stderr}"
             )));
         }
+        remove_profile(profile)?;
         Ok(stdout)
     }
 
@@ -170,11 +178,11 @@ impl Chromium {
         &self,
         html: &Path,
         png: &Path,
-        tmp: &Path,
+        dirs: [&Path; 2],
         [width, height]: [u32; 2],
         scale: u32,
     ) -> Result<Child, ChromiumError> {
-        self.command(tmp, width, height, f64::from(scale))?
+        self.command(dirs, width, height, f64::from(scale))?
             .arg(format!("--screenshot={}", png.display()))
             .arg(format!("file://{}", html.display()))
             .stdout(Stdio::null())
@@ -185,11 +193,13 @@ impl Chromium {
     /// Headless Chromium at a fixed window and scale. It asks
     /// xdg-desktop-portal over the session bus before its first request;
     /// where the portal cannot start, D-Bus activation waits 120 s. With
-    /// no session bus address it skips that. `tmp` is its `TMPDIR` ([`launch_tmp`]),
-    /// and holds its disk cache ([`contain_cache`]).
+    /// no session bus address it skips that. `[tmp, profile]`: `tmp` is its
+    /// `TMPDIR` ([`launch_tmp`]) and holds its disk cache ([`contain_cache`]);
+    /// `profile` is its `--user-data-dir` ([`launch_profile`]), so it makes
+    /// no profile of its own under `~/.config/chromium-headless`.
     fn command(
         &self,
-        tmp: &Path,
+        [tmp, profile]: [&Path; 2],
         width: u32,
         height: u32,
         scale: f64,
@@ -208,6 +218,7 @@ impl Chromium {
                 // Fonts load after first paint; give the page settled time.
                 "--virtual-time-budget=5000",
                 &format!("--window-size={width},{height}"),
+                &format!("--user-data-dir={}", profile.display()),
             ])
             .stderr(Stdio::piped());
         contain_cache(&mut command, tmp)?;
