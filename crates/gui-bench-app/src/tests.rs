@@ -13,4 +13,5 @@ mod order_parts;
 mod order_rows;
 mod orders_behaviour;
 mod pages;
+mod progress_fill;
 mod support;
