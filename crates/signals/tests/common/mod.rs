@@ -1,6 +1,10 @@
 //! Shared helpers of the task tests.
 #![allow(dead_code)]
 
+mod clock;
+#[allow(unused_imports)] // not every test binary needs the clock
+pub use clock::Clock;
+
 use std::cell::{Cell, RefCell};
 use std::future::{Future, poll_fn};
 use std::rc::Rc;
