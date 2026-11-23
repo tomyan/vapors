@@ -121,3 +121,81 @@ fn a_share_taken_as_the_quiet_lock_was_taken_is_let_go_and_waited_for_again() {
         "a share was kept"
     );
 }
+
+/// How many rounds [`quiet_taken_five_times`] has taken the quiet lock in.
+static ROUNDS_LOST: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// The lock directory [`quiet_taken_five_times`] writes into.
+static FIVE_IN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// The quiet lock taken for 100 ms in each of the first five load waits.
+fn quiet_taken_five_times(_: &str) -> Result<(), String> {
+    if ROUNDS_LOST.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 5 {
+        return Ok(());
+    }
+    let dir = FIVE_IN.get().expect("the test's lock directory");
+    let holder = Holder::me(
+        "/w/timed",
+        Duration::from_millis(100),
+        crate::quiet_lock::Form::Hold,
+        "x",
+    );
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(crate::quiet_lock::FILE), holder.line()).map_err(|e| e.to_string())
+}
+
+#[test]
+fn a_gate_that_loses_more_than_three_rounds_to_the_quiet_lock_still_gets_its_share() {
+    // Given
+    let dir = lock_dir("share-gate-five-rounds");
+    FIVE_IN.set(dir.to_path_buf()).expect("set once");
+    let place = Place {
+        load: quiet_taken_five_times,
+        ..Place::brief(&dir, "/w/gate", Duration::from_secs(10))
+    };
+
+    // When
+    let share = take(&place, Sharer::Gate);
+
+    // Then
+    assert!(share.is_ok(), "{share:?}");
+    assert!(
+        ROUNDS_LOST.load(std::sync::atomic::Ordering::SeqCst) > 5,
+        "it lost no more than three"
+    );
+}
+
+/// The lock directory [`quiet_taken_for_a_minute`] writes into.
+static MINUTE_IN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// The quiet lock taken for a minute during every load wait.
+fn quiet_taken_for_a_minute(_: &str) -> Result<(), String> {
+    let dir = MINUTE_IN.get().expect("the test's lock directory");
+    let holder = Holder::me(
+        "/w/timed",
+        Duration::from_mins(1),
+        crate::quiet_lock::Form::Hold,
+        "x",
+    );
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(crate::quiet_lock::FILE), holder.line()).map_err(|e| e.to_string())
+}
+
+#[test]
+fn a_gate_still_losing_to_the_quiet_lock_at_its_deadline_fails_naming_the_holder() {
+    // Given
+    let dir = lock_dir("share-gate-deadline");
+    MINUTE_IN.set(dir.to_path_buf()).expect("set once");
+    let place = Place {
+        load: quiet_taken_for_a_minute,
+        ..Place::brief(&dir, "/w/gate", BRIEF)
+    };
+
+    // When
+    let refusal = take(&place, Sharer::Gate).expect_err("past its deadline");
+
+    // Then
+    assert!(
+        refusal.contains("/w/timed") && refusal.contains("the quiet lock"),
+        "{refusal}"
+    );
+}

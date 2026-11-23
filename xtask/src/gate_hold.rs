@@ -30,6 +30,23 @@ pub enum Hold {
     Exclusive,
 }
 
+impl Hold {
+    /// The jobs a step under this hold builds with: a shared step as one
+    /// of the ci builders, `[build] jobs` (4 unless set: three builders
+    /// of 4 fill the machine's 12 threads, `gate_lock_slots.rs`); an
+    /// exclusive step, alone, on every thread (Tom, 2026-11-23).
+    ///
+    /// # Errors
+    ///
+    /// `[build] jobs` is not a positive number.
+    pub fn jobs(self) -> Result<String, String> {
+        match self {
+            Self::Shared => crate::priority::configured_jobs().map(|jobs| jobs.to_string()),
+            Self::Exclusive => Ok(crate::priority::threads()),
+        }
+    }
+}
+
 /// What a gate holds now.
 #[derive(Debug)]
 enum Held {
@@ -113,20 +130,20 @@ impl StepHolds {
         })
     }
 
-    /// Hold what `step` needs.
+    /// Hold what `step` needs; which hold that is.
     ///
     /// # Errors
     ///
     /// As [`GateHolds::hold`], or `step` is not in the table it was
     /// classified from.
-    pub fn before(&mut self, step: &PlannedStep) -> Result<(), String> {
+    pub fn before(&mut self, step: &PlannedStep) -> Result<Hold, String> {
         let hold = self.table.get(&step.name).copied().ok_or_else(|| {
             format!(
                 "`{}` was not classified when the gate began; fix: report it, this is a bug in xtask",
                 step.name
             )
         })?;
-        self.holds.hold(hold)
+        self.holds.hold(hold).map(|()| hold)
     }
 }
 

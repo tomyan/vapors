@@ -79,6 +79,25 @@ scaling`, which is not in the gate.
 | nested xtask in a gate step (`lint`, `wasm`, `test`, `deny`, `setup`, `screenshot`, `web`) | as the step | as the step | no lock: `XTASK_GATE=1` skips the quiet wait and the ci share (`priority::in_gate`) |
 | `cargo xtask scaling` | CPU, GPU timing judge | perf measurement | nothing (the nightly runs it under `nice`) |
 
+## Decisions
+
+- Holds per step, the wait added back to the job's clock; an unlisted
+  step refuses the gate (Tom, 2026-11-22).
+- A gate's shared hold takes one of the three ci slots (Tom, 2026-11-22).
+- `cargo xtask test` takes a share without a slot after its quiet wait
+  (Tom, 2026-11-22).
+- One gate per worktree by a flock that waits, with a measured deadline
+  (Tom, 2026-11-22).
+- In its shared steps a gate builds with 4 jobs, as a ci builder does
+  (`[build] jobs`; `gate_lock_slots.rs` counts three builders of 4 on 12
+  threads); its exclusive steps keep every thread (Tom, 2026-11-23).
+  The gate sets `CARGO_BUILD_JOBS` and `XTASK_GATE_JOBS` on each step,
+  and an xtask the step runs keeps the latter (`priority.rs`).
+- Losing a round to the quiet lock is not a failure for a gate: its
+  share keeps trying until the quiet lock's and the gate lock's longest
+  waits together, 101 min, then fails naming the holder. `ci` and
+  `test` keep their three rounds (Tom, 2026-11-23).
+
 ## Design
 
 ### Holds
@@ -194,10 +213,11 @@ held to the workflow by a test): the longest gate is 42 + 2 x 111 = 264
 min (`gate_deadline::LONGEST`). A second gate in the same worktree
 waits that long for the first (`gate_worktree_lock::WAIT`), and the
 queue kills a gate after it and `gate --pr`'s three gh calls of 30 s
-(`queue_gate_child::GATE_DEADLINE`). Declared limits: a share's later
-quiet rounds (`share.rs`, at most three) and a `[load]
-deadline_minutes` above the default are not counted; either can make a
-gate outlive the deadline, which then kills or refuses it.
+(`queue_gate_child::GATE_DEADLINE`). A gate's share tries rounds until 101 min
+(quiet and gate lock together) and then waits for the load at most 10
+more, so its hold too is within 111 min. Declared limit: a `[load]
+deadline_minutes` above the default is not counted; it can make a gate
+outlive the deadline, which then kills or refuses it.
 
 The exclusive hold's quiet holder file is renewed once the gate lock
 and the load wait are had, so its 60 min deadline runs from the start

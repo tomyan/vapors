@@ -5,6 +5,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use super::*;
+use crate::gate_hold::Hold;
 
 fn planned(name: &str, job_timeout: Duration) -> PlannedStep {
     PlannedStep {
@@ -42,7 +43,7 @@ fn a_wait_for_a_hold_inside_a_job_is_not_counted_against_the_job_s_timeout() {
         if step.name == "web: page contract" {
             std::thread::sleep(Duration::from_millis(1500));
         }
-        Ok(())
+        Ok(Hold::Shared)
     };
 
     // When
@@ -80,7 +81,7 @@ fn a_job_s_clock_runs_on_across_its_steps() {
     second.run = "sleep 0.6".to_owned();
 
     // When
-    let code = gate(&[first, second], &mut |_| Ok(()));
+    let code = gate(&[first, second], &mut |_| Ok(Hold::Shared));
 
     // Then
     assert_eq!(
@@ -88,4 +89,42 @@ fn a_job_s_clock_runs_on_across_its_steps() {
         ExitCode::FAILURE,
         "the second step had a fresh job clock"
     );
+}
+
+/// `step`'s value for `name`, as the gate runs it.
+fn env_of<'a>(step: &'a crate::steps::Step, name: &str) -> Option<&'a str> {
+    step.env
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.as_str())
+}
+
+#[test]
+fn a_shared_step_builds_with_a_ci_builder_s_jobs_and_an_exclusive_one_on_every_thread() {
+    // Given
+    let threads = std::thread::available_parallelism()
+        .expect("threads")
+        .to_string();
+    let step = planned("ci: lint", Duration::from_mins(9));
+
+    // When
+    let jobs = |hold: Hold| hold.jobs().expect("jobs");
+    let shared = step_for(
+        &step,
+        Path::new("/o"),
+        Wrap::SwitchedOff,
+        &jobs(Hold::Shared),
+    );
+    let alone = step_for(
+        &step,
+        Path::new("/o"),
+        Wrap::SwitchedOff,
+        &jobs(Hold::Exclusive),
+    );
+
+    // Then: and the xtask a step runs keeps it (`priority::GATE_JOBS_ENV`)
+    for name in ["CARGO_BUILD_JOBS", crate::priority::GATE_JOBS_ENV] {
+        assert_eq!(env_of(&shared, name), Some("4"), "{name}");
+        assert_eq!(env_of(&alone, name), Some(threads.as_str()), "{name}");
+    }
 }

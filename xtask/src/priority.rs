@@ -54,8 +54,32 @@ pub fn command(program: &str) -> Result<Command, String> {
     let mut command = command_for(program, gate, niced);
     if !gate {
         command.env("CARGO_BUILD_JOBS", configured_jobs()?.to_string());
+    } else if let Some(jobs) = gate_jobs_from(std::env::var(GATE_JOBS_ENV).ok().as_deref())? {
+        command.env("CARGO_BUILD_JOBS", jobs);
     }
     Ok(command)
+}
+
+/// Set by the gate on each step to the jobs it builds with
+/// (`gate_hold::Hold::jobs`), so an xtask the step runs builds with them
+/// too rather than on every thread.
+pub const GATE_JOBS_ENV: &str = "XTASK_GATE_JOBS";
+
+/// The jobs in [`GATE_JOBS_ENV`], if set.
+///
+/// # Errors
+///
+/// It is set to something other than a positive number, naming it.
+pub fn gate_jobs_from(value: Option<&str>) -> Result<Option<String>, String> {
+    let Some(text) = value else {
+        return Ok(None);
+    };
+    match text.parse::<u32>() {
+        Ok(jobs) if jobs > 0 => Ok(Some(text.to_owned())),
+        _ => Err(format!(
+            "{GATE_JOBS_ENV} is `{text}`, not a positive number; fix: unset it, it is set only by `cargo xtask gate`"
+        )),
+    }
 }
 
 /// Whether this process runs in the gate: it is the gate, or a gate's
@@ -88,13 +112,13 @@ pub fn command_for(program: &str, in_gate: bool, niced: bool) -> Command {
 
 /// The machine's thread count; 1 when it cannot be read, which only
 /// slows the gate.
-fn threads() -> String {
+pub fn threads() -> String {
     std::thread::available_parallelism()
         .map_or(1, std::num::NonZero::get)
         .to_string()
 }
 
-fn configured_jobs() -> Result<u32, String> {
+pub fn configured_jobs() -> Result<u32, String> {
     static JOBS: OnceLock<Result<u32, String>> = OnceLock::new();
     // From the workspace root, xtask's parent, wherever the step runs.
     let xtask = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

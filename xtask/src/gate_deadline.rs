@@ -3,12 +3,9 @@
 //! second gate waiting in the same worktree (`gate_worktree_lock.rs`)
 //! and of a gate the queue runs (`queue_gate_child.rs`).
 //!
-//! Declared limits: a share waits for the quiet lock again when one was
-//! taken between its wait and its share (`share.rs`, at most three
-//! rounds); only the first round is counted here. `[load]
-//! deadline_minutes` set above the default would also lengthen each hold.
-//! Either can make a gate outlive [`LONGEST`], which then kills or
-//! refuses it, loudly.
+//! Declared limit: `[load] deadline_minutes` set above the default
+//! would lengthen each hold. It can make a gate outlive [`LONGEST`],
+//! which then kills or refuses it, loudly.
 
 use std::time::Duration;
 
@@ -16,6 +13,8 @@ use std::time::Duration;
 /// min), then the turn, a slot and the gate lock together
 /// (`gate_lock::WAIT`, 40 min), then the load wait, which goes on at its
 /// default deadline (`load_wait::DEFAULT_DEADLINE`, 10 min): 111 min.
+/// A gate's share tries rounds for the first two together (`share.rs`)
+/// and then waits for the load, so it keeps within this too.
 pub const HOLD_WAIT: Duration = crate::quiet_lock::WAIT
     .saturating_add(crate::gate_lock::WAIT)
     .saturating_add(crate::load_wait::DEFAULT_DEADLINE);

@@ -9,6 +9,8 @@
 //! the gate already holds what its step needs, and a share would wait on
 //! the gate's own exclusive hold. Retired if no gate step ran xtask.
 
+use std::time::{Duration, Instant};
+
 use crate::gate_lock_shared::{Shared, Slot, acquire_shared_as};
 use crate::lock_place::Place;
 use crate::quiet_lock::{self, Holder};
@@ -40,8 +42,8 @@ impl Sharer {
     }
 }
 
-/// How many times a run waits for the quiet lock again when it was
-/// taken between its wait and its share. RELAXED: chosen, not measured;
+/// How many times a ci or test run waits for the quiet lock again when
+/// it was taken between its wait and its share. RELAXED: chosen, not measured;
 /// no log yet shows a hold landing in a ci run's load wait. Each round
 /// is a whole quiet window (up to 60 min), so three bounds the wait at
 /// about three hours, and a fourth fails naming the fix. Retired by a
@@ -77,30 +79,26 @@ pub fn unless_in_gate_at(
 
 /// Wait for the quiet lock (and the load, for a sharer that builds),
 /// then take a share at `place`; again if the quiet lock was taken
-/// meanwhile, at most [`QUIET_ROUNDS`] times.
+/// meanwhile. `ci` and `test` try at most [`QUIET_ROUNDS`] times; a
+/// gate, whose lost round is another gate's exclusive steps, not a
+/// failure, tries until its deadline (Tom, 2026-11-23): the quiet lock's
+/// and the gate lock's longest waits together (`quiet_lock::WAIT`, from
+/// gate 270's 2,885 s, and `gate_lock::WAIT`, from touche's gate times),
+/// 101 min, which with one load wait is `gate_deadline::HOLD_WAIT`.
 ///
 /// # Errors
 ///
-/// A wait's deadline passed, naming the holder, or the quiet lock was
-/// taken every round.
+/// A wait's deadline passed, naming the holder, or (`ci`, `test`) the
+/// quiet lock was taken every round.
 pub fn take(place: &Place, sharer: Sharer) -> Result<Shared, String> {
+    if sharer == Sharer::Gate {
+        return take_until(place, place.quiet_wait.saturating_add(place.lock_wait));
+    }
     let who = sharer.name();
     for _ in 0..QUIET_ROUNDS {
-        wait_quiet(place, who)?;
-        if sharer.builds() {
-            (place.load)(who)?;
-        }
-        let slot = if sharer.builds() {
-            Slot::Take
-        } else {
-            Slot::None
-        };
-        let worktree = place.worktree.as_str();
-        let share = acquire_shared_as(&place.dir, (worktree, who), place.lock_wait, slot)?;
-        if !taken_since(place)? {
+        if let Some(share) = round(place, sharer, (place.quiet_wait, place.lock_wait))? {
             return Ok(share);
         }
-        println!("{who}: the quiet lock was taken while this run waited; letting its share go");
     }
     Err(format!(
         "the quiet lock was taken {QUIET_ROUNDS} times between this run's wait and its share; \
@@ -108,10 +106,46 @@ pub fn take(place: &Place, sharer: Sharer) -> Result<Shared, String> {
     ))
 }
 
-/// Wait while someone else holds the quiet lock at `place`.
-fn wait_quiet(place: &Place, who: &str) -> Result<(), String> {
+/// A gate's share: rounds until `deadline` from now, each wait no
+/// longer than what is left of it.
+fn take_until(place: &Place, deadline: Duration) -> Result<Shared, String> {
+    let started = Instant::now();
+    loop {
+        let left = deadline.saturating_sub(started.elapsed());
+        if let Some(share) = round(place, Sharer::Gate, (left, left))? {
+            return Ok(share);
+        }
+    }
+}
+
+/// One round: the quiet wait, the load wait for a sharer that builds,
+/// the share, then the re-check; none, the share let go, when the quiet
+/// lock was taken meanwhile.
+fn round(
+    place: &Place,
+    sharer: Sharer,
+    (quiet_wait, lock_wait): (Duration, Duration),
+) -> Result<Option<Shared>, String> {
+    let who = sharer.name();
+    wait_quiet(place, who, quiet_wait)?;
+    let slot = if sharer.builds() {
+        (place.load)(who)?;
+        Slot::Take
+    } else {
+        Slot::None
+    };
+    let share = acquire_shared_as(&place.dir, (&place.worktree, who), lock_wait, slot)?;
+    if !taken_since(place)? {
+        return Ok(Some(share));
+    }
+    println!("{who}: the quiet lock was taken while this run waited; letting its share go");
+    Ok(None)
+}
+
+/// Wait while someone else holds the quiet lock at `place`, up to `wait`.
+fn wait_quiet(place: &Place, who: &str, wait: Duration) -> Result<(), String> {
     let mine = |holder: &Holder| is_mine(holder, place.parent, &place.worktree);
-    quiet_lock::wait_clear(&place.dir, (who, &mine), place.quiet_wait, &mut |line| {
+    quiet_lock::wait_clear(&place.dir, (who, &mine), wait, &mut |line| {
         println!("{line}");
     })
 }

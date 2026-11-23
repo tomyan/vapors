@@ -16,6 +16,7 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use crate::command;
+use crate::gate_hold::Hold;
 use crate::gate_plan::PlannedStep;
 use crate::report::Reporter;
 use crate::steps::Step;
@@ -25,7 +26,7 @@ mod sandbox;
 pub use sandbox::{Wrap, wrap as sandbox_wrap};
 
 /// Takes the hold a step needs before it runs.
-pub type HoldFor<'a> = &'a mut dyn FnMut(&PlannedStep) -> Result<(), String>;
+pub type HoldFor<'a> = &'a mut dyn FnMut(&PlannedStep) -> Result<Hold, String>;
 
 /// Run `planned`, each step with this run's own TMPDIR (`run_tmp`) and
 /// as `wrap` says, after `hold` takes what it needs; `output` is the
@@ -52,11 +53,12 @@ fn run_in(
     let mut job: Option<(&str, Instant)> = None;
     let mut passed = 0;
     for planned_step in planned {
-        let Some(job_started) = held_for(planned_step, job, hold) else {
+        let Some((job_started, jobs)) = held_for(planned_step, job, hold) else {
             break;
         };
         job = Some((&planned_step.job, job_started));
-        let mut step = crate::run_tmp::with_tmpdir(step_for(planned_step, output, wrap), tmp);
+        let built = step_for(planned_step, output, wrap, &jobs);
+        let mut step = crate::run_tmp::with_tmpdir(built, tmp);
         step.deadline = Some(deadline(planned_step, job_started.elapsed()));
         let load_at_start = crate::load::now();
         let outcome = command::run(&step);
@@ -76,25 +78,30 @@ fn run_in(
 }
 
 /// Take `step`'s hold; when its job's clock started, moved on by the
-/// wait so the wait is not counted, or now for a job's first step. None
-/// when the hold cannot be had, said as the gate's failure.
+/// wait so the wait is not counted, or now for a job's first step, and
+/// the jobs the step builds with. None when the hold cannot be had, said
+/// as the gate's failure.
 fn held_for(
     step: &PlannedStep,
     job: Option<(&str, Instant)>,
     hold: HoldFor<'_>,
-) -> Option<Instant> {
+) -> Option<(Instant, String)> {
     let asked = Instant::now();
-    if let Err(why) = hold(step) {
-        println!(
-            "FAIL gate: {}: its hold: {why}; then rerun `cargo xtask gate`",
-            step.name
-        );
-        return None;
-    }
-    match job {
-        Some((name, at)) if name == step.job => Some(at + asked.elapsed()),
-        _ => Some(Instant::now()),
-    }
+    let jobs = match hold(step).and_then(Hold::jobs) {
+        Ok(jobs) => jobs,
+        Err(why) => {
+            println!(
+                "FAIL gate: {}: its hold: {why}; then rerun `cargo xtask gate`",
+                step.name
+            );
+            return None;
+        }
+    };
+    let clock = match job {
+        Some((name, at)) if name == step.job => at + asked.elapsed(),
+        _ => Instant::now(),
+    };
+    Some((clock, jobs))
 }
 
 /// The gate's last lines: an unsandboxed run's notice again, then the
@@ -115,9 +122,11 @@ pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
     planned.step_timeout.map_or(left, |own| own.min(left))
 }
 
-/// A step running `planned`'s script as CI does.
+/// A step running `planned`'s script as CI does, building with `jobs`
+/// (`Hold::jobs`): set for cargo, and for an xtask the step runs to
+/// keep (`priority::GATE_JOBS_ENV`).
 #[must_use]
-pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
+pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap, jobs: &str) -> Step {
     let script = ["bash", "-eo", "pipefail", "-c", planned.run.as_str()];
     let (program, args) = match wrap {
         Wrap::HideGpuDevice => ("bwrap", [&sandbox::HIDE_GPU_DEVICE[..], &script].concat()),
@@ -132,6 +141,9 @@ pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
     step.env = planned.env.clone().into_iter().collect();
     step.env
         .push(("GITHUB_OUTPUT".to_owned(), output.display().to_string()));
+    for name in ["CARGO_BUILD_JOBS", crate::priority::GATE_JOBS_ENV] {
+        step.env.push((name.to_owned(), jobs.to_owned()));
+    }
     if planned.dir != "." {
         step.dir = Some(planned.dir.clone());
     }
