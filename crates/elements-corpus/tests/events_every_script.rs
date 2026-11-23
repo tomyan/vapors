@@ -14,10 +14,6 @@ use vapors_elements_corpus::events_vapors::play;
 use vapors_elements_corpus::page::split;
 
 #[path = "corpus_support/events.rs"]
-#[expect(
-    dead_code,
-    reason = "the viewport comes from each fixture (`VIEWPORT`)"
-)]
 mod events;
 
 use events::{fixture, read};

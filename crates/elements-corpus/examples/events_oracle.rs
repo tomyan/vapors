@@ -10,8 +10,8 @@
 //! `--check` is run on request, not in CI: a fixture edited without
 //! rerunning the oracle, or a Chromium whose answers differ, fails it,
 //! naming the first line that differs. CI plays every script on vapors
-//! against the committed answers (tests/events_every_script.rs) and
-//! holds the answers to the scripts (tests/committed_references.rs)
+//! against the committed answers (`tests/events_every_script.rs`) and
+//! holds the answers to the scripts (`tests/committed_references.rs`)
 //! without a browser. Without `--check` every answer is written, or none
 //! when one fails. An `.events` or `*.events.json` with no fixture is refused.
 

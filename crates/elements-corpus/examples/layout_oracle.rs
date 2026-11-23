@@ -8,8 +8,8 @@
 //! `--check` is run on request, not in CI: a fixture edited without
 //! rerunning the oracle, or a Chromium that lays a fixture out
 //! differently, fails it. CI holds vapors to the committed boxes
-//! (tests/corpus.rs) and the boxes to the fixtures
-//! (tests/committed_references.rs) without a browser.
+//! (`tests/corpus.rs`) and the boxes to the fixtures
+//! (`tests/committed_references.rs`) without a browser.
 
 use std::process::ExitCode;
 

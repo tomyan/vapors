@@ -7,9 +7,13 @@ use vapors_elements_corpus::events_script::parse;
 use vapors_elements_corpus::events_vapors::play;
 
 #[path = "corpus_support/events.rs"]
+#[expect(
+    dead_code,
+    reason = "these scripts are inline, so no fixture file is read (`read`)"
+)]
 mod events;
 
-use events::{VIEWPORT, fixture, read};
+use events::{VIEWPORT, fixture};
 
 #[test]
 fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
