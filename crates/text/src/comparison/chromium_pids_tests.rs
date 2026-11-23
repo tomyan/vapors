@@ -5,17 +5,36 @@ use std::process::{Child, Command};
 
 use super::*;
 
-/// A shell that loops until killed, with `arg` among its arguments. The
-/// loop keeps the shell from exec-ing its command, which would drop the
-/// argument, and bounds an orphaned `sleep` to 0.2 s.
+/// A shell with `arg` among its arguments, blocked reading a stdin
+/// nothing writes until it is killed. `read` is built in, so it starts no
+/// process: a loop of `sleep` forked copies of the shell, holding `arg`
+/// for a moment each, which the search then found too.
 fn holder(arg: &str) -> Child {
-    Command::new("sh")
-        .args(["-c", "while :; do sleep 0.2; done", "holder", arg])
-        // Not the test's: an orphaned `sleep` holding them is a leak to nextest.
+    let child = Command::new("sh")
+        .args(["-c", "read never", "holder", arg])
+        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .expect("sh starts")
+        .expect("sh starts");
+    started(&child, arg);
+    child
+}
+
+/// Wait until `child`'s command line holds `arg`: once in 15 runs one
+/// was not found by a search straight after `spawn` returned.
+fn started(child: &Child, arg: &str) {
+    let path = format!("/proc/{}/cmdline", child.id());
+    let since = std::time::Instant::now();
+    while !std::fs::read(&path)
+        .is_ok_and(|line| line.split(|&b| b == 0).any(|a| a == arg.as_bytes()))
+    {
+        assert!(
+            since.elapsed() < KILLED_END_WITHIN,
+            "{path} never held `{arg}`"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
 }
 
 fn profile(name: &str) -> PathBuf {
@@ -48,7 +67,7 @@ fn the_processes_holding_a_profile_are_found_by_the_whole_argument() {
     ];
 
     // When
-    let found = sorted(holding(&ours));
+    let found = sorted(holding(&ours).expect("/proc is readable"));
 
     // Then
     let wanted = sorted(vec![children[0].id(), children[1].id()]);
@@ -74,11 +93,11 @@ fn killing_a_profile_s_processes_ends_them_and_spares_the_rest_and_this_process(
     for child in &mut children[..2] {
         let _ = child.wait();
     }
-    let spared = holding(&theirs);
+    let spared = holding(&theirs).expect("/proc is readable");
     let others = children[2].id();
     reap(&mut children);
     assert_eq!(killed, Ok(()));
-    assert_eq!(holding(&ours), Vec::<u32>::new());
+    assert_eq!(holding(&ours), Ok(Vec::new()));
     assert_eq!(spared, vec![others]);
 }
 
@@ -86,4 +105,57 @@ fn killing_a_profile_s_processes_ends_them_and_spares_the_rest_and_this_process(
 fn a_profile_no_process_holds_is_killed_at_once() {
     // Given / When / Then
     assert_eq!(kill_holding(&profile("none")), Ok(()));
+}
+
+#[test]
+fn a_title_rewritten_into_one_space_joined_argument_is_found_by_the_whole_argument() {
+    // Given: Chromium's child processes rewrite their title, so their
+    // command line is one string of space-joined arguments: one such
+    // title holding the profile, one holding a profile that extends its path
+    let ours = profile("e");
+    let title =
+        |flag: &str| format!("/usr/lib/chromium/chromium --type=zygote {flag} --lang=en-US");
+    let mut children = vec![
+        holder(&title(&format!("--user-data-dir={}", ours.display()))),
+        holder(&title(&format!("--user-data-dir={}2", ours.display()))),
+        holder(&format!("--user-data-dir={}", ours.display())),
+    ];
+
+    // When
+    let found = sorted(holding(&ours).expect("/proc is readable"));
+
+    // Then
+    let wanted = sorted(vec![children[0].id(), children[2].id()]);
+    reap(&mut children);
+    assert_eq!(found, wanted);
+}
+
+#[test]
+fn a_process_table_that_cannot_be_read_is_refused_and_an_ended_process_is_absent() {
+    // Given: a table with one process holding the profile, one that has
+    // ended (no command line), then one whose command line is unreadable
+    let table = tempfile::tempdir().expect("a scratch process table");
+    let ours = profile("f");
+    let entry = |pid: &str, line: Option<&str>| {
+        let dir = table.path().join(pid);
+        std::fs::create_dir(&dir).expect("entry");
+        if let Some(line) = line {
+            std::fs::write(dir.join("cmdline"), line).expect("cmdline");
+        }
+    };
+    entry(
+        "10",
+        Some(&format!("chromium\0--user-data-dir={}\0", ours.display())),
+    );
+    entry("11", None);
+    let absent = holding_in(table.path(), &ours);
+    std::fs::create_dir_all(table.path().join("12/cmdline")).expect("an unreadable entry");
+    let unreadable = holding_in(table.path(), &ours);
+
+    // When / Then
+    assert_eq!(absent, Ok(vec![10]));
+    let refusal = unreadable.expect_err("a command line that is a directory");
+    assert!(refusal.contains("12/cmdline"), "{refusal}");
+    let missing = holding_in(&table.path().join("none"), &ours).expect_err("no table");
+    assert!(missing.starts_with("listing "), "{missing}");
 }

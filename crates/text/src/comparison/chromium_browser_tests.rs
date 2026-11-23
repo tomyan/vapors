@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::*;
-use crate::comparison::chromium_pids::holding;
+use crate::comparison::chromium_pids::{holding, kill_holding};
 use crate::comparison::chromium_process::DEADLINE;
 
 /// A scratch directory: pages, screenshots, and `profiles/`, the profile
@@ -194,7 +194,7 @@ fn a_screenshot_past_its_deadline_stops_only_its_browser_and_the_next_starts_ano
         message.contains("the screenshot, with 3s to finish"),
         "{message}"
     );
-    assert_eq!(holding(&profile), Vec::<u32>::new());
+    assert_eq!(holding(&profile), Ok(Vec::new()));
     assert!(
         !profile.exists(),
         "left in the profile: {:?}",
@@ -209,3 +209,54 @@ fn a_screenshot_past_its_deadline_stops_only_its_browser_and_the_next_starts_ano
 
 #[path = "chromium_browser_kill_tests.rs"]
 mod kill_tests;
+
+#[test]
+fn every_process_of_the_browser_is_found_and_killed_by_its_profile() {
+    // Given: a browser up, with its zygotes, GPU, utility and renderer
+    // processes, whose titles Chromium rewrites
+    let dir = scratch("every");
+    let fine = page(dir.path(), "fine", "<p>fine</p>");
+    let root = dir.path().join("profiles");
+    let mut browser = chromium(dir.path(), DEADLINE).browser();
+    browser
+        .screenshot(&fine, &dir.path().join("a.png"), 640, 400, 1)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let profile = root.join(&entries(&root)[0]);
+
+    // When: killed by profile while it runs, its main process included
+    let running = holding(&profile).expect("/proc is readable");
+    let killed = kill_holding(&profile);
+    let left = holding(&profile);
+    let closed = browser.close();
+
+    // Then: 9 were found on 2026-11-23 (the browser and 8 it started)
+    assert!(
+        running.len() > 1,
+        "only {running:?} found holding {}",
+        profile.display()
+    );
+    assert_eq!(killed, Ok(()));
+    assert_eq!(left, Ok(Vec::new()));
+    assert_eq!(closed, Ok(()));
+    assert!(!profile.exists());
+}
+
+#[test]
+fn a_page_that_cannot_be_loaded_is_refused_naming_it_and_chromium_s_error() {
+    // Given: a page that does not exist, which Chromium would show its
+    // own error page for
+    let dir = scratch("missing");
+    let missing = dir.path().join("missing.html");
+
+    // When
+    let refused =
+        chromium(dir.path(), DEADLINE).screenshot(&missing, &dir.path().join("a.png"), 640, 400, 1);
+
+    // Then
+    let message = refused.map(drop).expect_err("no page to load").to_string();
+    assert!(
+        message.contains(&missing.display().to_string()),
+        "{message}"
+    );
+    assert!(message.contains("net::ERR_FILE_NOT_FOUND"), "{message}");
+}

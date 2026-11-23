@@ -112,9 +112,16 @@ pub fn chromiums(browser: &mut Browser, test: &str, name: &str, scale: u32, chan
         .unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The test's browser, for all its screenshots; dropped with the test.
+/// The test's browser, for all its screenshots; [`close`] it at the end.
 pub fn browser() -> Browser {
     Chromium::find().unwrap_or_else(|e| panic!("{e}")).browser()
+}
+
+/// Stop the test's browser, failing the test if a process of it outlives
+/// the kill or its profile cannot be removed. Dropping it would only
+/// print that.
+pub fn close(browser: Browser) {
+    browser.close().unwrap_or_else(|e| panic!("{e}"));
 }
 
 pub fn image(rgba: &Rgba) -> Image<'_> {

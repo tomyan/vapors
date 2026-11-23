@@ -6,7 +6,7 @@
 
 mod paint_support;
 
-use paint_support::{browser, chromiums, image, laid_out, paint_fixtures, regions};
+use paint_support::{browser, chromiums, close, image, laid_out, paint_fixtures, regions};
 use vapors_elements_corpus::Fixture;
 use vapors_elements_corpus::paint_check::compare;
 
@@ -23,6 +23,7 @@ fn must_fail(test: &str, name: &str, changed: &str, scale: u32) {
     let mut browser = browser();
     let theirs = chromiums(&mut browser, test, name, scale, "");
     let mutant = chromiums(&mut browser, test, name, scale, changed);
+    close(browser);
     let doc = laid_out(&fixture(name), scale);
     let found = compare(
         &image(&mutant),

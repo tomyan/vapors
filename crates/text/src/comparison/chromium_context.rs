@@ -97,7 +97,14 @@ fn settle(page: &mut Session, url: &str, until: Instant) -> Result<(), String> {
         &json!({ "policy": "pause" }),
         until,
     )?;
-    call(page, "Page.navigate", &json!({ "url": url }), until)?;
+    let navigated = call(page, "Page.navigate", &json!({ "url": url }), until)?;
+    if let Some(error) = navigated.get("errorText").and_then(Value::as_str) {
+        return Err(format!(
+            "{url} did not load ({error}), so the screenshot would be Chromium's error page. \
+             Fix: write the page first; reproduce: ls -l '{}'",
+            url.trim_start_matches("file://")
+        ));
+    }
     call(page, "Emulation.setVirtualTimePolicy", &budget, until)?;
     let left = until.saturating_duration_since(Instant::now());
     page.wait_event("Emulation.virtualTimeBudgetExpired", left)

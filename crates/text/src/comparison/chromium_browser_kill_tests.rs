@@ -20,8 +20,10 @@ const HELPER: &str =
 const ROOT_ENV: &str = "VAPORS_BROWSER_HELPER_DIR";
 
 /// How long the holder may take to have its browser up: one screenshot,
-/// browser start included, has the launcher's deadline; 5 s more for the
-/// holder process itself.
+/// browser start included, has the launcher's deadline, and 5 s more is
+/// for the holder process itself. The whole, from spawning the holder to
+/// its `ready` line, took 0.49 to 1.05 s in 8 runs at load 13
+/// (2026-11-23), so 5 s is about five times all of it.
 const READY_WITHIN: Duration = Duration::from_secs(DEADLINE.as_secs() + 5);
 
 /// Run only by the test below, which sets [`ROOT_ENV`]; on its own it
@@ -78,11 +80,13 @@ fn kill_group(holder: &mut Child, profile: &Path) -> (bool, Vec<u32>) {
         .is_ok_and(|s| s.success());
     let _ = holder.wait();
     let started = Instant::now();
-    while !holding(profile).is_empty() && started.elapsed() < KILLED_END_WITHIN {
+    while !holding(profile).expect("/proc is readable").is_empty()
+        && started.elapsed() < KILLED_END_WITHIN
+    {
         std::thread::sleep(Duration::from_millis(20));
     }
     println!("browser gone {:?} after the kill", started.elapsed());
-    let left = holding(profile);
+    let left = holding(profile).expect("/proc is readable");
     let _ = kill_holding(profile);
     (killed, left)
 }

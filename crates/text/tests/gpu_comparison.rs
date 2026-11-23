@@ -58,4 +58,7 @@ fn gpu_body_paragraph_ink_is_within_the_band_of_chromiums_at_1x_and_2x() {
             a / b
         );
     }
+    // A browser process that outlives its kill, or a profile left, fails
+    // the test; dropping the browser would only print it
+    chromium.close().unwrap_or_else(|e| panic!("{e}"));
 }
