@@ -27,6 +27,22 @@ A text field or number field with no value paints its `placeholder`.
 
 It is not a hit or a selection: a press on it hits the input.
 
+## `::placeholder` colour
+
+```css
+.search::placeholder { color: #6b7280; }
+```
+
+`::placeholder` is taken only at the end of a selector (`input::placeholder`,
+`form ::placeholder`, `form > ::placeholder`), and only with `color`. The
+parser turns the rule into one on the input that sets
+`-vapors-placeholder-color` (initial `#757575`), so the cascade treats it as
+any property's value. Refused, naming them: another property in the rule;
+`inherit`, `initial` or `unset`, also from a `var()`; `::placeholder`
+anywhere else in a selector; the longhand written by name, also in
+`transition-property`. vapors-elements refuses a declared one until it paints
+it (the next slice).
+
 ## Which inputs
 
 A `placeholder` on a `range` or `checkbox` is refused, naming the type
