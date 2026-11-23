@@ -32,7 +32,7 @@ pub(crate) fn paint(
     let run = InlineRun {
         text: text.clone(),
         style: crate::style::TextStyle {
-            color: crate::placeholder::COLOR,
+            color: used.placeholder,
             ..used.text
         },
         visible: true,
