@@ -135,7 +135,7 @@ fn placement_off(name: &str, scale: u32, theirs: &vapors_text::comparison::Rgba)
 #[test]
 fn gpu_at_2x_placement_refuses_text_one_device_row_lower() {
     // Given
-    let saved = saved_text_line_box_paint();
+    let saved = saved_unshifted_and_placed();
 
     // When
     let off = placement_off("text_line_box_paint", 2, &placement::shifted_down(&saved));
@@ -148,7 +148,7 @@ fn gpu_at_2x_placement_refuses_text_one_device_row_lower() {
 #[test]
 fn gpu_at_2x_placement_refuses_text_one_device_column_right() {
     // Given
-    let saved = saved_text_line_box_paint();
+    let saved = saved_unshifted_and_placed();
 
     // When
     let off = placement_off("text_line_box_paint", 2, &placement::shifted_right(&saved));
@@ -160,9 +160,18 @@ fn gpu_at_2x_placement_refuses_text_one_device_column_right() {
     );
 }
 
-fn saved_text_line_box_paint() -> vapors_text::comparison::Rgba {
-    vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
-        .unwrap_or_else(|why| panic!("{why}"))
+/// The saved reference of `text_line_box_paint` at 2x, after holding
+/// that it passes the placement check unshifted, so a shift test's
+/// refusal comes from the shift alone.
+fn saved_unshifted_and_placed() -> vapors_text::comparison::Rgba {
+    let saved = vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
+        .unwrap_or_else(|why| panic!("{why}"));
+    let off = placement_off("text_line_box_paint", 2, &saved);
+    assert!(
+        off.is_empty(),
+        "the unshifted reference is already refused: {off:?}"
+    );
+    saved
 }
 
 fn check(name: &str, scale: u32) {
