@@ -97,10 +97,6 @@ pub fn take(place: &Place, sharer: Sharer) -> Result<Shared, String> {
         };
         let worktree = place.worktree.as_str();
         let share = acquire_shared_as(&place.dir, (worktree, who), place.lock_wait, slot)?;
-        // RELAXED: no test drives this re-check (it needs a quiet lock
-        // taken between two real waits); `taken_since` and the waits it
-        // repeats are tested. Retired by a test that takes the lock
-        // during a run's load wait.
         if !taken_since(place)? {
             return Ok(share);
         }

@@ -21,6 +21,7 @@ pub struct Child {
     process: std::process::Child,
     stdin: Option<ChildStdin>,
     lines: Receiver<String>,
+    waits: Receiver<String>,
 }
 
 impl Child {
@@ -52,11 +53,12 @@ impl Child {
             .stdout(Stdio::piped());
         let mut process = command.spawn().expect("the child started");
         let stdin = process.stdin.take();
-        let lines = said_lines(process.stdout.take().expect("its stdout"));
+        let (lines, waits) = said_lines(process.stdout.take().expect("its stdout"));
         Self {
             process,
             stdin,
             lines,
+            waits,
         }
     }
 
@@ -72,6 +74,22 @@ impl Child {
             Some(line),
             "the child's next line"
         );
+    }
+
+    /// Wait for it to say it waits for the gate lock held by `holder`, as
+    /// `gate_lock::wait_for` says on its first try that finds it held.
+    pub fn expect_waiting_on(&self, holder: &str) {
+        let started = Instant::now();
+        while let Some(left) = WITHIN.checked_sub(started.elapsed()) {
+            match self.waits.recv_timeout(left) {
+                Ok(line) if line.contains("waiting for the gate lock") && line.contains(holder) => {
+                    return;
+                }
+                Ok(_) => {}
+                Err(_) => break,
+            }
+        }
+        panic!("the child did not say it waits for the gate lock held by {holder}");
     }
 
     /// Whether it has said nothing since its last line read.
@@ -119,17 +137,21 @@ impl Drop for Child {
     }
 }
 
-/// The child's `child: ` lines, read on a thread of their own.
-fn said_lines(stdout: std::process::ChildStdout) -> Receiver<String> {
-    let (sender, lines) = std::sync::mpsc::channel();
+/// The child's `child: ` lines, and the lines its waits print (`<who>:
+/// waiting for ...`), read on a thread of their own.
+fn said_lines(stdout: std::process::ChildStdout) -> (Receiver<String>, Receiver<String>) {
+    let (said, lines) = std::sync::mpsc::channel();
+    let (waited, waits) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-            if let Some(said) = line.strip_prefix("child: ") {
-                let _ = sender.send(said.to_owned());
+            if let Some(child) = line.strip_prefix("child: ") {
+                let _ = said.send(child.to_owned());
+            } else if line.contains(": waiting for ") {
+                let _ = waited.send(line);
             }
         }
     });
-    lines
+    (lines, waits)
 }
 
 /// Wait until another holder has `gate.turn` in `dir`: poll its lock,

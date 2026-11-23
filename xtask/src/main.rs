@@ -62,6 +62,7 @@ mod files;
 mod files_walk;
 mod gate;
 mod gate_action;
+mod gate_deadline;
 mod gate_expression;
 mod gate_hold;
 mod gate_hold_table;

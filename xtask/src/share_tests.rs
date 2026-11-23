@@ -82,3 +82,42 @@ fn a_gate_s_share_is_named_as_a_gate_to_whoever_waits_on_it() {
     // Then
     assert!(refusal.contains("gate in /w/gating (pid "), "{refusal}");
 }
+
+/// The lock directory [`quiet_taken_meanwhile`] writes into.
+static TAKEN_IN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// A load wait during which another worktree takes the quiet lock for
+/// 200 ms, as a `quiet` started between a run's quiet wait and its share.
+fn quiet_taken_meanwhile(_: &str) -> Result<(), String> {
+    let dir = TAKEN_IN.get().expect("the test's lock directory");
+    let holder = Holder::me(
+        "/w/timed",
+        Duration::from_millis(200),
+        crate::quiet_lock::Form::Hold,
+        "x",
+    );
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(crate::quiet_lock::FILE), holder.line()).map_err(|e| e.to_string())
+}
+
+#[test]
+fn a_share_taken_as_the_quiet_lock_was_taken_is_let_go_and_waited_for_again() {
+    // Given: the quiet lock is taken during every round's load wait
+    let dir = lock_dir("share-recheck");
+    TAKEN_IN.set(dir.to_path_buf()).expect("set once");
+    let place = Place {
+        load: quiet_taken_meanwhile,
+        quiet_wait: Duration::from_secs(5),
+        ..Place::brief(&dir, "/w/ci", BRIEF)
+    };
+
+    // When
+    let refusal = take(&place, Sharer::Ci).expect_err("taken every round");
+
+    // Then: it gave up after its rounds, holding no share
+    assert!(refusal.contains("taken 3 times"), "{refusal}");
+    assert!(
+        crate::gate_lock::acquire(&dir, "/w/after", BRIEF).is_ok(),
+        "a share was kept"
+    );
+}

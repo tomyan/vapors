@@ -1,8 +1,8 @@
 //! `[gate.shared]` and `[gate.exclusive]` in `.config/factory.toml`:
 //! every step the gate runs, by its label, with the reason it may go
 //! beside other work or must run alone (`gate_hold.rs`). A step in
-//! neither or both, or an entry that names no step, refuses the gate
-//! before any step runs.
+//! neither or both, an entry that names no step, or one whose reason is
+//! blank, refuses the gate before any step runs.
 
 use std::collections::BTreeMap;
 
@@ -17,13 +17,15 @@ const EXCLUSIVE: &str = "gate.exclusive.";
 ///
 /// # Errors
 ///
-/// A step in neither table or in both, or an entry naming no planned
-/// step, naming it and the fix.
+/// A step in neither table or in both, an entry naming no planned step,
+/// or one with a blank reason, naming it and the fix.
 pub fn holds(config: &Config, planned: &[PlannedStep]) -> Result<BTreeMap<String, Hold>, String> {
     let shared = config.entries_under(SHARED);
     let exclusive = config.entries_under(EXCLUSIVE);
-    refuse_unused(&shared, "gate.shared", planned)?;
-    refuse_unused(&exclusive, "gate.exclusive", planned)?;
+    for (entries, table) in [(&shared, "gate.shared"), (&exclusive, "gate.exclusive")] {
+        refuse_unused(entries, table, planned)?;
+        refuse_blank(entries, table)?;
+    }
     planned
         .iter()
         .map(|step| {
@@ -51,6 +53,17 @@ fn hold_of(
              fix: add `\"{name}\" = \"<why>\"` to one of them in .config/factory.toml, \
              then rerun `cargo xtask gate`"
         )),
+    }
+}
+
+/// Refuse an entry of `table` whose reason is only spaces.
+fn refuse_blank(entries: &BTreeMap<String, String>, table: &str) -> Result<(), String> {
+    match entries.iter().find(|(_, reason)| reason.trim().is_empty()) {
+        Some((name, _)) => Err(format!(
+            "[{table}] `{name}` has no reason; \
+             fix: say why it may share the machine or must run alone in .config/factory.toml"
+        )),
+        None => Ok(()),
     }
 }
 

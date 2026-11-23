@@ -111,3 +111,46 @@ fn an_exclusive_step_waits_for_the_load_only_once_it_holds_the_gate_lock() {
     );
     assert_eq!(LOADS.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
+
+#[test]
+fn an_exclusive_hold_s_quiet_deadline_runs_from_when_it_has_the_gate_lock() {
+    // Given: another gate holds the lock; this one takes the quiet lock
+    // and waits for the gate lock, then says its quiet holder
+    let dir = lock_dir("hold-quiet-deadline");
+    let other = gate_lock::acquire(&dir, "/w/other", BRIEF).expect("other");
+    let (said, holder) = std::sync::mpsc::channel();
+    let (place, at) = (
+        Place::brief(&dir, "/w/gate", Duration::from_secs(20)),
+        dir.to_path_buf(),
+    );
+    let waiter = std::thread::spawn(move || {
+        let mut holds = GateHolds::new(place);
+        let taken = holds
+            .hold(Hold::Exclusive)
+            .and_then(|()| quiet_lock::current(&at));
+        said.send(taken).expect("said");
+    });
+    while quiet_lock::current(&dir).expect("read").is_none() {
+        std::thread::yield_now();
+    }
+
+    // When: the lock frees a second later; the wait is what is measured
+    std::thread::sleep(Duration::from_secs(1));
+    let freed_ms = quiet_lock::now_ms();
+    drop(other);
+    let held = holder
+        .recv()
+        .expect("the waiter said")
+        .expect("exclusive")
+        .expect("held");
+    waiter.join().expect("joined");
+
+    // Then
+    let longest_ms = u64::try_from(LONGEST.as_millis()).expect("ms");
+    assert!(
+        held.until_ms >= freed_ms + longest_ms,
+        "its deadline ran from before it had the lock: {} < {}",
+        held.until_ms,
+        freed_ms + longest_ms
+    );
+}

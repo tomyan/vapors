@@ -90,24 +90,28 @@ fn an_entry_that_names_no_step_is_refused_naming_its_table() {
 #[test]
 fn every_step_of_the_workflow_is_classified_in_the_repository_s_settings() {
     // Given
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let settings = Config::load_from(&root).expect("settings");
-    let read = |path: &str| std::fs::read_to_string(root.join(path)).map_err(|e| e.to_string());
-    let workflow = read(crate::gate::WORKFLOW).expect("workflow");
-    let (setup, actions) = (
-        crate::gate::setup_lines(&settings),
-        crate::gate::actions(&settings),
-    );
-    let sources = crate::gate_plan::Sources {
-        setup: &setup,
-        actions: &actions.expect("actions"),
-        read: &read,
-    };
-    let planned = crate::gate_plan::plan(&workflow, &sources).expect("plan");
+    let (settings, planned) = crate::gate_deadline::tests::repository_plan();
 
     // When
     let holds = holds(&settings, &planned).expect("classified");
 
     // Then
     assert_eq!(holds.len(), planned.len());
+}
+
+#[test]
+fn an_entry_whose_reason_is_blank_is_refused_naming_the_file_and_the_step() {
+    // Given
+    let text = BOTH.replace("\"fmt and clippy\"", "\"  \"");
+
+    // When
+    let planned = [step("ci: lint"), step("web: page contract")];
+    let refusal = holds(&config(&text), &planned).expect_err("blank reason");
+
+    // Then
+    assert!(
+        refusal.contains("[gate.shared] `ci: lint` has no reason")
+            && refusal.contains(".config/factory.toml"),
+        "{refusal}"
+    );
 }

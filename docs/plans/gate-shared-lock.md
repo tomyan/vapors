@@ -144,9 +144,10 @@ at once. Its exclusive hold takes none: it keeps every share out.
 
 Unchanged: a gate step's xtask sees `XTASK_GATE=1` and takes no lock,
 since its gate holds what the step needs. A nested acquire by the same
-gate therefore never waits on itself. The test for this drives the real
-`ci_shared::run` and `test` paths under `XTASK_GATE=1` while another
-process holds `gate.lock` exclusive.
+gate therefore never waits on itself. The test for this runs, in a
+second process with `XTASK_GATE=1`, `share::unless_in_gate_at`, the
+function `ci_shared::run` and `test_shared::run` both call, while the
+first process holds the exclusive hold.
 
 ### `cargo xtask test` (Tom, 2026-11-22)
 
@@ -182,12 +183,25 @@ is gone. No new state outlives a process.
 
 ### Deadlines
 
-Every wait keeps `gate_lock::WAIT` (40 min, from touche's gate times)
-and the quiet lock's `WAIT` (61 min). A shared wait lasts at most one
-other gate's exclusive phase (400 s in gate-603) plus the holds queued
-before it; an exclusive wait lasts at most the longest shared holder
-still running, a ci run of 7 to 23 minutes (`gate_lock_slots.rs`), so
-40 min stands.
+Every wait keeps its own deadline: the quiet lock's (`quiet_lock::WAIT`,
+61 min), the gate lock's for the turn, a slot and the lock together
+(`gate_lock::WAIT`, 40 min, from touche's gate times), and the load
+wait's, which goes on at its default 10 min. So one hold waits at most
+111 min (`gate_deadline::HOLD_WAIT`). A gate takes two holds over
+today's workflow, shared then exclusive (`HOLDS`, held to the tables by
+a test), and its jobs' `timeout-minutes` add up to 42 min (`JOBS`,
+held to the workflow by a test): the longest gate is 42 + 2 x 111 = 264
+min (`gate_deadline::LONGEST`). A second gate in the same worktree
+waits that long for the first (`gate_worktree_lock::WAIT`), and the
+queue kills a gate after it and `gate --pr`'s three gh calls of 30 s
+(`queue_gate_child::GATE_DEADLINE`). Declared limits: a share's later
+quiet rounds (`share.rs`, at most three) and a `[load]
+deadline_minutes` above the default are not counted; either can make a
+gate outlive the deadline, which then kills or refuses it.
+
+The exclusive hold's quiet holder file is renewed once the gate lock
+and the load wait are had, so its 60 min deadline runs from the start
+of the exclusive steps, not from before the waits.
 
 ### Transition
 
@@ -202,6 +216,13 @@ old-protocol gate arriving during a new gate's shared phase waits on
 the turn and the lock, as it waits for ci runs today. Old `test`
 binaries wait only on the quiet lock; the new gate's exclusive phase
 still writes the quiet holder file, so they wait for it too.
+
+Declared relaxed guard (`gate_hold.rs`, the exclusive hold): an old
+`test` binary waits on the quiet lock only at its start and holds
+nothing after. One started during a new gate's shared steps runs on
+into its exclusive steps, and no file says it is there, so no contained
+change can make the gate wait for it. Retired once every worktree's
+xtask is built from this change or later; a rebase rebuilds it.
 
 The order when switching from shared to exclusive is: release the
 share, take the quiet lock, then the turn and `gate.lock` exclusive.

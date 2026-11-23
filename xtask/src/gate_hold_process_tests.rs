@@ -41,7 +41,7 @@ fn an_exclusive_step_waits_for_running_shares_then_goes() {
     let sharing = Child::start("share", &dir, "/w/sharing", CHILD_WAIT, &[]);
     sharing.expect("held");
     let alone = Child::start("exclusive", &dir, "/w/alone", CHILD_WAIT, &[]);
-    turn_taken(&dir);
+    alone.expect_waiting_on("/w/sharing");
     assert!(alone.said_nothing(), "it went beside a share");
 
     // When

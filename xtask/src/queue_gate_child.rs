@@ -10,10 +10,13 @@ use std::time::{Duration, Instant};
 use crate::gate_pr::Ended;
 use crate::queue_ops::Gated;
 
-/// How long a gate run by the queue may take: the gate lock's 40 min
-/// wait (`gate_lock::WAIT`) and a touche gate's measured 4.5 to 8 min,
-/// with room. Killed at the deadline, and the kill is logged.
-pub const GATE_DEADLINE: Duration = Duration::from_mins(60);
+/// How long a gate run by the queue may take: the longest gate, its
+/// holds' waits and its jobs (`gate_deadline::LONGEST`, 264 min), and
+/// `gate --pr`'s three gh calls (two reads and the post) at
+/// `gate_pr_gh::GH_DEADLINE` each. Killed at the deadline, and the kill
+/// is logged.
+pub const GATE_DEADLINE: Duration =
+    crate::gate_deadline::LONGEST.saturating_add(crate::gate_pr_gh::GH_DEADLINE.saturating_mul(3));
 
 /// Run `command` within `deadline`, its output to `out`.
 ///

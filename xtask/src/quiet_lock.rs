@@ -62,6 +62,29 @@ impl Quiet {
         std::mem::forget(self);
     }
 
+    /// The same hold, its deadline `held_for` from now: for a hold taken
+    /// before a long wait for something else, so its deadline covers
+    /// what runs after the wait.
+    ///
+    /// # Errors
+    ///
+    /// The holder file no longer names this hold, or cannot be replaced.
+    pub fn renewed(mut self, held_for: Duration) -> Result<Self, String> {
+        let Holder {
+            owner, form, what, ..
+        } = &self.holder;
+        let new = Holder::me(&owner.worktree, held_for, *form, what);
+        if !file::replace_if(&self.dir, &self.holder, &new)? {
+            return Err(format!(
+                "{} no longer names this hold ({}); fix: rerun once its holder is done",
+                self.dir.join(FILE).display(),
+                self.holder.describe(now_ms())
+            ));
+        }
+        self.holder = new;
+        Ok(self)
+    }
+
     /// Whether the holder file still names this hold, before its deadline.
     pub fn still_held(&self) -> bool {
         read(&self.dir).is_ok_and(|now| now.as_ref() == Some(&self.holder))

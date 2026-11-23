@@ -68,3 +68,24 @@ fn a_hold_that_cannot_be_had_fails_the_gate_before_its_step_runs() {
     assert_eq!(code, ExitCode::FAILURE);
     assert!(!Path::new(&ran).exists(), "the step ran without its hold");
 }
+
+#[test]
+fn a_job_s_clock_runs_on_across_its_steps() {
+    // Given: a job of 1 s whose two steps take 0.6 s each; their run
+    // time is the thing measured, so they sleep for real
+    let job = Duration::from_secs(1);
+    let mut first = planned("web: trunk", job);
+    first.run = "sleep 0.6".to_owned();
+    let mut second = planned("web: page contract", job);
+    second.run = "sleep 0.6".to_owned();
+
+    // When
+    let code = gate(&[first, second], &mut |_| Ok(()));
+
+    // Then
+    assert_eq!(
+        code,
+        ExitCode::FAILURE,
+        "the second step had a fresh job clock"
+    );
+}

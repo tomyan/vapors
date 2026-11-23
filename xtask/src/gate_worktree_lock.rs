@@ -16,10 +16,9 @@ use crate::lock_owner::Owner;
 /// The lock file's name, under `target/gate`.
 pub const FILE: &str = "run.lock";
 
-/// The longest a second gate waits: the longest gate measured, gate
-/// 270's 2,885 s from start to end (docs/plans/factory-throughput.md),
-/// rounded up to the hour, as the quiet lock's longest hold is.
-pub const WAIT: Duration = crate::quiet_lock::LONGEST;
+/// The longest a second gate waits: one whole gate, waits and steps
+/// (`gate_deadline::LONGEST`, 264 min).
+pub const WAIT: Duration = crate::gate_deadline::LONGEST;
 
 /// How often a waiting gate says so.
 const SAY_EVERY: Duration = Duration::from_mins(1);

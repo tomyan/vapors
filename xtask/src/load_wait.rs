@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 #[path = "load_wait_settings.rs"]
 mod load_settings;
-pub use load_settings::{Settings, settings};
+pub use load_settings::{DEFAULT_DEADLINE, Settings, settings};
 
 /// How often the wait says the load it is waiting on.
 pub const SAY_EVERY: Duration = Duration::from_secs(30);

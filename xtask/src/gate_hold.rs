@@ -133,6 +133,12 @@ impl StepHolds {
 /// The quiet lock, unless its holder is the gate's own, then the gate
 /// lock exclusive, then the load wait: what a gate took for its whole run
 /// before its holds were per step.
+///
+/// RELAXED: a `cargo xtask test` built before tests took a share waits
+/// only on the quiet lock, at its start, and holds nothing; one started
+/// during a gate's shared steps runs on into its exclusive ones, and no
+/// file says it is there. Retired once every worktree's xtask is built
+/// from this change or later (each rebase rebuilds it).
 fn exclusive(place: &Place) -> Result<Held, String> {
     let current = quiet_lock::current(&place.dir)?;
     let quiet = if gate_takes_a_hold(current.as_ref(), place.parent, &place.worktree) {
@@ -143,6 +149,10 @@ fn exclusive(place: &Place) -> Result<Held, String> {
     };
     let held = gate_lock::acquire(&place.dir, &place.worktree, place.lock_wait)?;
     (place.load)("gate")?;
+    // The quiet hold's deadline runs from here, not from before the
+    // waits, so it covers the exclusive steps for an xtask that waits on
+    // the quiet lock alone (one built before holds were per step).
+    let quiet = quiet.map(|quiet| quiet.renewed(LONGEST)).transpose()?;
     Ok(Held::Exclusive {
         _quiet: quiet,
         _lock: held,
