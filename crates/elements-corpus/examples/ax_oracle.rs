@@ -10,7 +10,8 @@
 //! `--check` is what CI runs: a fixture edited without rerunning the
 //! oracle, or a Chromium whose tree differs, fails it, naming the first
 //! line that differs. Without `--check` every tree is written, or none
-//! when one fails. A `*.ax.json` with no fixture is refused.
+//! when one fails. A `*.ax.json` that no laid-out fixture needs is
+//! refused before Chromium starts.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -39,8 +40,9 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
-    refuse_orphans(&laid_out_fixture_names()?, ".ax.json")?;
-    let trees = trees()?;
+    let names = laid_out_fixture_names()?;
+    refuse_orphans(&names, ".ax.json")?;
+    let trees = trees(&names)?;
     if check {
         checked(&trees)
     } else {
@@ -49,7 +51,7 @@ fn run(check: bool) -> Result<(), String> {
 }
 
 /// Every fixture's tree as committed text, each beside its path.
-fn trees() -> Result<Vec<(String, PathBuf, String)>, String> {
+fn trees(names: &[String]) -> Result<Vec<(String, PathBuf, String)>, String> {
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     println!("chromium: {}", chromium.version());
     let work = Work::new("vapors-ax-oracle")?;
@@ -57,8 +59,8 @@ fn trees() -> Result<Vec<(String, PathBuf, String)>, String> {
     write_images(work.path())?;
     let (_live, mut session) = start(&chromium, work.path())?;
     let mut trees = Vec::new();
-    for name in laid_out_fixture_names()? {
-        let tree = tree(&mut session, work.path(), &name)?;
+    for name in names {
+        let tree = tree(&mut session, work.path(), name)?;
         let text = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())? + "\n";
         trees.push((
             name.clone(),
