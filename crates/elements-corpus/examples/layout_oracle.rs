@@ -5,8 +5,11 @@
 //! cargo run -p vapors-elements-corpus --example layout_oracle -- --check # fail on any difference
 //! ```
 //!
-//! `--check` is what CI runs: a fixture edited without rerunning the
-//! oracle, or a Chromium that lays a fixture out differently, fails it.
+//! `--check` is run on request, not in CI: a fixture edited without
+//! rerunning the oracle, or a Chromium that lays a fixture out
+//! differently, fails it. CI holds vapors to the committed boxes
+//! (tests/corpus.rs) and the boxes to the fixtures
+//! (tests/committed_references.rs) without a browser.
 
 use std::process::ExitCode;
 

@@ -218,20 +218,17 @@ jobs:
       # runner image ships google-chrome), composite uploaded for eyes.
       - name: text comparison page
         run: cargo run -p vapors-text --example text_comparison -- --out target
-      # The layout corpus's oracle: Chromium's boxes for every fixture must
-      # equal the committed fixtures/*.boxes.json, or a fixture was edited
-      # without rerunning the oracle, or Chrome lays it out differently.
-      - name: layout oracle against the runner's Chrome
-        run: cargo run -p vapors-elements-corpus --example layout_oracle -- --check
+      # The layout and events oracles' answers (fixtures/*.boxes.json and
+      # *.events.json) are held to vapors by the unit tier, with no browser
+      # (corpus.rs, events_every_script.rs, committed_references.rs); they
+      # are checked against Chromium on request with the oracles' --check
+      # (Tom, 2026-11-23).
       # The a11y oracle: Chromium's accessibility tree for every fixture,
       # read over the DevTools protocol, must match fixtures/*.ax.json.
+      # It stays live here: no vapors test reads *.ax.json yet, so this is
+      # their only check (Tom, 2026-11-23); a vapors comparison retires it.
       - name: a11y oracle against the runner's Chrome
         run: cargo run -p vapors-elements-corpus --example ax_oracle -- --check
-      # The events oracle: each fixture's .events script played in Chromium
-      # over the DevTools protocol; its expectations must hold and its
-      # answers match fixtures/*.events.json.
-      - name: events oracle against the runner's Chrome
-        run: cargo run -p vapors-elements-corpus --example events_oracle -- --check
       # The page's text input (E6): typed text, an IME's composition and
       # keys on Chromium's own <input> and on the web job's built page,
       # the field's text and selection equal after each step.
