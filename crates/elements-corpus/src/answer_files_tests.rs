@@ -37,7 +37,7 @@ fn a_wanted_name_without_an_answer_is_missing() {
 
     // Then
     assert_eq!(found.missing, names(&["b"]));
-    assert!(found.orphaned.is_empty());
+    assert_eq!(found.orphaned, Vec::<String>::new());
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn an_answer_no_name_wants_is_orphaned() {
 
     // Then
     assert_eq!(found.orphaned, names(&["c"]));
-    assert!(found.missing.is_empty());
+    assert_eq!(found.missing, Vec::<String>::new());
 }
 
 #[test]
