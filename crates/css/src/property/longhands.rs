@@ -19,6 +19,7 @@ macro_rules! longhands {
 }
 
 longhands! {
+    PLACEHOLDER_COLOR = "-vapors-placeholder-color",
     ACCENT_COLOR = "accent-color",
     ALIGN_CONTENT = "align-content",
     ALIGN_ITEMS = "align-items",

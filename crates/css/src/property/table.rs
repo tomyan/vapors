@@ -55,6 +55,15 @@ pub(super) const CURSOR: &str = "auto | default | none | pointer | text | move |
 
 /// Longhands a to g, sorted by name; `table_rest` has the rest.
 pub(super) const FIRST_HALF: &[PropertyDef] = &[
+    // `::placeholder { color }`, set on the originating input by the
+    // parser (`parse/placeholder.rs`); authors cannot write it. The
+    // initial value is the pinned Chromium's (docs/placeholder.md).
+    def(
+        "-vapors-placeholder-color",
+        false,
+        "rgb(117 117 117)",
+        "<color>",
+    ),
     def("accent-color", true, "auto", "auto | <color>"),
     def("align-content", false, "normal", ALIGN_CONTENT),
     def("align-items", false, "normal", ALIGN),

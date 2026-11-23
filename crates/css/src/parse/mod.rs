@@ -5,6 +5,7 @@ mod at_rules;
 pub(crate) mod component;
 mod declarations;
 mod keyframes;
+mod placeholder;
 mod rules;
 pub(crate) mod stream;
 
