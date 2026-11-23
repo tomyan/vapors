@@ -1,7 +1,8 @@
 //! An empty text field's placeholder (`docs/placeholder.md`): painted
 //! in the field's font and Chromium's grey, from the left
 //! of the content box, centred in it and cut to it; gone while the
-//! field has a value, however it got one.
+//! field has a value, however it got one; a press on it is a press on
+//! the field.
 
 use crate::support;
 
@@ -109,6 +110,30 @@ fn typing_hides_it_and_deleting_the_text_shows_it_again() {
 
     // Then
     assert_eq!((typed, shown(&page).len()), (0, 1));
+}
+
+#[test]
+fn a_press_on_the_placeholder_focuses_the_field_with_the_caret_at_its_start() {
+    // Given: a press on the placeholder's text, then a typed letter (a
+    // guard on the design: the placeholder is paint only, with no box to
+    // hit and no text in the editor)
+    let page = with_placeholder("Search");
+    let hit = page
+        .doc
+        .borrow()
+        .painted()
+        .expect("laid out")
+        .hit([20.0, 36.0]);
+    click(&page, [20.0, 36.0]);
+    type_text(&page, "a");
+
+    // Then: the field is hit and focused, and its value is only the
+    // letter, with the caret after it
+    let doc = page.doc.borrow();
+    assert_eq!(hit, Some(page.plain));
+    assert_eq!(doc.active_element(), Some(page.plain));
+    assert_eq!(doc.value(page.plain).as_deref(), Some("a"));
+    assert_eq!(doc.selection(page.plain), Some((1, 1)));
 }
 
 #[test]
