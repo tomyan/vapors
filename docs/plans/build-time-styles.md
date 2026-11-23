@@ -502,7 +502,7 @@ phase, in instructions and times. What is missing:
   each.
 - **The build-time part shown by the harness.** The Mount report gains
   `winners: compiled N, runtime N, foreign N` beside #240's styles
-  line, with `winners_runtime` 0 asserted in `gpu_mount_frames` and
+  line, with `winners_runtime` 0 asserted in `pmu_mount_frames` and
   `mount_styles_tests.rs`, and in tests mounting the racer and one
   demo page.
 - **Published:** `docs/perf/mount-<date>.md` with the run's commit,
