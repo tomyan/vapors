@@ -13,6 +13,7 @@
 
 use std::process::ExitCode;
 
+use vapors_elements_corpus::answer_files::refuse_orphans;
 use vapors_elements_corpus::oracle::{
     boxes, fixtures_dir, laid_out_fixture_names, to_text, write_fonts, write_images,
 };
@@ -34,6 +35,7 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
+    refuse_orphans(&laid_out_fixture_names()?, ".boxes.json")?;
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     println!("chromium: {}", chromium.version());
     let scratch = tempfile::Builder::new()

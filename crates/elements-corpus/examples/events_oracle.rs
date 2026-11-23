@@ -18,10 +18,11 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use vapors_elements_corpus::answer_files::refuse_orphans;
 use vapors_elements_corpus::ax::start;
 use vapors_elements_corpus::events_oracle::{answers, scripted};
 use vapors_elements_corpus::oracle::{fixtures_dir, write_fonts};
-use vapors_elements_corpus::oracle_files::{Committed, Work, compare, refuse_orphans};
+use vapors_elements_corpus::oracle_files::{Committed, Work, compare};
 use vapors_text::comparison::Chromium;
 
 fn main() -> ExitCode {
@@ -40,7 +41,7 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
-    refuse_orphans(".events.json", ".events")?;
+    refuse_orphans(&scripted()?, ".events.json")?;
     let trees = trees()?;
     if check {
         checked(&trees)

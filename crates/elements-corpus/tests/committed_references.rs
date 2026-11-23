@@ -1,56 +1,81 @@
 //! The committed Chromium answers match the fixtures one for one, with no
 //! browser: each fixture laid out from its `.wisp` has its boxes
-//! (`<name>.boxes.json`) and accessibility tree (`<name>.ax.json`), each
-//! `.events` script has its answers (`<name>.events.json`), and no answer
-//! is left whose fixture or script was removed. The answers themselves
-//! are held to vapors by `corpus.rs` and `events_every_script.rs`, and
-//! to Chromium by the oracles' `--check` runs.
+//! (`<name>.boxes.json`) at each viewport its `/* viewport */` comment
+//! names, and its accessibility tree (`<name>.ax.json`); each `.events`
+//! script has its answers (`<name>.events.json`); and no answer is left
+//! that no fixture or script needs. What the answers say is held to
+//! vapors by `corpus.rs` and `events_every_script.rs`, and to Chromium
+//! by the oracles' `--check` runs.
 //!
 //! Reproduce: `cargo test -p vapors-elements-corpus --test committed_references`.
 
-use std::collections::BTreeSet;
-
+use serde_json::Value;
+use vapors_elements_corpus::answer_files::{orphan, unmatched};
 use vapors_elements_corpus::events_oracle::scripted;
 use vapors_elements_corpus::oracle::{fixtures_dir, laid_out_fixture_names};
+use vapors_elements_corpus::page::split;
 
-/// The names of the files under `fixtures/` ending in `suffix`.
-fn committed(suffix: &str) -> BTreeSet<String> {
-    let dir = fixtures_dir();
-    let entries = std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
-    entries
-        .map(|entry| entry.unwrap_or_else(|e| panic!("{}: {e}", dir.display())))
-        .filter_map(|entry| {
-            let file = entry.file_name().to_string_lossy().into_owned();
-            file.strip_suffix(suffix).map(str::to_owned)
+/// The missing and orphaned answers with `suffix`, each naming the file
+/// and the fix.
+fn mismatches(wanted: &[String], suffix: &str, oracle: &str) -> Vec<String> {
+    let found = unmatched(wanted, suffix).unwrap_or_else(|e| panic!("{e}"));
+    let missing = found.missing.iter().map(|name| {
+        format!(
+            "fixtures/{name}{suffix} is missing; fix: cargo run -p vapors-elements-corpus --example {oracle}, review and commit it"
+        )
+    });
+    let orphaned = found.orphaned.iter().map(|name| orphan(name, suffix));
+    missing.chain(orphaned).collect()
+}
+
+/// The (width, height, scale) of each viewport in fixture `name`'s
+/// committed boxes, in order.
+fn committed_viewports(name: &str) -> Vec<(f64, f64, f64)> {
+    let path = fixtures_dir().join(format!("{name}.boxes.json"));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let json: Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let number = |v: &Value| {
+        v.as_f64()
+            .unwrap_or_else(|| panic!("{}: a viewport of another shape: {v}", path.display()))
+    };
+    json["viewports"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{}: no viewports", path.display()))
+        .iter()
+        .map(|s| {
+            (
+                number(&s["viewport"][0]),
+                number(&s["viewport"][1]),
+                number(&s["scale"]),
+            )
         })
         .collect()
 }
 
-/// What differs between the names that need an answer and those that
-/// have one, each naming the file and the fix.
-fn mismatches(wanted: &BTreeSet<String>, suffix: &str, oracle: &str) -> Vec<String> {
-    let found = committed(suffix);
-    let fix = format!("cargo run -p vapors-elements-corpus --example {oracle}");
-    let missing = wanted.difference(&found).map(|name| {
-        format!("fixtures/{name}{suffix} is missing; fix: {fix}, review and commit it")
-    });
-    let orphaned = found.difference(wanted).map(|name| {
-        format!("fixtures/{name}{suffix} answers no fixture that needs it; fix: remove it, or restore its fixture or script")
-    });
-    missing.chain(orphaned).collect()
+/// Fixture `name`'s boxes, if they are not at the viewports its `.wisp` names.
+fn viewports_differ(name: &str) -> Option<String> {
+    let path = fixtures_dir().join(format!("{name}.wisp"));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let source = split(name, &text).unwrap_or_else(|e| panic!("{e}"));
+    let wanted: Vec<(f64, f64, f64)> = source
+        .viewports
+        .iter()
+        .map(|v| (f64::from(v.width), f64::from(v.height), v.scale))
+        .collect();
+    let committed = committed_viewports(name);
+    (committed != wanted).then(|| {
+        format!(
+            "fixtures/{name}.boxes.json is at {committed:?}, {name}.wisp names {wanted:?} (width, height, scale); fix: cargo run -p vapors-elements-corpus --example layout_oracle, review and commit it"
+        )
+    })
 }
 
 #[test]
 fn every_answer_matches_a_fixture_one_for_one() {
     // Given
-    let laid_out: BTreeSet<String> = laid_out_fixture_names()
-        .unwrap_or_else(|e| panic!("{e}"))
-        .into_iter()
-        .collect();
-    let scripts: BTreeSet<String> = scripted()
-        .unwrap_or_else(|e| panic!("{e}"))
-        .into_iter()
-        .collect();
+    let laid_out = laid_out_fixture_names().unwrap_or_else(|e| panic!("{e}"));
+    let scripts = scripted().unwrap_or_else(|e| panic!("{e}"));
     assert!(
         !laid_out.is_empty(),
         "no laid-out fixtures: nothing is compared"
@@ -67,6 +92,23 @@ fn every_answer_matches_a_fixture_one_for_one() {
         mismatches(&scripts, ".events.json", "events_oracle"),
     ]
     .concat();
+
+    // Then
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+#[test]
+fn every_fixtures_boxes_are_at_the_viewports_it_names() {
+    // Given
+    let laid_out = laid_out_fixture_names().unwrap_or_else(|e| panic!("{e}"));
+    let have_boxes = unmatched(&laid_out, ".boxes.json").unwrap_or_else(|e| panic!("{e}"));
+
+    // When: a missing file is the other test's failure
+    let found: Vec<String> = laid_out
+        .iter()
+        .filter(|name| !have_boxes.missing.contains(name))
+        .filter_map(|name| viewports_differ(name))
+        .collect();
 
     // Then
     assert!(found.is_empty(), "{}", found.join("\n"));

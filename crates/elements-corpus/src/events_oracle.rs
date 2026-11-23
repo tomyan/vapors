@@ -9,8 +9,9 @@ use std::time::Duration;
 use serde_json::Value;
 use vapors_devtools::Session;
 
+use crate::ax::{PageSize, first_viewport};
 use crate::events_play::play;
-use crate::events_script::parse;
+use crate::events_script::{Script, parse};
 use crate::oracle::fixtures_dir;
 
 /// vapors' `COLD_START`, 145 s, about 2.5x the slowest first launch on a
@@ -18,7 +19,7 @@ use crate::oracle::fixtures_dir;
 const DEADLINE: Duration = Duration::from_secs(145);
 
 /// The size another page (`page`) opens at when the script names none.
-pub const PAGE_SIZE: (u32, u32) = (640, 400);
+const PAGE_SIZE: (u32, u32) = (640, 400);
 
 /// The names of the fixtures with a script, sorted.
 ///
@@ -54,9 +55,34 @@ pub fn answers(session: &mut Session, work: &Path, name: &str) -> Result<Value, 
     let path = fixtures_dir().join(format!("{name}.events"));
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let script = parse(name, &text)?;
+    let size = page_size(name, &script)?;
     match &script.page {
-        Some(file) => crate::ax::open_file(session, file, script.viewport.unwrap_or(PAGE_SIZE))?,
-        None => drop(crate::ax::open(session, work, name, script.viewport)?),
+        Some(file) => crate::ax::open_file(session, file, size)?,
+        None => drop(crate::ax::open(session, work, name, Some(size))?),
     }
     play(session, name, &script, DEADLINE)
+}
+
+/// The size and scale fixture `name`'s script is played at, in Chromium
+/// and on vapors: the script's own size (`at`) if it names one, else
+/// `PAGE_SIZE` for another page (`page`) or the fixture's first viewport;
+/// at 1x on another page, else at that viewport's scale.
+///
+/// # Errors
+/// The fixture cannot be read or split, or has no viewport.
+pub fn page_size(name: &str, script: &Script) -> Result<PageSize, String> {
+    let fallback = match script.page {
+        Some(_) => PageSize {
+            width: PAGE_SIZE.0,
+            height: PAGE_SIZE.1,
+            scale: 1.0,
+        },
+        None => first_viewport(name)?,
+    };
+    let (width, height) = script.viewport.unwrap_or((fallback.width, fallback.height));
+    Ok(PageSize {
+        width,
+        height,
+        ..fallback
+    })
 }

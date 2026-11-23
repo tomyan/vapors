@@ -8,10 +8,9 @@
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
-use vapors_elements_corpus::events_oracle::{PAGE_SIZE, scripted};
+use vapors_elements_corpus::events_oracle::{page_size, scripted};
 use vapors_elements_corpus::events_script::{Script, parse};
 use vapors_elements_corpus::events_vapors::play;
-use vapors_elements_corpus::page::split;
 
 #[path = "corpus_support/events.rs"]
 mod events;
@@ -26,32 +25,23 @@ use events::{fixture, read};
 /// removed here.
 const NOT_PLAYED_ON_VAPORS: [(&str, &str); 1] = [("buttons", "never fires `wheel`")];
 
-/// The size the events oracle opens the page at: the script's own (`at`),
-/// else for another page (`page`) `PAGE_SIZE` at 1x, else the fixture's
-/// first viewport.
+/// The size and scale the events oracle played the script at in Chromium.
 #[allow(clippy::cast_possible_truncation)] // a device scale is 1 or 2
 #[allow(clippy::cast_precision_loss)] // viewports are a few hundred pixels
-fn viewport(name: &str, script: &Script) -> Viewport {
-    let (size, scale) = if script.page.is_some() {
-        (PAGE_SIZE, 1.0)
-    } else {
-        let source = split(name, &read(&format!("{name}.wisp"))).unwrap_or_else(|e| panic!("{e}"));
-        let first = source.viewports[0];
-        ((first.width, first.height), first.scale)
-    };
-    let (width, height) = script.viewport.unwrap_or(size);
-    Viewport {
-        width: width as f32,
-        height: height as f32,
-        scale: scale as f32,
-    }
+fn viewport(name: &str, script: &Script) -> Result<Viewport, String> {
+    let size = page_size(name, script)?;
+    Ok(Viewport {
+        width: size.width as f32,
+        height: size.height as f32,
+        scale: size.scale as f32,
+    })
 }
 
 /// Fixture `name`'s script on vapors against Chromium's answers.
 fn played(name: &str) -> Result<(), String> {
     let script = parse(name, &read(&format!("{name}.events")))?;
     let answers = committed(name)?;
-    let log = play(&fixture(name), &script, viewport(name, &script))?;
+    let log = play(&fixture(name), &script, viewport(name, &script)?)?;
     compare(name, &script, &log, &answers)
 }
 
