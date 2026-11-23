@@ -5,7 +5,11 @@
 //! a test that reads a counter without the `pmu_` prefix fails on a
 //! machine with a PMU too, not only on a hosted runner without one.
 //! Unset (a run of `vapors-perf`, or `cargo nextest run` by hand) or
-//! [`COUNTER_TIER`], the opens go ahead.
+//! [`COUNTER_TIER`], the opens go ahead. Unset is allowed because
+//! `vapors-perf` and `cargo xtask scaling` read counters outside any
+//! tier; a hosted job that ran nextest without xtask would get no guard
+//! (its `pmu_` tests would still fail loudly without a PMU). Setting the
+//! variable from `vapors-perf`'s callers would let unset be refused.
 //!
 //! [`InstructionCounter::open`]: crate::instructions::InstructionCounter::open
 //! [`HardwareCounters::open`]: crate::hardware_counters::HardwareCounters::open
@@ -39,7 +43,8 @@ pub fn allowed_in(tier: Option<&str>) -> Result<(), String> {
             "a test opened a hardware counter in the {tier} tier ({TIER_ENV}={tier}); the pmu \
              tier runs test functions named pmu_*, and a hosted runner may have no PMU, so this \
              test fails there. Fix: rename the test function to pmu_<name>, then run `cargo \
-             xtask test --tier pmu`"
+             xtask test --tier pmu`; if it is named pmu_ already, run it that way, not with \
+             {TIER_ENV} set to another tier"
         )),
     }
 }

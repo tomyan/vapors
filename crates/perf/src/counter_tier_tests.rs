@@ -25,5 +25,6 @@ fn a_counter_in_another_tier_is_refused_naming_the_tier_and_the_rename() {
             "{refusal}"
         );
         assert!(refusal.contains("cargo xtask test --tier pmu"), "{refusal}");
+        assert!(refusal.contains("named pmu_ already"), "{refusal}");
     }
 }
