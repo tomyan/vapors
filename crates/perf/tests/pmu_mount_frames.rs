@@ -1,6 +1,9 @@
-//! GPU tier: the Mount page's first frame as a user waits for it
-//! (`Sampler::first_frame`): `App::start` holds the first update, then
-//! frame 0 draws, timed to submit and to the GPU's idle.
+//! PMU tier (and a GPU): the Mount page's first frame as a user waits for
+//! it (`Sampler::first_frame`): `App::start` holds the first update, then
+//! frame 0 draws, timed to submit and to the GPU's idle. Named `pmu_`
+//! because the phase clock counts instructions with a hardware counter
+//! (`checked_counter`), which a VM may not have (`xtask/src/steps_tiers.rs`
+//! `PMU_TESTS`): `cargo xtask test --tier pmu` runs them.
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::gpu_time::FEATURES;
@@ -13,7 +16,7 @@ use vapors_perf::spans::PhaseClock;
 const ROWS: usize = 300;
 
 #[test]
-fn gpu_the_first_update_is_in_the_start_and_frame_0_is_timed_to_idle() {
+fn pmu_the_first_update_is_in_the_start_and_frame_0_is_timed_to_idle() {
     // Given
     let mut mount = Mount::new(ROWS, checked_counter().expect("perf events"));
     let gpu = gpu_with(FEATURES);
@@ -43,7 +46,7 @@ fn gpu_the_first_update_is_in_the_start_and_frame_0_is_timed_to_idle() {
 }
 
 #[test]
-fn gpu_a_failed_mount_ends_the_first_frame_with_its_cause_not_a_panic() {
+fn pmu_a_failed_mount_ends_the_first_frame_with_its_cause_not_a_panic() {
     // Given
     let mut mount = Mount::new(10, checked_counter().expect("perf events"));
     mount.fail_for_test("reading /proc/self/status: gone");
