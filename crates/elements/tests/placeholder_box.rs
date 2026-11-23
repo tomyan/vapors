@@ -36,11 +36,15 @@ fn placeholder(css: &str) -> Vec<([f32; 2], Option<Rect>, f32)> {
 
 #[test]
 fn a_hidden_field_paints_no_placeholder() {
-    // Given, when
-    let found = placeholder("height: 24px; padding: 2px; visibility: hidden;");
+    // Given
+    let css = "height: 24px; padding: 2px;";
 
-    // Then
-    assert_eq!(found, []);
+    // When
+    let shown = placeholder(css).len();
+    let hidden = placeholder(&format!("{css} visibility: hidden;")).len();
+
+    // Then: the same field paints one when it is not hidden
+    assert_eq!((shown, hidden), (1, 0));
 }
 
 #[test]
