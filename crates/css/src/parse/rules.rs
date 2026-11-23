@@ -2,7 +2,7 @@
 
 use super::component::{split_commas, values_until};
 use super::stream::{Stream, describe};
-use super::{at_rules, declarations};
+use super::{at_rules, declarations, placeholder};
 use crate::ast::{ComponentValue, Condition, Rule, Stylesheet};
 use crate::token::TokenKind;
 use crate::{Error, Result};
@@ -53,14 +53,25 @@ fn qualified_rule(
         )));
     }
     let decls = declarations::block(stream)?;
+    let (prelude, lowered) = placeholder::rewritten(&prelude);
+    let placeholder_decls = if lowered.contains(&true) {
+        placeholder::lowered(&decls)?
+    } else {
+        Vec::new()
+    };
     let parsed = crate::selector::parse_from_prelude(&prelude, position)?;
-    for (selector, parsed) in split_commas(&prelude).into_iter().zip(parsed) {
+    let selectors = split_commas(&prelude).into_iter().zip(lowered);
+    for ((selector, lowered), parsed) in selectors.zip(parsed) {
         let position = selector.first().map_or(position, ComponentValue::position);
         sheet.rules.push(Rule {
             prelude: selector,
             selector: parsed,
             conditions: conditions.to_vec(),
-            declarations: decls.clone(),
+            declarations: if lowered {
+                placeholder_decls.clone()
+            } else {
+                decls.clone()
+            },
             position,
         });
     }
