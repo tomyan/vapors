@@ -17,7 +17,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 #[path = "gate_floor.rs"]
 pub(crate) mod floor;
@@ -26,10 +26,9 @@ use crate::config::Config;
 use crate::gate_hold::StepHolds;
 use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::gate_run::{Wrap, pass_lines};
+pub(crate) use crate::gate_state::git;
+use crate::gate_state::{DIRTY, State, state};
 use crate::report::Reporter;
-
-/// How a state with changes in its tree is marked.
-const DIRTY: &str = " (dirty)";
 
 /// The workflow the gate runs.
 pub const WORKFLOW: &str = ".github/workflows/ci.yml";
@@ -149,74 +148,6 @@ pub fn actions(config: &Config) -> Result<BTreeMap<String, String>, String> {
 #[must_use]
 pub fn setup_lines(config: &Config) -> BTreeSet<String> {
     config.entries_under("gate.setup.").into_keys().collect()
-}
-
-/// HEAD, whether the tree has changes, and each pinned sibling's.
-#[derive(Debug, PartialEq, Eq)]
-pub struct State {
-    /// HEAD's SHA, ` (dirty)` when the tree has changes.
-    pub head: String,
-    /// Each sibling's HEAD, which equals its pin and is clean.
-    pub siblings: Vec<String>,
-}
-
-fn state(siblings: &[(String, String)]) -> Result<State, String> {
-    let head = checkout(".")?;
-    let siblings = siblings
-        .iter()
-        .map(|(dir, pin_file)| pinned(dir, pin_file))
-        .collect::<Result<_, _>>()?;
-    Ok(State { head, siblings })
-}
-
-/// A sibling checkout, which must be clean and at its pin.
-fn pinned(dir: &str, pin_file: &str) -> Result<String, String> {
-    let text = std::fs::read_to_string(pin_file).map_err(|e| format!("{pin_file}: {e}"))?;
-    let pin = text
-        .lines()
-        .find(|line| !line.starts_with('#'))
-        .unwrap_or_default()
-        .trim()
-        .to_owned();
-    let head = checkout(dir)?;
-    if head != pin {
-        return Err(format!(
-            "{dir} is at {head}, not {pin} from {pin_file}, or has changes; fix: git -C {dir} checkout --detach {pin} on a clean tree"
-        ));
-    }
-    Ok(head)
-}
-
-/// `dir`'s HEAD SHA, ` (dirty)` when it has changes; git must exit 0.
-fn checkout(dir: &str) -> Result<String, String> {
-    let sha = git(dir, &["rev-parse", "HEAD"])?;
-    let changes = git(dir, &["status", "--porcelain"])?;
-    Ok(if changes.is_empty() {
-        sha
-    } else {
-        format!("{sha}{DIRTY}")
-    })
-}
-
-/// git in `dir`, its stdout trimmed; hook variables stripped (CLAUDE.md).
-pub(crate) fn git(dir: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git -C {dir} {}: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 #[cfg(test)]

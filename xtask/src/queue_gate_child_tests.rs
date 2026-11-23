@@ -91,3 +91,12 @@ fn a_killed_gate_takes_its_steps_in_their_own_groups_with_it() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(!survived, "the step {step} outlived the kill");
 }
+
+#[test]
+fn the_queue_s_gate_deadline_is_a_wait_for_another_gate_its_own_run_and_gate_pr_s_calls() {
+    assert_eq!(
+        GATE_DEADLINE,
+        crate::gate_deadline::LONGEST.saturating_mul(2) + Duration::from_mins(2)
+    );
+    assert_eq!(GATE_DEADLINE, Duration::from_mins(535));
+}

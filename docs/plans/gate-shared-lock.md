@@ -97,6 +97,12 @@ scaling`, which is not in the gate.
   share keeps trying until the quiet lock's and the gate lock's longest
   waits together, 101 min, then fails naming the holder. `ci` and
   `test` keep their three rounds (Tom, 2026-11-23).
+- The gate's untimed parts get their own deadlines, each from a
+  measurement: its git reads of the checkout's state before and after
+  (30 s each), the disk floor's `stat`s (10 s each) and the sandbox
+  check (10 s). The queue's kill is derived from those, the jobs, the
+  holds' waits, and a wait for another gate in the run worktree (Tom,
+  2026-11-23).
 
 ## Design
 
@@ -209,16 +215,28 @@ wait's, which goes on at its default 10 min. So one hold waits at most
 111 min (`gate_deadline::HOLD_WAIT`). A gate takes two holds over
 today's workflow, shared then exclusive (`HOLDS`, held to the tables by
 a test), and its jobs' `timeout-minutes` add up to 42 min (`JOBS`,
-held to the workflow by a test): the longest gate is 42 + 2 x 111 = 264
-min (`gate_deadline::LONGEST`). A second gate in the same worktree
+held to the workflow by a test). Its own commands outside its steps
+each have a deadline set from a measurement (20 runs each at load 1.2,
+2026-11-23): two `stat`s for the disk floor (1.1 ms at most; 10 s),
+the sandbox check (2.4 ms; 10 s), and two git calls per checkout for
+its state before and after (9.3 ms; 30 s), 150 s together
+(`OWN_COMMANDS`). The longest gate is 42 min + 2 x 111 min + 150 s =
+266.5 min (`gate_deadline::LONGEST`). A second gate in the same worktree
 waits that long for the first (`gate_worktree_lock::WAIT`), and the
-queue kills a gate after it and `gate --pr`'s three gh calls of 30 s
-(`queue_gate_child::GATE_DEADLINE`). A gate's share tries rounds until 101 min
-(quiet and gate lock together). Each quiet and lock wait is cut to what
+queue kills a gate after that wait (another gate may already be in its
+run worktree), the gate's own run, and `gate --pr`'s git read of HEAD
+(30 s) and three gh calls of 30 s: 535 min
+(`queue_gate_child::GATE_DEADLINE`). The gate's reads in its own
+process (settings, workflow, plan, the twin's files, the run TMPDIR's
+sweep, /proc) have no deadline of their own: there is no child to kill.
+
+A gate's share tries rounds until 101 min (quiet and gate lock
+together). Each quiet and lock wait is cut to what
 is left of that when it starts, so the waits of a round together keep
 within it; only a load wait begun just before the deadline can pass it,
-by at most its own 10 min. So the share too is within 111 min. Declared limit: a `[load]
-deadline_minutes` above the default is not counted; it can make a gate
+by at most its own 10 min. So the share too is within 111 min.
+
+Declared limit: a `[load] deadline_minutes` above the default is not counted; it can make a gate
 outlive the deadline, which then kills or refuses it.
 
 The exclusive hold's quiet holder file is renewed once the gate lock

@@ -55,7 +55,20 @@ fn the_workflow_s_jobs_take_as_long_as_the_deadline_counts() {
 }
 
 #[test]
-fn a_gate_s_longest_run_is_its_jobs_and_two_holds_longest_waits() {
+fn a_gate_s_longest_run_is_its_jobs_two_holds_longest_waits_and_its_own_commands() {
     assert_eq!(HOLD_WAIT, std::time::Duration::from_mins(111));
-    assert_eq!(LONGEST, std::time::Duration::from_mins(264));
+    assert_eq!(OWN_COMMANDS, std::time::Duration::from_secs(150));
+    assert_eq!(LONGEST, std::time::Duration::from_secs(266 * 60 + 30));
+}
+
+#[test]
+fn the_gate_reads_as_many_checkouts_as_the_deadline_counts() {
+    // Given
+    let (settings, _) = repository_plan();
+
+    // When
+    let pinned = settings.entries_under("gate.pinned.").len();
+
+    // Then
+    assert_eq!(pinned + 1, usize::try_from(CHECKOUTS).expect("small"));
 }

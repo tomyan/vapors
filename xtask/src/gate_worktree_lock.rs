@@ -17,7 +17,7 @@ use crate::lock_owner::Owner;
 pub const FILE: &str = "run.lock";
 
 /// The longest a second gate waits: one whole gate, waits and steps
-/// (`gate_deadline::LONGEST`, 264 min).
+/// (`gate_deadline::LONGEST`, 266.5 min).
 pub const WAIT: Duration = crate::gate_deadline::LONGEST;
 
 /// How often a waiting gate says so.

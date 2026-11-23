@@ -76,6 +76,7 @@ mod gate_pr_real;
 mod gate_pr_text;
 mod gate_report;
 mod gate_run;
+mod gate_state;
 mod gate_step;
 mod gate_steps;
 mod gate_twin;

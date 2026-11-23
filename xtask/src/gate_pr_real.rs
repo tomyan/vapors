@@ -35,20 +35,7 @@ impl Effects for Real {
     }
 
     fn local_head(&self) -> Result<String, String> {
-        let output = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .output()
-            .map_err(|e| format!("git: {e}"))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git rev-parse HEAD: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        crate::gate_state::git(".", &["rev-parse", "HEAD"])
     }
 
     fn gate(&self) -> Result<Ran, String> {

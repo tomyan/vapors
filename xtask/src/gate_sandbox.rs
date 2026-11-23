@@ -8,6 +8,7 @@
 
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 use crate::config::Config;
 
@@ -148,13 +149,30 @@ fn entries(dri: &Path) -> String {
 ///
 /// As [`check`].
 pub fn check_with(program: &str) -> Result<(), String> {
-    let output = Command::new(program)
+    check_within(program, CHECK_DEADLINE)
+}
+
+/// How long the check may take. Measured 2026-11-23, 20 runs at load
+/// 1.2: bwrap hiding /dev/dri and listing it took 2.2 ms (median) to
+/// 2.4 ms. 10 s is thousands of times that, for a far busier machine.
+pub const CHECK_DEADLINE: Duration = Duration::from_secs(10);
+
+/// [`check_with`] within `deadline`.
+///
+/// # Errors
+///
+/// As [`check`], or the check passed `deadline`, naming it.
+pub fn check_within(program: &str, deadline: Duration) -> Result<(), String> {
+    let mut command = Command::new(program);
+    command
         .args(HIDE_GPU_DEVICE)
-        .args(["/bin/ls", "-A", "/dev/dri"])
-        .output()
-        .map_err(|e| {
-            format!("{program} could not run ({e}); the gate hides /dev/dri with it; fix: install bubblewrap (apt install bubblewrap), or on a machine where it cannot run set [gate] hide_gpu_device = \"false\" in .config/factory.toml")
-        })?;
+        .args(["/bin/ls", "-A", "/dev/dri"]);
+    let output = crate::api_timed::within(command, deadline).map_err(|e| {
+        if e.contains("passed its deadline") {
+            return format!("the gate's sandbox check, {program} hiding /dev/dri: {e}; fix: find what holds it up (`ps`), then rerun `cargo xtask gate`");
+        }
+        format!("{program} could not run ({e}); the gate hides /dev/dri with it; fix: install bubblewrap (apt install bubblewrap), or on a machine where it cannot run set [gate] hide_gpu_device = \"false\" in .config/factory.toml")
+    })?;
     if !output.status.success() || !output.stdout.is_empty() {
         return Err(format!(
             "{program} did not run with /dev/dri hidden ({}; it listed `{}`); fix: allow unprivileged user namespaces, or set [gate] hide_gpu_device = \"false\" in .config/factory.toml",

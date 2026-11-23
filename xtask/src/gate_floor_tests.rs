@@ -125,3 +125,26 @@ fn target_is_the_workspace_before_a_build_and_a_dangling_link_is_refused() {
         "{dangling}"
     );
 }
+
+#[test]
+fn a_floor_read_past_its_deadline_fails_naming_the_floor_and_the_path() {
+    // Given: a stat that does not end
+    let mut stuck = Command::new("sleep");
+    stuck.arg("30");
+
+    // When
+    let refusal = free_by(
+        stuck,
+        Path::new("/tmp"),
+        std::time::Duration::from_millis(100),
+    )
+    .expect_err("past its deadline");
+
+    // Then
+    assert!(
+        refusal.contains("the gate's disk floor, `stat -f /tmp`")
+            && refusal.contains("deadline")
+            && refusal.contains("cargo xtask gate"),
+        "{refusal}"
+    );
+}

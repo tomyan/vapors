@@ -23,7 +23,7 @@ use crate::steps::Step;
 
 #[path = "gate_sandbox.rs"]
 mod sandbox;
-pub use sandbox::{Wrap, wrap as sandbox_wrap};
+pub use sandbox::{CHECK_DEADLINE as SANDBOX_CHECK_DEADLINE, Wrap, wrap as sandbox_wrap};
 
 /// Takes the hold a step needs before it runs.
 pub type HoldFor<'a> = &'a mut dyn FnMut(&PlannedStep) -> Result<Hold, String>;
