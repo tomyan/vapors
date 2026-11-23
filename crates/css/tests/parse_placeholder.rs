@@ -4,6 +4,7 @@
 
 use crate::support;
 
+use support::serialize::round_trip;
 use support::{prop, refusal, sheet};
 use vapors_css::property::longhands::PLACEHOLDER_COLOR;
 
@@ -100,4 +101,82 @@ fn the_lowered_longhand_written_by_an_author_is_refused() {
 
     // Then
     assert!(err.message.contains("::placeholder { color"), "{err}");
+}
+
+#[test]
+fn a_placeholder_right_after_a_combinator_originates_in_any_element() {
+    for (text, originating) in [
+        ("form>::placeholder", "form > *"),
+        ("h1+::placeholder", "h1 + *"),
+    ] {
+        // When
+        let lowered = &sheet(&format!("{text} {{ color: red; }}")).rules[0];
+
+        // Then
+        let expected = &sheet(&format!("{originating} {{ }}")).rules[0];
+        assert_eq!(lowered.selector, expected.selector, "{text}");
+    }
+}
+
+#[test]
+fn a_placeholder_inside_a_function_or_doubled_or_prefixed_is_refused() {
+    for text in [
+        ":is(input::placeholder)",
+        ":not(input::placeholder)",
+        "input::placeholder::placeholder",
+        "input::-webkit-input-placeholder",
+    ] {
+        // When
+        let err = refusal(&format!("{text} {{ color: red; }}"));
+
+        // Then
+        assert!(err.message.contains("pseudo-element"), "{text}: {err}");
+    }
+}
+
+#[test]
+fn a_placeholder_rule_inside_media_keeps_its_condition() {
+    // When
+    let s = sheet("@media (min-width: 1px) { input::placeholder { color: red; } }");
+
+    // Then
+    assert_eq!(s.rules[0].conditions.len(), 1);
+    assert_eq!(prop(&s.rules[0], LOWERED), "red");
+}
+
+#[test]
+fn a_placeholder_rule_serializes_back_to_itself() {
+    // When
+    let s = round_trip("form ::placeholder { color: red !important; } input { color: blue; }");
+
+    // Then
+    let originating = &sheet("form * { }").rules[0];
+    assert_eq!(s.rules[0].selector, originating.selector);
+    assert_eq!(prop(&s.rules[0], LOWERED), "red");
+    assert!(s.rules[0].declarations[0].important);
+    assert_eq!(prop(&s.rules[1], "color"), "blue");
+}
+
+#[test]
+fn the_lowered_longhand_named_in_a_transition_is_refused() {
+    // When
+    let err = refusal(&format!("input {{ transition-property: {LOWERED}; }}"));
+
+    // Then
+    assert!(err.message.contains("::placeholder { color"), "{err}");
+}
+
+#[test]
+fn a_var_that_gives_a_placeholder_colour_a_css_wide_keyword_is_refused() {
+    // Given
+    let (tree, leaf) = support::chain(&["input.x"]);
+    let src = "input::placeholder { color: var(--hint, inherit); }";
+
+    // When
+    let err = support::cascade(src)
+        .compute(&tree.node(leaf), None, &support::env())
+        .expect_err("a substituted keyword");
+
+    // Then
+    assert!(err.message.contains("give the variable a colour"), "{err}");
 }

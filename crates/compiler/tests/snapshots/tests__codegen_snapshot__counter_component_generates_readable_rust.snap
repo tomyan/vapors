@@ -1,5 +1,6 @@
 ---
 source: crates/compiler/tests/codegen_snapshot.rs
+assertion_line: 16
 expression: code
 ---
 // Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
