@@ -174,6 +174,7 @@ mod outline_scale;
 mod paint;
 mod paint_labels;
 mod placeholder;
+mod placeholder_box;
 mod placeholder_number;
 mod placeholder_refused;
 mod pointer_capture;

@@ -1,5 +1,6 @@
-//! The placeholder on the other fields (`docs/placeholder.md`): a
-//! number field paints it, one of only line breaks paints none.
+//! The placeholder's text against the field's attributes
+//! (`docs/placeholder.md`): a number field paints it, a `value` hides
+//! it, line breaks in it are removed.
 
 use crate::support;
 
@@ -64,4 +65,28 @@ fn a_placeholder_of_only_line_breaks_paints_nothing() {
 
     // Then
     assert_eq!(found, []);
+}
+
+#[test]
+fn a_text_field_with_a_value_attribute_paints_none() {
+    // Given, when
+    let found = painted(&[("placeholder", "Search"), ("value", "ada")], "");
+
+    // Then
+    assert_eq!(
+        found.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(),
+        ["ada"]
+    );
+}
+
+#[test]
+fn line_breaks_inside_a_placeholder_are_removed_not_replaced() {
+    // Given, when
+    let found = painted(&[("placeholder", "Sea\r\nrch")], "");
+
+    // Then
+    assert_eq!(
+        found.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(),
+        ["Search"]
+    );
 }
