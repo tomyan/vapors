@@ -15,7 +15,7 @@ use vapors_elements_corpus::page::{html, split};
 use vapors_elements_corpus::paint_check::{Image, Region};
 use vapors_elements_corpus::{Fixture, all};
 use vapors_text::FontSystem;
-use vapors_text::comparison::{Chromium, Rgba};
+use vapors_text::comparison::{Browser, Chromium, Rgba};
 
 pub const WIDTH: u32 = 640;
 pub const HEIGHT: u32 = 400;
@@ -86,8 +86,9 @@ pub fn regions(doc: &Document, scale: u32) -> Vec<Region> {
 /// CSS appended to its style (empty for the fixture as it is). Its
 /// files go in a directory of the test's own, named by `test`: tests
 /// run in parallel, and one rewriting a page or screenshot another is
-/// reading fails that one.
-pub fn chromiums(test: &str, name: &str, scale: u32, changed: &str) -> Rgba {
+/// reading fails that one. `browser` is the test's ([`browser`]): its
+/// screenshots share one Chromium, each in a browser context of its own.
+pub fn chromiums(browser: &mut Browser, test: &str, name: &str, scale: u32, changed: &str) -> Rgba {
     let label = if changed.is_empty() {
         "as-is".to_owned()
     } else {
@@ -105,11 +106,15 @@ pub fn chromiums(test: &str, name: &str, scale: u32, changed: &str) -> Rgba {
     source.style.push_str(changed);
     let page = work.join(format!("{name}_{label}.html"));
     std::fs::write(&page, html(&source)).expect("page");
-    let chrome = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
     let png = work.join(format!("{name}_{label}.png"));
-    chrome
+    browser
         .screenshot(&page, &png, WIDTH, HEIGHT, scale)
         .unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The test's browser, for all its screenshots; dropped with the test.
+pub fn browser() -> Browser {
+    Chromium::find().unwrap_or_else(|e| panic!("{e}")).browser()
 }
 
 pub fn image(rgba: &Rgba) -> Image<'_> {

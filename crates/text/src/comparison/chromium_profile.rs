@@ -144,7 +144,7 @@ pub(super) fn in_profile<T>(
 /// # Errors
 ///
 /// [`ChromiumError::Failed`] naming the profile left behind.
-fn remove_profile(profile: tempfile::TempDir) -> Result<(), ChromiumError> {
+pub(super) fn remove_profile(profile: tempfile::TempDir) -> Result<(), ChromiumError> {
     let path = profile.path().to_owned();
     profile.close().map_err(|e| {
         ChromiumError::Failed(format!(

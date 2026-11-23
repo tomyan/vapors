@@ -10,13 +10,23 @@
 #[cfg(not(target_family = "wasm"))]
 mod chromium;
 #[cfg(not(target_family = "wasm"))]
+mod chromium_base64;
+#[cfg(not(target_family = "wasm"))]
+mod chromium_browser;
+#[cfg(not(target_family = "wasm"))]
+mod chromium_context;
+#[cfg(not(target_family = "wasm"))]
 mod chromium_live;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_name;
 #[cfg(not(target_family = "wasm"))]
+mod chromium_pids;
+#[cfg(not(target_family = "wasm"))]
 mod chromium_process;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_profile;
+#[cfg(not(target_family = "wasm"))]
+mod chromium_running;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_tmp;
 #[cfg(not(target_family = "wasm"))]
@@ -31,6 +41,8 @@ mod spec;
 
 #[cfg(not(target_family = "wasm"))]
 pub use chromium::{Chromium, ChromiumError};
+#[cfg(not(target_family = "wasm"))]
+pub use chromium_browser::Browser;
 #[cfg(not(target_family = "wasm"))]
 pub use chromium_live::Live;
 pub use composite::{GAP, compose, row_width};

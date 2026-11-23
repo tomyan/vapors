@@ -16,7 +16,7 @@ mod placement;
 
 use std::path::PathBuf;
 
-use paint_support::{HEIGHT, WIDTH, chromiums, image, laid_out, paint_fixtures, regions};
+use paint_support::{HEIGHT, WIDTH, browser, chromiums, image, laid_out, paint_fixtures, regions};
 use vapors_app::ScenePainter;
 use vapors_elements::Document;
 use vapors_elements_corpus::paint_check::compare;
@@ -106,7 +106,7 @@ fn check_placement(name: &str, scale: u32) {
         .into_iter()
         .find(|f| f.name == name)
         .expect("a paint fixture");
-    let theirs = chromiums("placement", name, scale, "");
+    let theirs = chromiums(&mut browser(), "placement", name, scale, "");
     let doc = laid_out(&fixture, scale);
     let ours = ours(&doc.borrow(), scale);
     let regions = regions(&doc.borrow(), scale);
@@ -158,7 +158,11 @@ fn differences(name: &str, scale: u32) -> (Vec<String>, PathBuf) {
             panic!("{name} is not a paint fixture: remove its test in gpu_paint.rs")
         });
     // Given
-    let theirs = exact::with_exact_pixels(name, scale, chromiums("match", name, scale, ""));
+    let theirs = exact::with_exact_pixels(
+        name,
+        scale,
+        chromiums(&mut browser(), "match", name, scale, ""),
+    );
     let doc = laid_out(&fixture, scale);
     assert_lanes_framed(name, &doc.borrow());
 

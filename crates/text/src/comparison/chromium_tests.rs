@@ -1,6 +1,7 @@
 //! The runner's checks on plain data: stale files and sizes.
 
 use super::*;
+use crate::comparison::chromium_process::{check_size, remove_stale};
 
 #[test]
 fn a_stale_screenshot_is_removed_and_a_missing_one_is_fine() {
@@ -43,8 +44,11 @@ fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
 #[test]
 #[allow(clippy::too_many_lines)] // one scenario: the hung browser, its child and its stderr
 fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_reported() {
-    // Given: a "browser" that writes to stderr, leaves a child holding
-    // the pipe, then hangs
+    // Given: a "browser" that writes to stderr, starts a child that, like
+    // each of Chromium's processes, carries its arguments (so its
+    // `--user-data-dir`), then hangs without writing DevToolsActivePort.
+    // Asked `--version` (to name it in the failure) it only hangs, so the
+    // pid file names the launch's child, not the version run's
     let scratch = tempfile::Builder::new()
         .prefix("vapors-chromium-hang-")
         .tempdir();
@@ -53,7 +57,7 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
     let script = dir.join("hang.sh");
     let child_pid = dir.join("child.pid");
     let text = format!(
-        "#!/bin/sh\necho 'gpu process died' >&2\nsleep 300 &\necho $! > {}\nsleep 300\n",
+        "#!/bin/sh\n[ \"$1\" = --version ] && while :; do sleep 0.2; done\necho 'gpu process died' >&2\nsh -c 'while :; do sleep 0.2; done' child \"$@\" &\necho $! > {}\nwhile :; do sleep 0.2; done\n",
         child_pid.display()
     );
     std::fs::write(&script, text).expect("script");
@@ -93,7 +97,8 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
         stage("the kill was late")
     );
     assert!(
-        message.contains("did not finish within 1s"),
+        message.contains("starting the browser, with 1s to finish")
+            && message.contains("held no port by the deadline"),
         "{}",
         stage("no deadline message")
     );

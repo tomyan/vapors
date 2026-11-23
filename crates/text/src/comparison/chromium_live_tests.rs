@@ -77,3 +77,32 @@ fn a_profile_with_contents_is_refused() {
     // Then
     assert!(refusal.to_string().contains("is not empty"), "{refusal}");
 }
+
+#[test]
+fn a_live_browser_writes_nothing_beside_its_profile_and_leaves_nothing_once_dropped() {
+    // Given: its profile in a root of its own, as in the automation cache,
+    // where the retention job removes profile directories and nothing else
+    let scratch = dir("beside");
+    let root = scratch.path().join("profiles");
+    let profile = root.join("expires-2000-01-01-x");
+    let names = || -> Vec<String> {
+        std::fs::read_dir(&root).map_or_else(
+            |_| Vec::new(),
+            |read| {
+                read.map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
+                    .collect()
+            },
+        )
+    };
+
+    // When
+    let live = failing(scratch.path())
+        .live(&profile, 400, 300, 1)
+        .expect("starts");
+    let running = names();
+    drop(live);
+
+    // Then
+    assert_eq!(running, vec!["expires-2000-01-01-x".to_owned()]);
+    assert_eq!(names(), Vec::<String>::new());
+}

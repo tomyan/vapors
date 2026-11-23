@@ -5,14 +5,13 @@
 use std::fmt;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
+use super::chromium_process::{DEADLINE, drain, finish, on_path};
 use super::chromium_profile::{in_profile, profile_root};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
-use super::png_file::read_png;
 
 /// Environment variable naming the browser binary, overriding the search.
 pub const CHROMIUM_ENV: &str = "VAPORS_CHROMIUM";
@@ -51,6 +50,7 @@ impl fmt::Display for ChromiumError {
 impl std::error::Error for ChromiumError {}
 
 /// A browser binary.
+#[derive(Clone)]
 pub struct Chromium {
     pub(super) binary: PathBuf,
     /// How long one screenshot may take before Chromium is killed.
@@ -84,13 +84,14 @@ impl Chromium {
     }
 
     /// Screenshot `html` at `width` by `height` CSS pixels at `scale`
-    /// device pixels per CSS pixel into `png`, and read it back.
+    /// device pixels per CSS pixel into `png`, and read it back: one
+    /// screenshot in a [`Browser`](super::Browser) of its own, closed after it. A test
+    /// taking more than one holds a [`Chromium::browser`] instead.
     ///
     /// # Errors
     ///
-    /// [`ChromiumError::Failed`] when it exits non-zero, hangs past the
-    /// deadline, a stale `png` cannot be removed first, or the PNG is not
-    /// the requested size.
+    /// As [`Browser::screenshot`](super::Browser::screenshot), and
+    /// [`Browser::close`](super::Browser::close)'s failure.
     pub fn screenshot(
         &self,
         html: &Path,
@@ -99,50 +100,15 @@ impl Chromium {
         height: u32,
         scale: u32,
     ) -> Result<Rgba, ChromiumError> {
-        self.shoot(html, png, [width, height], scale)
-            .map_err(|error| self.named(error))
-    }
-
-    fn shoot(
-        &self,
-        html: &Path,
-        png: &Path,
-        size: [u32; 2],
-        scale: u32,
-    ) -> Result<Rgba, ChromiumError> {
-        remove_stale(png)?;
-        let tmp = launch_tmp()?;
-        in_profile(&self.profiles, std::time::SystemTime::now(), |profile| {
-            self.shoot_in(html, png, [tmp.path(), profile], size, scale)
-        })
-    }
-
-    /// One screenshot with `dirs` as its `[TMPDIR, profile]`.
-    fn shoot_in(
-        &self,
-        html: &Path,
-        png: &Path,
-        dirs: [&Path; 2],
-        size: [u32; 2],
-        scale: u32,
-    ) -> Result<Rgba, ChromiumError> {
-        let [width, height] = size;
-        let mut child = self.spawn(html, png, dirs, size, scale)?;
-        let stderr = drain(
-            child
-                .stderr
-                .take()
-                .ok_or_else(|| ChromiumError::Failed("its stderr was not piped".to_owned()))?,
-        );
-        let (status, stderr) = finish(&mut child, &stderr, self.deadline)?;
-        if !status.success() {
-            return Err(ChromiumError::Failed(format!(
-                "exited with {status}:\n{stderr}"
-            )));
+        let mut browser = self.browser();
+        let shot = browser.screenshot(html, png, width, height, scale);
+        match (shot, browser.close()) {
+            (shot, Ok(())) => shot,
+            (Ok(_), Err(closing)) => Err(self.named(closing)),
+            (Err(failure), Err(closing)) => {
+                Err(ChromiumError::Failed(format!("{failure}\nand {closing}")))
+            }
         }
-        let image = read_png(png).map_err(ChromiumError::Failed)?;
-        check_size(&image, png, [width * scale, height * scale])?;
-        Ok(image)
     }
 
     /// The DOM of `html` at `width` by `height` CSS pixels and device
@@ -195,22 +161,6 @@ impl Chromium {
             )));
         }
         Ok(stdout)
-    }
-
-    fn spawn(
-        &self,
-        html: &Path,
-        png: &Path,
-        dirs: [&Path; 2],
-        [width, height]: [u32; 2],
-        scale: u32,
-    ) -> Result<Child, ChromiumError> {
-        self.command(dirs, width, height, f64::from(scale))?
-            .arg(format!("--screenshot={}", png.display()))
-            .arg(format!("file://{}", html.display()))
-            .stdout(Stdio::null())
-            .spawn()
-            .map_err(|e| self.cannot_start(&e))
     }
 
     /// Headless Chromium at a fixed window and scale. It asks

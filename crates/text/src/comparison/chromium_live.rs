@@ -1,8 +1,8 @@
 //! A Chromium that stays up, for the `DevTools` protocol: headless, at a
 //! fixed window and scale, on a profile of its own, with
 //! `--remote-debugging-port=0`, so `vapors-devtools` reads the port from
-//! the profile and drives the page. Its stderr goes to a file beside the
-//! profile, so an early exit says why ([`Live::alive`]). It is stopped,
+//! the profile and drives the page. Its stderr goes to a file in its
+//! `TMPDIR`, so an early exit says why ([`Live::alive`]). It is stopped,
 //! with what it started, and its profile, disk cache and `TMPDIR` removed, when
 //! dropped.
 
@@ -44,7 +44,10 @@ impl Chromium {
         let tmp = launch_tmp()?;
         let mut command = self.live_command(profile, width, height, scale);
         contain_cache(&mut command, tmp.path())?;
-        let stderr = profile.with_extension("stderr.log");
+        // In its TMPDIR, not beside the profile: a profile root may be the
+        // automation cache, whose retention job removes only profile
+        // directories, and a killed test never runs `drop`.
+        let stderr = tmp.path().join("stderr.log");
         let log = File::create(&stderr).map_err(|e| failed(&stderr, &e))?;
         let child = command
             .env("TMPDIR", tmp.path())
@@ -111,7 +114,6 @@ impl Drop for Live {
             eprintln!("chromium: stopping it: {why}; it may still be running");
         }
         let _ = std::fs::remove_dir_all(&self.profile);
-        let _ = std::fs::remove_file(&self.stderr);
     }
 }
 

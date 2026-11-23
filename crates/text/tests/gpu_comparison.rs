@@ -27,7 +27,7 @@ fn gpu_body_paragraph_ink_is_within_the_band_of_chromiums_at_1x_and_2x() {
     std::fs::write(&html_path, html()).expect("html");
     let gpu = gpu();
     let mut system = FontSystem::bundle_only();
-    let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
+    let mut chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}")).browser();
     let background = SCHEMES[0].background.to_rgba8();
 
     for scale in SCALES {
