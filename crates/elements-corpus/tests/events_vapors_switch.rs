@@ -1,7 +1,6 @@
-//! The live switch fixture's `.events` script played on vapors and
-//! compared step by step with what Chromium logged for it
-//! (`fixtures/live_switch.events.json`, from the events oracle): a click,
-//! Space, Enter and Tab on a `switch` input, as on a checkbox.
+//! A changed live switch script fails the comparison with Chromium's
+//! answers (`fixtures/live_switch.events.json`): the script itself is
+//! played in `events_every_script.rs`.
 //! Reproduce: `cargo test -p vapors-elements-corpus --test events_vapors_switch`.
 
 use vapors_elements::Viewport;
@@ -26,12 +25,6 @@ fn ours(script: &str) -> Result<(), String> {
     let answers = serde_json::from_str(&read("live_switch.events.json")).expect("json");
     let log = play(&fixture("live_switch"), &script, VIEWPORT)?;
     compare("live_switch", &script, &log, &answers)
-}
-
-#[test]
-fn the_live_switch_script_logs_on_vapors_what_chromium_logged() {
-    // Given, When, Then: the events, focus and checked state after each step
-    ours(&read("live_switch.events")).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

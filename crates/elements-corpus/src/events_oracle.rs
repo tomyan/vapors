@@ -18,7 +18,7 @@ use crate::oracle::fixtures_dir;
 const DEADLINE: Duration = Duration::from_secs(145);
 
 /// The size another page (`page`) opens at when the script names none.
-const PAGE_SIZE: (u32, u32) = (640, 400);
+pub const PAGE_SIZE: (u32, u32) = (640, 400);
 
 /// The names of the fixtures with a script, sorted.
 ///
