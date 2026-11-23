@@ -36,6 +36,16 @@ impl Window {
         }
     }
 
+    /// This geometry with a window `height` px tall: the list's laid-out
+    /// height, which follows a resize (`virtual_list.wisp`).
+    ///
+    /// # Panics
+    /// On a height that is negative or not finite, as [`Window::new`].
+    #[must_use]
+    pub fn with_height(self, height: f32) -> Window {
+        Window::new(self.row_height, height, self.overscan)
+    }
+
     /// The rows of `count` that exist at vertical scroll offset `offset`:
     /// those any part of which is in the window, and `overscan` more on
     /// each side, cut to `0..count`.

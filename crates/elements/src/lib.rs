@@ -148,6 +148,7 @@ mod range_paint;
 mod repaint;
 #[cfg(debug_assertions)]
 mod repaint_check;
+mod resize_event;
 mod restyle;
 mod restyle_check;
 mod restyle_children;

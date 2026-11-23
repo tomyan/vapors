@@ -10,21 +10,40 @@ use vapors_elements::{Document, Viewport};
 /// A point inside the list, below the header.
 pub const IN_LIST: [f32; 2] = [640.0, 400.0];
 
-/// The list of `count` orders, mounted and drawn once, its change flag
-/// taken.
+/// The list of `count` orders, mounted and drawn in the spec's window
+/// until it asks for no more frames (`settled_at`).
 pub fn list_of(count: usize) -> MountedList {
     let mounted = mount(count);
-    frame(&mounted);
-    mounted.document.borrow_mut().take_changed();
+    settled_at(&mounted, WINDOW.1);
     mounted
 }
 
-/// What a frame does: settle the scrolls owed, then update.
+/// What a frame does in the spec's window: settle the scrolls and
+/// resizes owed, then update.
 pub fn frame(mounted: &MountedList) {
+    frame_at(mounted, WINDOW.1);
+}
+
+/// Frames in a window of the spec's width and `height` px tall until the
+/// document asks for none, as an app that redraws on change draws them;
+/// refused past three, more than a resize needs (the frame that lays it
+/// out and the one that fires its `resize`).
+pub fn settled_at(mounted: &MountedList, height: f32) {
+    for _ in 0..3 {
+        frame_at(mounted, height);
+        if !mounted.document.borrow_mut().take_changed() {
+            return;
+        }
+    }
+    panic!("the list still asks for a frame after three at {height} px");
+}
+
+/// A frame in a window of the spec's width and `height` px tall.
+pub fn frame_at(mounted: &MountedList, height: f32) {
     Document::settle_scroll(&mounted.document);
     let viewport = Viewport {
         width: WINDOW.0,
-        height: WINDOW.1,
+        height,
         scale: 1.0,
     };
     mounted

@@ -166,3 +166,27 @@ fn a_count_whose_f64_product_rounds_to_an_f32_is_not_taken_as_exact() {
     // below it are refused too
     let _ = Window::new(3.0, 60.0, 1).px(((1_usize << 54) - 1) / 3);
 }
+
+#[test]
+fn a_window_given_a_taller_height_holds_the_rows_of_that_height() {
+    // When: 100 px shows rows 0..5
+    let rows = small().with_height(100.0).rows(0.0, 20);
+
+    // Then
+    assert_eq!(rows, 0..6);
+}
+
+#[test]
+fn a_window_given_a_shorter_height_holds_the_rows_of_that_height() {
+    // When: 30 px down, 20 px shows part of rows 1 and 2
+    let rows = small().with_height(20.0).rows(30.0, 20);
+
+    // Then
+    assert_eq!(rows, 0..4);
+}
+
+#[test]
+#[should_panic(expected = "height is NaN")]
+fn a_laid_out_height_that_is_not_a_number_is_refused() {
+    let _ = small().with_height(f32::NAN);
+}

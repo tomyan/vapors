@@ -1,6 +1,6 @@
 # Parts built by hand (`IDIOMS.md` rule 5)
 
-Part, what vapors lacks, the smallest framework change. The window, the sidebar and the metric cards, the page switch and the messages feed are plain elements and CSS. The `list` scenario uses vapors' own virtual list, `vapors_components::virtual_list::VirtualList` (`docs/virtual-list.md`), added to the framework for this scenario rather than built in the app; its window height is the spec's 756 px, read at mount (`src/list.rs`), since the component does not yet follow its laid-out size.
+Part, what vapors lacks, the smallest framework change. The window, the sidebar and the metric cards, the page switch and the messages feed are plain elements and CSS. The `list` scenario uses vapors' own virtual list, `vapors_components::virtual_list::VirtualList` (`docs/virtual-list.md`), added to the framework for this scenario rather than built in the app; it fills the window below the header and its rows follow its laid-out height as the window resizes (`src/tests/list_resize.rs`).
 
 | Part | What vapors lacks | The smallest change |
 |---|---|---|

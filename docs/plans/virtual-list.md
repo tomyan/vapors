@@ -95,11 +95,50 @@ page does not scroll in vapors).
   at row 600,000, the sort's first rows and last row, and idle (same
   elements, `take_changed` false).
 
+## V4: the window follows the list's laid-out height (done)
+
+The spec's list fills the window below the header at any window size,
+as Zgui's virtual list does: its height comes from layout, and the list
+reads the scrollport's laid-out size after each layout.
+
+- **The `resize` event.** `Document::settle_scroll`, after the
+  `scroll`s, fires one `resize` at each scroll container whose laid-out
+  client size (its padding box: vapors' thumbs overlay it) differs from
+  the one its last `resize` carried, (0, 0) for one that has fired none,
+  carrying it in CSS px, unrounded, compared exactly:
+  `Event::client_size()`. Only a container with a `resize` listener
+  owes one, as a `ResizeObserver` reports only what it observes, so a
+  page without one draws no extra frame. It does not bubble, and only
+  scroll containers fire it. The DOM has no element `resize`; a page there
+  uses a `ResizeObserver`, whose callbacks run once per frame after
+  layout, and this is that report for scroll containers. An update that
+  changes a size leaves the `resize` owed, and `take_changed` answers
+  true until the next settle fires it, so the frame after a resize
+  holds the new rows: the frame that lays the new size out shows the
+  rows of the old one, as Zgui's does. Tests:
+  `crates/elements/tests/resize_event.rs`.
+- **The list.** `VirtualList`'s window is the height the last `resize`
+  reported, `height` until the first. `height` above 0 still sets the
+  container's CSS height; at 0, now the default, the list fills its
+  parent's height (`height: 100%`), and its first frame holds only the
+  overscan. Tests: `crates/compiler-examples/tests/virtual_fill.rs`
+  (embedded in a panel under a header: 200, 300 and 120 px windows, at
+  the top, 400 px down and at the end); `virtual_rows.rs` keeps a
+  60 px `height`.
+- **The bench.** The list sits in a box from the header to the
+  window's bottom and fills it; `crates/gui-bench-app/src/tests/list_resize.rs`
+  holds a million rows in 1000 and 600 px windows: the bottom row of
+  the window, the last order reachable at the end of the shorter, the
+  rows below row 600,000 and the last order at the end after the
+  taller.
+
 ## Open
 
-- A height that follows the list's laid-out size (`height` is read at
-  mount); rows of differing heights; another crate's `.wisp` component
-  inside a snippet.
+- Rows of differing heights; another crate's `.wisp` component inside
+  a snippet; a `{render}` of a snippet prop inside a local snippet,
+  which compiles against `dyn Dom` where the block needs the mount's
+  `D` (`VirtualList` writes its content out in both branches of
+  `{if fixed}` for this).
 - A deep lane that declines framing (`LaneFramePixel`: a fractional
   start) is placed in f32, off by fractions of a pixel, and not
   reported.

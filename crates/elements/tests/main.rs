@@ -190,6 +190,7 @@ mod refusals;
 mod refusals_button;
 mod refusals_declared;
 mod rehover_changed;
+mod resize_event;
 mod same_value_writes;
 mod scene_anchors;
 mod scene_appearance;
