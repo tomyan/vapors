@@ -13,8 +13,10 @@ use std::time::Duration;
 /// min), then the turn, a slot and the gate lock together
 /// (`gate_lock::WAIT`, 40 min), then the load wait, which goes on at its
 /// default deadline (`load_wait::DEFAULT_DEADLINE`, 10 min): 111 min.
-/// A gate's share tries rounds for the first two together (`share.rs`)
-/// and then waits for the load, so it keeps within this too.
+/// A gate's share tries rounds until the first two together, 101 min
+/// (`share.rs`); each quiet and lock wait is cut to what is left when it
+/// starts, and only a load wait begun just before that deadline can pass
+/// it, by at most its own 10 min, so the share too keeps within 111.
 pub const HOLD_WAIT: Duration = crate::quiet_lock::WAIT
     .saturating_add(crate::gate_lock::WAIT)
     .saturating_add(crate::load_wait::DEFAULT_DEADLINE);

@@ -214,8 +214,10 @@ min (`gate_deadline::LONGEST`). A second gate in the same worktree
 waits that long for the first (`gate_worktree_lock::WAIT`), and the
 queue kills a gate after it and `gate --pr`'s three gh calls of 30 s
 (`queue_gate_child::GATE_DEADLINE`). A gate's share tries rounds until 101 min
-(quiet and gate lock together) and then waits for the load at most 10
-more, so its hold too is within 111 min. Declared limit: a `[load]
+(quiet and gate lock together). Each quiet and lock wait is cut to what
+is left of that when it starts, so the waits of a round together keep
+within it; only a load wait begun just before the deadline can pass it,
+by at most its own 10 min. So the share too is within 111 min. Declared limit: a `[load]
 deadline_minutes` above the default is not counted; it can make a gate
 outlive the deadline, which then kills or refuses it.
 

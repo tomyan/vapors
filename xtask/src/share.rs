@@ -96,7 +96,7 @@ pub fn take(place: &Place, sharer: Sharer) -> Result<Shared, String> {
     }
     let who = sharer.name();
     for _ in 0..QUIET_ROUNDS {
-        if let Some(share) = round(place, sharer, (place.quiet_wait, place.lock_wait))? {
+        if let Some(share) = round(place, sharer, (place.quiet_wait, &|| place.lock_wait))? {
             return Ok(share);
         }
     }
@@ -107,12 +107,14 @@ pub fn take(place: &Place, sharer: Sharer) -> Result<Shared, String> {
 }
 
 /// A gate's share: rounds until `deadline` from now, each wait no
-/// longer than what is left of it.
+/// longer than what is left of it when the wait starts, so the quiet,
+/// load and lock waits of a round together keep within it (the load
+/// wait, which goes on at its own deadline, can pass it by at most that).
 fn take_until(place: &Place, deadline: Duration) -> Result<Shared, String> {
     let started = Instant::now();
+    let left = || deadline.saturating_sub(started.elapsed());
     loop {
-        let left = deadline.saturating_sub(started.elapsed());
-        if let Some(share) = round(place, Sharer::Gate, (left, left))? {
+        if let Some(share) = round(place, Sharer::Gate, (left(), &left))? {
             return Ok(share);
         }
     }
@@ -120,11 +122,12 @@ fn take_until(place: &Place, deadline: Duration) -> Result<Shared, String> {
 
 /// One round: the quiet wait, the load wait for a sharer that builds,
 /// the share, then the re-check; none, the share let go, when the quiet
-/// lock was taken meanwhile.
+/// lock was taken meanwhile. The lock's wait is read once the quiet and
+/// load waits are over.
 fn round(
     place: &Place,
     sharer: Sharer,
-    (quiet_wait, lock_wait): (Duration, Duration),
+    (quiet_wait, lock_wait): (Duration, &dyn Fn() -> Duration),
 ) -> Result<Option<Shared>, String> {
     let who = sharer.name();
     wait_quiet(place, who, quiet_wait)?;
@@ -134,7 +137,7 @@ fn round(
     } else {
         Slot::None
     };
-    let share = acquire_shared_as(&place.dir, (&place.worktree, who), lock_wait, slot)?;
+    let share = acquire_shared_as(&place.dir, (&place.worktree, who), lock_wait(), slot)?;
     if !taken_since(place)? {
         return Ok(Some(share));
     }

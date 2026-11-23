@@ -199,3 +199,34 @@ fn a_gate_still_losing_to_the_quiet_lock_at_its_deadline_fails_naming_the_holder
         "{refusal}"
     );
 }
+
+#[test]
+fn a_gate_s_quiet_and_lock_waits_together_keep_within_its_share_s_deadline() {
+    // Given: a 2 s deadline (1 s quiet and 1 s lock waits); another
+    // worktree's quiet hold for 1.8 s, then the gate lock held throughout.
+    // The hold's length is what is measured, so it is real time.
+    let dir = lock_dir("share-gate-one-deadline");
+    let place = Place::brief(&dir, "/w/gate", Duration::from_secs(1));
+    let quiet = Holder::me(
+        "/w/other",
+        Duration::from_millis(1800),
+        crate::quiet_lock::Form::Hold,
+        "x",
+    );
+    std::fs::create_dir_all(&*dir).expect("dir");
+    std::fs::write(dir.join(crate::quiet_lock::FILE), quiet.line()).expect("quiet");
+    let _alone = crate::gate_lock::acquire(&dir, "/w/alone", BRIEF).expect("alone");
+
+    // When
+    let started = std::time::Instant::now();
+    let taken = take(&place, Sharer::Gate);
+    let took = started.elapsed();
+
+    // Then
+    let refusal = taken.expect_err("a share beside an exclusive holder");
+    assert!(refusal.contains("/w/alone"), "{refusal}");
+    assert!(
+        took < Duration::from_millis(2500),
+        "it waited {took:?}, past its 2 s deadline"
+    );
+}
