@@ -1,36 +1,23 @@
-//! A capture is refused before any browser starts when what it would
-//! capture is not a paint fixture at a scale.
+//! The page a capture loads is the fixture's, with its state's CSS
+//! appended and nothing else.
 
 use super::*;
 
-/// A scratch directory for what a capture would write, so a refusal that
-/// regresses writes nothing into `fixtures/references/`.
-fn scratch() -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .prefix("vapors-capture-")
-        .tempdir()
-        .expect("a scratch dir")
-}
-
 #[test]
-fn a_capture_of_a_fixture_that_is_not_a_paint_fixture_is_refused() {
-    // When: borders has no `/* paint */` in its style
-    let dir = scratch();
-    let refused = capture_into(dir.path(), "borders", 2).expect_err("refused");
+fn a_states_page_is_the_fixtures_with_its_css_appended() {
+    // Given
+    let plain = Reference::of("paint_boxes", None, 1).expect("a fixture");
+    let changed = Reference::of("paint_boxes", Some("card_radius_4"), 1).expect("a state");
 
-    // Then
-    assert!(
-        refused.contains("borders is not a paint fixture"),
-        "{refused}"
-    );
-}
-
-#[test]
-fn a_capture_at_scale_zero_is_refused() {
     // When
-    let dir = scratch();
-    let refused = capture_into(dir.path(), "text_line_box_paint", 0).expect_err("refused");
+    let (plain, changed) = (page(&plain).expect("page"), page(&changed).expect("page"));
 
     // Then
-    assert!(refused.contains("scale 0"), "{refused}");
+    assert!(!plain.contains(".card { border-radius: 4px; }"));
+    assert!(changed.contains(".card { border-radius: 4px; }"));
+    assert_eq!(
+        changed.replace(".card { border-radius: 4px; }", ""),
+        plain,
+        "only the state's CSS differs"
+    );
 }

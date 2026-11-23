@@ -1,29 +1,24 @@
 //! GPU tier: each paint fixture (a `/* paint */` comment in its style),
-//! drawn by vapors offscreen and by headless Chromium at 1x and 2x, is
-//! held to the rules in `paint_check`: flat regions within 2, every
+//! drawn by vapors offscreen at 1x and 2x and compared with headless
+//! Chromium's saved rendering of it, is held to the rules in `paint_check`: flat regions within 2, every
 //! pixel within 96, and in each element's region at most 2 pixels off
 //! by more than half the local contrast. The composite (vapors | Chromium | difference
 //! x4) is written to `target/tmp/paint_<name>_<scale>x.png`.
 //! The rules are checked in `gpu_paint_rules`. Four pixels of touche's
 //! Mute icon at 1x (two in each of the two opaque rows) are compared with exact coverage instead
-//! (`paint_support/exact.rs`, declared there). Chromium's side of the
-//! fixtures and scales `saved::SAVED` lists is a committed saved
-//! reference, read without launching a browser and refused when stale
-//! (`vapors_elements_corpus::paint_reference`); every other is
-//! screenshotted live (`paint_support/saved.rs`).
+//! (`paint_support/exact.rs`, declared there). Chromium's side of every
+//! fixture and scale is its committed saved reference, read without
+//! starting a browser (`vapors_elements_corpus::paint_reference`).
 
 #[path = "paint_support/exact.rs"]
 mod exact;
 mod paint_support;
 #[path = "paint_support/placement.rs"]
 mod placement;
-#[path = "paint_support/saved.rs"]
-mod saved;
 
 use std::path::PathBuf;
 
-use paint_support::{HEIGHT, WIDTH, image, laid_out, paint_fixtures, regions};
-use saved::theirs;
+use paint_support::{HEIGHT, WIDTH, image, laid_out, paint_fixtures, regions, theirs};
 use vapors_app::ScenePainter;
 use vapors_elements::Document;
 use vapors_elements_corpus::paint_check::compare;
@@ -109,7 +104,7 @@ fn assert_lanes_framed(name: &str, doc: &Document) {
 /// `name` at `scale` inks each element's region over the same rows and
 /// columns as Chromium (`placement.rs`).
 fn check_placement(name: &str, scale: u32) {
-    let theirs = theirs("placement", name, scale);
+    let theirs = theirs(name, None, scale);
     let off = placement_off(name, scale, &theirs);
     assert!(
         off.is_empty(),
@@ -164,8 +159,7 @@ fn gpu_at_2x_placement_refuses_text_one_device_column_right() {
 /// that it passes the placement check unshifted, so a shift test's
 /// refusal comes from the shift alone.
 fn saved_unshifted_and_placed() -> vapors_text::comparison::Rgba {
-    let saved = vapors_elements_corpus::paint_reference::saved("text_line_box_paint", 2)
-        .unwrap_or_else(|why| panic!("{why}"));
+    let saved = theirs("text_line_box_paint", None, 2);
     let off = placement_off("text_line_box_paint", 2, &saved);
     assert!(
         off.is_empty(),
@@ -205,7 +199,7 @@ fn differences(name: &str, scale: u32) -> (Vec<String>, PathBuf) {
             panic!("{name} is not a paint fixture: remove its test in gpu_paint.rs")
         });
     // Given
-    let theirs = exact::with_exact_pixels(name, scale, theirs("match", name, scale));
+    let theirs = exact::with_exact_pixels(name, scale, theirs(name, None, scale));
     let doc = laid_out(&fixture, scale);
     assert_lanes_framed(name, &doc.borrow());
 

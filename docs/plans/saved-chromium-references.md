@@ -1,95 +1,74 @@
-# Saved Chromium references: thin slices
+# Saved Chromium references
 
-The paint corpus (`crates/elements-corpus/tests/gpu_paint.rs`) launches
-headless Chromium in every run to screenshot each fixture, and holds
-vapors' render to that screenshot. On the hosted runner the same pinned
-Chromium 157 draws `text_line_box_paint`'s glyph rows one device pixel
-off from this machine (runs 45067990897 and 45072756560: 9 boxes one
-row off), so the check depends on where it runs. Tom decided on
-2026-11-22 that ordinary checks would compare against a committed
-Chromium screenshot instead, captured with the pinned build (#610) and
-regenerated on request.
+The paint tests (`crates/elements-corpus/tests/gpu_paint.rs` and
+`gpu_paint_rules.rs`) hold vapors' rendering of each paint fixture to
+Chromium's. They used to screenshot every fixture with headless Chromium
+in each run. On the hosted runner, the same Chromium 157 draws
+`text_line_box_paint`'s glyph rows one device pixel off from this
+machine (runs 45067990897 and 45072756560), so the result depended on
+where it ran. Tom decided on 2026-11-22 that ordinary checks compare
+against committed Chromium screenshots, and on 2026-11-23 that:
 
-## R1: `text_line_box_paint` at 2x from a saved reference (this slice)
+- an ordinary run renders vapors and compares it with the committed PNG,
+  and queries nothing about the browser or the reference's freshness
+  (no version, checksum, flags or manifest);
+- a missing or unreadable reference fails, naming the file and the
+  capture command;
+- references are captured with Chromium by hand, only to investigate a
+  mismatch when there is reason to suspect the reference, and looked at
+  before a replacement is committed. Otherwise a mismatch is fixed in
+  vapors;
+- every reference the paint suite uses is saved: each fixture, scale
+  and changed state.
 
-The two 2x tests of `text_line_box_paint`, `gpu_at_2x_placement` (the
-ink-bounds check) and `gpu_at_2x_still_differs` (the tripwire), would read
-Chromium's side from a committed file and launch no browser. The 1x test
-and every other fixture would stay live until later slices.
+## What is saved
 
-- Files: `crates/elements-corpus/fixtures/references/text_line_box_paint_2x.png`
-  holds Chromium's own PNG, byte for byte as it wrote it, and
-  `text_line_box_paint_2x.json` is its manifest:
-  - `page_sha256`: the HTML page the capture loaded, which covers the
-    `.wisp` and the page template;
-  - `fonts` and `images`: the sha256 of each file written beside the page;
-  - `browser`: the `chromium.version` and `chromium.binary_sha256` pinned
-    in `.config/tools.toml` at capture time;
-  - `width`, `height` and `scale`: 640, 400 and 2;
-  - `flags`: Chromium's render flags at this size and scale, as
-    `vapors_text::comparison::render_flags` gives them. That is a new
-    function holding the six flags `Chromium::command` passes today, and
-    `command` would call it, so the capture and the check read one list.
-    The per-run paths (`--screenshot`, #603's `--user-data-dir`) stay out
-    of it;
-  - `png_sha256`: the PNG's hash;
-  - `host`: the capture machine's OS and kernel, recorded for a reader
-    and not checked, since it is expected to differ.
-- Check: before comparing, the test would recompute each checked field
-  from the tree as it is and refuse a missing manifest or PNG, a field
-  that differs, or a PNG whose hash differs. Each refusal names the file,
-  the field, both values, and the regeneration command.
-- Regeneration: `cargo xtask reference text_line_box_paint 2` runs the
-  corpus example `paint_reference`. The example finds the pinned
-  Chromium, refuses a binary whose sha256 is not the pin's (for example
-  a `VAPORS_CHROMIUM` override), screenshots the page as the live path
-  does, and writes the PNG and its manifest.
-- One answer: the corpus reads the pin's version and hash from
-  `.config/tools.toml`, the same file `vapors_text`'s `chromium_pin`
-  reads. A unit test would hold the version it reads to the directory
-  `chromium_pin::pinned_binary` names.
-- The ink-bounds assertion stays as it is. Only where Chromium's image
-  comes from changes.
-- Shifted text: a gpu test would move the saved reference's pixels down
-  one device row and assert the placement check refuses it.
-- No browser: the slice's tests are run with `VAPORS_CHROMIUM` set to a
-  path that does not exist and `/usr/bin/chromium` hidden from PATH, and
-  must pass. The output goes in the PR.
-- Unchanged: ci.yml, the rest of `crates/text/src/comparison`, xtask's downloads,
-  and the withdrawn hosted diagnostic (branch
-  `diag/chromium-text-placement`, no PR).
+`crates/elements-corpus/fixtures/references/` holds 50 PNGs, each as
+Chromium wrote it:
 
-Tests:
+- `<fixture>_<scale>x.png`: the 11 paint fixtures (a `/* paint` comment
+  in the style) at 1x and 2x, 22 files. `gpu_paint` compares vapors with
+  them: pixel rules for every fixture at 1x and for all but
+  `text_line_box_paint` at 2x, ink placement and the tripwire for
+  `text_line_box_paint` at 2x;
+- `<fixture>_<state>_<scale>x.png`: the 14 changed states in
+  `paint_reference_states.rs` `STATES` (CSS appended to `paint_boxes` or
+  `icons_paint`, as a vapors bug would change them) at 1x and 2x, 28
+  files. `gpu_paint_rules` holds that each fails the rules against its
+  fixture as it is.
 
-- unit (`paint_reference` in vapors-elements-corpus): a missing manifest,
-  a missing PNG, each stale field, a field the manifest lacks, a missing
-  `host`, an unrecognised field, and a PNG of another hash or size are
-  each refused with the file, field and command; a matching manifest
-  gives the decoded image; the pin read from tools.toml is
-  `chromium_pin`'s; a capture of a fixture that is not a paint fixture,
-  or at scale 0, is refused before any browser starts.
-- gpu: the two 2x tests of `text_line_box_paint` pass from the saved
-  reference; the reference moved one device row down, or one device
-  column right, is refused.
+The first set was captured on 2026-11-23 with the pinned Chromium
+`157.0.8103.0-r1717344` (binary sha256 `c620e149…`, `.config/tools.toml`)
+on Debian 13. `text_line_box_paint_2x.png` is byte for byte the file
+captured for R1 on 2026-11-22.
 
-Known limits, from review:
+## Checks
 
-- A capture checks the sha256 of the Chromium executable only. A copy of
-  the pinned executable beside other `.pak` or `.so` files would be
-  accepted. Rendering inputs outside the page (system fallback fonts,
-  fontconfig) are recorded only in `host`, which is not compared.
-- The corpus parses `[downloads] chromium.*` itself, mirroring
-  `chromium_pin::pinned_field`. A test holds the version it reads to
-  `chromium_pin::pinned_binary`. Making `pinned_field` public in #610
-  would leave one parser.
-- `sha256` hands `sha256sum` a file as its stdin and waits at most 30 s
-  for it to exit, then kills it and refuses the hash. That is about seven
-  times the slowest measured run (`sha256.rs` `DEADLINE`). xtask's own
-  `download_install::sha256` still waits without a deadline.
+- `paint_reference::read` refuses a missing file, one that is not a
+  readable PNG, and one that is not the window's size at its scale.
+  Each refusal names the file and its capture command.
+- `the_committed_references_are_every_one_the_paint_tests_read` holds
+  the directory to exactly the references the tests read: none missing,
+  none unread.
+- `gpu_paint_rules_every_state_is_tested_at_every_scale` holds every
+  state to a test at each scale.
+- The two shift tests in `gpu_paint` move the saved
+  `text_line_box_paint` 2x reference one device row down, or one column
+  right. They hold that the placement check refuses each, after
+  checking that it passes unshifted.
 
-## Next slices (to replan after R1)
+## Capture
 
-- R2: the 1x test of `text_line_box_paint` and the other `only_1x`
-  fixtures' placement tests.
-- R3: every paint fixture at 1x and 2x, then `chromiums` removed from the
-  ordinary path, keeping the live comparison as a named command.
+`cargo xtask reference all` or `cargo xtask reference <fixture> <scale>
+[<state>]` runs the corpus example `paint_reference`. It finds Chromium
+as every comparison does (`Chromium::find`: `VAPORS_CHROMIUM`, else the
+pinned install), loads the fixture's page with the state's CSS appended,
+and copies the screenshot into the references directory. Nothing records
+which browser drew a file; the commit that adds or replaces it says so.
+
+## Not covered
+
+- `gpu_events` still drives a live Chromium. It compares events, not
+  paint, and the layout, a11y and events oracles do the same.
+- The live comparison is gone from the paint tests. The withdrawn hosted
+  diagnostic (branch `diag/chromium-text-placement`, no PR) is separate.

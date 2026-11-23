@@ -10,8 +10,6 @@
 #[cfg(not(target_family = "wasm"))]
 mod chromium;
 #[cfg(not(target_family = "wasm"))]
-mod chromium_flags;
-#[cfg(not(target_family = "wasm"))]
 mod chromium_live;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_name;
@@ -34,11 +32,7 @@ mod spec;
 #[cfg(not(target_family = "wasm"))]
 pub use chromium::{Chromium, ChromiumError};
 #[cfg(not(target_family = "wasm"))]
-pub use chromium_flags::render_flags;
-#[cfg(not(target_family = "wasm"))]
 pub use chromium_live::Live;
-#[cfg(not(target_family = "wasm"))]
-pub use chromium_pin::pinned_binary;
 pub use composite::{GAP, compose, row_width};
 pub use html::{FONT_FILES, html};
 pub use measure::{INK_BAND, Rgba, ink_within_band, mean_ink};

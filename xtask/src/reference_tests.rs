@@ -1,11 +1,12 @@
-//! The reference command runs the corpus's capture.
+//! The reference command runs the corpus's capture with its target.
 
 use super::*;
 
 #[test]
-fn the_reference_command_runs_the_corpus_capture_with_the_fixture_and_scale() {
+fn the_reference_command_passes_its_target_to_the_corpus_capture() {
     // When
-    let steps = steps("text_line_box_paint", 2);
+    let target = ["paint_boxes", "2", "card_radius_4"].map(String::from);
+    let steps = steps(&target);
 
     // Then
     let [step] = steps.as_slice() else {
@@ -21,8 +22,9 @@ fn the_reference_command_runs_the_corpus_capture_with_the_fixture_and_scale() {
             "--example",
             "paint_reference",
             "--",
-            "text_line_box_paint",
-            "2"
+            "paint_boxes",
+            "2",
+            "card_radius_4"
         ]
     );
 }

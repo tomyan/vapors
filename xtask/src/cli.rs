@@ -186,13 +186,13 @@ pub enum Command {
     },
     /// Check formatting and lints without running tests.
     Lint,
-    /// Capture a paint fixture's saved Chromium reference again with the
-    /// pinned Chromium, into crates/elements-corpus/fixtures/references/.
+    /// Capture saved Chromium references for the paint tests, on request
+    /// only, into crates/elements-corpus/fixtures/references/: `all`, or
+    /// `<fixture> <scale> [<state>]`. Look at each before committing it.
     Reference {
-        /// The paint fixture, as `text_line_box_paint`.
-        fixture: String,
-        /// Device pixels per CSS pixel.
-        scale: u32,
+        /// `all`, or a paint fixture, its scale and optionally a state.
+        #[arg(required = true, num_args = 1..=3)]
+        target: Vec<String>,
     },
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,

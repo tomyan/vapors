@@ -280,7 +280,7 @@ fn main() -> ExitCode {
         Command::Scaling => return scaling::run(&reporter),
         Command::Quiet { args } => return quiet_command::run(&args),
         Command::Lint => steps::lint(),
-        Command::Reference { fixture, scale } => reference::steps(&fixture, scale),
+        Command::Reference { target } => reference::steps(&target),
         Command::Deny => steps::deny_check(),
         Command::Test { tier } => {
             if let Err(why) = quiet_wait::before("test") {
