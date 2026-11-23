@@ -16,11 +16,10 @@ pub(crate) const COLOR: Color = Color {
     a: 1.0,
 };
 
-/// Whether `element` is an input that paints a placeholder: a text
-/// field, or an `input type=number`.
+/// Whether `element` is an input that paints a placeholder: one with an
+/// editor (`text_field::is_edited`), a text or number field.
 pub(crate) fn takes_placeholder(element: &Element) -> bool {
-    element.tag == "input"
-        && (crate::text_field::is_text_input(element) || crate::check::is_type(element, "number"))
+    crate::text_field::is_edited(element)
 }
 
 /// What `element` shows while it is empty: its `placeholder`, as the

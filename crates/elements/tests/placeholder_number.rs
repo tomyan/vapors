@@ -7,8 +7,8 @@ use support::{document, element, viewport};
 use vapors_dom::Dom;
 use vapors_scene::{Color, Item};
 
-/// The strings and colours, bar an empty editor's, a 100 px input with `attributes` paints,
-/// with `css` added to the field's rule.
+/// The strings and colours a 100 px input with `attributes` paints,
+/// with `css` added to its rule, leaving out an empty editor's line.
 fn painted(attributes: &[(&str, &str)], css: &str) -> Vec<(String, Color)> {
     let mut doc = document();
     let body = doc.body();

@@ -67,8 +67,8 @@ fn switch_refusal(element: &Element) -> Option<String> {
 
 /// A `placeholder` on an input of a type that takes none (HTML,
 /// 4.10.5.1: it applies to text, search, url, tel, email, password
-/// and number), named by its type; Chromium ignores it there, which
-/// would hide a field the author meant to show a hint.
+/// and number), named by its type; Chromium ignores it there, so the
+/// hint the author wrote would never show.
 fn placeholder_refusal(element: &Element) -> Option<String> {
     element.attributes.get("placeholder")?;
     if crate::placeholder::takes_placeholder(element) {
