@@ -18,6 +18,7 @@ mod live_behaviour;
 mod live_rows;
 mod live_switch;
 mod menu;
+mod menu_anchor;
 mod order_parts;
 mod order_rows;
 mod orders_behaviour;
