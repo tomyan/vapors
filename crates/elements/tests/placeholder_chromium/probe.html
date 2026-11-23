@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- The pinned Chromium's placeholder colours, under the text page's sheet
+     (tests/support/text_page.rs). Regenerate computed.txt with
+     `scripts/placeholder-chromium.sh`; tests/placeholder_colour.rs reads it. -->
+<html><head><style>
+body { margin: 0; font-size: 14px; }
+input { display: block; box-sizing: border-box; width: 160px; height: 24px; margin: 0; padding: 1px 2px; }
+.author { color: #111827; }
+.styled { color: #111827; }
+.styled::placeholder { color: #6b7280; }
+</style></head><body>
+<input class="plain" type="text" placeholder="Search">
+<input class="author" type="text" placeholder="Search">
+<input class="styled" type="text" placeholder="Search">
+<input class="number" type="number" placeholder="Search">
+<pre id="out"></pre>
+<script>
+const rgb = (c) => c.match(/\d+/g).slice(0, 3).join(" ");
+const rows = [...document.querySelectorAll("input")].map((input) => {
+  const own = getComputedStyle(input);
+  const hint = getComputedStyle(input, "::placeholder");
+  return `${input.className} placeholder=${rgb(hint.color)} fill=${rgb(hint.webkitTextFillColor)} opacity=${hint.opacity} input=${rgb(own.color)}`;
+});
+document.getElementById("out").textContent = rows.join("\n");
+</script></body></html>
