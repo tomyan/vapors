@@ -40,28 +40,39 @@ fn opened_at(width: f32) -> Mounted {
     mounted
 }
 
+/// Each top bar control's box in a 1280 px window, by class.
+fn spec_boxes() -> [(&'static str, Rect); 5] {
+    let control = |x: f32, width: f32| [x, 14.0, width, CONTROL_HEIGHT];
+    let spinner_y = TOPBAR_HEIGHT / 2.0 - SPINNER_SIZE / 2.0;
+    [
+        ("search-input", control(SEARCH_X, SEARCH_WIDTH)),
+        ("live-switch", [LIVE_X, LIVE_Y, SWITCH_WIDTH, SWITCH_HEIGHT]),
+        (
+            "spinner",
+            [SPINNER_X, spinner_y, SPINNER_SIZE, SPINNER_SIZE],
+        ),
+        ("export", control(EXPORT_X, EXPORT_WIDTH)),
+        ("avatar", control(TOPBAR_AVATAR_X, 36.0)),
+    ]
+}
+
 #[test]
 fn the_top_bar_controls_keep_their_distance_from_the_right_edge() {
     for width in WIDTHS {
-        // Given
+        // Given: the live switch on, so the spinner shows
         let mounted = laid_out_at(width);
+        mounted.controls.live.on.set(true);
+        refresh_at(&mounted, width);
         let shift = width - WINDOW.0;
 
-        // Then: each control's spec x at 1280, moved with the right edge
-        let lefts: Vec<(&str, f32)> = ["search-input", "export", "live-switch", "avatar"]
-            .into_iter()
-            .map(|class| (class, box_of(&mounted, class)[0]))
-            .collect();
-        assert_eq!(
-            lefts,
-            [
-                ("search-input", SEARCH_X + shift),
-                ("export", EXPORT_X + shift),
-                ("live-switch", LIVE_X + shift),
-                ("avatar", TOPBAR_AVATAR_X + shift),
-            ],
-            "at width {width}"
-        );
+        // Then: each control's spec box at 1280, moved with the right edge
+        let got: Vec<(&str, Rect)> = spec_boxes()
+            .map(|(class, _)| (class, box_of(&mounted, class)))
+            .into();
+        let want: Vec<(&str, Rect)> = spec_boxes()
+            .map(|(class, [x, y, w, h])| (class, [x + shift, y, w, h]))
+            .into();
+        assert_eq!(got, want, "at width {width}");
     }
 }
 
