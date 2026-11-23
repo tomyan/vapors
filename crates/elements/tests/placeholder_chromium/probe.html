@@ -8,11 +8,17 @@ input { display: block; box-sizing: border-box; width: 160px; height: 24px; marg
 .author { color: #111827; }
 .styled { color: #111827; }
 .styled::placeholder { color: #6b7280; }
+input.specific::placeholder { color: #0000ff; }
+.specific::placeholder { color: #ff0000; }
+.current { color: #008000; }
+.current::placeholder { color: currentcolor; }
 </style></head><body>
 <input class="plain" type="text" placeholder="Search">
 <input class="author" type="text" placeholder="Search">
 <input class="styled" type="text" placeholder="Search">
 <input class="number" type="number" placeholder="Search">
+<input class="specific" type="text" placeholder="Search">
+<input class="current" type="text" placeholder="Search">
 <pre id="out"></pre>
 <script>
 const rgb = (c) => c.match(/\d+/g).slice(0, 3).join(" ");
