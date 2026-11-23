@@ -21,6 +21,9 @@ pub const CHROMIUM_ENV: &str = "VAPORS_CHROMIUM";
 pub enum ChromiumError {
     /// The pinned build is not installed at this path, and no override.
     NotFound(PathBuf),
+    /// No override, and `HOME` is not set, so the pinned build's path
+    /// cannot be resolved.
+    NoHome,
     /// It ran and failed, or produced the wrong thing.
     Failed(String),
 }
@@ -34,6 +37,12 @@ impl fmt::Display for ChromiumError {
                  [downloads] chromium from .config/tools.toml), or set {CHROMIUM_ENV} to a browser \
                  binary for a diagnosis by hand.",
                 pinned.display()
+            ),
+            Self::NoHome => write!(
+                f,
+                "HOME is not set, so the pinned Chromium's path (~/.local/share/factory/...) \
+                 cannot be resolved. Fix: set HOME to the home `cargo xtask setup` installed \
+                 into, or set {CHROMIUM_ENV} to a browser binary for a diagnosis by hand."
             ),
             Self::Failed(message) => write!(f, "chromium: {message}"),
         }
@@ -56,15 +65,24 @@ impl Chromium {
     /// # Errors
     ///
     /// [`ChromiumError::NotFound`] when the pinned build is not installed,
-    /// naming its path and the fix.
+    /// naming its path and the fix; [`ChromiumError::NoHome`] when `HOME`
+    /// is unset and there is no override.
     pub fn find() -> Result<Self, ChromiumError> {
         let home = std::env::var_os("HOME").map(PathBuf::from);
+        if let Some(chosen) = std::env::var_os(CHROMIUM_ENV) {
+            // a relaxed guard, declared where it runs: the override skips the
+            // pin, for a diagnosis by hand; said on every use so a run that
+            // inherits it is not mistaken for one on the pinned build
+            eprintln!(
+                "chromium: {CHROMIUM_ENV}={} overrides the pinned build",
+                PathBuf::from(chosen).display()
+            );
+        }
         let binary = super::chromium_pin::resolve(
             std::env::var_os(CHROMIUM_ENV),
             home.as_deref(),
             Path::is_file,
-        )
-        .map_err(ChromiumError::NotFound)?;
+        )?;
         Ok(Self {
             binary,
             deadline: DEADLINE,

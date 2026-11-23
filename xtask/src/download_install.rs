@@ -86,7 +86,13 @@ fn fetch_and_place(
         return rename(&binary, path);
     };
     std::fs::create_dir_all(root).map_err(|e| format!("{}: {e}", root.display()))?;
-    rename(&work.join(tree), &root.join(tree))
+    let installed = root.join(tree);
+    if installed.exists() {
+        // a tree that failed `verified`: moved into `work`, which `ensure`
+        // removes, once the new one has verified
+        rename(&installed, &work.join("replaced"))?;
+    }
+    rename(&work.join(tree), &installed)
 }
 
 /// Extracts the member, or the whole tree, into `work`.

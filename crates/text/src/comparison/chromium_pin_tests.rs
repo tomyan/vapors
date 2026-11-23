@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{TOOLS, pinned_binary, pinned_field, resolve};
+use crate::comparison::chromium::ChromiumError;
 
 #[test]
 fn the_pinned_build_is_found_under_the_factory_directory_by_version() {
@@ -51,5 +52,17 @@ fn the_installed_pinned_build_is_launched() {
 fn a_pinned_build_not_installed_is_refused_naming_its_path() {
     let home = Path::new("/home/t");
     let refused = resolve(None, Some(home), |_| false);
-    assert_eq!(refused, Err(pinned_binary(home)));
+    assert_eq!(refused, Err(ChromiumError::NotFound(pinned_binary(home))));
+}
+
+#[test]
+fn without_home_or_an_override_the_pin_is_unresolvable_not_absent() {
+    // When
+    let refused = resolve(None, None, |_| true);
+
+    // Then
+    assert_eq!(refused, Err(ChromiumError::NoHome));
+    let said = ChromiumError::NoHome.to_string();
+    assert!(said.contains("HOME is not set"), "{said}");
+    assert!(said.contains("VAPORS_CHROMIUM"), "{said}");
 }

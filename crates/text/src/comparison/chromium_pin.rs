@@ -1,4 +1,6 @@
-//! The one Chromium every comparison uses, local and in CI alike: the
+//! The one Chromium every comparison through [`super::Chromium::find`]
+//! uses, local and in CI alike (the web scripts' `scripts/browser.sh`
+//! still takes the browser on PATH): the
 //! build pinned under `[downloads] chromium` in `.config/tools.toml`,
 //! installed by `cargo xtask setup` after its archive's and binary's
 //! SHA-256 match, at `~/.local/share/factory/chromium-<version>/<member>`
@@ -8,6 +10,8 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+
+use super::chromium::ChromiumError;
 
 /// The tools file, as built: the pin's one source.
 const TOOLS: &str = include_str!(concat!(
@@ -51,20 +55,22 @@ pub(super) fn pinned_field<'a>(tools: &'a str, field: &str) -> Option<&'a str> {
 /// under `home` when `installed` says it is there.
 ///
 /// # Errors
-/// The pinned path, when there is no override and it is not installed.
+/// [`ChromiumError::NoHome`] with neither an override nor a home;
+/// [`ChromiumError::NotFound`] naming the pinned path when it is not
+/// installed.
 pub(super) fn resolve(
     override_: Option<OsString>,
     home: Option<&Path>,
     installed: impl Fn(&Path) -> bool,
-) -> Result<PathBuf, PathBuf> {
+) -> Result<PathBuf, ChromiumError> {
     if let Some(binary) = override_ {
         return Ok(PathBuf::from(binary));
     }
-    let pinned = pinned_binary(home.unwrap_or(Path::new("$HOME")));
-    if home.is_some() && installed(&pinned) {
+    let pinned = pinned_binary(home.ok_or(ChromiumError::NoHome)?);
+    if installed(&pinned) {
         Ok(pinned)
     } else {
-        Err(pinned)
+        Err(ChromiumError::NotFound(pinned))
     }
 }
 

@@ -174,3 +174,30 @@ fn a_zip_tree_is_installed_whole_after_both_hashes_match_and_never_run() {
     );
     assert!(!fixture.marker.exists(), "the binary was run");
 }
+
+#[test]
+fn a_changed_installed_tree_is_replaced_whole_by_ensure() {
+    // Given: installed, then its binary overwritten and a stray file added
+    let fixture = zip_fixture("zip-changed");
+    let path = ensure(&fixture.download, &fixture.home).expect("installed");
+    std::fs::write(&path, "#!/bin/sh\n").expect("overwrite");
+    std::fs::write(path.with_file_name("stray"), "left").expect("stray");
+
+    // When
+    let replaced = ensure(&fixture.download, &fixture.home);
+
+    // Then: the pinned tree again, nothing of the changed one left
+    assert_eq!(replaced, Ok(path.clone()));
+    assert!(verified(&fixture.download, &fixture.home).is_ok());
+    let mut tree = leftovers(&fixture);
+    tree.sort();
+    assert_eq!(tree, ["data", "tool"], "the old tree survived");
+    let factory = fixture.home.join(".local/share/factory");
+    let work: Vec<_> = std::fs::read_dir(&factory)
+        .expect("factory")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".download-"))
+        .collect();
+    assert!(work.is_empty(), "work left in {}", factory.display());
+    assert!(!fixture.marker.exists(), "the binary was run");
+}

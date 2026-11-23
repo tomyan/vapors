@@ -26,9 +26,12 @@ static-web-server.url = "https://github.com/static-web-server/static-web-server/
 static-web-server.sha256 = "a71fb43143d0964f82417178fa56d8f6ee4b33f49ddde4b2263d97404fdfbbc4"
 static-web-server.member = "static-web-server-v2.44.1-x86_64-unknown-linux-gnu/static-web-server"
 static-web-server.binary_sha256 = "4b39efe44e995bfb1a19517079046490ccc9b4e9907bf924ec46bef3197be56b"
-# The Chromium every comparison launches, here and in CI (Tom, 2026-11-22:
-# 157): the same build the ubuntu24/20261116.376 runner image installs at
-# /usr/bin/chromium. That image ships Google Chrome 157.0.8103.78, whose
+# The Chromium every comparison through vapors_text's Chromium::find
+# launches, here and in CI (Tom, 2026-11-22: 157); the web scripts
+# (scripts/browser.sh) still take the browser on PATH. The same build the
+# ubuntu24/20261116.376 runner image installs at /usr/bin/chromium: its
+# warm-up reports "Chromium 157.0.8103.0" (run 45142856208), and its text
+# comparison is byte-identical to this pin's (runs 45142856208, 45078364817). That image ships Google Chrome 157.0.8103.78, whose
 # Chrome for Testing revision is 1717349; its install script takes the
 # largest chromium-browser-snapshots revision at or below that, 1717344
 # (listed 2026-11-22). Installed whole (tree) to
