@@ -15,8 +15,10 @@ impl InstructionCounter {
     ///
     /// # Errors
     /// Why perf events cannot be opened, naming the sysctl and the value
-    /// that allows them; there is no fallback to time.
+    /// that allows them; there is no fallback to time. In a test tier
+    /// other than pmu, the refusal of `counter_tier::allowed`.
     pub fn open() -> Result<Self, String> {
+        crate::counter_tier::allowed()?;
         imp::open().map(Self).map_err(|why| refusal(&why))
     }
 
