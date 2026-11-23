@@ -80,3 +80,35 @@ fn a_title_that_describes_the_field_wins_over_the_placeholder() {
         ("Search".into(), Some("Looks in reports".into()))
     );
 }
+
+#[test]
+fn aria_describedby_wins_over_the_placeholder() {
+    // Given: a field naming a hint by id, the hint added after it
+    let (mut doc, _) = field(&[
+        ("aria-label", "Search"),
+        ("aria-describedby", "hint"),
+        ("placeholder", "Find a report"),
+    ]);
+    let body = doc.body();
+    let hint = element(&mut doc, body, "div", "");
+    doc.set_attribute(hint, "id", "hint");
+    support::text(&mut doc, hint, "Searches titles");
+
+    // When
+    doc.update(viewport(200.0, 100.0)).expect("updates");
+
+    // Then
+    assert_eq!(
+        textbox(&doc),
+        ("Search".into(), Some("Searches titles".into()))
+    );
+}
+
+#[test]
+fn a_placeholder_of_only_spaces_describes_nothing() {
+    // Given
+    let (doc, _) = field(&[("aria-label", "Search"), ("placeholder", "   ")]);
+
+    // Then
+    assert_eq!(textbox(&doc), ("Search".into(), None));
+}

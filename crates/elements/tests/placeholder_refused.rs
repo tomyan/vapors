@@ -15,9 +15,29 @@ fn blocks() -> vapors_elements::Document {
     doc
 }
 
+/// Each type with a placeholder, and what its one refusal says: a type
+/// that takes none is refused for the placeholder, naming the type; a
+/// type not built is refused once, for its type (that check comes first).
+const REFUSED: [(&str, &[&str]); 5] = [
+    (
+        "range",
+        &["type=\"range\" placeholder", "remove the attribute"],
+    ),
+    (
+        "checkbox",
+        &["type=\"checkbox\" placeholder", "remove the attribute"],
+    ),
+    (
+        "RANGE",
+        &["type=\"RANGE\" placeholder", "remove the attribute"],
+    ),
+    ("hidden", &["is not implemented"]),
+    ("button", &["is not implemented"]),
+];
+
 #[test]
-fn a_placeholder_on_a_range_or_a_checkbox_is_refused_naming_the_type() {
-    for kind in ["range", "checkbox", "RANGE"] {
+fn a_placeholder_on_a_type_that_takes_none_is_refused_once_naming_the_type() {
+    for (kind, wants) in REFUSED {
         // Given
         let mut doc = blocks();
         let body = doc.body();
@@ -29,28 +49,9 @@ fn a_placeholder_on_a_range_or_a_checkbox_is_refused_naming_the_type() {
         let errors = refusals(&mut doc);
 
         // Then
-        assert_eq!(errors.len(), 1, "{errors:?}");
-        let want = format!("type=\"{kind}\" placeholder");
-        assert!(errors[0].contains(&want), "{kind}: {errors:?}");
-        assert!(errors[0].contains("remove the attribute"), "{errors:?}");
-    }
-}
-
-#[test]
-fn a_type_not_built_is_refused_once_for_its_type_not_for_its_placeholder() {
-    for kind in ["hidden", "button"] {
-        // Given: a type `takes_placeholder` rejects and the type check refuses
-        let mut doc = blocks();
-        let body = doc.body();
-        let input = element(&mut doc, body, "input", "");
-        doc.set_attribute(input, "type", kind);
-        doc.set_attribute(input, "placeholder", "Search");
-
-        // When
-        let errors = refusals(&mut doc);
-
-        // Then: the one refusal is the type's
-        assert_eq!(errors.len(), 1, "{errors:?}");
-        assert!(errors[0].contains("is not implemented"), "{errors:?}");
+        assert_eq!(errors.len(), 1, "{kind}: {errors:?}");
+        for want in wants {
+            assert!(errors[0].contains(want), "{kind}: {errors:?}");
+        }
     }
 }

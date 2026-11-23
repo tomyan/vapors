@@ -44,9 +44,7 @@ so give the field an `aria-label`).
 
 ## Left
 
-- `::placeholder { color }` in a component's sheet: vapors-css refuses every
-  pseudo-element; it needs a parser, a matcher and `compute_pseudo`, in
-  place of the constant.
-- `:placeholder-shown`; search, url, tel, email and password inputs (not
+- `::placeholder { color }` (vapors-css refuses every pseudo-element) and
+  `:placeholder-shown`; search, url, tel, email and password inputs (not
   built); a right-to-left or wrapping placeholder; vertical centring of the
   typed text.

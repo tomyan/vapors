@@ -82,9 +82,10 @@ fn placeholder_refusal(element: &Element) -> Option<String> {
 
 /// The `type` attribute as written, `text` when absent.
 fn type_name(element: &Element) -> &str {
-    element.attributes.get("type").map_or("text", String::as_str)
-}
-    ))
+    element
+        .attributes
+        .get("type")
+        .map_or("text", String::as_str)
 }
 
 /// `data-scrub` is a number field's: empty for the default px per

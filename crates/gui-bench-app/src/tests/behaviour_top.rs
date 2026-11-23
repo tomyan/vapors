@@ -18,18 +18,6 @@ pub(super) fn texts(mounted: &crate::app::Mounted, class: &str) -> Vec<String> {
         .collect()
 }
 
-/// Every text the document paints, in paint order.
-pub(super) fn painted_texts(mounted: &crate::app::Mounted) -> Vec<String> {
-    let doc = mounted.document.borrow();
-    let painted = doc.painted().expect("laid out");
-    let scene = painted.scene().to_scene();
-    let texts = scene.items().iter().filter_map(|item| match item {
-        vapors_scene::Item::Text { text, .. } => Some(painted.text(*text).text().to_owned()),
-        _ => None,
-    });
-    texts.collect()
-}
-
 #[test]
 fn the_top_bar_and_cards_show_the_specs_texts_at_tick_zero() {
     // Given
@@ -39,8 +27,7 @@ fn the_top_bar_and_cards_show_the_specs_texts_at_tick_zero() {
     assert_eq!(texts(&mounted, "title"), [PAGE_TITLE]);
     assert_eq!(texts(&mounted, "export"), [EXPORT_LABEL]);
     assert_eq!(texts(&mounted, "avatar"), [USER_INITIALS]);
-    let shown = painted_texts(&mounted);
-    assert_eq!(shown.iter().filter(|t| *t == SEARCH_PLACEHOLDER).count(), 1);
+    assert_eq!(texts(&mounted, "placeholder"), [SEARCH_PLACEHOLDER]);
     let values: Vec<String> = (0..KPI_COUNT).map(|k| kpi_value(k, 0)).collect();
     assert_eq!(texts(&mounted, "kpi-value"), values);
     let labels: Vec<&str> = KPIS.iter().map(|kpi| kpi.label).collect();
@@ -53,7 +40,6 @@ fn the_top_bar_and_cards_show_the_specs_texts_at_tick_zero() {
 fn typing_in_the_search_input_sets_the_search_and_hides_the_placeholder() {
     // Given
     let mounted = laid_out();
-    assert!(painted_texts(&mounted).contains(&SEARCH_PLACEHOLDER.to_owned()));
     assert!(
         mounted.document.borrow().active_element().is_none(),
         "not focused at startup"
@@ -72,7 +58,7 @@ fn typing_in_the_search_input_sets_the_search_and_hides_the_placeholder() {
 
     // Then
     assert_eq!(mounted.search.get_untracked(), "ada");
-    assert!(!painted_texts(&mounted).contains(&SEARCH_PLACEHOLDER.to_owned()));
+    assert_eq!(texts(&mounted, "placeholder"), Vec::<String>::new());
 }
 
 #[test]
