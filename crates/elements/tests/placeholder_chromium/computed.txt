@@ -1,5 +1,7 @@
-# Chromium 157.0.8103.0 , crates/elements/tests/placeholder_chromium/probe.html
+# chromium.version 157.0.8103.0-r1717344 (Chromium 157.0.8103.0 ), crates/elements/tests/placeholder_chromium/probe.html
 plain placeholder=117 117 117 fill=117 117 117 opacity=1 input=0 0 0
 author placeholder=117 117 117 fill=117 117 117 opacity=1 input=17 24 39
 styled placeholder=107 114 128 fill=107 114 128 opacity=1 input=17 24 39
 number placeholder=117 117 117 fill=117 117 117 opacity=1 input=0 0 0
+specific placeholder=0 0 255 fill=0 0 255 opacity=1 input=0 0 0
+current placeholder=0 128 0 fill=0 128 0 opacity=1 input=0 128 0
