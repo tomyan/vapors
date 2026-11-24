@@ -1,11 +1,14 @@
-# Diagnostic, not for merging (no PR): one cold run of main's ci job with
-# its unit step split into build and test run, to measure where the
-# 9-minute timeout goes (ci cancelled in unit on main, run 45226956035,
-# and on #620/#621). The Rust cache key is unique to the run, so nothing
-# is restored, and nothing is saved, so the repository's caches are not
-# touched. The 40-minute ceiling lets a cold run finish; it is not a
-# proposed limit. Steps are main's ci.yml at a4bb9c63 plus #606's Chromium
-# warm-up, which the unit tier needs on the runner (run 45076354761).
+# Diagnostic, not for merging (no PR). Second use (Tom, 2026-11-24): one
+# cold run of main's gpu job, to set its 13-minute deadline from a
+# measurement (#624's gpu job was cancelled at 13 minutes after a 550 s
+# gpu tier, run 45349685941). The steps are main's gpu job at 0e5841d2,
+# with the gpu tier split into its build and its test run. Its Rust cache
+# key is unique to the run, so nothing is restored, and nothing is saved.
+# The apt step gets 10 minutes here rather than 2 so a mirror stall does
+# not end the measurement; its own time is recorded, and the shared apt
+# deadlines are not this branch's (they belong to the placeholder worker).
+# The 45-minute ceiling lets a cold run finish; it is not a proposed limit.
+# The first use, the ci job's cold run, is run 45283781763 at 5edd132a.
 name: diag-ci-cold
 
 on:
@@ -25,63 +28,91 @@ defaults:
     shell: bash
 
 jobs:
-  cold:
+  # Only what the gpu job's text input step needs: the built page.
+  web:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    env:
-      VAPORS_SYSTEM_FONTS: 1
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: runner
-        run: |
-          nproc; free -g | head -2; df -h . | tail -1
-          echo "ImageOS=${ImageOS:-unset} ImageVersion=${ImageVersion:-unset}"
-      - name: install a CJK system font for the fallback test
-        timeout-minutes: 2
-        uses: ./.github/actions/apt-install
-        with:
-          packages: fonts-noto-cjk
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          prefix-key: diag-cold-${{ github.run_id }}
           save-if: false
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
-      - name: dependencies (cargo-deny)
-        run: cargo xtask deny
-      - name: lint
-        run: cargo xtask lint
-      - name: wasm lint
-        run: cargo xtask wasm
+      - name: build the web demo with trunk
+        run: cargo xtask web
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web
+          path: target/web
+
+  gpu-cold:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs: web
+    env:
+      VAPORS_GPU_ADAPTER: llvmpipe
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: runner
+        run: |
+          nproc; free -g | head -2
+          echo "ImageOS=${ImageOS:-unset} ImageVersion=${ImageVersion:-unset}"
+      - name: install lavapipe
+        timeout-minutes: 10
+        uses: ./.github/actions/apt-install
+        with:
+          packages: mesa-vulkan-drivers vulkan-tools
+          mesa-major: 25
+      - name: lavapipe is the Vulkan device
+        run: |
+          devices=$(vulkaninfo --summary)
+          printf '%s\n' "$devices" | grep -E 'deviceName|driverName'
+          case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device"; exit 1 ;; esac
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: diag-cold-gpu-${{ github.run_id }}
+          save-if: false
+      - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
+      - name: install pinned tools
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo xtask setup --ci
       - name: warm headless Chromium
         run: cargo run -p vapors-text --example warm_chromium
-      # The unit tier's build alone, with xtask's sccache environment
+      # The gpu tier's build alone, with xtask's sccache environment
       # (xtask/src/sccache.rs ENV), so the next step only runs tests.
-      - name: unit build only (nextest --no-run)
+      - name: gpu tier build only (nextest --no-run)
         env:
           RUSTC_WRAPPER: sccache
           CARGO_INCREMENTAL: 0
           SCCACHE_IDLE_TIMEOUT: 0
         run: cargo nextest run --workspace --no-run
-      - name: unit
-        run: cargo xtask test --tier unit
-      - name: slowest unit tests (junit)
-        if: always()
-        run: |
-          f=target/nextest/ci/junit.xml
-          [ -f "$f" ] || { echo "::error::$f missing"; exit 1; }
-          grep -o '<testsuites[^>]*>' "$f"
-          grep -o '<testcase name="[^"]*" classname="[^"]*" time="[^"]*"' "$f" \
-            | sed -E 's/<testcase name="([^"]*)" classname="([^"]*)" time="([^"]*)"/\3 \2 \1/' \
-            | sort -rn | head -40
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+      - name: gpu tier
+        run: cargo xtask test --tier gpu
+      - name: text comparison page
+        if: ${{ !cancelled() }}
+        run: cargo run -p vapors-text --example text_comparison -- --out target
+      - name: layout oracle against the runner's Chrome
+        if: ${{ !cancelled() }}
+        run: cargo run -p vapors-elements-corpus --example layout_oracle -- --check
+      - name: a11y oracle against the runner's Chrome
+        if: ${{ !cancelled() }}
+        run: cargo run -p vapors-elements-corpus --example ax_oracle -- --check
+      - name: events oracle against the runner's Chrome
+        if: ${{ !cancelled() }}
+        run: cargo run -p vapors-elements-corpus --example events_oracle -- --check
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: diag-junit
-          path: target/nextest/ci/junit.xml
-          if-no-files-found: ignore
+          name: web
+          path: target/web
+      - name: the page's text input against Chromium's <input>
+        if: ${{ !cancelled() }}
+        run: scripts/web-text-input.sh target/web "$(mktemp -d)"
