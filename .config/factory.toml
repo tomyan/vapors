@@ -138,6 +138,50 @@ chain_hops = "3"
 "actions/upload-artifact" = "uploads files for people to read; nothing is checked"
 "actions/download-artifact" = "fetches the web job's target/web for the gpu job; the gate runs the web job first in this worktree, so target/web is already its build"
 
+# Which steps of the gate share the machine with other gates and ci
+# runs, and which run alone (xtask/src/gate_hold.rs). Every step, by its
+# label as the gate prints it, is in exactly one table with its reason;
+# an unlisted step refuses the gate. Shared steps take a share of the
+# gate lock and a ci slot; exclusive ones the quiet lock and the gate
+# lock exclusive. Times are gate-603's (the lead's log in
+# ~/.cache/handoffs). Short correctness steps between exclusive steps
+# are exclusive: a shared hold there gives the machine up for seconds
+# and queues the gate again behind every exclusive step waiting.
+[gate.shared]
+"ci: install a CJK system font for the fallback test: the Mesa the reference images were made with" = "a version check, 0.3 s; nothing timed"
+"ci: the CJK font is there" = "fc-list, 0.1 s; nothing timed"
+"ci: dependencies (cargo-deny)" = "advisories and licences: correctness, 9 s"
+"ci: lint" = "fmt and clippy: correctness, 51 s"
+"ci: wasm lint" = "clippy for wasm32: correctness, 37 s"
+"ci: unit" = "the unit tier: correctness; nextest's 60 s kill is its only deadline, and three ci runs already run it together"
+"ci: host" = "bwrap and the user's systemd: correctness, 3 s"
+"ci: build timings" = "a build of bins and examples: correctness, 45 s"
+"web: build the web demo with trunk" = "a release build into target/web: correctness, 70 s"
+
+[gate.exclusive]
+"web: page contract in headless Chrome" = "first-frame and per-check deadlines and frames at set intervals in Chrome; failed on timing at load 40 to 58"
+"web: the waker in headless Chrome" = "wakes 300 ms apart, each owed a frame by 900 ms"
+"web: the readout row in headless Chrome" = "the readout must appear within 45 s in Chrome"
+"gpu: install lavapipe: the Mesa the reference images were made with" = "a version check, 0.1 s, between the web job's exclusive steps and the gpu job's"
+"gpu: lavapipe is the Vulkan device" = "vulkaninfo, 0.2 s, between exclusive steps"
+"gpu: warm headless Chromium" = "warms Chrome so the gpu tier's 20 s screenshot deadline holds; a cold launch took 15 to 58 s"
+"gpu: gpu tier" = "lavapipe runs on the CPU; screenshot deadlines and frames counted per wake"
+"gpu: text comparison page" = "a Chrome screenshot under its deadline"
+"gpu: layout oracle against the runner's Chrome" = "DevTools calls under deadlines in Chrome"
+"gpu: a11y oracle against the runner's Chrome" = "DevTools calls under deadlines in Chrome"
+"gpu: events oracle against the runner's Chrome" = "events played in Chrome under deadlines"
+"gpu: the page's text input against Chromium's <input>" = "typed text and IME steps in Chrome under a run deadline"
+"window: install lavapipe, Xvfb and winit's X11 libraries: the Mesa the reference images were made with" = "a version check, 0.1 s, between the gpu job's exclusive steps and the window job's"
+"window: screenshot of the clear window" = "an Xvfb window on lavapipe, screenshot under its deadline"
+"window: the waker in a window" = "one frame per wake from a thread, counted under Xvfb"
+"window: a gpu-surface in a window, idle, invalidated, animating and stopped" = "frames and renders counted per invalidate under Xvfb"
+"window: the clipboard's image under Xvfb" = "xclip under Xvfb, 4 s, between exclusive steps"
+"window: screenshot of the gradient fixture, fitted" = "an Xvfb screenshot under its deadline"
+"window: screenshot of the hello demo (F2c S1)" = "an Xvfb screenshot under its deadline"
+"window: screenshot of the counter demo after a click (F2c S2)" = "an Xvfb screenshot after a click, under its deadline"
+"window: screenshot of the boxes demo (F2c S3)" = "an Xvfb screenshot under its deadline"
+"window: screenshot of the shell demo (F2c S4)" = "an Xvfb screenshot under its deadline"
+
 # Crates only the SaaS or corp product may use, kept out of each shipped
 # build's dependency tree by `cargo xtask check-builds` (touche's
 # docs/decisions/2026-10-26-product-builds-separate.md). Each build is

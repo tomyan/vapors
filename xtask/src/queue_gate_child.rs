@@ -10,10 +10,19 @@ use std::time::{Duration, Instant};
 use crate::gate_pr::Ended;
 use crate::queue_ops::Gated;
 
-/// How long a gate run by the queue may take: the gate lock's 40 min
-/// wait (`gate_lock::WAIT`) and a touche gate's measured 4.5 to 8 min,
-/// with room. Killed at the deadline, and the kill is logged.
-pub const GATE_DEADLINE: Duration = Duration::from_mins(60);
+/// How long a gate run by the queue may take (Tom, 2026-11-23): its wait
+/// for another gate already in the run worktree, as the watchdog bounds
+/// it (`gate_worktree_lock::WATCHED`: one whole gate and 5 s), then its
+/// own run (`gate_deadline::LONGEST`, 276 min 50 s, every part at its
+/// deadline), and `gate --pr`'s own calls: its git read of HEAD
+/// (`gate_state::GIT_DEADLINE`, 30 s) and three gh calls (two reads and
+/// the post) at `gate_pr_gh::GH_DEADLINE`, 30 s each: 555 min 45 s. It
+/// is a backstop: each part fails the gate at its own deadline first.
+/// Killed at the deadline, and the kill is logged.
+pub const GATE_DEADLINE: Duration = crate::gate_worktree_lock::WATCHED
+    .saturating_add(crate::gate_deadline::LONGEST)
+    .saturating_add(crate::gate_state::GIT_DEADLINE)
+    .saturating_add(crate::gate_pr_gh::GH_DEADLINE.saturating_mul(3));
 
 /// Run `command` within `deadline`, its output to `out`.
 ///

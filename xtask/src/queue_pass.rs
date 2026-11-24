@@ -2,8 +2,8 @@
 //! `Ops`. Each PR is judged (`queue_judge.rs`). A skip is logged when its
 //! reason changes and the pass goes on. So does a failed action, which
 //! is no action taken. The first action that completes ends the pass:
-//! after a merge main has moved, and a gate takes the machine's one gate
-//! slot. Before acting, the PR is read again (`fresh`).
+//! after a merge main has moved, and a gate takes the pass's time (one
+//! gate per pass). Before acting, the PR is read again (`fresh`).
 
 use std::time::Duration;
 

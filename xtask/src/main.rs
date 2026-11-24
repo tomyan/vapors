@@ -62,7 +62,10 @@ mod files;
 mod files_walk;
 mod gate;
 mod gate_action;
+mod gate_deadline;
 mod gate_expression;
+mod gate_hold;
+mod gate_hold_table;
 mod gate_lock;
 mod gate_lock_shared;
 mod gate_lock_slots;
@@ -73,10 +76,13 @@ mod gate_pr_real;
 mod gate_pr_text;
 mod gate_report;
 mod gate_run;
+mod gate_state;
 mod gate_step;
 mod gate_steps;
 mod gate_twin;
+mod gate_watchdog;
 mod gate_workflow;
+mod gate_worktree_lock;
 mod gate_yaml;
 mod gpu_info;
 #[cfg(test)]
@@ -88,7 +94,12 @@ mod layers;
 mod layers_graph;
 mod load;
 mod load_wait;
+#[cfg(test)]
+mod lock_child;
+#[cfg(test)]
+mod lock_child_handle;
 mod lock_owner;
+mod lock_place;
 mod pixels;
 mod precompress;
 mod priority;
@@ -153,6 +164,7 @@ mod serve_unit;
 mod serve_verify_rules;
 mod setup;
 mod setup_install;
+mod share;
 mod stamp_page;
 mod step;
 mod steps;
@@ -161,6 +173,7 @@ mod stop;
 mod stream;
 mod tailscale;
 mod target_cap;
+mod test_shared;
 mod tools;
 mod trunk;
 mod trunk_process;
@@ -196,7 +209,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use cli::{Cli, Command, Tier};
+use cli::{Cli, Command};
 
 #[allow(clippy::too_many_lines)] // the command dispatch, one arm per command
 fn main() -> ExitCode {
@@ -280,17 +293,7 @@ fn main() -> ExitCode {
         Command::Quiet { args } => return quiet_command::run(&args),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
-        Command::Test { tier } => {
-            if let Err(why) = quiet_wait::before("test") {
-                return fail("test", &why);
-            }
-            match tier {
-                Tier::Unit => steps::unit_tests(),
-                Tier::Gpu => steps::gpu_tests(),
-                Tier::Host => steps::host_tests(),
-                Tier::Pmu => steps::pmu_tests(),
-            }
-        }
+        Command::Test { tier } => return test_shared::run(tier, &reporter),
     };
     ci::run(&steps, &reporter)
 }

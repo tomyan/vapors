@@ -5,48 +5,70 @@
 //! a file under target/, as CI gives one, and the run's TMPDIR, and runs
 //! with `/dev/dri` hidden, as on CI (`gate_sandbox.rs`). Each step's
 //! line is followed by the machine's load at its start and end.
+//!
+//! Before each step the gate takes the hold it needs (`gate_hold.rs`).
+//! The time spent waiting for it is added back to the job's clock, so a
+//! wait never uses up the job's `timeout-minutes`; a hold that cannot be
+//! had fails the gate before the step runs.
 
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use crate::command;
+use crate::gate_hold::Hold;
 use crate::gate_plan::PlannedStep;
+use crate::gate_watchdog::{self as watchdog, IN_PROCESS};
 use crate::report::Reporter;
 use crate::steps::Step;
 
 #[path = "gate_sandbox.rs"]
 mod sandbox;
-pub use sandbox::{Wrap, wrap as sandbox_wrap};
+pub use sandbox::{CHECK_DEADLINE as SANDBOX_CHECK_DEADLINE, Wrap, wrap as sandbox_wrap};
+
+/// Takes the hold a step needs before it runs.
+pub type HoldFor<'a> = &'a mut dyn FnMut(&PlannedStep) -> Result<Hold, String>;
 
 /// Run `planned`, each step with this run's own TMPDIR (`run_tmp`) and
-/// as `wrap` says; `output` is the `GITHUB_OUTPUT` file.
-pub fn run(planned: &[PlannedStep], output: &Path, wrap: Wrap, reporter: &Reporter) -> ExitCode {
-    crate::run_tmp::around_temp_dir("gate", |tmp| run_in(planned, output, wrap, reporter, tmp))
+/// as `wrap` says, after `hold` takes what it needs; `output` is the
+/// `GITHUB_OUTPUT` file.
+pub fn run(
+    planned: &[PlannedStep],
+    (output, wrap): (&Path, Wrap),
+    reporter: &Reporter,
+    hold: HoldFor<'_>,
+) -> ExitCode {
+    let watch = |part: &'static str| watchdog::watch(part, IN_PROCESS);
+    let base = std::env::temp_dir();
+    crate::run_tmp::around_watched("gate", &base, watch, |tmp| {
+        run_in(planned, (output, wrap), reporter, tmp, hold)
+    })
+    .unwrap_or_else(|why| {
+        println!("FAIL tmp: {why}");
+        ExitCode::FAILURE
+    })
 }
 
 fn run_in(
     planned: &[PlannedStep],
-    output: &Path,
-    wrap: Wrap,
+    (output, wrap): (&Path, Wrap),
     reporter: &Reporter,
     tmp: &Path,
+    hold: HoldFor<'_>,
 ) -> ExitCode {
     let started = Instant::now();
     let mut job: Option<(&str, Instant)> = None;
     let mut passed = 0;
     for planned_step in planned {
-        let job_started = match job {
-            Some((name, at)) if name == planned_step.job => at,
-            _ => Instant::now(),
+        let Some((job_started, jobs)) = held_for(planned_step, job, hold) else {
+            break;
         };
         job = Some((&planned_step.job, job_started));
-        let mut step = crate::run_tmp::with_tmpdir(step_for(planned_step, output, wrap), tmp);
-        step.deadline = Some(deadline(planned_step, job_started.elapsed()));
-        let load_at_start = crate::load::now();
-        let outcome = command::run(&step);
-        reporter.step(&step, &outcome);
-        println!("{}", crate::load::line(&load_at_start, &crate::load::now()));
+        let built = step_for(planned_step, output, wrap, &jobs);
+        let mut step = crate::run_tmp::with_tmpdir(built, tmp);
+        let step_deadline = deadline(planned_step, job_started.elapsed());
+        step.deadline = Some(step_deadline);
+        let outcome = ran(&step, step_deadline, reporter);
         if !outcome.passed {
             break;
         }
@@ -58,6 +80,56 @@ fn run_in(
     } else {
         ExitCode::FAILURE
     }
+}
+
+/// `step` run and reported between two load readings, each watched: the
+/// step for its deadline and its start's own reads (`IN_PROCESS`).
+fn ran(step: &Step, step_deadline: Duration, reporter: &Reporter) -> command::Outcome {
+    let name = &step.name;
+    let reading = |when: &str| {
+        watchdog::watched(
+            format!("the load reading {when} `{name}`"),
+            IN_PROCESS,
+            crate::load::now,
+        )
+    };
+    let at_start = reading("before");
+    let watched_for = step_deadline.saturating_add(IN_PROCESS);
+    let outcome = watchdog::watched(format!("the step `{name}`"), watched_for, || {
+        command::run(step)
+    });
+    reporter.step(step, &outcome);
+    println!("{}", crate::load::line(&at_start, &reading("after")));
+    outcome
+}
+
+/// Take `step`'s hold; when its job's clock started, moved on by the
+/// wait so the wait is not counted, or now for a job's first step, and
+/// the jobs the step builds with. None when the hold cannot be had, said
+/// as the gate's failure.
+fn held_for(
+    step: &PlannedStep,
+    job: Option<(&str, Instant)>,
+    hold: HoldFor<'_>,
+) -> Option<(Instant, String)> {
+    let asked = Instant::now();
+    let part = format!("the hold for `{}`", step.name);
+    let taken = watchdog::watched(part, crate::gate_deadline::HOLD_WATCHED, || hold(step));
+    let jobs = match taken.and_then(Hold::jobs) {
+        Ok(jobs) => jobs,
+        Err(why) => {
+            println!(
+                "FAIL gate: {}: its hold: {why}; then rerun `cargo xtask gate`",
+                step.name
+            );
+            return None;
+        }
+    };
+    let clock = match job {
+        Some((name, at)) if name == step.job => at + asked.elapsed(),
+        _ => Instant::now(),
+    };
+    Some((clock, jobs))
 }
 
 /// The gate's last lines: an unsandboxed run's notice again, then the
@@ -78,9 +150,11 @@ pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
     planned.step_timeout.map_or(left, |own| own.min(left))
 }
 
-/// A step running `planned`'s script as CI does.
+/// A step running `planned`'s script as CI does, building with `jobs`
+/// (`Hold::jobs`): set for cargo, and for an xtask the step runs to
+/// keep (`priority::GATE_JOBS_ENV`).
 #[must_use]
-pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
+pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap, jobs: &str) -> Step {
     let script = ["bash", "-eo", "pipefail", "-c", planned.run.as_str()];
     let (program, args) = match wrap {
         Wrap::HideGpuDevice => ("bwrap", [&sandbox::HIDE_GPU_DEVICE[..], &script].concat()),
@@ -95,6 +169,9 @@ pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
     step.env = planned.env.clone().into_iter().collect();
     step.env
         .push(("GITHUB_OUTPUT".to_owned(), output.display().to_string()));
+    for name in ["CARGO_BUILD_JOBS", crate::priority::GATE_JOBS_ENV] {
+        step.env.push((name.to_owned(), jobs.to_owned()));
+    }
     if planned.dir != "." {
         step.dir = Some(planned.dir.clone());
     }
@@ -104,3 +181,7 @@ pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
 #[cfg(test)]
 #[path = "gate_run_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gate_run_hold_tests.rs"]
+mod hold_tests;

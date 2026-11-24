@@ -96,6 +96,23 @@ fn staged(dir: &Path, holder: &Holder) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Replace the holder file with `new` if it still names `old`, under the
+/// takers' lock; whether it did.
+///
+/// # Errors
+///
+/// A file cannot be locked, read, written or renamed, naming it.
+pub fn replace_if(dir: &Path, old: &Holder, new: &Holder) -> Result<bool, String> {
+    let _take = serialised(dir)?;
+    if read(dir)?.as_ref() != Some(old) {
+        return Ok(false);
+    }
+    let temporary = staged(dir, new)?;
+    let path = dir.join(FILE);
+    std::fs::rename(&temporary, &path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(true)
+}
+
 /// Remove the holder file if it names `holder`, under the takers' lock,
 /// so a taker's fresh file replacing an ended `holder` is never removed.
 /// Unlocked if the lock cannot be had: the file is checked just before.

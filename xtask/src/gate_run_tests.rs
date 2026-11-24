@@ -26,13 +26,14 @@ fn a_gate_step_is_bash_with_pipefail_without_a_gpu_device_and_reproduces_with_it
         &planned("cargo xtask test --tier gpu"),
         Path::new("/t/out"),
         Wrap::HideGpuDevice,
+        "4",
     );
 
     // Then
     assert_eq!(step.name, "gpu: gpu tier");
     assert_eq!(
         step.reproduce(),
-        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out bwrap --dev-bind / / --tmpfs /dev/dri --die-with-parent bash -eo pipefail -c 'cargo xtask test --tier gpu'"
+        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out CARGO_BUILD_JOBS=4 XTASK_GATE_JOBS=4 bwrap --dev-bind / / --tmpfs /dev/dri --die-with-parent bash -eo pipefail -c 'cargo xtask test --tier gpu'"
     );
 }
 
@@ -44,7 +45,7 @@ fn a_composite_step_reproduces_from_its_directory() {
 
     // When / Then
     assert!(
-        step_for(&composite, Path::new("/o"), Wrap::HideGpuDevice)
+        step_for(&composite, Path::new("/o"), Wrap::HideGpuDevice, "4")
             .reproduce()
             .starts_with("cd .. && CI=true")
     );
@@ -94,7 +95,7 @@ fn killed_at_its_deadline_with_its_child(wrap: Wrap, name: &str) {
     let dir = crate::scratch::dir(name);
     let pid_file = dir.join("child.pid");
     let script = format!("sleep 300 & echo $! > {}; wait", pid_file.display());
-    let mut step = step_for(&planned(&script), &dir.join("out"), wrap);
+    let mut step = step_for(&planned(&script), &dir.join("out"), wrap, "4");
     let (_target, env) = crate::scratch::target(name);
     step.env.push(env);
     step.deadline = Some(Duration::from_secs(1));
@@ -132,12 +133,18 @@ fn killed_at_its_deadline_with_its_child(wrap: Wrap, name: &str) {
 #[test]
 fn with_the_gpu_device_not_hidden_a_step_is_plain_bash() {
     // When
-    let step = step_for(&planned("true"), Path::new("/t/out"), Wrap::SwitchedOff);
+    let step = step_for(
+        &planned("true"),
+        Path::new("/t/out"),
+        Wrap::SwitchedOff,
+        "4",
+    );
 
     // Then
     assert!(
-        step.reproduce()
-            .ends_with("GITHUB_OUTPUT=/t/out bash -eo pipefail -c true"),
+        step.reproduce().ends_with(
+            "GITHUB_OUTPUT=/t/out CARGO_BUILD_JOBS=4 XTASK_GATE_JOBS=4 bash -eo pipefail -c true"
+        ),
         "{}",
         step.reproduce()
     );
@@ -161,7 +168,13 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
     // When
     let reporter = crate::report::Reporter::new(false);
     let ran = crate::run_tmp::around("gate", &base, |tmp| {
-        let code = run_in(&[step], &output, Wrap::SwitchedOff, &reporter, tmp);
+        let code = run_in(
+            &[step],
+            (&output, Wrap::SwitchedOff),
+            &reporter,
+            tmp,
+            &mut |_| Ok(crate::gate_hold::Hold::Shared),
+        );
         assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
         code
     });

@@ -173,3 +173,28 @@ fn only_an_unsandboxed_gate_has_a_notice() {
             .is_some_and(|n| n.contains("hide_gpu_device"))
     );
 }
+
+#[test]
+fn a_sandbox_check_past_its_deadline_fails_naming_the_check() {
+    // Given: a bwrap that does not end
+    let dir = crate::scratch::dir("bwrap-stuck");
+    let program = dir.join("bwrap");
+    std::fs::write(&program, "#!/bin/sh\nexec sleep 30\n").expect("written");
+    let executable = std::os::unix::fs::PermissionsExt::from_mode(0o755);
+    std::fs::set_permissions(&program, executable).expect("mode");
+
+    // When
+    let refusal = check_within(
+        &program.display().to_string(),
+        std::time::Duration::from_millis(100),
+    )
+    .expect_err("past its deadline");
+
+    // Then
+    assert!(
+        refusal.contains("the gate's sandbox check")
+            && refusal.contains("deadline")
+            && refusal.contains("cargo xtask gate"),
+        "{refusal}"
+    );
+}

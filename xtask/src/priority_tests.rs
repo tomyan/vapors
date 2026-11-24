@@ -117,3 +117,16 @@ fn sccache_is_never_niced_since_its_server_keeps_the_niceness_it_starts_with() {
         "sccache"
     );
 }
+
+#[test]
+fn an_xtask_in_a_gate_s_step_builds_with_the_jobs_its_gate_gave_the_step() {
+    assert_eq!(gate_jobs_from(Some("4")), Ok(Some("4".to_owned())));
+    assert_eq!(gate_jobs_from(None), Ok(None));
+    for text in ["", "0", "four"] {
+        let refusal = gate_jobs_from(Some(text)).expect_err(text);
+        assert!(
+            refusal.contains(GATE_JOBS_ENV) && refusal.contains(&format!("`{text}`")),
+            "{refusal}"
+        );
+    }
+}

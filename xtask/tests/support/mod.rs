@@ -7,6 +7,7 @@
 //! directory) and ran the real tiers, which ran these tests again: the
 //! `quiet_wiring` timeouts and nested leftovers of issue #358.
 
+pub mod gate;
 mod output;
 
 pub use output::output_within;

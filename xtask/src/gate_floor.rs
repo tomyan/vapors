@@ -34,28 +34,17 @@ pub struct Free {
     pub bytes: u64,
 }
 
-/// The locks a gate holds for its run.
-pub type Locks = (Option<crate::quiet_lock::Quiet>, crate::gate_lock::Held);
-
-/// Take the quiet lock, so no new ci or test run starts, then the gate
-/// lock for `worktree`, then check the floors and the load wait; both
-/// are held until the returned guards are dropped.
-pub fn begin(worktree: &str) -> Result<Locks, String> {
-    let quiet = crate::quiet_wait::for_gate(worktree)?;
-    let held = crate::gate_lock::dir()
-        .and_then(|dir| crate::gate_lock::acquire(&dir, worktree, crate::gate_lock::WAIT))?;
-    before()?;
-    crate::load_wait::before("gate")?;
-    Ok((quiet, held))
-}
-
 /// Refuse when the temp dir or target/ is under its floor.
 ///
 /// # Errors
 /// Either is under its floor, or `stat` could not say, naming the fix.
 pub fn before() -> Result<(), String> {
     let tmp = std::env::temp_dir();
-    let target = target_dir(Path::new("."))?;
+    let target = crate::gate_watchdog::watched(
+        "the disk floor's target directory",
+        crate::gate_watchdog::IN_PROCESS,
+        || target_dir(Path::new(".")),
+    )?;
     let tmp_free = free(&tmp)?;
     if tmp_free.inodes.is_none() {
         println!(
@@ -86,13 +75,36 @@ pub fn target_dir(workspace: &Path) -> Result<std::path::PathBuf, String> {
     }
 }
 
-/// `stat -L -f` on `path`, judged by its exit code.
+/// How long one `stat` may take. Measured 2026-11-23, 20 runs each at
+/// load 1.2: `stat -L -f` on /tmp and on target/ took 0.8 to 1.1 ms.
+/// 10 s is thousands of times that, for a far busier machine or a slow
+/// filesystem.
+pub const STAT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// `stat -L -f` on `path` within [`STAT_DEADLINE`], judged by its exit code.
 fn free(path: &Path) -> Result<Free, String> {
-    let output = Command::new("stat")
-        .args(["-L", "-f", "-c", "%c %d %a %S"])
-        .arg(path)
-        .output()
-        .map_err(|e| format!("stat: {e}; fix: install coreutils"))?;
+    let mut stat = Command::new("stat");
+    stat.args(["-L", "-f", "-c", "%c %d %a %S"]).arg(path);
+    free_by(stat, path, STAT_DEADLINE)
+}
+
+/// [`free`] by `command` within `deadline`.
+///
+/// # Errors
+///
+/// It could not start, passed `deadline` (naming the floor and the
+/// path), did not exit 0, or printed another shape.
+pub fn free_by(
+    command: Command,
+    path: &Path,
+    deadline: std::time::Duration,
+) -> Result<Free, String> {
+    let output = crate::api_timed::within(command, deadline).map_err(|e| {
+        format!(
+            "the gate's disk floor, `stat -f {}`: {e}; fix: find what holds the filesystem up (`ps`), then rerun `cargo xtask gate`",
+            path.display()
+        )
+    })?;
     if !output.status.success() {
         let said = String::from_utf8_lossy(&output.stderr);
         return Err(format!("stat -f {}: {}", path.display(), said.trim()));

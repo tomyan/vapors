@@ -4,7 +4,9 @@
 //! locks are its own; `[load] wait = "false"` keeps the load out of it.
 //! A child that gets past its wait finds only a stand-in `cargo` and no
 //! repository (`support`), so it fails its first step at once instead of
-//! running the real tiers, which ran this test again (issue #358).
+//! running the real tiers, which ran this test again (issue #358). The
+//! gate's is a repository of one step (`support::gate`), whose hold
+//! waits.
 
 #[allow(
     dead_code,
@@ -86,6 +88,9 @@ fn ci_test_and_gate_wait_for_another_holder_saying_who_and_until_when() {
     ] {
         // Given
         let dir = scratch(who);
+        if who == "gate" {
+            support::gate::workspace(&dir, CONFIG, "shared");
+        }
         let until = held_by_another(&dir);
 
         // When

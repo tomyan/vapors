@@ -42,7 +42,7 @@ const SAY_EVERY: Duration = Duration::from_mins(1);
 /// slot file cannot be opened or locked.
 pub fn take(
     dir: &Path,
-    worktree: &str,
+    (worktree, who): (&str, &str),
     (started, wait): (Instant, Duration),
 ) -> Result<File, String> {
     let mut said: Option<Instant> = None;
@@ -53,13 +53,13 @@ pub fn take(
         if started.elapsed() >= wait {
             return Err(format!(
                 "all {SLOTS} ci slots are still taken after {wait:?}, by {}; \
-                 fix: wait for one to finish, then rerun `cargo xtask ci`",
+                 fix: wait for one to finish, then rerun `cargo xtask {who}`",
                 holders(dir)
             ));
         }
         if said.is_none_or(|at| at.elapsed() >= SAY_EVERY) {
             println!(
-                "ci: waiting for one of {SLOTS} ci slots, taken by {}",
+                "{who}: waiting for one of {SLOTS} ci slots, taken by {}",
                 holders(dir)
             );
             said = Some(Instant::now());

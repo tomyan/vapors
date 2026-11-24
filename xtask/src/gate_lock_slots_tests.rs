@@ -80,11 +80,11 @@ fn a_slot_names_its_holder_from_the_moment_it_is_taken() {
     let dir = lock_dir("slots-named");
     let started = (Instant::now(), BRIEF);
     let _slots: Vec<_> = (0..SLOTS)
-        .map(|_| take(&dir, "/w/early", started).expect("a slot"))
+        .map(|_| take(&dir, ("/w/early", "ci"), started).expect("a slot"))
         .collect();
 
     // When
-    let refusal = take(&dir, "/w/late", started).expect_err("no slot");
+    let refusal = take(&dir, ("/w/late", "ci"), started).expect_err("no slot");
 
     // Then
     assert!(refusal.contains("ci in /w/early (pid "), "{refusal}");

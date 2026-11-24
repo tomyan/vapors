@@ -1,14 +1,16 @@
 //! The quiet lock: one holder at a time keeps xtask's builds and test
 //! runs from starting, so a timed run gets the machine to itself. It is
 //! a file, `~/.cache/factory/quiet.holder`, naming who holds it and until
-//! when, and in which form; `cargo xtask ci`, `test` and `gate` wait while
-//! it is held (`quiet_wait.rs`), saying who holds it and when it expires.
+//! when, and in which form; `cargo xtask ci`, `test` and a gate's steps
+//! wait while it is held (`share.rs`, `gate_hold.rs`), saying who holds
+//! it and when it expires.
 //! A hold ends at its deadline, which is hard: a forgotten hold blocks
 //! nobody past it. A gate's hold and a `quiet <minutes> -- <command>`
 //! hold also end when their process does, however it ends (its pid gone
 //! or reused, as `lock_owner` reads it); a `quiet hold` outlives its
-//! process by design. The gate takes it for its run (`gate_floor.rs`);
-//! `cargo xtask quiet` takes it by hand (`quiet_command.rs`).
+//! process by design. A gate takes it for each run of its exclusive steps
+//! (`gate_hold.rs`); `cargo xtask quiet` takes it by hand
+//! (`quiet_command.rs`).
 //!
 //! Declared limits: plain `cargo` outside xtask does not wait, and nor
 //! does an xtask built before this file, in another worktree or in
@@ -33,8 +35,8 @@ pub const FILE: &str = "quiet.holder";
 
 /// The longest hold: gate 270's 2,885 s from start to end (lock wait,
 /// load wait and steps), the longest of the 65 gates in
-/// docs/plans/factory-throughput.md, rounded up to the hour. The gate
-/// holds the lock this long; a hold by hand may not be longer.
+/// docs/plans/factory-throughput.md, rounded up to the hour. A gate's
+/// exclusive hold is this long; a hold by hand may not be longer.
 pub const LONGEST: Duration = Duration::from_mins(60);
 
 /// A waiter's own deadline: the longest hold and a minute, so only a
@@ -58,6 +60,29 @@ impl Quiet {
     /// `cargo xtask quiet release`.
     pub fn keep(self) {
         std::mem::forget(self);
+    }
+
+    /// The same hold, its deadline `held_for` from now: for a hold taken
+    /// before a long wait for something else, so its deadline covers
+    /// what runs after the wait.
+    ///
+    /// # Errors
+    ///
+    /// The holder file no longer names this hold, or cannot be replaced.
+    pub fn renewed(mut self, held_for: Duration) -> Result<Self, String> {
+        let Holder {
+            owner, form, what, ..
+        } = &self.holder;
+        let new = Holder::me(&owner.worktree, held_for, *form, what);
+        if !file::replace_if(&self.dir, &self.holder, &new)? {
+            return Err(format!(
+                "{} no longer names this hold ({}); fix: rerun once its holder is done",
+                self.dir.join(FILE).display(),
+                self.holder.describe(now_ms())
+            ));
+        }
+        self.holder = new;
+        Ok(self)
     }
 
     /// Whether the holder file still names this hold, before its deadline.

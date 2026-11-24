@@ -47,8 +47,8 @@ cargo xtask quiet 10 -- <command>
                           finish, run the command, release; `quiet hold [minutes]` (15
                           by default, 60 at most) keeps it after returning (xtask runs
                           from the same worktree go on), `quiet release` there ends it.
-                          The gate holds it for its run; a gate's or a command's hold
-                          also ends when its process does
+                          A gate holds it for its exclusive steps; a gate's or a
+                          command's hold also ends when its process does
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
@@ -85,9 +85,12 @@ Incremental compilation is off for every build (`.cargo/config.toml`;
 `CARGO_INCREMENTAL` set in the environment overrides it): xtask's builds
 go through sccache, which needs it off, and an incremental target of a
 plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` in
-`.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
-ci` runs go at once on the machine, and the next waits for a slot,
-naming who holds them. A worktree's `target` lives under
+`.cargo/config.toml`), as xtask's steps do; at most three builders
+(`cargo xtask ci` runs and gates' shared steps) go at once on the
+machine, and the next waits for a slot, naming who holds them. Gates in
+different worktrees overlap: each step shares the machine or runs alone
+as `[gate.shared]` and `[gate.exclusive]` in `.config/factory.toml` say
+(`xtask/src/gate_hold.rs`); one gate runs at a time in a worktree. A worktree's `target` lives under
 `~/.cache`, never the `/tmp` tmpfs, and holds at most 80 GB (the lead's
 limit, set after the disk filled on 2026-11-09): every build xtask starts
 is refused over it (`[targets] max_gb`, `xtask/src/target_cap.rs`). When

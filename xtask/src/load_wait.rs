@@ -10,9 +10,10 @@
 //! has timed out on its deadlines rather than failed on its code. An
 //! unreadable load is refused, never taken as low, naming `[load] wait =
 //! false` as the fix. A `ci` run inside a gate does not wait: the gate
-//! already did (`main.rs`, the in-gate branch of `ci_shared::run`). The
-//! gate waits once it holds its lock, so the load it measures is what it
-//! will run beside.
+//! already did (`share.rs`, `unless_in_gate`). A gate waits before each
+//! share it takes, as a ci run does, and once it holds each exclusive
+//! hold, so the load it measures there is what it will run beside
+//! (`gate_hold.rs`).
 
 use std::collections::VecDeque;
 use std::sync::OnceLock;
@@ -21,7 +22,7 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 #[path = "load_wait_settings.rs"]
 mod load_settings;
-pub use load_settings::{Settings, settings};
+pub use load_settings::{DEFAULT_DEADLINE, Settings, settings};
 
 /// How often the wait says the load it is waiting on.
 pub const SAY_EVERY: Duration = Duration::from_secs(30);

@@ -10,23 +10,26 @@
 //! that must be clean at the commit its pin file names) are read before
 //! and after, and any change, or an unreadable state, fails the gate.
 //! Locally every job runs in this one worktree, one after another; CI
-//! gives each job a fresh runner. One gate runs at a time on the
-//! machine (`gate_lock`).
+//! gives each job a fresh runner. One gate runs at a time in a worktree
+//! (`gate_worktree_lock`); gates in other worktrees go beside it, each
+//! step holding the machine shared or alone as `[gate.shared]` and
+//! `[gate.exclusive]` say (`gate_hold`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 #[path = "gate_floor.rs"]
 pub(crate) mod floor;
 
 use crate::config::Config;
+use crate::gate_hold::StepHolds;
 use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::gate_run::{Wrap, pass_lines};
+pub(crate) use crate::gate_state::git;
+use crate::gate_state::{DIRTY, State, state};
+use crate::gate_watchdog::{IN_PROCESS, watched};
 use crate::report::Reporter;
-
-/// How a state with changes in its tree is marked.
-const DIRTY: &str = " (dirty)";
 
 /// The workflow the gate runs.
 pub const WORKFLOW: &str = ".github/workflows/ci.yml";
@@ -40,18 +43,21 @@ pub fn run(reporter: &Reporter) -> ExitCode {
     crate::priority::enter_gate();
     let worktree =
         std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let _lock = match floor::begin(&worktree) {
+    let begun = floor::before().and_then(|()| crate::gate_worktree_lock::take_here(&worktree));
+    let _lock = match begun {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
-    let prepared = Config::load()
+    let prepared = watched("the settings", IN_PROCESS, Config::load)
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
-    let (steps, before, siblings, output, wrap) = match prepared {
+    let ((steps, mut holds), before, siblings, output, wrap) = match prepared {
         Ok(prepared) => prepared,
         Err(why) => return refuse(&why),
     };
-    let code = crate::gate_run::run(&steps, &output, wrap, reporter);
+    let code = crate::gate_run::run(&steps, (&output, wrap), reporter, &mut |step| {
+        holds.before(step)
+    });
     if code != ExitCode::SUCCESS {
         return code;
     }
@@ -76,7 +82,7 @@ fn refuse(why: &str) -> ExitCode {
 type Pinned = Vec<(String, String)>;
 
 /// What the gate runs, and how.
-type Prepared = (Vec<PlannedStep>, State, Pinned, PathBuf, Wrap);
+type Prepared = ((Vec<PlannedStep>, StepHolds), State, Pinned, PathBuf, Wrap);
 
 /// The plan, the state before (a clean tree), the pinned siblings, and
 /// the `GITHUB_OUTPUT` file, emptied.
@@ -86,10 +92,19 @@ fn prepare(config: &Config) -> Result<Prepared, String> {
     refuse_dirty(&before)?;
     let wrap = crate::gate_run::sandbox_wrap(config)?;
     let twin = config.get(crate::gate_twin::KEY).map(std::path::Path::new);
-    println!(
-        "{}",
-        crate::gate_twin::check(std::path::Path::new("."), twin)?
-    );
+    let twinned = watched("the twin check", IN_PROCESS, || {
+        crate::gate_twin::check(std::path::Path::new("."), twin)
+    });
+    println!("{}", twinned?);
+    let planned = watched("the workflow, its plan and its holds", IN_PROCESS, || {
+        planned(config)
+    })?;
+    let output = watched("the GITHUB_OUTPUT file", IN_PROCESS, output_file)?;
+    Ok((planned, before, siblings, output, wrap))
+}
+
+/// The workflow's plan and each step's hold.
+fn planned(config: &Config) -> Result<(Vec<PlannedStep>, StepHolds), String> {
     let workflow = std::fs::read_to_string(WORKFLOW)
         .map_err(|e| format!("{WORKFLOW}: {e}; run from the workspace root"))?;
     let (setup, actions) = (setup_lines(config), actions(config)?);
@@ -100,7 +115,8 @@ fn prepare(config: &Config) -> Result<Prepared, String> {
         read: &read,
     };
     let planned = plan(&workflow, &sources).map_err(|why| format!("{WORKFLOW}: {why}"))?;
-    Ok((planned, before, siblings, output_file()?, wrap))
+    let holds = StepHolds::new(config, &planned)?;
+    Ok((planned, holds))
 }
 
 /// The gate passes only a commit: a tree with changes is refused.
@@ -142,74 +158,6 @@ pub fn actions(config: &Config) -> Result<BTreeMap<String, String>, String> {
 #[must_use]
 pub fn setup_lines(config: &Config) -> BTreeSet<String> {
     config.entries_under("gate.setup.").into_keys().collect()
-}
-
-/// HEAD, whether the tree has changes, and each pinned sibling's.
-#[derive(Debug, PartialEq, Eq)]
-pub struct State {
-    /// HEAD's SHA, ` (dirty)` when the tree has changes.
-    pub head: String,
-    /// Each sibling's HEAD, which equals its pin and is clean.
-    pub siblings: Vec<String>,
-}
-
-fn state(siblings: &[(String, String)]) -> Result<State, String> {
-    let head = checkout(".")?;
-    let siblings = siblings
-        .iter()
-        .map(|(dir, pin_file)| pinned(dir, pin_file))
-        .collect::<Result<_, _>>()?;
-    Ok(State { head, siblings })
-}
-
-/// A sibling checkout, which must be clean and at its pin.
-fn pinned(dir: &str, pin_file: &str) -> Result<String, String> {
-    let text = std::fs::read_to_string(pin_file).map_err(|e| format!("{pin_file}: {e}"))?;
-    let pin = text
-        .lines()
-        .find(|line| !line.starts_with('#'))
-        .unwrap_or_default()
-        .trim()
-        .to_owned();
-    let head = checkout(dir)?;
-    if head != pin {
-        return Err(format!(
-            "{dir} is at {head}, not {pin} from {pin_file}, or has changes; fix: git -C {dir} checkout --detach {pin} on a clean tree"
-        ));
-    }
-    Ok(head)
-}
-
-/// `dir`'s HEAD SHA, ` (dirty)` when it has changes; git must exit 0.
-fn checkout(dir: &str) -> Result<String, String> {
-    let sha = git(dir, &["rev-parse", "HEAD"])?;
-    let changes = git(dir, &["status", "--porcelain"])?;
-    Ok(if changes.is_empty() {
-        sha
-    } else {
-        format!("{sha}{DIRTY}")
-    })
-}
-
-/// git in `dir`, its stdout trimmed; hook variables stripped (CLAUDE.md).
-pub(crate) fn git(dir: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git -C {dir} {}: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 #[cfg(test)]

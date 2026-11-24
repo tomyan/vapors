@@ -2,7 +2,15 @@
 //! run inside a gate does not: each runs as a process in a scratch
 //! workspace whose `[load] wait = "false"` makes the wait say so without
 //! reading the load. HOME is the scratch directory, so the gate lock is
-//! its own and no real gate is waited on.
+//! its own and no real gate is waited on. The gate's scratch directory
+//! is a repository of one step (`support::gate`), whose hold waits.
+
+#[allow(
+    dead_code,
+    unused_imports,
+    reason = "each test binary compiles `support` and uses part of it"
+)]
+mod support;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -38,6 +46,9 @@ fn run(spec: &Run<'_>) -> String {
         spec.load.len()
     );
     let dir = scratch(&name, spec.load);
+    if spec.command == "gate" {
+        support::gate::workspace(&dir, &format!("{WEB}{}", spec.load), "shared");
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_xtask"));
     child
         .arg(spec.command)
@@ -103,10 +114,11 @@ fn ci_inside_a_gate_does_not_wait_again() {
     assert!(!text.contains("load:"), "{text}");
 }
 
-// The gate waits once it holds its lock: with a HOME the lock refuses
-// (not absolute), it stops before any load line.
+// The gate's holds wait for the load (`gate_hold.rs`): with a HOME the
+// lock directory refuses (not absolute), it stops before its first
+// step's hold, so before any load line.
 #[test]
-fn the_gate_takes_its_lock_before_it_waits() {
+fn a_gate_whose_lock_directory_is_refused_stops_before_any_load_wait() {
     // When
     let text = run(&Run {
         home: Some("relative-home"),
