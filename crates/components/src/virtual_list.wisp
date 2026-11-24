@@ -41,11 +41,18 @@ let on_scroll = move |event: &mut Event| {
         offset.set(y);
     }
 };
+// A resize carries the offset as laid out, which a taller list at its
+// end clamped before its `scroll` (the next frame's) can say.
 let on_resize = move |event: &mut Event| {
     if let Some([_, h]) = event.client_size()
         && h.to_bits() != laid_out.get_untracked().to_bits()
     {
         laid_out.set(h);
+    }
+    if let Some([_, y]) = event.scroll_offset()
+        && y.to_bits() != offset.get_untracked().to_bits()
+    {
+        offset.set(y);
     }
 };
 </script>

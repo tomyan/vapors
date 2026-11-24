@@ -82,7 +82,8 @@ impl Event {
         self
     }
 
-    /// Attaches the scroll container's offset, on a `scroll`.
+    /// Attaches the scroll container's offset, on a `scroll` or a
+    /// `resize`.
     #[must_use]
     pub fn with_scroll_offset(mut self, offset: [f32; 2]) -> Event {
         self.scroll_offset = Some(offset);
@@ -90,8 +91,10 @@ impl Event {
     }
 
     /// The scroll container's offset (CSS px, x then y; the DOM's
-    /// `scrollLeft` and `scrollTop` of the target) on a `scroll`; `None`
-    /// on any other event.
+    /// `scrollLeft` and `scrollTop` of the target) on a `scroll`, and on
+    /// a `resize` as the update that changed the size laid it out (an
+    /// offset that update clamped, whose `scroll` fires in the next
+    /// frame); `None` on any other event.
     #[must_use]
     pub fn scroll_offset(&self) -> Option<[f32; 2]> {
         self.scroll_offset

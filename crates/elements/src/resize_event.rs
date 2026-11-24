@@ -1,17 +1,19 @@
 //! A scroll container's `resize` event (virtual list V4,
 //! `docs/plans/virtual-list.md`): fired at each scroll container whose
 //! laid-out client size differs from the one its last `resize` carried,
-//! once per settle, carrying the size (`Event::client_size`). The DOM
+//! once per settle, carrying the size (`Event::client_size`) and the
+//! container's offset as laid out (`Event::scroll_offset`). The DOM
 //! has no element `resize`; a page learns an element's new size from a
 //! `ResizeObserver`, whose callbacks run once per frame after layout,
 //! and this is modelled on that report, for scroll containers only, the
-//! boxes whose window a page may build to (`VirtualList`). As those
-//! callbacks run before the browser paints, `Document::update_frame`
-//! fires it after the frame's first update and lays out what its
-//! handler changed in the second, so the frame that changes a size
-//! draws the rows of the new one. A container is observed while it has a `resize`
-//! listener: one without owes none, so it never asks for a frame. It
-//! does not bubble.
+//! boxes whose window a page may build to (`VirtualList`). Those
+//! callbacks run before the browser paints, so `Document::update_frame`
+//! fires it after the frame's first update and lays out what its handler
+//! changed in the second: the frame that changes a size draws the rows
+//! of the new one. A browser repeats that round while observations
+//! reach deeper elements, up to a limit; this runs one. A container is
+//! observed while it has a `resize` listener: one without owes none, so
+//! it never asks for a frame. It does not bubble.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -42,14 +44,23 @@ impl ReportedSizes {
 }
 
 impl Document {
-    /// Fires the `resize` each scroll container owes, in node order
-    /// (`Document::settle_scroll` calls this after the `scroll`s).
-    pub(crate) fn settle_resize(document: &Rc<RefCell<Document>>) {
+    /// Fires the `resize` each scroll container owes, in node order,
+    /// each carrying the container's offset as last laid out, which a
+    /// layout that clamped it changed before its `scroll` could say
+    /// (`Document::settle_scroll` calls this after the `scroll`s,
+    /// `Document::update_frame` after a frame's first update). Answers
+    /// whether it fired any.
+    pub(crate) fn settle_resize(document: &Rc<RefCell<Document>>) -> bool {
         let owed = document.borrow_mut().take_owed_resizes();
+        let fired = !owed.is_empty();
         for (node, size) in owed {
+            // an observed container is a scroll container: it has one
+            let offset = document.borrow().scroll_offset(node);
+            let offset = offset.expect("a container that owes a resize scrolls");
             let event = Event::new("resize").with_client_size(size);
-            dispatch_here(document, node, event);
+            dispatch_here(document, node, event.with_scroll_offset(offset));
         }
+        fired
     }
 
     /// Whether any observed scroll container owes a `resize`.

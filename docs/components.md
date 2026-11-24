@@ -127,16 +127,22 @@ the one difference from the brief in this slice.
   in the same settle as the `scroll`s, after them, when the last update laid it
   out at a client size (its padding box) other than its last `resize`
   carried, including its first layout at any size above (0, 0).
-  `event.client_size()` is `Some([width, height])` in CSS pixels. Only
+  `event.client_size()` is `Some([width, height])` in CSS pixels, and
+  `event.scroll_offset()` the container's offset as that update laid it
+  out: an offset the update clamped (a taller list at its end) is there
+  a frame before its `scroll`. Only
   a container with a `resize` listener is observed: one without owes
   none and never asks for a frame. It
   does not bubble, and other elements never fire it: the DOM has no
   element `resize`, and this stands in for a `ResizeObserver` on a
-  scroll container. As a `ResizeObserver`'s callbacks run before the
-  browser paints, the app's frame (`Document::update_frame`) fires it
-  after its first update and lays out what the handler changed in its
-  second, so that frame draws it. A frame runs at most two updates: a
-  size the second changes again is owed to the next frame.
+  scroll container. A `ResizeObserver`'s callbacks run before the
+  browser paints; the app's frame (`Document::update_frame`) fires
+  `resize` after its first update and lays out what the handler changed
+  in its second, so that frame draws it, and a third update runs when
+  the second moved the hover (rows built under a resting pointer). A
+  frame whose `resize`s fired runs at most three updates, any other at
+  most two, and a size the last changes again is owed to the next
+  frame.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.

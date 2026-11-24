@@ -260,6 +260,7 @@ mod typing_after_hide;
 mod ua_focus;
 mod update_counts;
 mod update_frame;
+mod update_frame_settle;
 mod used_sharing;
 mod viewport_signals;
 mod window_keys;

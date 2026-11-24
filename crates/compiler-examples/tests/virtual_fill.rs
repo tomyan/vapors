@@ -194,3 +194,24 @@ fn the_frame_after_a_resize_changes_nothing() {
     );
     assert_eq!(existing(&m), (0..14).collect::<Vec<_>>());
 }
+
+#[test]
+fn a_resting_pointer_at_the_end_keeps_the_frame_of_a_taller_window_settled() {
+    // Given: at the end, the pointer resting over the list's top rows
+    let m = mounted(200.0);
+    scroll_to(&m, 10_000.0, 200.0);
+    Document::pointer_moved(&m.doc, [10.0, 40.0]);
+    settled(&m, 200.0);
+
+    // When: 300 px, which clamps the offset and builds rows under the pointer
+    settled(&m, 300.0);
+    frame(&m, 300.0);
+
+    // Then: the rows of the clamped offset, and nothing more asked for
+    assert_eq!(shown_at(&m, TOP), "87");
+    assert_eq!(shown_at(&m, 289.0), "99");
+    assert!(
+        !m.doc.borrow_mut().take_changed(),
+        "the frame after asks for another"
+    );
+}

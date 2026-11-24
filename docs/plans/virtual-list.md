@@ -115,23 +115,35 @@ reads the scrollport's laid-out size after each layout.
   Tests: `crates/elements/tests/resize_event.rs`.
 - **In the frame that lays it out.** A browser runs the observer's
   callbacks before it paints and lays out again if they changed
-  anything, so it never paints the old rows at a new size.
-  `Document::update_frame`, the app's Update phase, does the same within
-  the bounded second update it already ran for the focus fixup's blur
-  and the rehover: before the first update the `scroll`s and `resize`s
-  owed; after it, the `scroll` a clamp to the new layout owes, then the
-  `resize`s; the second update if anything changed. So the first frame
-  drawn holds the rows of the list's height, as does each frame after a
-  resize; Zgui's list, which reads the scrollport's size from an observer and
-  builds the rows in its next frame, draws one frame of the old rows. A
-  frame runs at most two updates: a size the second changes again (a
-  handler that resizes its own container) is owed, `take_changed`
-  answers true, and the next frame fires it, so such a page draws a
-  frame each time it changes the size, and a browser would report a
-  ResizeObserver loop error for it. Tests:
+  anything, repeating while observations reach deeper elements, up to
+  a limit, so it never paints the old rows at a new size.
+  `Document::update_frame`, the app's Update phase, runs one such round
+  within the bounded updates it already ran for the focus fixup's blur
+  and the rehover:
+  1. the `scroll`s and `resize`s owed, before the first update: one
+     `scroll` a container a frame, as Chromium's scroll steps;
+  2. the first update; then the `resize`s it owes, each carrying the
+     offset as laid out, so a list at its end that grew taller builds
+     the rows of the clamped offset now (the clamp's `scroll` fires in
+     the next frame's step 1, with the offset the list already has);
+  3. the second update, if anything changed;
+  4. a third, only when step 2 fired a `resize` and the second update
+     moved the hover: rows built under a resting pointer;
+  5. the refusal, if the last update left the document changed.
+
+  So the first frame drawn holds the rows of the list's height, as does
+  each frame after a resize, with the pointer anywhere; Zgui's list,
+  which reads the scrollport's size from an observer and builds the
+  rows in its next frame, draws one frame of the old rows. A size the
+  last update changes again (a handler that resizes its own container)
+  is owed, `take_changed` answers true, and the next frame fires it, so
+  such a page draws a frame each time it changes the size, where a
+  browser would report a ResizeObserver loop error. Tests:
   `crates/elements/tests/update_frame.rs` (the order, the bound, a
-  settled frame updating once) and the single-frame checks of
-  `virtual_fill.rs` and `list_resize.rs`.
+  settled frame updating once), `update_frame_settle.rs` (a resting
+  pointer, a hover that moves boxes refused after two updates or three,
+  one `scroll` a frame, the offset on the `resize`) and the single-frame
+  checks of `virtual_fill.rs` and `list_resize.rs`.
 - **The list.** `VirtualList`'s window is the height the last `resize`
   reported, `height` until the first. `height` above 0 still sets the
   container's CSS height; at 0, now the default, the list fills its
