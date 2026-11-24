@@ -139,9 +139,9 @@ reads the scrollport's laid-out size after each layout.
   `crates/zgui-runtime/src/window/frame.rs` and `observe.rs`), also
   draws the new rows in the frame that resizes: after layout it
   dispatches the frame's `scroll`s, then delivers observations in at
-  most two passes, restyling and laying out after each. Zgui fires
-  `scroll` after layout, so an offset that layout clamped (a taller list at
-  its end, keys that shrank) reaches the list in that frame; vapors
+  most two passes, restyling and laying out after a pass that left work
+  owed. Zgui fires `scroll` after layout, so an offset that layout
+  clamped (a taller list at its end, keys that shrank) reaches the list in that frame; vapors
   fires it before the first update, and only a `resize` carries a clamped
   offset in the same frame. Keys that shrink at the end with no
   resize, which main has too, draw one frame without rows here. The
@@ -150,7 +150,9 @@ reads the scrollport's laid-out size after each layout.
   A `scroll_to` from a `resize` handler is laid out in that frame and
   reaches `onscroll` in the next in both: Zgui's observations are
   delivered after its `scroll`s, and the scroll they make is dispatched
-  by the next frame's (`scroll/mod.rs`, `take_moved`). A size the
+  by the next frame's `dispatch_scroll`
+  (`zgui-runtime/src/window/scroll/mod.rs`, which takes them with
+  `take_moved`, `zgui-scroll/src/scroller/mod.rs`). A size the
   last update changes again (a handler that resizes its own container)
   is owed, `take_changed` answers true, and the next frame fires it, so
   such a page draws a frame each time it changes the size, where a

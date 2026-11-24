@@ -14,11 +14,12 @@
 //! elements deeper in the tree than the last, then reports a loop
 //! error; this runs one. It reports the padding box (`clientHeight`),
 //! where a default `ResizeObserver` reports the content box, so a
-//! change of padding fires one here and none there under
-//! `box-sizing: content-box`, and the reverse under `border-box` with a
-//! fixed size. A container is
-//! observed while it has a `resize` listener: one without owes none, so
-//! it never asks for a frame. It does not bubble.
+//! change of padding alone fires one here and none there when the
+//! content size is fixed, and the reverse when the border-box size is
+//! fixed (a set `border-box` size, an auto width that fills its
+//! container, or `top`/`bottom` insets with an auto height). A
+//! container is observed while it has a `resize` listener: one without
+//! owes none, so it never asks for a frame. It does not bubble.
 
 use std::cell::RefCell;
 use std::rc::Rc;

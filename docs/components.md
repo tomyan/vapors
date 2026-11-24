@@ -127,10 +127,11 @@ the one difference from the brief in this slice.
   `Document::update_frame`, which settles the `scroll`s and `resize`s;
   until a frame does, `Document::take_changed` answers true.
 - **Resize:** `onresize={handler}` on a scroll container hears `resize`
-  after the frame's first update (or, when the last frame left it
-  owed, at the next frame's start, after the `scroll`s), when that
-  update laid it out at a client size (its padding box) other than its last `resize`
-  carried, including its first layout at any size above (0, 0).
+  when an update lays it out at a client size (its padding box) other
+  than its last `resize` carried, including its first layout at any
+  size above (0, 0): after the frame's first update, or, for a size the
+  last frame's last update changed, at the next frame's start, after
+  the `scroll`s.
   `event.client_size()` is `Some([width, height])` in CSS pixels, and
   `event.scroll_offset()` the container's offset as that update laid it
   out: an offset the update clamped (a taller list at its end) is there
@@ -140,11 +141,13 @@ the one difference from the brief in this slice.
   does not bubble, and other elements never fire it: the DOM has no
   element `resize`, and this stands in for a `ResizeObserver` on a
   scroll container. It differs from a `ResizeObserver`, which by
-  default observes the content box: a change of padding fires a
-  `resize` and no observation under `box-sizing: content-box`, and an
-  observation and no `resize` under `border-box` with a fixed size. A `ResizeObserver`'s callbacks run before the
-  browser paints; the app's frame (`Document::update_frame`) fires
-  `resize` after its first update and lays out what the handler changed
+  default observes the content box: a change of padding alone fires a
+  `resize` and no observation when the content size is fixed, and an
+  observation and no `resize` when the border-box size is fixed (a set
+  `border-box` size, an auto width that fills its container, or
+  `top`/`bottom` insets with an auto height). A `ResizeObserver`'s
+  callbacks run before the browser paints; the app's frame
+  (`Document::update_frame`) fires `resize` after its first update and lays out what the handler changed
   in its second, so that frame draws it, and a third update runs when
   the second left the document changed (the hover moved by rows built
   under a resting pointer, or the fixup's blur). A
