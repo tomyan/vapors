@@ -118,7 +118,7 @@ chain_hops = "3"
 # the cache key needs the runner image's variables, and the install runs
 # apt as root. Literal keys ('...') hold lines with double quotes.
 '[ -n "${ImageOS:-}" ] && [ -n "${ImageVersion:-}" ] || { echo "::error::ImageOS or ImageVersion is unset; the apt cache key needs the runner image"; exit 1; }' = "apt cache key: needs the runner image's ImageOS and ImageVersion"
-'echo "key=apt-$ImageOS-$ImageVersion-$(printf %s "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"' = "apt cache key: written for actions/cache"
+'echo "key=apt-$ImageOS-$ImageVersion-$(printf %s "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"' = "apt cache key: written for actions/cache/restore and actions/cache/save"
 'archives="$HOME/.cache/apt-archives"' = "apt install: where the cached .debs live on the runner"
 'mkdir -p "$archives/partial"' = "apt install: the cache directory"
 "sudo apt-get update -q" = "apt install: the runner's package lists"
@@ -130,7 +130,8 @@ chain_hops = "3"
 "cargo xtask setup --ci" = "the pinned tools, installed once per machine"
 
 [gate.actions]
-"actions/cache" = "restores the apt .debs on the runner; the apt steps are runner setup here"
+"actions/cache/restore" = "restores the apt .debs on the runner; the apt steps are runner setup here"
+"actions/cache/save" = "saves the apt .debs on the runner; the apt steps are runner setup here"
 "actions/checkout" = "the gate runs in a checkout of this repository"
 "Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
 "cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"

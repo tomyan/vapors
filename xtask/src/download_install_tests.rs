@@ -28,6 +28,8 @@ fn fixture(name: &str) -> Fixture {
         .arg("tool/tool"))
     .expect("tar");
     let download = Download {
+        archive: crate::downloads::Archive::TarGz,
+        tree: None,
         name: "tool".into(),
         version: "1.0.0".into(),
         url: format!("file://{}", archive.display()),
@@ -131,4 +133,71 @@ fn a_tool_not_installed_names_setup() {
         refusal.contains("is not installed; fix: cargo xtask setup"),
         "{refusal}"
     );
+}
+
+/// A zip holding `tree/tool` (the marker script) and `tree/data` beside it.
+fn zip_fixture(name: &str) -> Fixture {
+    let mut fixture = fixture(name);
+    let src = fixture.home.parent().expect("root").join("src");
+    std::fs::create_dir_all(src.join("tree")).expect("dir");
+    std::fs::copy(src.join("tool/tool"), src.join("tree/tool")).expect("copy");
+    std::fs::write(src.join("tree/data"), "beside").expect("data");
+    let archive = src.join("tree.zip");
+    let script = "import sys, zipfile, os\nwith zipfile.ZipFile(sys.argv[1], 'w') as z:\n    for f in ('tree/tool', 'tree/data'):\n        z.write(os.path.join(sys.argv[2], f), f)\n";
+    run(Command::new("python3")
+        .args(["-I", "-c", script])
+        .arg(&archive)
+        .arg(&src))
+    .expect("zip");
+    fixture.download.archive = crate::downloads::Archive::Zip;
+    fixture.download.tree = Some("tree".into());
+    fixture.download.member = "tree/tool".into();
+    fixture.download.url = format!("file://{}", archive.display());
+    fixture.download.sha256 = sha256(&archive).expect("hash");
+    fixture
+}
+
+#[test]
+fn a_zip_tree_is_installed_whole_after_both_hashes_match_and_never_run() {
+    // Given
+    let fixture = zip_fixture("zip-tree");
+
+    // When
+    let path = ensure(&fixture.download, &fixture.home).expect("installed");
+
+    // Then: the binary verified and executable, its neighbour beside it
+    assert_eq!(path, installed_path(&fixture.download, &fixture.home));
+    assert!(path.metadata().expect("installed").permissions().mode() & 0o111 != 0);
+    assert_eq!(
+        std::fs::read_to_string(path.with_file_name("data")).expect("data"),
+        "beside"
+    );
+    assert!(!fixture.marker.exists(), "the binary was run");
+}
+
+#[test]
+fn a_changed_installed_tree_is_replaced_whole_by_ensure() {
+    // Given: installed, then its binary overwritten and a stray file added
+    let fixture = zip_fixture("zip-changed");
+    let path = ensure(&fixture.download, &fixture.home).expect("installed");
+    std::fs::write(&path, "#!/bin/sh\n").expect("overwrite");
+    std::fs::write(path.with_file_name("stray"), "left").expect("stray");
+
+    // When
+    let replaced = ensure(&fixture.download, &fixture.home);
+
+    // Then: the pinned tree again, nothing of the changed one left
+    assert_eq!(replaced, Ok(path.clone()));
+    assert!(verified(&fixture.download, &fixture.home).is_ok());
+    let mut tree = leftovers(&fixture);
+    tree.sort();
+    assert_eq!(tree, ["data", "tool"], "the old tree survived");
+    let factory = fixture.home.join(".local/share/factory");
+    let work: Vec<_> = std::fs::read_dir(&factory)
+        .expect("factory")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".download-"))
+        .collect();
+    assert!(work.is_empty(), "work left in {}", factory.display());
+    assert!(!fixture.marker.exists(), "the binary was run");
 }
