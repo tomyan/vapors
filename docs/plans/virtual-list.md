@@ -110,8 +110,8 @@ reads the scrollport's laid-out size after each layout.
   owes one, as a `ResizeObserver` reports only what it observes, so a
   page without one draws no extra frame. It does not bubble, and only
   scroll containers fire it. The DOM has no element `resize`; a page there
-  uses a `ResizeObserver`, whose callbacks run once per frame after
-  layout, and this is modelled on that report for scroll containers.
+  uses a `ResizeObserver`, whose callbacks run after layout and before
+  paint, and this is modelled on that report for scroll containers.
   Tests: `crates/elements/tests/resize_event.rs`.
 - **In the frame that lays it out.** A browser runs the observer's
   callbacks before it paints and lays out again if they changed
@@ -138,15 +138,19 @@ reads the scrollport's laid-out size after each layout.
   at the commit the bench pins (zgui 5bb4387,
   `crates/zgui-runtime/src/window/frame.rs` and `observe.rs`), also
   draws the new rows in the frame that resizes: after layout it
-  dispatches the frame's `scroll`s, then delivers observations, at most
-  two passes, then settles again. It differs in two ways. Zgui fires
+  dispatches the frame's `scroll`s, then delivers observations in at
+  most two passes, restyling and laying out after each. Zgui fires
   `scroll` after layout, so an offset that layout clamped (a taller list at
   its end, keys that shrank) reaches the list in that frame; vapors
   fires it before the first update, and only a `resize` carries a clamped
   offset in the same frame. Keys that shrink at the end with no
-  resize, which main has too, draw one frame without rows. And a
-  `scroll_to` from a `resize` handler reaches `onscroll` in the next
-  frame. Zgui runs up to two observation passes; vapors runs one. A size the
+  resize, which main has too, draw one frame without rows here. The
+  bench's `list` scenario only reorders its keys, so it never meets
+  that case. Zgui runs up to two observation passes; vapors runs one.
+  A `scroll_to` from a `resize` handler is laid out in that frame and
+  reaches `onscroll` in the next in both: Zgui's observations are
+  delivered after its `scroll`s, and the scroll they make is dispatched
+  by the next frame's (`scroll/mod.rs`, `take_moved`). A size the
   last update changes again (a handler that resizes its own container)
   is owed, `take_changed` answers true, and the next frame fires it, so
   such a page draws a frame each time it changes the size, where a
