@@ -27,15 +27,17 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # DIAGNOSTIC CEILING, not a measured limit: no cold run has finished
-    # inside the old 9 minutes since 2026-11-12 (cancelled in unit, which
-    # also stops the cache save: runs 45067990897 and 45072756560). 25
-    # minutes lets one cold run finish and save its cache, so its time and
-    # a warm run's can be measured. Replaced in this PR by about 2.5x the
-    # measured worst before it merges. The old basis: 2.5x the job's worst
-    # in the 37 runs to 2026-10-23 (185 s, run 39807737788, plus 13 s for
-    # the apt step with its cache, run 39932437148).
-    timeout-minutes: 25
+    # About 2.5x the job's worst measured, cold: 950 s. Setup to the end
+    # of unit took 733 s with no Rust cache (run 45283781763, 2026-11-23,
+    # main a4bb9c63 with unit's build and test run timed apart: build 351
+    # s, tests 112 s); add host 4 s, build timings' cold worst 184 s (run
+    # 45275344913) and the post steps with the cache save, 29 s (run
+    # 45142856208). Warm, the job took 634 s (that run): the cache holds
+    # dependencies, and every workspace crate still builds, at opt-level
+    # 1 since #233 (2026-11-12). That took lint and unit from 282 s (run
+    # 43218588943) to 439 s and cancelled (run 43227249253), past the old
+    # 9 minutes (2.5x 198 s, to 2026-10-23).
+    timeout-minutes: 40
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
@@ -125,7 +127,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 25
+          TIMEOUT_MINUTES: 40
         run: .github/scripts/report-timeout.sh
 
   web:
