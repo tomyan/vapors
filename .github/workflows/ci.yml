@@ -27,11 +27,17 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x (the job's worst without its apt step in the 37 runs to
-    # 2026-10-23, 185 s in run 39807737788, plus that step's worst with
-    # the cache, 13 s in run 39932437148). The uncached 1811 s install in
-    # run 39803408769 is excluded: it is the slow mirror the cache avoids.
-    timeout-minutes: 9
+    # About 2.5x the job's worst measured, cold: 950 s. Setup to the end
+    # of unit took 733 s with no Rust cache (run 45283781763, 2026-11-23,
+    # main a4bb9c63 with unit's build and test run timed apart: build 351
+    # s, tests 112 s); add host 4 s, build timings' cold worst 184 s (run
+    # 45275344913) and the post steps with the cache save, 29 s (run
+    # 45142856208). Warm, the job took 634 s (that run): the cache holds
+    # dependencies, and every workspace crate still builds, at opt-level
+    # 1 since #233 (2026-11-12). That took lint and unit from 282 s (run
+    # 43218588943) to 439 s and cancelled (run 43227249253), past the old
+    # 9 minutes (2.5x 198 s, to 2026-10-23).
+    timeout-minutes: 40
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
@@ -42,18 +48,33 @@ jobs:
       # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
       # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
       # stalled on the mirror past the old 1-minute limit (run 40036716064).
-      - name: install a CJK system font for the fallback test
+      # bubblewrap: the host tier's sandboxed fetch runs git-upload-pack
+      # under bwrap (xtask/src/api_push_fetch.rs); the runner image has no
+      # bwrap, so run 45082608870 failed three host tests on "bwrap: not
+      # found". The sandbox's own arguments are unchanged.
+      - name: install a CJK system font for the fallback test, and bubblewrap
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
-          packages: fonts-noto-cjk
+          packages: fonts-noto-cjk bubblewrap
       - name: the CJK font is there
         run: |
           fc-list :lang=zh | head -1 | grep . || { echo "::error::no CJK font after the install; fix: check the apt-install step"; exit 1; }
+      - name: bwrap is there
+        run: |
+          bwrap --version || { echo "::error::no bwrap after the install; fix: check the apt-install step"; exit 1; }
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that times out or fails still saves what it
+      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
@@ -71,6 +92,14 @@ jobs:
         run: cargo xtask lint
       - name: wasm lint
         run: cargo xtask wasm
+      # The unit tier launches Chromium (gui-bench-app's chart oracle), as
+      # the gpu job's tier does; the same warm-up as there. Without it the
+      # first unit run to finish since 2026-11-12 (run 45076354761) failed
+      # three chart tests at the 20 s screenshot deadline on the runner's
+      # cold first launch. No hosted tier reads a hardware counter: those
+      # tests are in the pmu tier (#612), which no job here runs.
+      - name: warm headless Chromium
+        run: cargo run -p vapors-text --example warm_chromium
       - name: unit
         run: cargo xtask test --tier unit
       # bwrap making a user namespace: run here and in the gate, never in
@@ -98,7 +127,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 40
         run: .github/scripts/report-timeout.sh
 
   web:
@@ -199,7 +228,15 @@ jobs:
           case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device after installing lavapipe; fix: check the install step and mesa-major"; exit 1 ;; esac
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that times out or fails still saves what it
+      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
