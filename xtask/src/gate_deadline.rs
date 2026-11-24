@@ -4,12 +4,9 @@
 //! a second gate waiting in the same worktree (`gate_worktree_lock.rs`)
 //! and of a gate the queue runs (`queue_gate_child.rs`).
 //!
-//! Declared limits: `[load] deadline_minutes` set above the default
-//! would lengthen each hold. The gate's reads in its own process (the
-//! settings, the workflow and its plan, the twin's files, the run
-//! TMPDIR's sweep, /proc) have no deadline of their own, since there is
-//! no child to kill; each is a read of local files. Either can make a gate
-//! outlive [`LONGEST`], which then kills or refuses it, loudly.
+//! Declared limit: `[load] deadline_minutes` set above the default
+//! would lengthen each hold past [`HOLD_WATCHED`]; the gate's watchdog
+//! then fails it, naming the hold (`gate_watchdog.rs`).
 
 use std::time::Duration;
 
@@ -48,11 +45,33 @@ pub const OWN_COMMANDS: Duration = crate::gate::floor::STAT_DEADLINE
     .saturating_add(crate::gate_run::SANDBOX_CHECK_DEADLINE)
     .saturating_add(crate::gate_state::GIT_DEADLINE.saturating_mul(4 * CHECKOUTS));
 
-/// The longest a gate runs: its jobs, each hold's longest wait, and its
-/// own commands, 42 min + 2 x 111 min + 150 s = 266.5 min.
+/// The watchdog's deadline on one hold (`gate_run.rs`): its longest
+/// wait, and a minute for its own work beside the waits: the quiet
+/// lock's claim and its renewal each wait at most 10 s for other takers
+/// (`quiet_file::CLAIM_WAIT`), and its reads of lock files and /proc
+/// take milliseconds (the process tests' holds, 12 to 36 ms each).
+pub const HOLD_WATCHED: Duration = HOLD_WAIT.saturating_add(Duration::from_mins(1));
+
+/// The steps of .github/workflows/ci.yml the gate runs. A test holds it
+/// to the plan.
+pub const STEPS: u32 = 31;
+
+/// The gate's parts that do only local reads and writes, each watched
+/// for `gate_watchdog::IN_PROCESS`: the settings, the twin check, the
+/// workflow with its plan and holds, the `GITHUB_OUTPUT` file, the disk
+/// floor's target directory, the run TMPDIR's sweep and its leftover
+/// check (7); each sibling's pin file before and after; and for each
+/// step its load readings before and after and its start's own reads
+/// (3 per step): 7 + 3 x 31 = 100.
+pub const IN_PROCESS_PARTS: u32 = 7 + 2 * (CHECKOUTS - 1) + 3 * STEPS;
+
+/// The longest a gate runs, each part at its deadline: its jobs, each
+/// hold as watched, its own commands, and its in-process parts,
+/// 42 min + 2 x 112 min + 150 s + 100 x 5 s = 276 min 50 s.
 pub const LONGEST: Duration = JOBS
-    .saturating_add(HOLD_WAIT.saturating_mul(HOLDS))
-    .saturating_add(OWN_COMMANDS);
+    .saturating_add(HOLD_WATCHED.saturating_mul(HOLDS))
+    .saturating_add(OWN_COMMANDS)
+    .saturating_add(crate::gate_watchdog::IN_PROCESS.saturating_mul(IN_PROCESS_PARTS));
 
 #[cfg(test)]
 #[path = "gate_deadline_tests.rs"]

@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::process::Command;
 
-const WORKFLOW: &str = r"defaults:
+pub const WORKFLOW: &str = r"defaults:
   run:
     shell: bash
 jobs:
@@ -30,10 +30,16 @@ jobs:
 /// `dir` as a committed repository with `settings` and the workflow,
 /// its one step held as `hold` (`shared` or `exclusive`).
 pub fn workspace(dir: &Path, settings: &str, hold: &str) {
+    workspace_with(dir, settings, hold, ("", WORKFLOW));
+}
+
+/// [`workspace`], with `gate_keys` added under `[gate]` and `workflow`
+/// in place of the one-step workflow.
+pub fn workspace_with(dir: &Path, settings: &str, hold: &str, (gate_keys, workflow): (&str, &str)) {
     std::fs::create_dir_all(dir.join(".github/workflows")).expect("workflow dir");
-    std::fs::write(dir.join(".github/workflows/ci.yml"), WORKFLOW).expect("workflow");
+    std::fs::write(dir.join(".github/workflows/ci.yml"), workflow).expect("workflow");
     let gate = format!(
-        "[gate]\nhide_gpu_device = \"false\"\n\n[gate.actions]\n\"actions/checkout\" = \"a checkout\"\n\n\
+        "[gate]\nhide_gpu_device = \"false\"\n{gate_keys}\n[gate.actions]\n\"actions/checkout\" = \"a checkout\"\n\n\
          [gate.{hold}]\n\"ci: check\" = \"the one step\"\n"
     );
     std::fs::write(

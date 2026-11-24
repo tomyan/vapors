@@ -34,7 +34,9 @@ pub fn state(siblings: &[(String, String)]) -> Result<State, String> {
 
 /// A sibling checkout, which must be clean and at its pin.
 fn pinned(dir: &str, pin_file: &str) -> Result<String, String> {
-    let text = std::fs::read_to_string(pin_file).map_err(|e| format!("{pin_file}: {e}"))?;
+    let read = || std::fs::read_to_string(pin_file).map_err(|e| format!("{pin_file}: {e}"));
+    let part = format!("the pin file {pin_file}");
+    let text = crate::gate_watchdog::watched(part, crate::gate_watchdog::IN_PROCESS, read)?;
     let pin = text
         .lines()
         .find(|line| !line.starts_with('#'))

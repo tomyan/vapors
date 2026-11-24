@@ -103,6 +103,13 @@ scaling`, which is not in the gate.
   check (10 s). The queue's kill is derived from those, the jobs, the
   holds' waits, and a wait for another gate in the run worktree (Tom,
   2026-11-23).
+- The branch gets onto main by merging origin/main into it, a plain
+  push, with no rebase and no force (Tom, 2026-11-24).
+- The gate's reads in its own process are timed too, by one watchdog
+  (`gate_watchdog.rs`): a thread per part that, at the part's measured
+  deadline, fails the gate naming the part and ends the process with
+  exit code 1, since a thread cannot stop a stuck read. The queue's kill
+  is then only a backstop (Tom, 2026-11-24).
 
 ## Design
 
@@ -220,15 +227,34 @@ each have a deadline set from a measurement (20 runs each at load 1.2,
 2026-11-23): two `stat`s for the disk floor (1.1 ms at most; 10 s),
 the sandbox check (2.4 ms; 10 s), and two git calls per checkout for
 its state before and after (9.3 ms; 30 s), 150 s together
-(`OWN_COMMANDS`). The longest gate is 42 min + 2 x 111 min + 150 s =
-266.5 min (`gate_deadline::LONGEST`). A second gate in the same worktree
-waits that long for the first (`gate_worktree_lock::WAIT`), and the
-queue kills a gate after that wait (another gate may already be in its
-run worktree), the gate's own run, and `gate --pr`'s git read of HEAD
-(30 s) and three gh calls of 30 s: 535 min
-(`queue_gate_child::GATE_DEADLINE`). The gate's reads in its own
-process (settings, workflow, plan, the twin's files, the run TMPDIR's
-sweep, /proc) have no deadline of their own: there is no child to kill.
+(`OWN_COMMANDS`). A second gate in the same worktree waits for the
+first for one whole gate (`gate_worktree_lock::WAIT` =
+`gate_deadline::LONGEST`, below).
+
+The gate's work in its own process is watched (`gate_watchdog.rs`):
+each part has a thread that, at the part's deadline, fails the gate
+naming the part and ends the process with exit code 1. The parts and
+their deadlines:
+- the settings, the twin check, the workflow with its plan and holds,
+  the `GITHUB_OUTPUT` file, the disk floor's target directory, the run
+  TMPDIR's sweep and its leftover check, each sibling's pin file, and
+  each step's load readings: 5 s each (`IN_PROCESS`). The most any
+  took, 20 runs each at load 1.2 to 6.3 on 2026-11-23 and 24, was
+  15.6 ms (the leftover check of 1,275 entries);
+- each step: its own deadline and 5 s, for its start's reads (the build
+  directory's measure of a 25 GB target took 8.75 ms at most);
+- each hold: its longest wait and a minute (`HOLD_WATCHED`, 112 min),
+  for the quiet lock's two claims of at most 10 s each and its reads of
+  lock files and /proc;
+- the wait for this worktree's gate lock: its wait and 5 s.
+
+So the longest gate, every part at its deadline, is 42 min (jobs) +
+2 x 112 min (holds) + 150 s (its own commands) + 100 x 5 s (in-process
+parts: 7 once, and 3 for each of the 31 steps) = 276 min 50 s
+(`gate_deadline::LONGEST`, with `STEPS` held to the plan by a test).
+The queue's kill is the worktree lock's watched wait (one whole gate
+and 5 s), the gate's own run, and `gate --pr`'s git read and three gh
+calls: 555 min 45 s, a backstop behind each part's own deadline.
 
 A gate's share tries rounds until 101 min (quiet and gate lock
 together). Each quiet and lock wait is cut to what
@@ -236,8 +262,8 @@ is left of that when it starts, so the waits of a round together keep
 within it; only a load wait begun just before the deadline can pass it,
 by at most its own 10 min. So the share too is within 111 min.
 
-Declared limit: a `[load] deadline_minutes` above the default is not counted; it can make a gate
-outlive the deadline, which then kills or refuses it.
+Declared limit: a `[load] deadline_minutes` above the default is not
+counted; the watchdog then fails the hold, naming it.
 
 The exclusive hold's quiet holder file is renewed once the gate lock
 and the load wait are had, so its 60 min deadline runs from the start

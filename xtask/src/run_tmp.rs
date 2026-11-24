@@ -175,9 +175,28 @@ pub fn around(
     base: &Path,
     body: impl FnOnce(&Path) -> ExitCode,
 ) -> Result<ExitCode, String> {
+    around_watched(run, base, |_| (), body)
+}
+
+/// [`around`], `watch` held over the sweep before `body` and over the
+/// sweep and leftover check after it (the gate's watchdog,
+/// `gate_watchdog.rs`), named for each.
+///
+/// # Errors
+/// As [`around`].
+pub fn around_watched<W>(
+    run: &str,
+    base: &Path,
+    watch: impl Fn(&'static str) -> W,
+    body: impl FnOnce(&Path) -> ExitCode,
+) -> Result<ExitCode, String> {
     let who = this_run()?;
-    let tmp = begin(base)?;
+    let tmp = {
+        let _watched = watch("the run TMPDIR's sweep");
+        begin(base)?
+    };
     let code = body(tmp.path());
+    let _watched = watch("the run TMPDIR's leftover check");
     end(tmp, run, std::env::var_os(KEEP_ENV).is_some(), &who)?;
     Ok(code)
 }

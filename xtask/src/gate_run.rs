@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 use crate::command;
 use crate::gate_hold::Hold;
 use crate::gate_plan::PlannedStep;
+use crate::gate_watchdog::{self as watchdog, IN_PROCESS};
 use crate::report::Reporter;
 use crate::steps::Step;
 
@@ -37,8 +38,14 @@ pub fn run(
     reporter: &Reporter,
     hold: HoldFor<'_>,
 ) -> ExitCode {
-    crate::run_tmp::around_temp_dir("gate", |tmp| {
+    let watch = |part: &'static str| watchdog::watch(part, IN_PROCESS);
+    let base = std::env::temp_dir();
+    crate::run_tmp::around_watched("gate", &base, watch, |tmp| {
         run_in(planned, (output, wrap), reporter, tmp, hold)
+    })
+    .unwrap_or_else(|why| {
+        println!("FAIL tmp: {why}");
+        ExitCode::FAILURE
     })
 }
 
@@ -59,11 +66,9 @@ fn run_in(
         job = Some((&planned_step.job, job_started));
         let built = step_for(planned_step, output, wrap, &jobs);
         let mut step = crate::run_tmp::with_tmpdir(built, tmp);
-        step.deadline = Some(deadline(planned_step, job_started.elapsed()));
-        let load_at_start = crate::load::now();
-        let outcome = command::run(&step);
-        reporter.step(&step, &outcome);
-        println!("{}", crate::load::line(&load_at_start, &crate::load::now()));
+        let step_deadline = deadline(planned_step, job_started.elapsed());
+        step.deadline = Some(step_deadline);
+        let outcome = ran(&step, step_deadline, reporter);
         if !outcome.passed {
             break;
         }
@@ -77,6 +82,27 @@ fn run_in(
     }
 }
 
+/// `step` run and reported between two load readings, each watched: the
+/// step for its deadline and its start's own reads (`IN_PROCESS`).
+fn ran(step: &Step, step_deadline: Duration, reporter: &Reporter) -> command::Outcome {
+    let name = &step.name;
+    let reading = |when: &str| {
+        watchdog::watched(
+            format!("the load reading {when} `{name}`"),
+            IN_PROCESS,
+            crate::load::now,
+        )
+    };
+    let at_start = reading("before");
+    let watched_for = step_deadline.saturating_add(IN_PROCESS);
+    let outcome = watchdog::watched(format!("the step `{name}`"), watched_for, || {
+        command::run(step)
+    });
+    reporter.step(step, &outcome);
+    println!("{}", crate::load::line(&at_start, &reading("after")));
+    outcome
+}
+
 /// Take `step`'s hold; when its job's clock started, moved on by the
 /// wait so the wait is not counted, or now for a job's first step, and
 /// the jobs the step builds with. None when the hold cannot be had, said
@@ -87,7 +113,9 @@ fn held_for(
     hold: HoldFor<'_>,
 ) -> Option<(Instant, String)> {
     let asked = Instant::now();
-    let jobs = match hold(step).and_then(Hold::jobs) {
+    let part = format!("the hold for `{}`", step.name);
+    let taken = watchdog::watched(part, crate::gate_deadline::HOLD_WATCHED, || hold(step));
+    let jobs = match taken.and_then(Hold::jobs) {
         Ok(jobs) => jobs,
         Err(why) => {
             println!(

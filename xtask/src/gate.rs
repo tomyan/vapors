@@ -28,6 +28,7 @@ use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::gate_run::{Wrap, pass_lines};
 pub(crate) use crate::gate_state::git;
 use crate::gate_state::{DIRTY, State, state};
+use crate::gate_watchdog::{IN_PROCESS, watched};
 use crate::report::Reporter;
 
 /// The workflow the gate runs.
@@ -47,7 +48,7 @@ pub fn run(reporter: &Reporter) -> ExitCode {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
-    let prepared = Config::load()
+    let prepared = watched("the settings", IN_PROCESS, Config::load)
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
     let ((steps, mut holds), before, siblings, output, wrap) = match prepared {
@@ -91,10 +92,19 @@ fn prepare(config: &Config) -> Result<Prepared, String> {
     refuse_dirty(&before)?;
     let wrap = crate::gate_run::sandbox_wrap(config)?;
     let twin = config.get(crate::gate_twin::KEY).map(std::path::Path::new);
-    println!(
-        "{}",
-        crate::gate_twin::check(std::path::Path::new("."), twin)?
-    );
+    let twinned = watched("the twin check", IN_PROCESS, || {
+        crate::gate_twin::check(std::path::Path::new("."), twin)
+    });
+    println!("{}", twinned?);
+    let planned = watched("the workflow, its plan and its holds", IN_PROCESS, || {
+        planned(config)
+    })?;
+    let output = watched("the GITHUB_OUTPUT file", IN_PROCESS, output_file)?;
+    Ok((planned, before, siblings, output, wrap))
+}
+
+/// The workflow's plan and each step's hold.
+fn planned(config: &Config) -> Result<(Vec<PlannedStep>, StepHolds), String> {
     let workflow = std::fs::read_to_string(WORKFLOW)
         .map_err(|e| format!("{WORKFLOW}: {e}; run from the workspace root"))?;
     let (setup, actions) = (setup_lines(config), actions(config)?);
@@ -106,7 +116,7 @@ fn prepare(config: &Config) -> Result<Prepared, String> {
     };
     let planned = plan(&workflow, &sources).map_err(|why| format!("{WORKFLOW}: {why}"))?;
     let holds = StepHolds::new(config, &planned)?;
-    Ok(((planned, holds), before, siblings, output_file()?, wrap))
+    Ok((planned, holds))
 }
 
 /// The gate passes only a commit: a tree with changes is refused.

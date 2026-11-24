@@ -96,7 +96,7 @@ fn a_killed_gate_takes_its_steps_in_their_own_groups_with_it() {
 fn the_queue_s_gate_deadline_is_a_wait_for_another_gate_its_own_run_and_gate_pr_s_calls() {
     assert_eq!(
         GATE_DEADLINE,
-        crate::gate_deadline::LONGEST.saturating_mul(2) + Duration::from_mins(2)
+        crate::gate_deadline::LONGEST.saturating_mul(2) + Duration::from_secs(5 + 30 + 3 * 30)
     );
-    assert_eq!(GATE_DEADLINE, Duration::from_mins(535));
+    assert_eq!(GATE_DEADLINE, Duration::from_secs(555 * 60 + 45));
 }

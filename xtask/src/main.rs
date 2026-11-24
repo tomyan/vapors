@@ -80,6 +80,7 @@ mod gate_state;
 mod gate_step;
 mod gate_steps;
 mod gate_twin;
+mod gate_watchdog;
 mod gate_workflow;
 mod gate_worktree_lock;
 mod gate_yaml;

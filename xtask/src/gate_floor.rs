@@ -40,7 +40,11 @@ pub struct Free {
 /// Either is under its floor, or `stat` could not say, naming the fix.
 pub fn before() -> Result<(), String> {
     let tmp = std::env::temp_dir();
-    let target = target_dir(Path::new("."))?;
+    let target = crate::gate_watchdog::watched(
+        "the disk floor's target directory",
+        crate::gate_watchdog::IN_PROCESS,
+        || target_dir(Path::new(".")),
+    )?;
     let tmp_free = free(&tmp)?;
     if tmp_free.inodes.is_none() {
         println!(

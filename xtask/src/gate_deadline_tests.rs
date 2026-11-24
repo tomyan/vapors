@@ -55,10 +55,12 @@ fn the_workflow_s_jobs_take_as_long_as_the_deadline_counts() {
 }
 
 #[test]
-fn a_gate_s_longest_run_is_its_jobs_two_holds_longest_waits_and_its_own_commands() {
+fn a_gate_s_longest_run_is_its_jobs_holds_own_commands_and_in_process_parts() {
     assert_eq!(HOLD_WAIT, std::time::Duration::from_mins(111));
     assert_eq!(OWN_COMMANDS, std::time::Duration::from_secs(150));
-    assert_eq!(LONGEST, std::time::Duration::from_secs(266 * 60 + 30));
+    assert_eq!(HOLD_WATCHED, std::time::Duration::from_mins(112));
+    assert_eq!(IN_PROCESS_PARTS, 100);
+    assert_eq!(LONGEST, std::time::Duration::from_secs(276 * 60 + 50));
 }
 
 #[test]
@@ -71,4 +73,13 @@ fn the_gate_reads_as_many_checkouts_as_the_deadline_counts() {
 
     // Then
     assert_eq!(pinned + 1, usize::try_from(CHECKOUTS).expect("small"));
+}
+
+#[test]
+fn the_workflow_has_as_many_steps_as_the_deadline_counts() {
+    // Given
+    let (_, planned) = repository_plan();
+
+    // Then
+    assert_eq!(planned.len(), usize::try_from(STEPS).expect("small"));
 }

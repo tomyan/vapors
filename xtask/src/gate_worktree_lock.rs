@@ -17,7 +17,7 @@ use crate::lock_owner::Owner;
 pub const FILE: &str = "run.lock";
 
 /// The longest a second gate waits: one whole gate, waits and steps
-/// (`gate_deadline::LONGEST`, 266.5 min).
+/// (`gate_deadline::LONGEST`, 276 min 50 s).
 pub const WAIT: Duration = crate::gate_deadline::LONGEST;
 
 /// How often a waiting gate says so.
@@ -32,8 +32,15 @@ const POLL: Duration = Duration::from_millis(100);
 ///
 /// As [`take`].
 pub fn take_here(worktree: &str) -> Result<File, String> {
-    take(Path::new("target/gate"), worktree, WAIT)
+    let part = "the wait for this worktree's gate lock";
+    crate::gate_watchdog::watched(part, WATCHED, || {
+        take(Path::new("target/gate"), worktree, WAIT)
+    })
 }
+
+/// The watchdog's deadline on [`take_here`]: its wait, and the lock
+/// file's own open and write (`gate_watchdog::IN_PROCESS`).
+pub const WATCHED: Duration = WAIT.saturating_add(crate::gate_watchdog::IN_PROCESS);
 
 /// Take the lock in `dir` (`target/gate`) for the gate in `worktree`,
 /// waiting up to `wait`.
