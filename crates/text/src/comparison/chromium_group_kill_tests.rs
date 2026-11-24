@@ -113,6 +113,20 @@ fn kill_group(holder: &mut Child, profile: &Path) -> (bool, Vec<u32>) {
     (killed, left)
 }
 
+/// Kill `holder`'s whole group and every process holding a profile under
+/// `root`, whatever the test found: when no profile was held in time,
+/// killing the holder alone left its Chromium running in its group.
+fn clear(holder: &mut Child, root: &Path) {
+    let group = format!("-{}", holder.id());
+    let _ = Command::new("kill")
+        .args(["-s", "KILL", "--", &group])
+        .status();
+    let _ = holder.wait();
+    for name in entries(root) {
+        let _ = kill_holding(&root.join(name));
+    }
+}
+
 /// The holder `helper` killed with its group once Chromium is up: no
 /// process holding its profile is left, and its launch's TMPDIR is left
 /// in the holder's, which goes when this returns. That TMPDIR is
@@ -135,7 +149,7 @@ fn assert_killed_with_its_group(helper: &str) {
         .map_or((false, Vec::new()), |p| kill_group(&mut holder, p));
 
     // Then
-    let _ = (holder.kill(), holder.wait());
+    clear(&mut holder, &dir.path().join("profiles"));
     assert!(
         profile.is_some(),
         "{helper}: no process held a profile within {UP_WITHIN:?}"

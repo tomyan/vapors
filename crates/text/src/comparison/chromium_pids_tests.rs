@@ -5,14 +5,16 @@ use std::process::{Child, Command};
 
 use super::*;
 
-/// A shell with `arg` among its arguments, blocked reading a stdin
-/// nothing writes until it is killed. `read` is built in, so it starts no
+/// A shell with `arg` among its arguments that stops itself (SIGSTOP)
+/// and so never ends but by a kill. `kill` is built in, so it starts no
 /// process: a loop of `sleep` forked copies of the shell, holding `arg`
-/// for a moment each, which the search then found too.
+/// for a moment each, which the search then found too. A `read` of a
+/// piped stdin ended by itself when `Child::wait` closed the pipe, so a
+/// kill that did nothing still passed.
 fn holder(arg: &str) -> Child {
     let child = Command::new("sh")
-        .args(["-c", "read never", "holder", arg])
-        .stdin(std::process::Stdio::piped())
+        .args(["-c", "kill -s STOP $$", "holder", arg])
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -88,16 +90,15 @@ fn killing_a_profile_s_processes_ends_them_and_spares_the_rest_and_this_process(
 
     // When
     let killed = kill_holding(&ours);
+    let left = holding(&ours);
 
-    // Then
-    for child in &mut children[..2] {
-        let _ = child.wait();
-    }
+    // Then: read before any wait on the holders, which cannot end by
+    // themselves
     let spared = holding(&theirs).expect("/proc is readable");
     let others = children[2].id();
     reap(&mut children);
     assert_eq!(killed, Ok(()));
-    assert_eq!(holding(&ours), Ok(Vec::new()));
+    assert_eq!(left, Ok(Vec::new()));
     assert_eq!(spared, vec![others]);
 }
 
