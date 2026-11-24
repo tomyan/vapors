@@ -22,8 +22,13 @@ pub fn with_rows(rows: usize) -> Mounted {
 }
 
 pub fn refresh(mounted: &Mounted) {
+    refresh_at(mounted, WINDOW.0);
+}
+
+/// Lays the dashboard out in a window `width` wide and the spec's height.
+pub fn refresh_at(mounted: &Mounted, width: f32) {
     let viewport = Viewport {
-        width: WINDOW.0,
+        width,
         height: WINDOW.1,
         scale: 1.0,
     };

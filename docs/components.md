@@ -230,6 +230,14 @@ the one difference from the brief in this slice.
   `Clone`; a `Signal<..>` or `Memo<..>` parameter is refused, since the
   parameter is reactive already. Recursion, direct or through another
   snippet, is refused for now.
+- **A component inside a snippet.** A snippet's body is built against
+  `dyn Dom`, and a component tag in it is mounted there: a `.wisp`
+  component of the same directory as `Name::mount_before::<dyn Dom>`,
+  any other tag with the plain call, as a hand-written mount (the scene
+  tags' `&impl DynDom`) needs. A `.wisp` component of another crate
+  inside a snippet does not compile yet (rustc reports mismatched
+  types at its `mount_before`): the compiler cannot tell it from a
+  hand-written one until it reads another crate's components.
 
 ## Page-level keys: `<vapors:window>`
 
@@ -680,5 +688,6 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   implements `Dom` over the real element tree, with layout and paint.
 - **Accessibility (F2d).** Implicit roles, ARIA attributes and the
   AccessKit tree are not generated or checked.
-- **In the compiler:** recursive snippets. Props passed to a child are
+- **In the compiler:** recursive snippets; another crate's `.wisp`
+  component inside a snippet (see "A component inside a snippet"). Props passed to a child are
   not reactive unless they are `Signal`s. There is no hot reload, LSP or inspector yet.

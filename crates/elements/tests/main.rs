@@ -67,6 +67,7 @@ mod compiled_sheets;
 mod counter;
 mod declared_events;
 mod decoration;
+mod deep_scroll_rows;
 mod dispatcher;
 mod dom_agreement;
 mod equal_writes_bindings;

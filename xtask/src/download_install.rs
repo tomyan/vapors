@@ -10,10 +10,11 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::deadline::{Finished, run_with_deadline};
-use crate::downloads::{Download, installed_path};
+use crate::downloads::{Archive, Download, installed_path, tree_root};
 
 /// The 2.44.1 archive (4.6 MB) downloaded in under 2 s on the dev box
-/// (2026-10-26); 120 s allows a slow link without hanging setup.
+/// (2026-10-26), and Chromium's 239 MB zip in 7 s (2026-11-22); 120 s
+/// allows a slow link without hanging setup.
 const FETCH_DEADLINE: Duration = Duration::from_secs(120);
 
 /// The installed binary, hashed and matching its pin.
@@ -51,33 +52,70 @@ pub fn ensure(download: &Download, home: &Path) -> Result<PathBuf, String> {
         return Ok(path);
     }
     let path = installed_path(download, home);
-    let bin = path.parent().ok_or("the install path has no directory")?;
+    let root = tree_root(download, home);
+    let beside = match download.tree {
+        None => path.parent(),
+        Some(_) => root.parent(),
+    };
+    let bin = beside.ok_or("the install path has no directory")?;
     let work = bin.join(format!(
         ".download-{}-{}",
         download.name,
         std::process::id()
     ));
     std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    let installed = fetch_and_place(download, &work, &path);
+    let installed = fetch_and_place(download, &work, &path, &root);
     let _ = std::fs::remove_dir_all(&work);
     installed.map(|()| path)
 }
 
-fn fetch_and_place(download: &Download, work: &Path, path: &Path) -> Result<(), String> {
-    let archive = work.join("archive.tar.gz");
+fn fetch_and_place(
+    download: &Download,
+    work: &Path,
+    path: &Path,
+    root: &Path,
+) -> Result<(), String> {
+    let archive = work.join("archive");
     fetch(&download.url, &archive)?;
     matches(&archive, &download.sha256, &download.url)?;
-    run(Command::new("tar")
-        .arg("-xzf")
-        .arg(&archive)
-        .arg("-C")
-        .arg(work)
-        .arg(&download.member))?;
+    unpack(download, &archive, work)?;
     let binary = work.join(&download.member);
     matches(&binary, &download.binary_sha256, &download.member)?;
     executable(&binary)?;
-    std::fs::rename(&binary, path)
-        .map_err(|e| format!("{} to {}: {e}", binary.display(), path.display()))
+    let Some(tree) = &download.tree else {
+        return rename(&binary, path);
+    };
+    std::fs::create_dir_all(root).map_err(|e| format!("{}: {e}", root.display()))?;
+    let installed = root.join(tree);
+    if installed.exists() {
+        // a tree that failed `verified`: moved into `work`, which `ensure`
+        // removes, once the new one has verified
+        rename(&installed, &work.join("replaced"))?;
+    }
+    rename(&work.join(tree), &installed)
+}
+
+/// Extracts the member, or the whole tree, into `work`.
+fn unpack(download: &Download, archive: &Path, work: &Path) -> Result<(), String> {
+    let wanted = download.tree.as_ref().unwrap_or(&download.member);
+    match download.archive {
+        Archive::TarGz => run(Command::new("tar")
+            .arg("-xzf")
+            .arg(archive)
+            .arg("-C")
+            .arg(work)
+            .arg(wanted)),
+        Archive::Zip => run(Command::new("unzip")
+            .arg("-q")
+            .arg(archive)
+            .arg(format!("{wanted}*"))
+            .arg("-d")
+            .arg(work)),
+    }
+}
+
+fn rename(from: &Path, to: &Path) -> Result<(), String> {
+    std::fs::rename(from, to).map_err(|e| format!("{} to {}: {e}", from.display(), to.display()))
 }
 
 fn fetch(url: &str, to: &Path) -> Result<(), String> {

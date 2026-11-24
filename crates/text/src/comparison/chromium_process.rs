@@ -1,7 +1,7 @@
 //! Around the Chromium process: the deadline, its output, the files it
 //! reads and writes, and where its binary is.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, ExitStatus};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
@@ -131,13 +131,6 @@ pub(crate) fn read_all(mut stream: impl std::io::Read) -> String {
     let mut text = String::new();
     let _ = stream.read_to_string(&mut text);
     text
-}
-
-pub(crate) fn on_path(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|dir| dir.join(name))
-        .find(|candidate| candidate.is_file())
 }
 
 #[cfg(test)]

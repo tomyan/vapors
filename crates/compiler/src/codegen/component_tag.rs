@@ -29,7 +29,9 @@ impl Emitter<'_> {
                 tag.name
             )));
         }
-        let required = self.check_props(tag).unwrap_or_default();
+        let checked = self.check_props(tag);
+        let generated = checked.is_some();
+        let required = checked.unwrap_or_default();
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
@@ -67,7 +69,7 @@ impl Emitter<'_> {
         self.line("..Default::default()");
         self.dedent(1);
         self.line("};");
-        let binding = self.emit_mount(tag, &var, place);
+        let binding = self.emit_mount(tag, &var, place, generated);
         self.emit_anchor_toggles(tag, &binding, &var)
     }
 
@@ -97,7 +99,15 @@ impl Emitter<'_> {
     }
 
     /// Mounts the component; returns the binding that holds it.
-    fn emit_mount(&mut self, tag: &ComponentTag, var: &str, place: &Place) -> String {
+    /// `generated`: the tag is a `.wisp` component of this directory,
+    /// whose mount is generic over `D` (`mount_path`).
+    fn emit_mount(
+        &mut self,
+        tag: &ComponentTag,
+        var: &str,
+        place: &Place,
+        generated: bool,
+    ) -> String {
         // the anchor toggles read the binding after the mount
         let read = place.roots || tag.attributes.iter().any(is_class_directive);
         let binding = if read {
@@ -105,9 +115,9 @@ impl Emitter<'_> {
         } else {
             format!("_{var}")
         };
+        let mount = self.mount_path(&tag.name, generated);
         self.line(format!(
-            "let {binding} = {}::mount_before(dom, {}, {}, {var}_props).owned_by_parent();",
-            tag.name,
+            "let {binding} = {mount}(dom, {}, {}, {var}_props).owned_by_parent();",
             place.parent,
             place.before()
         ));
@@ -117,6 +127,25 @@ impl Emitter<'_> {
             ));
         }
         binding
+    }
+}
+
+impl Emitter<'_> {
+    /// What the mount calls: `Name::mount_before`, or inside a snippet,
+    /// where `dom` is `dyn Dom`, `Name::mount_before::<dyn Dom>` for a
+    /// generated component: left to inference, rustc takes the enclosing
+    /// mount's `D` for the child's from its `where Rc<RefCell<D>>: DynDom`
+    /// clause. RELAXED: a component the compiler cannot see (another
+    /// crate's) keeps the plain call, since a hand-written mount (the
+    /// scene tags' `&impl DynDom`) takes no type argument; a generated
+    /// one of another crate inside a snippet still fails in rustc. The
+    /// compiler reading another crate's components retires this.
+    fn mount_path(&self, name: &str, generated: bool) -> String {
+        if generated && self.dom_type == "dyn Dom" {
+            format!("{name}::mount_before::<dyn Dom>")
+        } else {
+            format!("{name}::mount_before")
+        }
     }
 }
 

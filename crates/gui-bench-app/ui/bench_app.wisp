@@ -3,7 +3,6 @@ use crate::sidebar::{Sidebar, SidebarProps};
 use crate::topbar::{Topbar, TopbarProps};
 use crate::content::{Content, ContentProps};
 use crate::controls::Controls;
-use crate::export_menu::{ExportMenu, ExportMenuProps};
 // The active nav item, the first at startup; the controls the chart, the
 // filters and the search input share; the count of messages the feed shows.
 let active: Signal<usize> = Signal::new(0);
@@ -23,6 +22,5 @@ let search: Signal<String> = controls.search;
   <div class="main">
     <Topbar search={search} controls={controls} />
     <Content controls={controls} active={active} rows={rows} />
-    <ExportMenu controls={controls} />
   </div>
 </div>

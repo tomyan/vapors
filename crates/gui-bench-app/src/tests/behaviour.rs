@@ -6,7 +6,7 @@
     clippy::cast_sign_loss
 )] // WINDOW is whole
 use super::support::*;
-use crate::app::{Mounted, not_built, options, run};
+use crate::app::{Mounted, options};
 use crate::cli::Scenario;
 use crate::dashboard::*;
 use vapors_dom::NodeId;
@@ -125,14 +125,4 @@ fn the_window_is_borderless_1280_by_800_with_the_runners_app_id() {
     assert!(!window.decorations);
     assert_eq!(window.app_id.as_deref(), Some("gui-bench.vapors"));
     assert_eq!(window.title, Scenario::App { count: 100 }.title());
-}
-
-#[test]
-fn the_list_scenario_is_refused_naming_s3b() {
-    // When
-    let list = run(Scenario::List { count: 10 }).unwrap_err();
-
-    // Then
-    assert_eq!(list, not_built("the `list` scenario"));
-    assert!(list.contains("s3b") && list.contains("vapors-bench --scenario app"));
 }

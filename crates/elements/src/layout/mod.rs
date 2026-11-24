@@ -191,14 +191,20 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
 /// containing block's content, whose origin is that box's corner less
 /// its scroll offset (`offsets`, by box index, in CSS pixels); and each
 /// box's padding, read in the same pass. A lane child is where Taffy
-/// puts it, its start from `lanes` added back.
+/// puts it, its start from `lanes` added back, unless `framed` gives
+/// its place along the axis in a lane frame of its own: then it is
+/// there, and what is placed in it composes from it, as placement's
+/// walk composes (`placement_walk.rs`, `put`), so a box far down its
+/// scroll frame keeps its fractions of a pixel.
 pub(crate) fn placed(
     (boxes, lanes): (&[LayoutBox], &Lanes),
     offsets: &[[f32; 2]],
+    framed: &dyn Fn(usize) -> Option<f32>,
 ) -> (Vec<BoxRect>, Vec<taffy::Rect<f32>>) {
     let corner = |index: usize, origin: (f32, f32)| {
         let location = lanes.taffy_location(index, &boxes[index].layout);
-        (origin.0 + location.x, origin.1 + location.y)
+        let y = framed(index).unwrap_or(origin.1 + location.y);
+        (origin.0 + location.x, y)
     };
     let origins = crate::chain::by_containing_block(boxes, (0.0, 0.0), &|index, origin| {
         let (x, y) = corner(index, origin);
