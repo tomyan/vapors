@@ -115,8 +115,9 @@ reads the scrollport's laid-out size after each layout.
   Tests: `crates/elements/tests/resize_event.rs`.
 - **In the frame that lays it out.** A browser runs the observer's
   callbacks before it paints and lays out again if they changed
-  anything, repeating while observations reach deeper elements, up to
-  a limit, so it never paints the old rows at a new size.
+  anything, repeating while each round reaches elements deeper in the
+  tree than the last, then reporting a loop error, so it never paints
+  the old rows at a new size.
   `Document::update_frame`, the app's Update phase, runs one such round
   within the bounded updates it already ran for the focus fixup's blur
   and the rehover:
@@ -128,13 +129,24 @@ reads the scrollport's laid-out size after each layout.
      the next frame's step 1, with the offset the list already has);
   3. the second update, if anything changed;
   4. a third, only when step 2 fired a `resize` and the second update
-     moved the hover: rows built under a resting pointer;
+     left the document changed: the hover moved by rows built under a
+     resting pointer, or the second fixup's blur;
   5. the refusal, if the last update left the document changed.
 
   So the first frame drawn holds the rows of the list's height, as does
-  each frame after a resize, with the pointer anywhere; Zgui's list,
-  which reads the scrollport's size from an observer and builds the
-  rows in its next frame, draws one frame of the old rows. A size the
+  each frame after a resize, with the pointer anywhere. Zgui's frame,
+  at the commit the bench pins (zgui 5bb4387,
+  `crates/zgui-runtime/src/window/frame.rs` and `observe.rs`), also
+  draws the new rows in the frame that resizes: after layout it
+  dispatches the frame's `scroll`s, then delivers observations, at most
+  two passes, then settles again. It differs in two ways. Zgui fires
+  `scroll` after layout, so an offset that layout clamped (a taller list at
+  its end, keys that shrank) reaches the list in that frame; vapors
+  fires it before the first update, and only a `resize` carries a clamped
+  offset in the same frame. Keys that shrink at the end with no
+  resize, which main has too, draw one frame without rows. And a
+  `scroll_to` from a `resize` handler reaches `onscroll` in the next
+  frame. Zgui runs up to two observation passes; vapors runs one. A size the
   last update changes again (a handler that resizes its own container)
   is owed, `take_changed` answers true, and the next frame fires it, so
   such a page draws a frame each time it changes the size, where a

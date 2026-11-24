@@ -120,11 +120,14 @@ the one difference from the brief in this slice.
   end of the range, a scroll and its reverse in one frame) fires none.
   `event.scroll_offset()` is `Some([x, y])`, the offset in CSS pixels;
   a change the handler makes is drawn in the same frame. It does not
-  bubble, as an element's `scroll` does not in the DOM. A host that runs
-  its own frames calls `Document::settle_scroll` before each update;
-  until it does, `Document::take_changed` answers true.
+  bubble, as an element's `scroll` does not in the DOM. A container
+  fires at most one `scroll` a frame: a `scroll_to` made by a handler
+  later in the frame (a `resize`'s, a blur's) fires in the next. A host
+  that runs its own frames runs each frame's Update phase with
+  `Document::update_frame`, which settles the `scroll`s and `resize`s;
+  until a frame does, `Document::take_changed` answers true.
 - **Resize:** `onresize={handler}` on a scroll container hears `resize`
-  in the same settle as the `scroll`s, after them, when the last update laid it
+  after the frame's first update, when that update laid it
   out at a client size (its padding box) other than its last `resize`
   carried, including its first layout at any size above (0, 0).
   `event.client_size()` is `Some([width, height])` in CSS pixels, and
@@ -135,11 +138,14 @@ the one difference from the brief in this slice.
   none and never asks for a frame. It
   does not bubble, and other elements never fire it: the DOM has no
   element `resize`, and this stands in for a `ResizeObserver` on a
-  scroll container. A `ResizeObserver`'s callbacks run before the
+  scroll container. It differs from a `ResizeObserver`, which by
+  default observes the content box: a change of padding alone fires a
+  `resize` and no observation. A `ResizeObserver`'s callbacks run before the
   browser paints; the app's frame (`Document::update_frame`) fires
   `resize` after its first update and lays out what the handler changed
   in its second, so that frame draws it, and a third update runs when
-  the second moved the hover (rows built under a resting pointer). A
+  the second left the document changed (the hover moved by rows built
+  under a resting pointer, or the fixup's blur). A
   frame whose `resize`s fired runs at most three updates, any other at
   most two, and a size the last changes again is owed to the next
   frame.

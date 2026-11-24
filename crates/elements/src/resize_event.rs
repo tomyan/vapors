@@ -4,14 +4,17 @@
 //! once per settle, carrying the size (`Event::client_size`) and the
 //! container's offset as laid out (`Event::scroll_offset`). The DOM
 //! has no element `resize`; a page learns an element's new size from a
-//! `ResizeObserver`, whose callbacks run once per frame after layout,
+//! `ResizeObserver`, whose callbacks run after layout and before paint,
 //! and this is modelled on that report, for scroll containers only, the
 //! boxes whose window a page may build to (`VirtualList`). Those
 //! callbacks run before the browser paints, so `Document::update_frame`
 //! fires it after the frame's first update and lays out what its handler
 //! changed in the second: the frame that changes a size draws the rows
-//! of the new one. A browser repeats that round while observations
-//! reach deeper elements, up to a limit; this runs one. A container is
+//! of the new one. A browser repeats that round while each reaches
+//! elements deeper in the tree than the last, then reports a loop
+//! error; this runs one. It reports the padding box (`clientHeight`),
+//! where a default `ResizeObserver` reports the content box, so a
+//! change of padding alone fires one here and none there. A container is
 //! observed while it has a `resize` listener: one without owes none, so
 //! it never asks for a frame. It does not bubble.
 

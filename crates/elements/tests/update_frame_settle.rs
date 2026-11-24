@@ -116,3 +116,21 @@ fn the_offset_a_layout_clamped_fires_its_scroll_in_the_next_frame() {
     assert_eq!(did, ["scroll", "update"]);
     assert_eq!(page.doc.borrow().scroll_offset(list), Some([0.0, 20.0]));
 }
+
+#[test]
+fn a_scroll_a_resize_handler_makes_fires_in_the_next_frame() {
+    // Given: a resize handler that scrolls its list
+    let page = page(OnResize::Scrolls, "");
+    let did = page.frame(100.0);
+    assert_eq!(did, ["update", "resize", "update"]);
+
+    // When
+    let did = page.frame(100.0);
+
+    // Then: its scroll, once, at the next frame's start
+    assert_eq!(did, ["scroll", "update"]);
+    assert_eq!(
+        page.doc.borrow().scroll_offset(page.list),
+        Some([0.0, 30.0])
+    );
+}

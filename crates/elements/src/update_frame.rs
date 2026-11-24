@@ -3,7 +3,8 @@
 //! owed from before the frame, the update and the focus fixup, the
 //! `resize`s that update owes, then, when anything changed since it, a
 //! second update and fixup. A frame whose `resize`s fired runs a third
-//! when the second moved the hover (rows built under a resting pointer);
+//! when the second left the document changed (the hover moved by rows
+//! built under a resting pointer, or the fixup's blur);
 //! any other runs at most two. What the last leaves owed fires at the
 //! next frame's start.
 
@@ -55,8 +56,9 @@ impl Document {
         if !resized {
             return settled(document, "two");
         }
-        // the hover the resize handlers' rows moved under a resting
-        // pointer: one more update shows it (virtual list V4)
+        // what the second update and fixup changed: the hover the
+        // resize handlers' rows moved under a resting pointer, or a blur;
+        // one more update shows it (virtual list V4)
         if document.borrow().changed_since_update() {
             update_and_settle(document, &mut update)?;
         }

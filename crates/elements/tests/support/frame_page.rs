@@ -24,6 +24,8 @@ pub enum OnResize {
     AddsARow,
     /// Makes the list 10 px taller than its size: a size that never settles.
     Grows,
+    /// Scrolls the list 30 px down.
+    Scrolls,
 }
 
 /// A `.list`, `overflow: auto`, 10 px below the top of the window and
@@ -137,6 +139,9 @@ fn resize_does(doc: &mut Document, list: NodeId, on_resize: OnResize, height: f3
         OnResize::Grows => {
             let taller = format!("height: {}px;", height + 10.0);
             doc.set_attribute(list, "style", &taller);
+        }
+        OnResize::Scrolls => {
+            doc.scroll_to(list, [0.0, 30.0]);
         }
     }
 }
