@@ -27,12 +27,12 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the job's worst measured, cold: 1133 s, rounded up. The
-    # worst cold job, run 45076354761 (2026-11-22, no Rust cache), took
-    # 1080 s with unit 648 s, the cache save included; it had no Chromium
-    # warm-up (worst 49 s, run 45084188329) and skipped host (3.4 s
-    # failing, run 45142856208; never timed passing on a runner), so add
-    # 49 and 4. A faster cold run, 45283781763 (main a4bb9c63), reached the
+    # About 2.5x the job's worst measured, cold: 1149 s (2.5x is 47.9
+    # minutes). Run 45361157497, attempt 1 (2026-11-24, #624, no Rust
+    # cache), ran every step, unit 662 s, host 3.5 s (failing on the
+    # runner; never timed passing there). Run 45076354761 (2026-11-22)
+    # took 1080 s with unit 648 s and no Chromium warm-up (worst 49 s, run
+    # 45084188329) or host. A faster cold run, 45283781763 (main a4bb9c63), reached the
     # end of unit in 733 s: unit's build 351 s, its tests 112 s. Warm, the
     # job took 634 s (45142856208): the cache holds dependencies, and every
     # workspace crate still builds, at opt-level 1 since #233 (2026-11-12),
