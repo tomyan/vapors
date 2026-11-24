@@ -130,7 +130,8 @@ chain_hops = "3"
 "cargo xtask setup --ci" = "the pinned tools, installed once per machine"
 
 [gate.actions]
-"actions/cache" = "restores the apt .debs on the runner; the apt steps are runner setup here"
+"actions/cache/restore" = "restores the apt .debs on the runner; the apt steps are runner setup here"
+"actions/cache/save" = "saves the apt .debs on the runner; the apt steps are runner setup here"
 "actions/checkout" = "the gate runs in a checkout of this repository"
 "Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
 "cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
