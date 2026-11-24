@@ -186,6 +186,14 @@ pub enum Command {
     },
     /// Check formatting and lints without running tests.
     Lint,
+    /// Capture saved Chromium references for the paint tests, on request
+    /// only, into crates/elements-corpus/fixtures/references/: `all`, or
+    /// `<fixture> <scale> [<state>]`. Look at each before committing it.
+    Reference {
+        /// `all`, or a paint fixture, its scale and optionally a state.
+        #[arg(required = true, num_args = 1..=3)]
+        target: Vec<String>,
+    },
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,
     /// Fail naming each file where ./xtask differs from <sibling>/xtask.

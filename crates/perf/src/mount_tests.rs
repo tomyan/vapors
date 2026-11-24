@@ -1,5 +1,8 @@
 //! The Mount workload: its page mounts the rows it was given, measures
-//! the mount, and the first frame's update sees every row.
+//! the mount, and the first frame's update sees every row. The tests that
+//! open the instruction counter (`checked_counter`, a hardware counter a
+//! VM may not have) are named `pmu_`, in the PMU tier
+//! (`xtask/src/steps_tiers.rs` `PMU_TESTS`).
 
 use vapors_elements::Viewport;
 
@@ -15,7 +18,7 @@ fn row_data_numbers_its_rows_from_zero() {
 }
 
 #[test]
-fn a_mount_is_measured_and_its_page_updates_every_row() {
+fn pmu_a_mount_is_measured_and_its_page_updates_every_row() {
     // Given
     let mut mount = Mount::new(50, checked_counter().expect("perf events"));
 
@@ -36,7 +39,7 @@ fn a_mount_is_measured_and_its_page_updates_every_row() {
 }
 
 #[test]
-fn each_sample_after_the_first_mounts_a_fresh_page() {
+fn pmu_each_sample_after_the_first_mounts_a_fresh_page() {
     // Given
     let mut mount = Mount::new(10, checked_counter().expect("perf events"));
 
@@ -49,7 +52,7 @@ fn each_sample_after_the_first_mounts_a_fresh_page() {
 }
 
 #[test]
-fn a_checked_frame_keeps_the_resident_set_after_it_and_the_peak() {
+fn pmu_a_checked_frame_keeps_the_resident_set_after_it_and_the_peak() {
     // Given
     let mount = Mount::new(10, checked_counter().expect("perf events"));
 
@@ -65,7 +68,7 @@ fn a_checked_frame_keeps_the_resident_set_after_it_and_the_peak() {
 }
 
 #[test]
-fn a_mount_with_no_page_is_not_ready_and_says_why() {
+fn pmu_a_mount_with_no_page_is_not_ready_and_says_why() {
     // Given
     let mut mount = Mount::new(10, checked_counter().expect("perf events"));
     mount.page = None;
@@ -79,7 +82,7 @@ fn a_mount_with_no_page_is_not_ready_and_says_why() {
 }
 
 #[test]
-fn a_mount_that_could_not_be_measured_fails_the_next_check_with_its_error() {
+fn pmu_a_mount_that_could_not_be_measured_fails_the_next_check_with_its_error() {
     // Given
     let mut mount = Mount::new(10, checked_counter().expect("perf events"));
     mount.failure = Some("the resident set cannot be read here".into());

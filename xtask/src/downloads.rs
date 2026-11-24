@@ -14,14 +14,27 @@ use crate::tools::ParseError;
 pub struct Download {
     pub name: String,
     pub version: String,
-    /// An https URL of a `.tar.gz` release asset.
+    /// An https URL of a `.tar.gz` release asset, or of a `.zip` when
+    /// `archive` says so.
     pub url: String,
+    /// The archive's format.
+    pub archive: Archive,
+    /// A directory inside the archive installed whole, for a tool that
+    /// needs its files beside it (Chromium); `None` installs `member` alone.
+    pub tree: Option<String>,
     /// The archive's SHA-256, lower-case hex.
     pub sha256: String,
     /// The binary's path inside the archive.
     pub member: String,
     /// The binary's SHA-256, checked after extracting and before any use.
     pub binary_sha256: String,
+}
+
+/// An archive's format: `.tar.gz` unless `archive = "zip"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Archive {
+    TarGz,
+    Zip,
 }
 
 /// The tools file `[downloads]` is read from.
@@ -42,12 +55,33 @@ pub fn pinned(name: &str) -> Result<Download, String> {
         .ok_or_else(|| format!("{TOOLS_FILE} pins no {name} under [downloads]; fix: add it"))
 }
 
-const FIELDS: [&str; 5] = ["version", "url", "sha256", "member", "binary_sha256"];
+const FIELDS: [&str; 7] = [
+    "version",
+    "url",
+    "sha256",
+    "member",
+    "binary_sha256",
+    "archive",
+    "tree",
+];
 
-/// Where `download` is installed: `~/.local/share/factory/bin/<name>-<version>`.
+/// Where `download`'s binary is installed:
+/// `~/.local/share/factory/bin/<name>-<version>`, or with a `tree`,
+/// `~/.local/share/factory/<name>-<version>/<member>`.
 #[must_use]
 pub fn installed_path(download: &Download, home: &Path) -> PathBuf {
-    home.join(".local/share/factory/bin")
+    match &download.tree {
+        None => home
+            .join(".local/share/factory/bin")
+            .join(format!("{}-{}", download.name, download.version)),
+        Some(_) => tree_root(download, home).join(&download.member),
+    }
+}
+
+/// The directory a `tree` download's files are installed under.
+#[must_use]
+pub fn tree_root(download: &Download, home: &Path) -> PathBuf {
+    home.join(".local/share/factory")
         .join(format!("{}-{}", download.name, download.version))
 }
 
@@ -107,8 +141,9 @@ fn check_value(kind: &str, value: &str) -> Result<(), String> {
         "sha256" | "binary_sha256" if !hex => Err(format!(
             "{kind} must be 64 lower-case hex digits (a SHA-256)"
         )),
-        "url" if !value.starts_with("https://") || !value.ends_with(".tar.gz") => {
-            Err("url must be an https URL of a .tar.gz release asset".to_owned())
+        "url" if !value.starts_with("https://") => Err("url must be an https URL".to_owned()),
+        "archive" if value != "zip" => {
+            Err("archive must be \"zip\" (omit it for .tar.gz)".to_owned())
         }
         _ => Ok(()),
     }
@@ -143,14 +178,54 @@ fn one(name: &str, fields: &[(String, String, String, usize)]) -> Result<Downloa
             }),
         }
     };
-    Ok(Download {
+    let optional = |kind: &str| {
+        get(kind)
+            .ok()
+            .filter(|_| fields.iter().any(|f| f.0 == name && f.1 == kind))
+    };
+    let archive = if optional("archive").is_some() {
+        Archive::Zip
+    } else {
+        Archive::TarGz
+    };
+    let download = Download {
         name: name.to_owned(),
         version: get("version")?,
         url: get("url")?,
+        archive,
+        tree: optional("tree"),
         sha256: get("sha256")?,
         member: get("member")?,
         binary_sha256: get("binary_sha256")?,
-    })
+    };
+    check_shape(
+        &download,
+        fields.iter().find(|f| f.0 == name).map_or(0, |f| f.3),
+    )?;
+    Ok(download)
+}
+
+/// The URL's file matches the archive, and a tree holds the member.
+fn check_shape(download: &Download, line: usize) -> Result<(), ParseError> {
+    let path = download.url.split('?').next().unwrap_or_default();
+    let ending = match download.archive {
+        Archive::TarGz => ".tar.gz",
+        Archive::Zip => ".zip",
+    };
+    let refuse = |reason: String| Err(ParseError { line, reason });
+    if !path.ends_with(ending) {
+        return refuse(format!(
+            "[downloads] {}: url must name a {ending} file, as archive says",
+            download.name
+        ));
+    }
+    match &download.tree {
+        Some(tree) if !download.member.starts_with(&format!("{tree}/")) => refuse(format!(
+            "[downloads] {}: member must be inside tree `{tree}/`",
+            download.name
+        )),
+        _ => Ok(()),
+    }
 }
 
 #[cfg(test)]

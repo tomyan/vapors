@@ -3,26 +3,21 @@
 use super::*;
 
 #[test]
-fn the_unit_tier_tells_its_tests_it_is_the_unit_tier() {
-    // When
-    let step = unit();
-
-    // Then
-    let expected = (UNIT_TIER.0.to_owned(), UNIT_TIER.1.to_owned());
-    assert_eq!(step.env, [expected]);
-}
-
-#[test]
-fn the_gpu_tier_sets_no_tier_so_gpu_opens_the_gpu() {
-    // When
-    let step = gpu();
-
-    // Then
-    assert!(
-        !step.env.iter().any(|(name, _)| name == UNIT_TIER.0),
-        "{:?}",
-        step.env
-    );
+fn each_tier_tells_its_tests_its_name() {
+    for (step, name) in [
+        (unit(), "unit"),
+        (gpu(), "gpu"),
+        (host(), "host"),
+        (pmu(), "pmu"),
+    ] {
+        // Then
+        assert_eq!(
+            step.env,
+            [(TIER_ENV.to_owned(), name.to_owned())],
+            "{}",
+            step.name
+        );
+    }
 }
 
 // One answer to "which tier refuses the GPU": what unit() sets is the
@@ -45,18 +40,35 @@ fn the_unit_steps_setting_is_the_one_gpu_harness_refuses() {
     }
 }
 
-/// gpu-harness's lib.rs: in vapors under crates/, in touche in the
-/// vapors checkout beside it.
+// One answer to "which tier may open a hardware counter": what pmu()
+// sets is the value vapors-perf's guard allows (counter_tier.rs).
+#[test]
+fn the_pmu_steps_setting_is_the_one_the_counter_guard_allows() {
+    // Given
+    let guard = source("crates/perf/src/counter_tier.rs");
+    let (_, value) = pmu().env.into_iter().next().expect("pmu() sets its tier");
+
+    // Then
+    let declared = format!("pub const COUNTER_TIER: &str = \"{value}\";");
+    assert!(
+        guard.contains(&declared),
+        "counter_tier.rs lacks `{declared}`"
+    );
+}
+
 fn harness_source() -> String {
+    source("crates/gpu-harness/src/lib.rs")
+}
+
+/// A vapors file: in vapors under the root, in touche in the vapors
+/// checkout beside it.
+fn source(path: &str) -> String {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let places = [
-        root.join("crates/gpu-harness/src/lib.rs"),
-        root.join("../vapors/crates/gpu-harness/src/lib.rs"),
-    ];
+    let places = [root.join(path), root.join("../vapors").join(path)];
     places
         .iter()
         .find_map(|place| std::fs::read_to_string(place).ok())
-        .unwrap_or_else(|| panic!("gpu-harness's lib.rs is at none of {places:?}"))
+        .unwrap_or_else(|| panic!("{path} is at none of {places:?}"))
 }
 
 #[test]
@@ -71,13 +83,17 @@ fn the_unit_tier_leaves_out_the_gpu_pmu_and_host_tests() {
     );
 }
 
+// A test named like `gpu_module::pmu_test` matches both filters; it reads
+// a counter, so the pmu tier runs it and the gpu and host tiers leave it.
 #[test]
-fn the_host_tier_runs_the_host_tests_alone() {
-    // When
-    let step = host();
-
-    // Then
-    assert_eq!(step.args.last().map(String::as_str), Some(HOST_TESTS));
+fn the_gpu_and_host_tiers_leave_out_the_pmu_tests() {
+    for (step, tests) in [(gpu(), GPU_TESTS), (host(), HOST_TESTS)] {
+        // Then
+        assert_eq!(
+            step.args.last().map(String::as_str),
+            Some(format!("({tests}) and not ({PMU_TESTS})").as_str())
+        );
+    }
 }
 
 #[test]

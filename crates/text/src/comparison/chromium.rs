@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
+use super::chromium_process::{DEADLINE, check_size, drain, finish, remove_stale};
 use super::chromium_profile::{in_profile, profile_root};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
@@ -17,19 +17,14 @@ use super::png_file::read_png;
 /// Environment variable naming the browser binary, overriding the search.
 pub const CHROMIUM_ENV: &str = "VAPORS_CHROMIUM";
 
-/// Binary names tried on `PATH`, in order.
-const CANDIDATES: [&str; 4] = [
-    "chromium",
-    "chromium-browser",
-    "google-chrome",
-    "google-chrome-stable",
-];
-
 /// Why Chromium could not be used.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChromiumError {
-    /// No binary found.
-    NotFound,
+    /// The pinned build is not installed at this path, and no override.
+    NotFound(PathBuf),
+    /// No override, and `HOME` is not set, so the pinned build's path
+    /// cannot be resolved.
+    NoHome,
     /// It ran and failed, or produced the wrong thing.
     Failed(String),
 }
@@ -37,11 +32,18 @@ pub enum ChromiumError {
 impl fmt::Display for ChromiumError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotFound => write!(
+            Self::NotFound(pinned) => write!(
                 f,
-                "no Chromium found: tried {} on PATH. Fix: install chromium, or set {CHROMIUM_ENV} \
-                 to the browser binary.",
-                CANDIDATES.join(", ")
+                "the pinned Chromium is not installed at {}. Fix: cargo xtask setup (it installs \
+                 [downloads] chromium from .config/tools.toml), or set {CHROMIUM_ENV} to a browser \
+                 binary for a diagnosis by hand.",
+                pinned.display()
+            ),
+            Self::NoHome => write!(
+                f,
+                "HOME is not set, so the pinned Chromium's path (~/.local/share/factory/...) \
+                 cannot be resolved. Fix: set HOME to the home `cargo xtask setup` installed \
+                 into, or set {CHROMIUM_ENV} to a browser binary for a diagnosis by hand."
             ),
             Self::Failed(message) => write!(f, "chromium: {message}"),
         }
@@ -60,21 +62,32 @@ pub struct Chromium {
 }
 
 impl Chromium {
-    /// `VAPORS_CHROMIUM`, else the first candidate on `PATH`. Its
+    /// `VAPORS_CHROMIUM`, else the pinned build (`chromium_pin.rs`), the
+    /// same binary on every machine. No browser on `PATH` is used. Its
     /// profiles go in the automation cache ([`profile_root`]).
     ///
     /// # Errors
     ///
-    /// [`ChromiumError::NotFound`], naming what was tried and the fix;
-    /// [`ChromiumError::Failed`] when there is no automation cache.
+    /// [`ChromiumError::NotFound`] when the pinned build is not installed,
+    /// naming its path and the fix; [`ChromiumError::NoHome`] when `HOME`
+    /// is unset and there is no override; [`ChromiumError::Failed`] when
+    /// there is no automation cache.
     pub fn find() -> Result<Self, ChromiumError> {
-        let binary = match std::env::var_os(CHROMIUM_ENV) {
-            Some(binary) => PathBuf::from(binary),
-            None => CANDIDATES
-                .iter()
-                .find_map(|name| on_path(name))
-                .ok_or(ChromiumError::NotFound)?,
-        };
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        if let Some(chosen) = std::env::var_os(CHROMIUM_ENV) {
+            // a relaxed guard, declared where it runs: the override skips the
+            // pin, for a diagnosis by hand; said on every use so a run that
+            // inherits it is not mistaken for one on the pinned build
+            eprintln!(
+                "chromium: {CHROMIUM_ENV}={} overrides the pinned build",
+                PathBuf::from(chosen).display()
+            );
+        }
+        let binary = super::chromium_pin::resolve(
+            std::env::var_os(CHROMIUM_ENV),
+            home.as_deref(),
+            Path::is_file,
+        )?;
         let profiles = profile_root(std::env::var_os("XDG_CACHE_HOME"), std::env::var_os("HOME"))?;
         Ok(Self {
             binary,
