@@ -27,17 +27,19 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the job's worst measured, cold: 950 s. Setup to the end
-    # of unit took 733 s with no Rust cache (run 45283781763, 2026-11-23,
-    # main a4bb9c63 with unit's build and test run timed apart: build 351
-    # s, tests 112 s); add host 4 s, build timings' cold worst 184 s (run
-    # 45275344913) and the post steps with the cache save, 29 s (run
-    # 45142856208). Warm, the job took 634 s (that run): the cache holds
-    # dependencies, and every workspace crate still builds, at opt-level
-    # 1 since #233 (2026-11-12). That took lint and unit from 282 s (run
-    # 43218588943) to 439 s and cancelled (run 43227249253), past the old
-    # 9 minutes (2.5x 198 s, to 2026-10-23).
-    timeout-minutes: 40
+    # About 2.5x the job's worst measured, cold: 1133 s, rounded up. The
+    # worst cold job, run 45076354761 (2026-11-22, no Rust cache), took
+    # 1080 s with unit 648 s, the cache save included; it had no Chromium
+    # warm-up (worst 49 s, run 45084188329) and skipped host (3.4 s
+    # failing, run 45142856208; never timed passing on a runner), so add
+    # 49 and 4. A faster cold run, 45283781763 (main a4bb9c63), reached the
+    # end of unit in 733 s: unit's build 351 s, its tests 112 s. Warm, the
+    # job took 634 s (45142856208): the cache holds dependencies, and every
+    # workspace crate still builds, at opt-level 1 since #233 (2026-11-12),
+    # when lint and unit went from 282 s (run 43218588943) to 439 s (run
+    # 43227249253, cancelled) and past the old 9 minutes (2.5x 198 s, to
+    # 2026-10-23). `cargo xtask gate` takes its ci-step deadline from this.
+    timeout-minutes: 48
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
@@ -66,8 +68,9 @@ jobs:
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      # cache-on-failure: a job that times out or fails still saves what it
-      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # cache-on-failure: a job that fails still saves what it compiled. One
+      # killed at its own timeout does not: the post step that saves never
+      # runs (run 45072756560). Without it the cache saved 2026-11-12 went stale when the
       # environment hash changed (cdee7d24 to c7ddb2ea), every later run
       # restored nothing ("No cache found"), timed out cold, and saved nothing:
       # ci cancelled in unit on main and in #602 (run 45067990897, twice);
@@ -127,7 +130,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 40
+          TIMEOUT_MINUTES: 48
         run: .github/scripts/report-timeout.sh
 
   web:
@@ -228,8 +231,9 @@ jobs:
           case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device after installing lavapipe; fix: check the install step and mesa-major"; exit 1 ;; esac
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      # cache-on-failure: a job that times out or fails still saves what it
-      # compiled. Without it the cache saved 2026-11-12 went stale when the
+      # cache-on-failure: a job that fails still saves what it compiled. One
+      # killed at its own timeout does not: the post step that saves never
+      # runs (run 45072756560). Without it the cache saved 2026-11-12 went stale when the
       # environment hash changed (cdee7d24 to c7ddb2ea), every later run
       # restored nothing ("No cache found"), timed out cold, and saved nothing:
       # ci cancelled in unit on main and in #602 (run 45067990897, twice);
