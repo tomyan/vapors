@@ -6,10 +6,12 @@
 #
 # The .debs are saved as soon as the install succeeds, not in
 # actions/cache's post step, which saves only when the whole job passes:
-# main's ci and gpu jobs were red, so main held no cache for their lists
-# (the repository's caches on 2026-11-24 held only the window job's), and
-# every pull request downloaded them again. On a hit the save finds the
-# key taken and warns, without failing.
+# a red job on main would otherwise leave every pull request without a
+# cache for its list. The save runs inside the caller's timeout-minutes
+# (1 to 3 s measured, run 45361157497). It is not a check: on a hit in
+# this branch's scope it warns that the key is taken; on a hit from
+# main's scope it saves a copy for this branch; a cache service failure
+# also only warns, and the next run downloads again.
 name: apt install, .debs cached
 description: apt-get install with the .debs cached, keyed on the runner image and the package list
 inputs:
