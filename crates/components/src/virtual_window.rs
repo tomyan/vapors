@@ -40,9 +40,14 @@ impl Window {
     /// height, which follows a resize (`virtual_list.wisp`).
     ///
     /// # Panics
-    /// On a height that is negative or not finite, as [`Window::new`].
+    /// On a height that is negative or not finite, which layout never
+    /// gives, so a bug in layout or in the `resize` that carried it.
     #[must_use]
     pub fn with_height(self, height: f32) -> Window {
+        assert!(
+            height.is_finite() && height >= 0.0,
+            "VirtualList: laid-out height is {height}; layout gave the list a height that is negative or not finite, a bug in layout or its `resize` (cargo test -p vapors-elements --test tests resize_event)"
+        );
         Window::new(self.row_height, height, self.overscan)
     }
 

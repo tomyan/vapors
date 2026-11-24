@@ -132,8 +132,10 @@ the one difference from the brief in this slice.
   none and never asks for a frame. It
   does not bubble, and other elements never fire it: the DOM has no
   element `resize`, and this stands in for a `ResizeObserver` on a
-  scroll container. The frame that lays a new size out draws before the
-  `resize`, so what the handler changes is drawn in the frame after.
+  scroll container. Unlike a `ResizeObserver`, whose callbacks run
+  before the browser paints, the frame that lays a new size out draws
+  before the `resize`, so what the handler changes is drawn in the frame
+  after.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.

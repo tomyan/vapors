@@ -186,7 +186,9 @@ fn a_window_given_a_shorter_height_holds_the_rows_of_that_height() {
 }
 
 #[test]
-#[should_panic(expected = "height is NaN")]
+#[should_panic(
+    expected = "VirtualList: laid-out height is NaN; layout gave the list a height that is negative or not finite"
+)]
 fn a_laid_out_height_that_is_not_a_number_is_refused() {
     let _ = small().with_height(f32::NAN);
 }

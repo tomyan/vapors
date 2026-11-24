@@ -111,7 +111,10 @@ reads the scrollport's laid-out size after each layout.
   page without one draws no extra frame. It does not bubble, and only
   scroll containers fire it. The DOM has no element `resize`; a page there
   uses a `ResizeObserver`, whose callbacks run once per frame after
-  layout, and this is that report for scroll containers. An update that
+  layout, and this is modelled on that report for scroll containers.
+  One difference: a browser runs the callbacks before it paints and
+  lays out again if they change anything, so it never paints the old
+  rows at the new size; here that frame is painted. An update that
   changes a size leaves the `resize` owed, and `take_changed` answers
   true until the next settle fires it, so the frame after a resize
   holds the new rows: the frame that lays the new size out shows the

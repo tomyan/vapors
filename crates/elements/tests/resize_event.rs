@@ -68,8 +68,13 @@ impl Page {
 
     /// An update in a window 200 px wide and `height` px tall.
     fn update(&self, height: f32) {
+        self.update_at(200.0, height);
+    }
+
+    /// An update in a window `width` by `height` px.
+    fn update_at(&self, width: f32, height: f32) {
         let viewport = Viewport {
-            width: 200.0,
+            width,
             height,
             scale: 1.0,
         };
@@ -129,6 +134,20 @@ fn a_shorter_window_fires_the_new_size_at_the_next_settle() {
 
     // Then
     assert_eq!(heard, vec![("list", Some([100.0, 106.0]))]);
+}
+
+#[test]
+fn a_narrower_window_alone_fires_the_new_size() {
+    // Given: half the window wide, 100 px of 200
+    let page = page("overflow: auto; width: 50%;", 200.0);
+    page.settle();
+
+    // When: 120 px wide, as tall as before
+    page.update_at(120.0, 200.0);
+    let heard = page.settle();
+
+    // Then
+    assert_eq!(heard, vec![("list", Some([60.0, 186.0]))]);
 }
 
 #[test]
