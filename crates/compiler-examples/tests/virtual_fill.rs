@@ -22,8 +22,7 @@ struct Mounted {
     _list: VirtualFill,
 }
 
-/// The list mounted and drawn in a window `height` px tall, frames run
-/// until the document asks for none.
+/// The list mounted and drawn in one frame in a window `height` px tall.
 fn mounted(height: f32) -> Mounted {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
     let body = doc.borrow().body();
@@ -34,30 +33,30 @@ fn mounted(height: f32) -> Mounted {
     m
 }
 
-/// What a frame does in a window `height` px tall: settle the scrolls
-/// and resizes owed, then update.
+/// What a frame does in a window `height` px tall: the app's Update
+/// phase (`Document::update_frame`).
 fn frame(m: &Mounted, height: f32) {
-    Document::settle_scroll(&m.doc);
     let viewport = Viewport {
         width: 200.0,
         height,
         scale: 1.0,
     };
-    m.doc.borrow_mut().update(viewport).expect("updates");
+    let update = || {
+        let mut doc = m.doc.borrow_mut();
+        doc.update(viewport)
+            .map(|_| ())
+            .map_err(|errors| format!("{errors:?}"))
+    };
+    Document::update_frame(&m.doc, update).expect("the frame settles");
 }
 
-/// Frames in a window `height` px tall until the document asks for no
-/// more: the frames an app that redraws on change draws. Refused past
-/// three, more than a resize needs (the frame that lays it out, the one
-/// that fires its `resize`).
+/// One frame in a window `height` px tall, what is drawn after it
+/// being what the app presents: the frame that lays a new size out draws
+/// its rows. The change flag that frame raises is taken, as the app's
+/// next-frame decision takes it.
 fn settled(m: &Mounted, height: f32) {
-    for _ in 0..3 {
-        frame(m, height);
-        if !m.doc.borrow_mut().take_changed() {
-            return;
-        }
-    }
-    panic!("the list still asks for a frame after three at {height} px");
+    frame(m, height);
+    m.doc.borrow_mut().take_changed();
 }
 
 /// The elements one of whose classes is `class`.
@@ -177,4 +176,21 @@ fn at_the_end_a_taller_window_keeps_the_last_row_at_the_bottom() {
     // Then
     assert_eq!(shown_at(&m, TOP), "87");
     assert_eq!(shown_at(&m, 289.0), "99");
+}
+
+#[test]
+fn the_frame_after_a_resize_changes_nothing() {
+    // Given: resized and drawn
+    let m = mounted(200.0);
+    settled(&m, 300.0);
+
+    // When: the frame the app draws after a change
+    frame(&m, 300.0);
+
+    // Then: no other is asked for, and the rows stay
+    assert!(
+        !m.doc.borrow_mut().take_changed(),
+        "a resize asks for frames past the one after it"
+    );
+    assert_eq!(existing(&m), (0..14).collect::<Vec<_>>());
 }

@@ -112,19 +112,30 @@ reads the scrollport's laid-out size after each layout.
   scroll containers fire it. The DOM has no element `resize`; a page there
   uses a `ResizeObserver`, whose callbacks run once per frame after
   layout, and this is modelled on that report for scroll containers.
-  One difference: a browser runs the callbacks before it paints and
-  lays out again if they change anything, so it never paints the old
-  rows at the new size; here that frame is painted. An update that
-  changes a size leaves the `resize` owed, and `take_changed` answers
-  true until the next settle fires it, so the frame after a resize
-  holds the new rows: the frame that lays the new size out shows the
-  rows of the old one, as Zgui's does. Tests:
-  `crates/elements/tests/resize_event.rs`.
+  Tests: `crates/elements/tests/resize_event.rs`.
+- **In the frame that lays it out.** A browser runs the observer's
+  callbacks before it paints and lays out again if they changed
+  anything, so it never paints the old rows at a new size.
+  `Document::update_frame`, the app's Update phase, does the same within
+  the bounded second update it already ran for the focus fixup's blur
+  and the rehover: before the first update the `scroll`s and `resize`s
+  owed; after it, the `scroll` a clamp to the new layout owes, then the
+  `resize`s; the second update if anything changed. So the first frame
+  drawn holds the rows of the list's height, as does each frame after a
+  resize; Zgui's list, which reads the scrollport's size from an observer and
+  builds the rows in its next frame, draws one frame of the old rows. A
+  frame runs at most two updates: a size the second changes again (a
+  handler that resizes its own container) is owed, `take_changed`
+  answers true, and the next frame fires it, so such a page draws a
+  frame each time it changes the size, and a browser would report a
+  ResizeObserver loop error for it. Tests:
+  `crates/elements/tests/update_frame.rs` (the order, the bound, a
+  settled frame updating once) and the single-frame checks of
+  `virtual_fill.rs` and `list_resize.rs`.
 - **The list.** `VirtualList`'s window is the height the last `resize`
   reported, `height` until the first. `height` above 0 still sets the
   container's CSS height; at 0, now the default, the list fills its
-  parent's height (`height: 100%`), and its first frame holds only the
-  overscan. Tests: `crates/compiler-examples/tests/virtual_fill.rs`
+  parent's height (`height: 100%`). Tests: `crates/compiler-examples/tests/virtual_fill.rs`
   (embedded in a panel under a header: 200, 300 and 120 px windows, at
   the top, 400 px down and at the end); `virtual_rows.rs` keeps a
   60 px `height`.

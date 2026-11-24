@@ -124,7 +124,7 @@ the one difference from the brief in this slice.
   its own frames calls `Document::settle_scroll` before each update;
   until it does, `Document::take_changed` answers true.
 - **Resize:** `onresize={handler}` on a scroll container hears `resize`
-  in the same settle, after the `scroll`s, when the last update laid it
+  in the same settle as the `scroll`s, after them, when the last update laid it
   out at a client size (its padding box) other than its last `resize`
   carried, including its first layout at any size above (0, 0).
   `event.client_size()` is `Some([width, height])` in CSS pixels. Only
@@ -132,10 +132,11 @@ the one difference from the brief in this slice.
   none and never asks for a frame. It
   does not bubble, and other elements never fire it: the DOM has no
   element `resize`, and this stands in for a `ResizeObserver` on a
-  scroll container. Unlike a `ResizeObserver`, whose callbacks run
-  before the browser paints, the frame that lays a new size out draws
-  before the `resize`, so what the handler changes is drawn in the frame
-  after.
+  scroll container. As a `ResizeObserver`'s callbacks run before the
+  browser paints, the app's frame (`Document::update_frame`) fires it
+  after its first update and lays out what the handler changed in its
+  second, so that frame draws it. A frame runs at most two updates: a
+  size the second changes again is owed to the next frame.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.

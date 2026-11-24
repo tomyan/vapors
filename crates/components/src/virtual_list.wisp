@@ -29,7 +29,7 @@ let row: Snippet<(usize,)> = Snippet::empty();
 let window = Window::new(row_height, height, overscan);
 let offset: Signal<f32> = Signal::new(0.0);
 // Until the first `resize`, the height given; a filling list's first
-// frame holds only the overscan, and the frame after it the window.
+// update holds only the overscan, and the frame's second the window.
 let laid_out: Signal<f32> = Signal::new(height);
 let range = move || keys.with(|all| window.with_height(laid_out.get()).rows(offset.get(), all.len()));
 let shown: Memo<Vec<usize>> = Memo::new(move || keys.with(|all| all[range()].to_vec()));

@@ -31,10 +31,11 @@ is bound to `height`; at 0, the default, it is `height: 100%`, so it
 fills a parent whose height is definite (a box with a set height, or
 an absolutely placed box between `top` and `bottom`). Either way the
 window is the height its `resize` last reported
-(`docs/components.md`, "Resize"), `height` until the first: a filling
-list's first frame holds only the overscan, and the frame after it the
-rows of its height. After a resize, the frame that lays the new height
-out shows the rows of the old one, and the next the new. Its content is a box `keys.len() * row_height` tall holding a spacer as
+(`docs/components.md`, "Resize"), `height` until the first. The
+frame's first update lays the list out at its new height, its `resize`
+fires, and the frame's second update builds the rows of that height,
+so the first frame drawn, and each frame after a resize, shows the
+rows of the height it lays out. Its content is a box `keys.len() * row_height` tall holding a spacer as
 tall as the rows above the first that exists, then the rows. Inside it:
 `.virtual-list`, `.virtual-content`, `.virtual-above`, `.virtual-row`.
 

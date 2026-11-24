@@ -37,8 +37,9 @@ impl Document {
     /// `scroll_to`, a press's scroll into view, or an update clamping it
     /// to content that shrank), in node order; then the `resize` each
     /// owes, at each whose client size the last update changed
-    /// (`resize_event.rs`). The app calls this once per frame before the
-    /// update, so what a listener changes is drawn in that frame.
+    /// (`resize_event.rs`). `Document::update_frame` calls this before
+    /// the frame's first update and again after it, so what a listener
+    /// changes is drawn in that frame.
     pub fn settle_scroll(document: &Rc<RefCell<Document>>) {
         let owed = document.borrow_mut().take_owed_scrolls();
         for (node, offset) in owed {

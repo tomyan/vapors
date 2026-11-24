@@ -5,10 +5,11 @@
 //! has no element `resize`; a page learns an element's new size from a
 //! `ResizeObserver`, whose callbacks run once per frame after layout,
 //! and this is modelled on that report, for scroll containers only, the
-//! boxes whose window a page may build to (`VirtualList`). Unlike those
-//! callbacks, which run before the browser paints, it fires in the frame
-//! after the one that laid the size out, so that frame paints what the
-//! old size gave. A container is observed while it has a `resize`
+//! boxes whose window a page may build to (`VirtualList`). As those
+//! callbacks run before the browser paints, `Document::update_frame`
+//! fires it after the frame's first update and lays out what its
+//! handler changed in the second, so the frame that changes a size
+//! draws the rows of the new one. A container is observed while it has a `resize`
 //! listener: one without owes none, so it never asks for a frame. It
 //! does not bubble.
 

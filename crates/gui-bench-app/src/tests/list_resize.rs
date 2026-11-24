@@ -99,3 +99,18 @@ fn a_shorter_window_holds_only_the_rows_of_its_height() {
     // Then: those and the 4 of overscan below
     assert_eq!(texts(&list, "order-number"), numbers(0..15));
 }
+
+#[test]
+fn the_frame_after_a_resize_changes_nothing() {
+    // Given: resized and drawn
+    let list = list_of(MILLION);
+    settled_at(&list, TALL);
+    let before = rows(&list);
+
+    // When: the frame the app draws after a change
+    frame_at(&list, TALL);
+
+    // Then: no other is asked for, and the rows stay
+    assert_eq!(rows(&list), before);
+    assert!(!list.document.borrow_mut().take_changed());
+}

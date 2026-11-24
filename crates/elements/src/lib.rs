@@ -217,6 +217,7 @@ mod typing;
 mod update;
 mod update_counts;
 mod update_counts_read;
+mod update_frame;
 mod update_layout;
 mod update_paint;
 
