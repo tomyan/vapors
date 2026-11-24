@@ -147,4 +147,4 @@ fn within(what: &str, why: &str, deadline: Duration) -> String {
 
 #[cfg(test)]
 #[path = "chromium_browser_tests.rs"]
-mod tests;
+pub(crate) mod tests;

@@ -62,15 +62,35 @@ pub(crate) fn drain(stream: impl std::io::Read + Send + 'static) -> Receiver<Str
     receiver
 }
 
-/// Chromium's exit status and stderr. Past `deadline` its process group
+/// How a process past its deadline is stopped: what was done, or why it
+/// could not be.
+pub(crate) type Stop<'a> = &'a mut dyn FnMut(&mut Child) -> Result<String, String>;
+
+/// The child's exit status and stderr. Past `deadline` its process group
 /// (it and the processes it started, which hold the pipe) is killed and
-/// reaped, and the failure carries what it wrote.
+/// reaped, and the failure carries what it wrote. For a child started
+/// with `process_group(0)` (`--version`).
 pub(crate) fn finish(
     child: &mut Child,
     stderr: &Receiver<String>,
     deadline: Duration,
 ) -> Result<(ExitStatus, String), ChromiumError> {
-    let status = wait_or_kill(child, deadline);
+    let stop: Stop = &mut |child| {
+        kill_group(child)
+            .map(|()| "killed with its process group".to_owned())
+            .map_err(|why| format!("its process group could not be killed ({why})"))
+    };
+    finish_with(child, stderr, deadline, stop)
+}
+
+/// [`finish`], stopping it past `deadline` with `stop`.
+pub(crate) fn finish_with(
+    child: &mut Child,
+    stderr: &Receiver<String>,
+    deadline: Duration,
+    stop: Stop,
+) -> Result<(ExitStatus, String), ChromiumError> {
+    let status = wait_or_kill(child, deadline, stop);
     let text = stderr.recv_timeout(STDERR_GRACE).unwrap_or_else(|_| {
         format!(
             "(stderr still open {}s after the end)",
@@ -83,17 +103,14 @@ pub(crate) fn finish(
     }
 }
 
-fn wait_or_kill(child: &mut Child, deadline: Duration) -> Result<ExitStatus, String> {
+fn wait_or_kill(child: &mut Child, deadline: Duration, stop: Stop) -> Result<ExitStatus, String> {
     let started = Instant::now();
     loop {
         if let Some(status) = child.try_wait().map_err(|e| format!("waiting: {e}"))? {
             return Ok(status);
         }
         if started.elapsed() > deadline {
-            let group = match kill_group(child) {
-                Ok(()) => "killed with its process group".to_owned(),
-                Err(why) => format!("its process group could not be killed ({why})"),
-            };
+            let group = stop(child).unwrap_or_else(|why| why);
             return Err(format!(
                 "did not finish within {}s; {group}",
                 deadline.as_secs()

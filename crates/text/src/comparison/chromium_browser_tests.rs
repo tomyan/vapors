@@ -11,7 +11,7 @@ use crate::comparison::chromium_process::DEADLINE;
 
 /// A scratch directory: pages, screenshots, and `profiles/`, the profile
 /// root, so nothing lands in the automation cache.
-pub(super) fn scratch(name: &str) -> tempfile::TempDir {
+pub(crate) fn scratch(name: &str) -> tempfile::TempDir {
     tempfile::Builder::new()
         .prefix(&format!("vapors-browser-{name}-"))
         .tempdir()
@@ -19,7 +19,7 @@ pub(super) fn scratch(name: &str) -> tempfile::TempDir {
 }
 
 /// The real browser, its profiles under `dir/profiles`.
-pub(super) fn chromium(dir: &Path, deadline: Duration) -> Chromium {
+pub(crate) fn chromium(dir: &Path, deadline: Duration) -> Chromium {
     let found = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
     Chromium {
         deadline,
@@ -28,7 +28,7 @@ pub(super) fn chromium(dir: &Path, deadline: Duration) -> Chromium {
     }
 }
 
-pub(super) fn page(dir: &Path, name: &str, body: &str) -> PathBuf {
+pub(crate) fn page(dir: &Path, name: &str, body: &str) -> PathBuf {
     let path = dir.join(format!("{name}.html"));
     let html =
         format!("<!doctype html><style>html, body {{ margin: 0; height: 100%; }}</style>{body}");
@@ -47,7 +47,7 @@ pub(super) fn pixel(image: &Rgba, x: u32, y: u32) -> [u8; 4] {
 }
 
 /// The profile root's entries, by name.
-pub(super) fn entries(root: &Path) -> Vec<String> {
+pub(crate) fn entries(root: &Path) -> Vec<String> {
     let Ok(read) = std::fs::read_dir(root) else {
         return Vec::new();
     };
@@ -206,9 +206,6 @@ fn a_screenshot_past_its_deadline_stops_only_its_browser_and_the_next_starts_ano
     assert!(after.is_ok(), "{after:?}");
     assert_eq!(browser.launches(), 2);
 }
-
-#[path = "chromium_browser_kill_tests.rs"]
-mod kill_tests;
 
 #[test]
 fn every_process_of_the_browser_is_found_and_killed_by_its_profile() {

@@ -7,12 +7,11 @@
 //! dropped.
 
 use std::fs::File;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 use super::chromium::{Chromium, ChromiumError};
-use super::chromium_process::kill_group;
+use super::chromium_pids::stop_holding;
 use super::chromium_tmp::{contain_cache, launch_tmp};
 
 /// A running headless Chromium.
@@ -68,7 +67,8 @@ impl Chromium {
         let mut command = Command::new(&self.binary);
         command
             .env_remove("DBUS_SESSION_BUS_ADDRESS")
-            .process_group(0)
+            // In the test's process group, so nextest's kill of a
+            // timed-out test reaches it; `drop` kills it by profile.
             .args([
                 "--headless=new",
                 "--no-sandbox",
@@ -110,7 +110,7 @@ impl Live {
 
 impl Drop for Live {
     fn drop(&mut self) {
-        if let Err(why) = kill_group(&mut self.child) {
+        if let Err(why) = stop_holding(&mut self.child, &self.profile) {
             eprintln!("chromium: stopping it: {why}; it may still be running");
         }
         let _ = std::fs::remove_dir_all(&self.profile);

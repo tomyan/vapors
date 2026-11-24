@@ -114,6 +114,18 @@ pub(super) fn kill_holding(profile: &Path) -> Result<(), String> {
     }
 }
 
+/// Kill every process holding `profile` (Chromium and all it started),
+/// then reap `child`.
+pub(super) fn stop_holding(
+    child: &mut std::process::Child,
+    profile: &Path,
+) -> Result<String, String> {
+    let killed = kill_holding(profile);
+    let _ = child.kill();
+    let _ = child.wait();
+    killed.map(|()| "killed with every process holding its profile".to_owned())
+}
+
 /// SIGKILL to `pids`. Its exit status is not read: a pid that ended since
 /// it was found makes `kill` exit 1, and what counts is whether any runs.
 ///
@@ -158,3 +170,7 @@ fn running(pid: u32) -> bool {
 #[cfg(test)]
 #[path = "chromium_pids_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "chromium_group_kill_tests.rs"]
+mod group_kill_tests;

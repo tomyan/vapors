@@ -3,12 +3,12 @@
 //! size.
 
 use std::fmt;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use super::chromium_process::{DEADLINE, drain, finish, on_path};
+use super::chromium_pids::{kill_holding, stop_holding};
+use super::chromium_process::{DEADLINE, Stop, drain, finish_with, on_path};
 use super::chromium_profile::{in_profile, profile_root};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 use super::measure::Rgba;
@@ -149,7 +149,13 @@ impl Chromium {
             .map_err(|e| self.cannot_start(&e))?;
         let stdout = drain(child.stdout.take().ok_or_else(|| not_piped("stdout"))?);
         let stderr = drain(child.stderr.take().ok_or_else(|| not_piped("stderr"))?);
-        let (status, stderr) = finish(&mut child, &stderr, self.deadline)?;
+        let profile = dirs[1];
+        let stop: Stop = &mut |child| stop_holding(child, profile);
+        let finished = finish_with(&mut child, &stderr, self.deadline, stop);
+        // Its zygotes and renderers end after it; none may write to the
+        // profile once it is removed.
+        kill_holding(profile).map_err(ChromiumError::Failed)?;
+        let (status, stderr) = finished?;
         let stdout = stdout
             .recv_timeout(std::time::Duration::from_secs(2))
             .map_err(|_| {
@@ -181,8 +187,9 @@ impl Chromium {
         command
             .env_remove("DBUS_SESSION_BUS_ADDRESS")
             .env("TMPDIR", tmp)
-            // Its own process group, so the deadline kills what it starts.
-            .process_group(0)
+            // In the test's process group, so nextest's kill of a
+            // timed-out test reaches it; its deadline kills it and what it
+            // started by profile ([`stop_holding`]), never the group.
             .args([
                 "--headless=new",
                 "--no-sandbox",

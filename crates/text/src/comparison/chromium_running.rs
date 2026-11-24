@@ -18,7 +18,7 @@ use std::time::{Instant, SystemTime};
 use vapors_devtools::Session;
 
 use super::chromium::{Chromium, ChromiumError};
-use super::chromium_pids::kill_holding;
+use super::chromium_pids::stop_holding;
 use super::chromium_profile::{launch_profile, remove_profile};
 use super::chromium_tmp::{contain_cache, launch_tmp};
 
@@ -144,9 +144,7 @@ impl Process {
         let Some(profile) = self.profile.take() else {
             return Ok(());
         };
-        let killed = kill_holding(profile.path());
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let killed = stop_holding(&mut self.child, profile.path()).map(drop);
         let removed = remove_profile(profile);
         killed.map_err(ChromiumError::Failed).and(removed)
     }
