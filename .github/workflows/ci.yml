@@ -106,7 +106,12 @@ jobs:
       - name: unit
         run: cargo xtask test --tier unit
       # bwrap making a user namespace: run here and in the gate, never in
-      # an API builder's sandbox (xtask/src/steps_tiers.rs HOST_TESTS)
+      # an API builder's sandbox (xtask/src/steps_tiers.rs HOST_TESTS).
+      # On GitHub's runner it fails: AppArmor refuses bwrap's user
+      # namespace ("bwrap: loopback: Failed RTM_NEWADDR: Operation not
+      # permitted", run 45142856208). Changing the runner's AppArmor
+      # setting is not authorised (Tom, 2026-11-23), so this step stays red
+      # there until that is decided; it passes in the local gate.
       - name: host
         run: cargo xtask test --tier host
       # Bins and examples only: the unit step's nextest built the test
