@@ -1,30 +1,24 @@
-//! Shared by the paint tests: fixtures laid out by vapors, rendered by
-//! Chromium, and the regions the rules hold to their budgets.
+//! Shared by the paint tests: fixtures laid out by vapors, Chromium's
+//! saved rendering of them, and the regions the rules hold to their
+//! budgets.
 
 #[path = "../corpus_support/images.rs"]
 mod images;
 
 use std::cell::RefCell;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use vapors_elements::{Document, Viewport};
-use vapors_elements_corpus::oracle::{fixtures_dir, write_fonts, write_images};
-use vapors_elements_corpus::page::{html, split};
 use vapors_elements_corpus::paint_check::{Image, Region};
+use vapors_elements_corpus::paint_reference::{is_paint, saved};
 use vapors_elements_corpus::{Fixture, all};
 use vapors_text::FontSystem;
-use vapors_text::comparison::{Chromium, Rgba};
+use vapors_text::comparison::Rgba;
 
-pub const WIDTH: u32 = 640;
-pub const HEIGHT: u32 = 400;
+pub use vapors_elements_corpus::paint_reference::{HEIGHT, WIDTH};
 
 pub fn paint_fixtures() -> Vec<Fixture> {
-    let fixtures: Vec<Fixture> = all()
-        .into_iter()
-        .filter(|f| f.style.contains("/* paint"))
-        .collect();
+    let fixtures: Vec<Fixture> = all().into_iter().filter(is_paint).collect();
     assert!(
         !fixtures.is_empty(),
         "no paint fixtures: nothing is compared"
@@ -82,34 +76,11 @@ pub fn regions(doc: &Document, scale: u32) -> Vec<Region> {
         .collect()
 }
 
-/// Chromium's rendering of fixture `name` at `scale`, with `changed`
-/// CSS appended to its style (empty for the fixture as it is). Its
-/// files go in a directory of the test's own, named by `test`: tests
-/// run in parallel, and one rewriting a page or screenshot another is
-/// reading fails that one.
-pub fn chromiums(test: &str, name: &str, scale: u32, changed: &str) -> Rgba {
-    let label = if changed.is_empty() {
-        "as-is".to_owned()
-    } else {
-        let mut hasher = DefaultHasher::new();
-        changed.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
-    };
-    let work = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("paint-{test}-{scale}x"));
-    std::fs::create_dir_all(&work).expect("work dir");
-    write_fonts(&work).expect("fonts");
-    write_images(&work).expect("images");
-    let path = fixtures_dir().join(format!("{name}.wisp"));
-    let mut source =
-        split(name, &std::fs::read_to_string(&path).expect("fixture")).expect("splits");
-    source.style.push_str(changed);
-    let page = work.join(format!("{name}_{label}.html"));
-    std::fs::write(&page, html(&source)).expect("page");
-    let chrome = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
-    let png = work.join(format!("{name}_{label}.png"));
-    chrome
-        .screenshot(&page, &png, WIDTH, HEIGHT, scale)
-        .unwrap_or_else(|e| panic!("{e}"))
+/// Chromium's rendering of paint fixture `name` in `state` (`None` as
+/// it is) at `scale`: its committed saved reference, read without
+/// starting a browser (`vapors_elements_corpus::paint_reference`).
+pub fn theirs(name: &str, state: Option<&str>, scale: u32) -> Rgba {
+    saved(name, state, scale).unwrap_or_else(|why| panic!("{why}"))
 }
 
 pub fn image(rgba: &Rgba) -> Image<'_> {
