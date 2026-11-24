@@ -9,8 +9,8 @@ let items: Vec<(usize, String)> = MENU_ITEMS.iter().enumerate().map(|(i, label)|
 </script>
 
 <style>
-/* Window x 1100 is 860 in the main column; y 54 is the spec's MENU_Y (a test holds the box to both). */
-.menu { position: absolute; left: 860px; top: 54px; width: 160px; box-sizing: border-box; padding: 4px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 12px #1118271a; }
+/* Placed in the box that holds the export button: its left edge under the button's, 4 px below its 36 px (the spec's MENU_Y is 54 for a button at y 14..50). z-index 1 paints it over the content, which comes later in the tree and holds positioned boxes. */
+.menu { position: absolute; left: 0; top: 40px; z-index: 1; width: 160px; box-sizing: border-box; padding: 4px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff; box-shadow: 0 4px 12px #1118271a; }
 .menu-item { height: 36px; padding: 0 12px; border-radius: 6px; display: flex; align-items: center; font-size: 14px; color: #111827; }
 .menu-item:hover { background-color: #f3f4f6; }
 </style>
