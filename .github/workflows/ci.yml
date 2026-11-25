@@ -47,11 +47,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Step timeout: about 2.5x the worst measured, rounded up to a minute.
-      # Over 17 runs with #626 (2026-11-24 to 25): a cache hit took 12 to 34 s
-      # (24 s on average), a miss 12 to 46 s (run 45482514993). A hit saves
-      # the download, not the unpacking, so it is not reliably faster.
-      # apt-install saves the .debs inside this limit (1 to 3 s). One miss
-      # stalled on the mirror past the old 1-minute limit (run 40036716064).
+      # Over 13 runs with #626 that installed this list (2026-11-24 to 25): a
+      # cache hit took 12 to 32 s (23 s on average), a miss 12 to 34 s (run
+      # 45457321390). A hit saves the download, not the unpacking, so it is
+      # not reliably faster. apt-install saves the .debs inside this limit
+      # (1 to 3 s, run 45361157497). Not counted: one miss stalled on the
+      # mirror and was killed at the old 1-minute limit (run 40036716064),
+      # so how long it would have taken is unknown.
       # No bubblewrap (Tom, 2026-11-25): nothing in this job runs bwrap on
       # the runner. The SDK harness's tests that did are out of the host
       # tier. The host tier's two gate tests, on a machine with no render
@@ -240,7 +242,8 @@ jobs:
       # Step timeout: about 2.5x the worst measured, rounded up to a minute.
       # Over 19 runs with #626 (2026-11-24 to 25): a cache hit took 12 to 38 s
       # (23 s on average, worst run 45489378697), a miss 14 to 36 s.
-      # apt-install saves the .debs inside this limit (1 to 3 s).
+      # apt-install saves the .debs inside this limit (1 to 3 s, run
+      # 45361157497).
       - name: install lavapipe
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
@@ -340,7 +343,7 @@ jobs:
       # Over 20 runs with #626 (2026-11-24 to 25), all cache hits: 13 to 46 s
       # (25 s on average, worst run 45457321390). The worst miss measured is
       # 52 s (run 40030067596, 2026-10-23). apt-install saves the .debs
-      # inside this limit (1 to 3 s).
+      # inside this limit (1 to 3 s, run 45361157497).
       - name: install lavapipe, Xvfb and winit's X11 libraries
         timeout-minutes: 3
         uses: ./.github/actions/apt-install
