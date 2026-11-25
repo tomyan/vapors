@@ -8,6 +8,7 @@ fn each_tier_tells_its_tests_its_name() {
         (unit(), "unit"),
         (gpu(), "gpu"),
         (host(), "host"),
+        (sdk_host(), "sdk-host"),
         (pmu(), "pmu"),
     ] {
         // Then
@@ -86,8 +87,8 @@ fn the_unit_tier_leaves_out_the_gpu_pmu_and_host_tests() {
 // A test named like `gpu_module::pmu_test` matches both filters; it reads
 // a counter, so the pmu tier runs it and the gpu and host tiers leave it.
 #[test]
-fn the_gpu_and_host_tiers_leave_out_the_pmu_tests() {
-    for (step, tests) in [(gpu(), GPU_TESTS), (host(), HOST_TESTS)] {
+fn the_gpu_tier_leaves_out_the_pmu_tests() {
+    for (step, tests) in [(gpu(), GPU_TESTS)] {
         // Then
         assert_eq!(
             step.args.last().map(String::as_str),
@@ -104,4 +105,33 @@ fn the_pmu_tier_runs_only_the_pmu_tests_and_is_not_in_ci() {
     // Then
     assert_eq!(step.args.last().map(String::as_str), Some(PMU_TESTS));
     assert!(!super::super::ci("web").iter().any(|s| s.name == "pmu"));
+}
+
+// The SDK harness's host tests fail on GitHub's runner (AppArmor refuses
+// bwrap's user namespace); routine CI runs the rest of the host tier.
+#[test]
+fn the_host_tier_leaves_out_the_pmu_and_sdk_harness_tests() {
+    // When
+    let step = host();
+
+    // Then
+    assert_eq!(
+        step.args.last().map(String::as_str),
+        Some(
+            format!("({HOST_TESTS}) and not ({PMU_TESTS}) and not ({SDK_HARNESS_TESTS})").as_str()
+        )
+    );
+}
+
+#[test]
+fn the_sdk_host_tier_runs_only_the_sdk_harness_host_tests_and_is_not_in_ci() {
+    // When
+    let step = sdk_host();
+
+    // Then
+    assert_eq!(
+        step.args.last().map(String::as_str),
+        Some(format!("({HOST_TESTS}) and ({SDK_HARNESS_TESTS}) and not ({PMU_TESTS})").as_str())
+    );
+    assert!(!super::super::ci("web").iter().any(|s| s.name == "sdk-host"));
 }
