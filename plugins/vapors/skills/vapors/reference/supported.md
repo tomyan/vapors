@@ -194,7 +194,7 @@ Vendor-prefixed properties are refused, except these, which are dropped:
 
 Type, `*`, `.class`, `#id`, attribute selectors and the combinators (descendant, `>`, `+`, `~`). Pseudo-classes accepted: `active`, `checked`, `disabled`, `empty`, `enabled`, `first-child`, `first-of-type`, `focus`, `focus-visible`, `focus-within`, `hover`, `invalid`, `last-child`, `last-of-type`, `only-child`, `only-of-type`, `root`, `has`, `is`, `not`, `where`, `nth-child`, `nth-last-child`, `nth-of-type`, `nth-last-of-type`.
 
-Refused: `any-link`, `default`, `defined`, `fullscreen`, `in-range`, `indeterminate`, `link`, `optional`, `out-of-range`, `placeholder-shown`, `read-only`, `read-write`, `required`, `target`, `valid`, `visited`, `lang`, `dir`, and every pseudo-element (`::before`, `::after`).
+Refused: `any-link`, `default`, `defined`, `fullscreen`, `in-range`, `indeterminate`, `link`, `optional`, `out-of-range`, `placeholder-shown`, `read-only`, `read-write`, `required`, `target`, `valid`, `visited`, `lang`, `dir`, and every pseudo-element (`::before`, `::after`) but `::placeholder` at the end of a selector, with only `color`.
 
 ## At-rules
 

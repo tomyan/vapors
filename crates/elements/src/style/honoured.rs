@@ -35,6 +35,10 @@ const GRID_JUSTIFY: Treatment = if cfg!(feature = "grid") {
 
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
+    (
+        "-vapors-placeholder-color",
+        Deferred("the placeholder paint slice"),
+    ),
     ("accent-color", Read),
     ("align-content", Read),
     ("align-items", Read),
