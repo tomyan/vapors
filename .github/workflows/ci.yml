@@ -205,12 +205,21 @@ jobs:
   gpu:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the job's worst with the page's text input step: 303 s
-    # in run 41349572659, of five runs at 243 to 303 s (41343451051,
-    # 41347128242, 41331047735, 41328354163), the step itself 9 to 17 s.
-    # The uncached 1812 s apt install in run 39801264114 is excluded: it
-    # is the slow mirror the cache avoids.
-    timeout-minutes: 13
+    # Software rendering (Lavapipe on the runner's CPU), not a GPU. About
+    # 2.5x the job's worst, 1155 s, summed from each step's worst over the
+    # 40 ci runs to 2026-11-24 and two cold diag runs: the gpu tier 628 s
+    # (run 45175872545; with no Rust cache, run 45360772923 built its
+    # tests in 371 s and ran them in 94 s, 45358442696 built them in 467
+    # s); text comparison, the three oracles and the text input 180 s
+    # (layout oracle 107 s, run 45349685941; text input 27 s, 45361157497);
+    # the lavapipe step at its own 2-minute limit, 120 s; setup, toolchain,
+    # tools and the Chromium warm-up 173 s (warm-up 85 s, 45231501868);
+    # uploads, the cache save and the post steps 54 s (cache save 47 s,
+    # 45349685941). The old 13 minutes (2.5x 303 s, run 41349572659)
+    # predates #233's opt-level 1 test builds (2026-11-12): the tier has
+    # taken up to 628 s since. `cargo xtask gate` takes its local
+    # deadline for this job's steps from this value too.
+    timeout-minutes: 49
     # The web job's build, for the page's text input check below; the gate
     # runs jobs in file order in one worktree, so web's target/web is there.
     needs: web
@@ -307,7 +316,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 13
+          TIMEOUT_MINUTES: 49
         run: .github/scripts/report-timeout.sh
 
   window:
