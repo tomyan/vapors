@@ -2,7 +2,9 @@
 //! or every refusal its computed style earns.
 
 use vapors_css::cascade::ComputedStyle;
-use vapors_css::property::longhands::{BACKGROUND_COLOR, CURSOR, DISPLAY, Z_INDEX};
+use vapors_css::property::longhands::{
+    BACKGROUND_COLOR, CURSOR, DISPLAY, PLACEHOLDER_COLOR, Z_INDEX,
+};
 use vapors_scene::Color;
 
 use super::box_style;
@@ -31,6 +33,9 @@ pub(crate) struct Used {
     /// `z-index` where it applies (a positioned box, or a flex or grid
     /// item), `None` for auto and where it does not.
     pub(crate) z_index: Option<i32>,
+    /// `::placeholder { color }` (`-vapors-placeholder-color`): an empty
+    /// text or number field's placeholder is painted in it.
+    pub(crate) placeholder: Color,
     /// `accent-color`, `None` for `auto` (a switch's checked track).
     pub(crate) accent: Option<Color>,
     /// How its thumb is drawn, when it scrolls.
@@ -120,6 +125,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
         accent: super::accent::accent(&mut reader),
+        placeholder: reader.read(PLACEHOLDER_COLOR, color, Color::default()),
         layout,
         inline,
         text,
@@ -165,6 +171,7 @@ impl Used {
             z_index,
             scrollbar,
             accent,
+            placeholder,
             parts,
             svg,
         } = self;
@@ -180,6 +187,7 @@ impl Used {
             ("z_index", *z_index == other.z_index),
             ("scrollbar", *scrollbar == other.scrollbar),
             ("accent", *accent == other.accent),
+            ("placeholder", *placeholder == other.placeholder),
             ("parts", *parts == other.parts),
             ("svg", *svg == other.svg),
         ]
