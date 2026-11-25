@@ -37,7 +37,7 @@ pub(crate) fn overflow(reader: &mut Reader<'_>, style: &mut Style) {
     style.overflow = Point { x, y };
 }
 
-/// Refuses a clip with rounded corners, but for a text field's whose
+/// Refuses a clip with rounded corners, except on a text field whose
 /// text scrolls on x, so is clipped to its content box on x
 /// (`clip.rs`), clear of every corner's curve, where the rectangle is
 /// the rounded clip.

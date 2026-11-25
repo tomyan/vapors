@@ -79,7 +79,12 @@ fn run(boxes: &[LayoutBox], index: usize) -> &LayoutBox {
     let run = boxes[index].children.first().unwrap_or_else(|| {
         panic!("field box {index} has no run: every field's text is its run (layout/field_box.rs `mark_run`); reproduce with `cargo xtask test`")
     });
-    &boxes[*run]
+    let run = &boxes[*run];
+    assert!(
+        run.run_of_field.is_some(),
+        "field box {index}'s first child is not its run: every field's text is its first child (layout/field_box.rs `mark_run`); reproduce with `cargo xtask test`"
+    );
+    run
 }
 
 /// The width of a field's content box, CSS px (`clip::content_box`).

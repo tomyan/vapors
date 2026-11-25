@@ -159,7 +159,9 @@ fn a_rounded_text_field_that_does_not_scroll_is_refused_whatever_its_padding() {
 
     // Then
     assert!(
-        errors.iter().any(|e| e.contains("border-radius")),
+        errors.iter().any(|e| e.contains("border-radius")
+            && e.contains("or the clip")
+            && !e.contains("side padding")),
         "{errors:?}"
     );
 }
