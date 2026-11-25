@@ -1,5 +1,5 @@
-//! The test tiers, split on the test function's name: unit, gpu, host,
-//! and pmu, which `ci` never runs.
+//! The test tiers, split on the test's name: unit, gpu, host, and two
+//! that `ci` never runs, sdk-host and pmu.
 
 use super::Step;
 

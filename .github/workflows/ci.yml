@@ -52,10 +52,12 @@ jobs:
       # stalled on the mirror past the old 1-minute limit (run 40036716064).
       # No bubblewrap (Tom, 2026-11-25): nothing in this job runs bwrap on
       # the runner. The SDK harness's tests that did are out of the host
-      # tier; the host tier's gate tests, on a machine with no render node
-      # (the runner), take the NoRenderNode path and run steps without it;
-      # the unit tier's tests use fake bwraps. Where there is a render node
-      # the gate still refuses to run without bwrap (gate_sandbox.rs).
+      # tier. The host tier's two gate tests, on a machine with no render
+      # node (the runner), check the NoRenderNode path: one asserts it, the
+      # other runs its step under plain bash. The unit tier's tests use
+      # fake bwraps. Where there is a render node the gate still refuses to
+      # run without bwrap (gate_sandbox.rs), so a runner image with a
+      # renderD* node would fail the host step, naming bubblewrap.
       - name: install a CJK system font for the fallback test
         timeout-minutes: 2
         uses: ./.github/actions/apt-install

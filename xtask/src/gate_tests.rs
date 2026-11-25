@@ -105,7 +105,7 @@ fn this_repositorys_workflow_is_one_the_gate_can_run() {
 #[test]
 fn the_ci_job_runs_lint_wasm_unit_and_host_as_four_steps_so_the_log_times_each() {
     // Given: the host tier among them, so the gate and GitHub run the
-    // host_ tests but the SDK harness's (steps_tiers.rs HOST_TESTS)
+    // host_ tests except the SDK harness's (steps_tiers.rs HOST_TESTS)
     let wanted = [
         "cargo xtask lint",
         "cargo xtask wasm",

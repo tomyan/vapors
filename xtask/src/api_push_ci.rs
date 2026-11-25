@@ -32,8 +32,8 @@ pub const CI_DEADLINE: Duration = Duration::from_mins(17);
 const ADVISORY_DEADLINE: Duration = Duration::from_secs(60);
 
 /// The sandboxed ci's command. Declared skip (the lead, L42): the host
-/// tier (`host_` tests) runs bwrap and systemd, which the sandbox refuses
-/// (`--disable-userns`, no user bus), so it cannot run inside. Retired
+/// tier (`host_` tests) runs bwrap where there is a render node, which the
+/// sandbox refuses (`--disable-userns`), so it cannot run inside. Retired
 /// when ci can run in a sandbox the host tier works in.
 pub const CI: [&str; 5] = ["cargo", "xtask", "ci", "--except", "host"];
 
