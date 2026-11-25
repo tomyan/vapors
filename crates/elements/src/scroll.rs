@@ -18,11 +18,13 @@ pub(crate) struct Offsets {
 }
 
 /// One container's offset and how far it can go, and both as last
-/// settled: a scroll moves `at` before the update settles it.
+/// settled: a scroll moves `at` before the update settles it; and its
+/// client size as last laid out.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Offset {
     at: [f32; 2],
     max: [f32; 2],
+    client: [f32; 2],
     settled: [[f32; 2]; 2],
     /// How opaque its own thumbs are drawn, 0 to 255 (`thumb.rs`), and
     /// as last settled.
@@ -39,6 +41,14 @@ impl Offsets {
     /// Each scroll container and its offset, in no order.
     pub(crate) fn each(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
         self.by_node.iter().map(|(node, offset)| (*node, offset.at))
+    }
+
+    /// Each scroll container and its client size as last laid out
+    /// (`client_size`), in no order.
+    pub(crate) fn sizes(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
+        self.by_node
+            .iter()
+            .map(|(node, offset)| (*node, offset.client))
     }
 
     /// The offset of `node` and how far it can go, if it scrolls.
@@ -116,15 +126,15 @@ impl Offsets {
     /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
     /// never settled.
     pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
-        let max = self.by_node.get(&node).map(|kept| kept.max);
-        let max = max.unwrap_or_else(|| {
+        let kept = self.by_node.get(&node).map(|kept| (kept.max, kept.client));
+        let (max, client) = kept.unwrap_or_else(|| {
             panic!(
                 "scroll container {node:?} is marked as only scrolled but kept no offset, so \
                  no range to clamp to: a box marked Scrolled was never settled \
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let offset = self.clamped_to(node, max);
+        let offset = self.clamped_to(node, max, client);
         self.settled_to(node, offset, scale)
     }
 
@@ -160,17 +170,19 @@ impl Offsets {
     }
 
     fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
-        self.clamped_to(node, range(laid, index))
+        self.clamped_to(node, range(laid, index), client_size(laid.0, index))
     }
 
-    /// `node`'s offset clamped to `max`, its range.
-    fn clamped_to(&self, node: NodeId, max: [f32; 2]) -> Offset {
+    /// `node`'s offset clamped to `max`, its range, with `client`, its
+    /// client size.
+    fn clamped_to(&self, node: NodeId, max: [f32; 2], client: [f32; 2]) -> Offset {
         let at = self.get(node).unwrap_or_default();
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
         Offset {
             at,
             max,
+            client,
             settled: [at, max],
             alpha,
             settled_alpha: alpha,
@@ -234,12 +246,9 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// counts, so the larger of the two is taken.
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
-    let (border, padding) = (layout.border, layout.padding);
+    let padding = layout.padding;
     let end = content_end((boxes, lanes), index);
-    let inner = [
-        layout.size.width - border.left - border.right,
-        layout.size.height - border.top - border.bottom,
-    ];
+    let inner = client_size(boxes, index);
     let reach = [
         layout.scroll_width().max(end[0] + padding.right - inner[0]),
         layout
@@ -251,6 +260,17 @@ fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     [
         if scrolls(overflow.x) { reach[0] } else { 0.0 },
         if scrolls(overflow.y) { reach[1] } else { 0.0 },
+    ]
+}
+
+/// Box `index`'s client size: its padding box, the border box less its
+/// borders (scroll thumbs overlay it and take none of it).
+fn client_size(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+    let layout = &boxes[index].layout;
+    let border = layout.border;
+    [
+        layout.size.width - border.left - border.right,
+        layout.size.height - border.top - border.bottom,
     ]
 }
 

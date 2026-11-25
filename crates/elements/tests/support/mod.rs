@@ -12,6 +12,7 @@ pub mod drive;
 pub mod fixup;
 pub mod flex_list;
 pub mod focus_page;
+pub mod frame_page;
 pub mod hidden_page;
 pub mod lane_page;
 pub mod link_page;

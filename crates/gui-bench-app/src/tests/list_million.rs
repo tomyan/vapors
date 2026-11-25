@@ -8,7 +8,6 @@ use super::layout::{Row, assert_rows, at, from_x, row};
 use super::list_support::*;
 use super::support::by_class;
 use crate::dashboard::*;
-use crate::list::LIST_HEIGHT;
 
 const MILLION: usize = 1_000_000;
 
@@ -38,7 +37,8 @@ fn the_last_order_is_reachable_at_a_million_rows() {
 
     // Then: the range ends a window above the last row's bottom, and the
     // last order fills the bottom of the window
-    assert_eq!(offset, ORDER_ROW_HEIGHT * MILLION as f32 - LIST_HEIGHT);
+    let list_height = WINDOW.1 - LIST_ROWS_TOP;
+    assert_eq!(offset, ORDER_ROW_HEIGHT * MILLION as f32 - list_height);
     assert_eq!(number_at(&list, WINDOW.1 - 1.0), "#1010199");
     assert_eq!(
         number_at(&list, WINDOW.1 - ORDER_ROW_HEIGHT - 1.0),
