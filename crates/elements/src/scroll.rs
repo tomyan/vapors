@@ -120,16 +120,15 @@ impl Offsets {
     /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
     /// never settled.
     pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
-        let max = self.by_node.get(&node).map(|kept| kept.max);
-        let max = max.unwrap_or_else(|| {
+        let kept = self.by_node.get(&node).unwrap_or_else(|| {
             panic!(
                 "scroll container {node:?} is marked as only scrolled but kept no offset, so \
                  no range to clamp to: a box marked Scrolled was never settled \
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let kept = &self.by_node[&node];
-        let offset = self.clamped_to(node, max, (kept.at, kept.revealed));
+        let (max, at) = (kept.max, (kept.at, kept.revealed));
+        let offset = self.clamped_to(node, max, at);
         self.settled_to(node, offset, scale)
     }
 
@@ -258,22 +257,19 @@ fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
         layout.size.width - border.left - border.right,
         layout.size.height - border.top - border.bottom,
     ];
-    let reach = [
-        layout.scroll_width().max(end[0] + padding.right - inner[0]),
-        layout
-            .scroll_height()
-            .max(end[1] + padding.bottom - inner[1]),
-    ];
-    let reach = if boxes[index].text_field {
-        [crate::scroll_reveal::field_reach(boxes, index), reach[1]]
+    let x = if crate::scroll_reveal::scrolls_text(&boxes[index]) {
+        crate::scroll_reveal::field_reach(boxes, index)
     } else {
-        reach
+        layout.scroll_width().max(end[0] + padding.right - inner[0])
     };
+    let y = layout
+        .scroll_height()
+        .max(end[1] + padding.bottom - inner[1]);
     let overflow = boxes[index].style.overflow;
     let scrolls = |axis: taffy::Overflow| axis == taffy::Overflow::Scroll;
     [
-        if scrolls(overflow.x) { reach[0] } else { 0.0 },
-        if scrolls(overflow.y) { reach[1] } else { 0.0 },
+        if scrolls(overflow.x) { x } else { 0.0 },
+        if scrolls(overflow.y) { y } else { 0.0 },
     ]
 }
 

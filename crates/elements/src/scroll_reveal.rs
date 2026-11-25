@@ -9,7 +9,7 @@
 //! Not yet: a selection's moving end is not revealed (Chromium reveals
 //! it); the offset is kept while a selection shows.
 
-use crate::layout::LayoutBox;
+use crate::layout::{BoxRect, LayoutBox};
 
 /// The caret's width, CSS px: `text_paint.rs` draws it 1 px wide.
 pub(crate) const CARET_WIDTH: f32 = 1.0;
@@ -29,7 +29,7 @@ pub(crate) fn revealed(
     at: [f32; 2],
     last: Revealed,
 ) -> ([f32; 2], Revealed) {
-    if !boxes[index].text_field {
+    if !scrolls_text(&boxes[index]) {
         return (at, None);
     }
     let now = caret(boxes, index);
@@ -52,8 +52,7 @@ fn shown(at: f32, x: f32, width: f32) -> f32 {
 
 /// The field's caret now, as [`Revealed`] holds it.
 fn caret(boxes: &[LayoutBox], index: usize) -> Revealed {
-    let run = boxes[index].children.first().map(|&run| &boxes[run]);
-    let marks = run.and_then(|run| run.text_marks.as_ref())?;
+    let marks = run(boxes, index).text_marks.as_ref()?;
     let width = content_width(&boxes[index]);
     Some(
         marks
@@ -62,12 +61,37 @@ fn caret(boxes: &[LayoutBox], index: usize) -> Revealed {
     )
 }
 
-/// The width of a box's content box, CSS px.
+/// Whether box `layout_box` is a text field whose text scrolls on x
+/// (the user-agent sheet's `overflow-x: auto`): cut off at its content
+/// box (`clip.rs`), its range its text's (`scroll.rs`), its offset
+/// following its caret. A number field's does not (refused,
+/// `style/overflow.rs`).
+pub(crate) fn scrolls_text(layout_box: &LayoutBox) -> bool {
+    layout_box.text_field && layout_box.style.overflow.x == taffy::Overflow::Scroll
+}
+
+/// The run of the field in box `index`: its text, its first child.
+///
+/// # Panics
+/// When it has none: every field's text is its run, a blank one a
+/// no-break space (`layout/field_box.rs` `mark_run`).
+fn run(boxes: &[LayoutBox], index: usize) -> &LayoutBox {
+    let run = boxes[index].children.first().unwrap_or_else(|| {
+        panic!("field box {index} has no run: every field's text is its run (layout/field_box.rs `mark_run`); reproduce with `cargo xtask test`")
+    });
+    &boxes[*run]
+}
+
+/// The width of a field's content box, CSS px (`clip::content_box`).
 fn content_width(field: &LayoutBox) -> f32 {
-    let layout = &field.layout;
-    let sides =
-        layout.border.left + layout.border.right + layout.padding.left + layout.padding.right;
-    (layout.size.width - sides).max(0.0)
+    let size = field.layout.size;
+    let border_box = BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: size.width,
+        height: size.height,
+    };
+    crate::clip::content_box(field, border_box).width
 }
 
 /// How far the text field in box `index` scrolls on x: its text's
@@ -75,9 +99,6 @@ fn content_width(field: &LayoutBox) -> f32 {
 /// the content box), and the caret's after it, past its content box;
 /// 0 when they fit.
 pub(crate) fn field_reach(boxes: &[LayoutBox], index: usize) -> f32 {
-    let Some(&run) = boxes[index].children.first() else {
-        return 0.0;
-    };
-    let text = boxes[run].layout.scrollable_overflow_rect.right;
+    let text = run(boxes, index).layout.scrollable_overflow_rect.right;
     (text + CARET_WIDTH - content_width(&boxes[index])).max(0.0)
 }

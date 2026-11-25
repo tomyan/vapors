@@ -70,7 +70,7 @@ fn same_paint(fresh: &LayoutBox, kept: &LayoutBox) -> bool {
         && fresh.switch == kept.switch
         && fresh.text_field == kept.text_field
         && fresh.placeholder == kept.placeholder
-        && fresh.field_text == kept.field_text
+        && fresh.run_of_field == kept.run_of_field
         && fresh.text_marks == kept.text_marks
 }
 

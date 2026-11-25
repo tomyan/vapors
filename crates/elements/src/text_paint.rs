@@ -31,7 +31,7 @@ pub(crate) fn paint(
     input: &PaintInput<'_>,
     out: &mut Painting,
 ) {
-    let Some(node) = boxes[index].field_text else {
+    let Some(node) = boxes[index].run_of_field else {
         return;
     };
     let origin = rects[index];

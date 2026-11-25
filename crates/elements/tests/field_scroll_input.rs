@@ -113,3 +113,25 @@ fn a_narrower_window_keeps_the_caret_in_the_content_box_on_its_first_frame() {
     let column = caret_column(&page).expect("a caret shows");
     assert!((13.0..187.0).contains(&column), "caret at {column}");
 }
+
+#[test]
+fn a_wheel_scroll_of_a_focused_field_is_kept_across_a_relayout() {
+    // Given: 60 characters, scrolled to the end, then 100 px back
+    let page = page();
+    typed_to(&page, 60);
+    let point = [800.0, middle_y(&page)];
+    assert!(page.doc.borrow_mut().scroll_by(point, [-100.0, 0.0]));
+    update(&page);
+    let scrolled = offset(&page);
+
+    // When: the field is laid out again, its caret and width unchanged
+    page.doc
+        .borrow_mut()
+        .add_stylesheet("taller.css", "input { height: 40px; }")
+        .expect("parses");
+    update(&page);
+
+    // Then
+    assert_eq!(border_box(&page)[3], 40.0, "laid out again");
+    assert_eq!(offset(&page), scrolled);
+}

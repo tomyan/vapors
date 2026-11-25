@@ -144,6 +144,27 @@ fn a_rounded_text_field_whose_padding_does_not_clear_its_corners_is_refused() {
 }
 
 #[test]
+fn a_rounded_text_field_that_does_not_scroll_is_refused_whatever_its_padding() {
+    // Given: padding that clears the corners, but `overflow: hidden`,
+    // whose clip is the square padding box
+    let mut doc = document();
+    let body = doc.body();
+    let field = element(&mut doc, body, "input", "field");
+    doc.set_attribute(field, "type", "text");
+    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 7px; overflow: hidden; }";
+    doc.add_stylesheet("app.css", css).expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors.iter().any(|e| e.contains("border-radius")),
+        "{errors:?}"
+    );
+}
+
+#[test]
 fn a_rounded_text_field_whose_padding_clears_its_corners_is_drawn() {
     // Given: 7 px side padding clears an 8 px radius over a 1 px border
     let mut doc = document();

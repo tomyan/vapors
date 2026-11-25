@@ -42,6 +42,6 @@ pub(super) fn mark_run(boxes: &mut [LayoutBox], field: usize, node: NodeId) {
     let run = *boxes[field].children.first().unwrap_or_else(|| {
         panic!("field {node:?} has no run: its text, a blank one a no-break space, is its run (boxes.rs `add_element`)")
     });
-    boxes[run].field_text = Some(node);
+    boxes[run].run_of_field = Some(node);
     boxes[run].text_marks = boxes[field].text_marks.take();
 }

@@ -50,7 +50,7 @@ pub(crate) fn within(clip: Option<BoxRect>, rect: BoxRect) -> BoxRect {
 /// ends (entry 44); on y still its padding box.
 pub(crate) fn content_clip(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
     let padding = padding_box(layout_box, border_box);
-    if !(layout_box.text_field && layout_box.style.overflow.x == taffy::Overflow::Scroll) {
+    if !crate::scroll_reveal::scrolls_text(layout_box) {
         return padding;
     }
     let content = content_box(layout_box, border_box);

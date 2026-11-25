@@ -38,8 +38,9 @@ pub(crate) fn overflow(reader: &mut Reader<'_>, style: &mut Style) {
 }
 
 /// Refuses a clip with rounded corners, but for a text field's whose
-/// text is clipped to its content box on x (`clip.rs`) clear of every
-/// corner's curve, where the rectangle is the rounded clip.
+/// text scrolls on x, so is clipped to its content box on x
+/// (`clip.rs`), clear of every corner's curve, where the rectangle is
+/// the rounded clip.
 pub(crate) fn refuse_rounded_clip(
     reader: &mut Reader<'_>,
     style: &Style,
@@ -49,12 +50,18 @@ pub(crate) fn refuse_rounded_clip(
     if !clips(style) || decoration.radii.iter().all(|r| *r <= 0.0) {
         return;
     }
-    if text_field && clear_of_corners(style, decoration) {
+    let scrolling_text = text_field && style.overflow.x == Overflow::Scroll;
+    if scrolling_text && clear_of_corners(style, decoration) {
         return;
     }
+    let fix = if scrolling_text {
+        "remove the radius, or give the field side padding at least its corners' radius less its border"
+    } else {
+        "remove the radius or the clip"
+    };
     reader.refuse(
         OVERFLOW_X,
-        "clips to a box with a border-radius, and rounded clips are refused until a slice needs them (docs/F2c.md); remove the radius or the clip, or, on a text field, give it side padding at least its corners' radius less its border".to_owned(),
+        format!("clips to a box with a border-radius, and rounded clips are refused until a slice needs them (docs/F2c.md); {fix}"),
     );
 }
 

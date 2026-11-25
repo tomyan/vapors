@@ -14,7 +14,7 @@ use support::long_field::{
     CHROMIUM_DELETED, CHROMIUM_TYPED, CONTENT, Page, backspace, caret_column, length, offset, page,
     text_clip, type_w, update,
 };
-use vapors_elements::Document;
+use vapors_elements::{Document, Modifiers};
 
 /// Types up to `count` characters.
 fn typed_to(page: &Page, count: usize) {
@@ -106,4 +106,19 @@ fn blur_scrolls_back_to_the_start_and_focus_shows_the_caret_again() {
     // Then: Chromium 0 after blur(), 539 and the caret at 941 after focus()
     assert_eq!(blurred, (0.0, None));
     assert_like_chromium(&page, (60, 539.0, 941.0), "focused again at");
+}
+
+#[test]
+fn home_scrolls_back_to_show_the_caret_at_the_start() {
+    // Given: 60 characters typed, scrolled to the caret at the end
+    let page = page();
+    typed_to(&page, 60);
+
+    // When
+    Document::key_pressed(&page.doc, "Home", Modifiers::default());
+    Document::key_released(&page.doc, "Home", Modifiers::default());
+    update(&page);
+
+    // Then: unscrolled, the caret at the content box's left
+    assert_eq!((offset(&page), caret_column(&page)), (0.0, Some(CONTENT.0)));
 }

@@ -62,10 +62,10 @@ pub(crate) struct LayoutBox {
     /// The placeholder an empty text or number field shows, for paint
     /// (`placeholder.rs`).
     pub(crate) placeholder: Option<String>,
-    /// On a text or number field's run, its text: the field, whose
-    /// text origin paint keeps for the pointer from this box, in the
-    /// field's scroll frame when it scrolls (entry 44).
-    pub(crate) field_text: Option<NodeId>,
+    /// On a text or number field's run (its text), the field: paint
+    /// keeps the field's text origin from this box, in the field's
+    /// scroll frame when it scrolls (entry 44).
+    pub(crate) run_of_field: Option<NodeId>,
     /// On a focused field's run, its caret and selection, for paint.
     pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
     /// Whether the box was kept from the last update rather than built
@@ -95,7 +95,7 @@ impl LayoutBox {
             switch: false,
             text_field: false,
             placeholder: None,
-            field_text: None,
+            run_of_field: None,
             text_marks: None,
             kept: false,
         }
