@@ -135,6 +135,8 @@ mod painted;
 mod painted_batches;
 mod painted_positions;
 mod painting;
+mod placeholder;
+mod placeholder_paint;
 mod placement;
 mod placement_changes;
 mod placement_check;
@@ -148,6 +150,7 @@ mod range_paint;
 mod repaint;
 #[cfg(debug_assertions)]
 mod repaint_check;
+mod resize_event;
 mod restyle;
 mod restyle_check;
 mod restyle_children;
@@ -216,6 +219,7 @@ mod typing;
 mod update;
 mod update_counts;
 mod update_counts_read;
+mod update_frame;
 mod update_layout;
 mod update_paint;
 

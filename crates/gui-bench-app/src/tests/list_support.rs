@@ -1,6 +1,5 @@
 //! The `list` scenario mounted headless at the spec window size, driven
-//! frame by frame as the app's loop drives it: scrolls settled, then the
-//! update.
+//! frame by frame as the app's loop drives it (`Document::update_frame`).
 use super::support::{by_class, rect, text};
 use crate::dashboard::WINDOW;
 use crate::list::{MountedList, mount};
@@ -10,28 +9,43 @@ use vapors_elements::{Document, Viewport};
 /// A point inside the list, below the header.
 pub const IN_LIST: [f32; 2] = [640.0, 400.0];
 
-/// The list of `count` orders, mounted and drawn once, its change flag
-/// taken.
+/// The list of `count` orders, mounted and drawn in one frame in the
+/// spec's window (`settled_at`).
 pub fn list_of(count: usize) -> MountedList {
     let mounted = mount(count);
-    frame(&mounted);
-    mounted.document.borrow_mut().take_changed();
+    settled_at(&mounted, WINDOW.1);
     mounted
 }
 
-/// What a frame does: settle the scrolls owed, then update.
+/// What a frame does in the spec's window: the app's Update phase.
 pub fn frame(mounted: &MountedList) {
-    Document::settle_scroll(&mounted.document);
+    frame_at(mounted, WINDOW.1);
+}
+
+/// One frame in a window of the spec's width and `height` px tall, what
+/// is drawn after it being what the app presents: the frame that lays a
+/// new size out draws its rows, as the app's first frame and each resize
+/// do. The change flag that frame raises is taken, as the app's
+/// next-frame decision takes it.
+pub fn settled_at(mounted: &MountedList, height: f32) {
+    frame_at(mounted, height);
+    mounted.document.borrow_mut().take_changed();
+}
+
+/// A frame in a window of the spec's width and `height` px tall: the
+/// app's Update phase (`Document::update_frame`).
+pub fn frame_at(mounted: &MountedList, height: f32) {
     let viewport = Viewport {
         width: WINDOW.0,
-        height: WINDOW.1,
+        height,
         scale: 1.0,
     };
-    mounted
-        .document
-        .borrow_mut()
-        .update(viewport)
-        .expect("the list lays out");
+    let update = || {
+        let mut document = mounted.document.borrow_mut();
+        let laid_out = document.update(viewport);
+        laid_out.map(|_| ()).map_err(|errors| format!("{errors:?}"))
+    };
+    Document::update_frame(&mounted.document, update).expect("the list lays out");
 }
 
 /// A wheel scroll of `dy` px over the list, then a frame.

@@ -41,7 +41,7 @@ These HTML boolean attributes are on by being present, so the compiler refuses t
 
 ## Events
 
-The element tree fires these; `on<name>={handler}` listens for one: `click`, `dblclick`, `pointerdown`, `pointermove`, `pointerup`, `gotpointercapture`, `lostpointercapture`, `pointercancel`, `keydown`, `keyup`, `focus`, `blur`, `focusin`, `focusout`, `input`, `change`, `selectionchange`, `paste`, `scroll`.
+The element tree fires these; `on<name>={handler}` listens for one: `click`, `dblclick`, `pointerdown`, `pointermove`, `pointerup`, `gotpointercapture`, `lostpointercapture`, `pointercancel`, `keydown`, `keyup`, `focus`, `blur`, `focusin`, `focusout`, `input`, `change`, `selectionchange`, `paste`, `scroll`, `resize`.
 
 ## CSS properties
 
