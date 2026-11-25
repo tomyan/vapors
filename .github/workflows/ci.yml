@@ -27,11 +27,19 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x (the job's worst without its apt step in the 37 runs to
-    # 2026-10-23, 185 s in run 39807737788, plus that step's worst with
-    # the cache, 13 s in run 39932437148). The uncached 1811 s install in
-    # run 39803408769 is excluded: it is the slow mirror the cache avoids.
-    timeout-minutes: 9
+    # About 2.5x the job's worst measured, cold: 1149 s (2.5x is 47.9
+    # minutes). Run 45361157497, attempt 1 (2026-11-24, #624, no Rust
+    # cache), ran every step, unit 662 s, host 3.5 s (failing on the
+    # runner; never timed passing there). Run 45076354761 (2026-11-22)
+    # took 1080 s with unit 648 s and no Chromium warm-up (worst 49 s, run
+    # 45084188329) or host. A faster cold run, 45283781763 (main a4bb9c63), reached the
+    # end of unit in 733 s: unit's build 351 s, its tests 112 s. Warm, the
+    # job took 634 s (45142856208): the cache holds dependencies, and every
+    # workspace crate still builds, at opt-level 1 since #233 (2026-11-12),
+    # when lint and unit went from 282 s (run 43218588943) to 439 s (run
+    # 43227249253, cancelled) and past the old 9 minutes (2.5x 198 s, to
+    # 2026-10-23). `cargo xtask gate` takes its ci-step deadline from this.
+    timeout-minutes: 48
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
@@ -42,6 +50,14 @@ jobs:
       # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
       # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
       # stalled on the mirror past the old 1-minute limit (run 40036716064).
+      # No bubblewrap (Tom, 2026-11-25): nothing in this job runs bwrap on
+      # the runner. The SDK harness's tests that did are out of the host
+      # tier. The host tier's two gate tests, on a machine with no render
+      # node (the runner), check the NoRenderNode path: one asserts it, the
+      # other runs its step under plain bash. The unit tier's tests use
+      # fake bwraps. Where there is a render node the gate still refuses to
+      # run without bwrap (gate_sandbox.rs), so a runner image with a
+      # renderD* node would fail the host step, naming bubblewrap.
       - name: install a CJK system font for the fallback test
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
@@ -53,7 +69,16 @@ jobs:
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that fails still saves what it compiled. One
+      # killed at its own timeout does not: the post step that saves never
+      # runs (run 45072756560). Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
@@ -71,10 +96,24 @@ jobs:
         run: cargo xtask lint
       - name: wasm lint
         run: cargo xtask wasm
+      # The unit tier launches Chromium (gui-bench-app's chart oracle), as
+      # the gpu job's tier does; the same warm-up as there. Without it the
+      # first unit run to finish since 2026-11-12 (run 45076354761) failed
+      # three chart tests at the 20 s screenshot deadline on the runner's
+      # cold first launch. No hosted tier reads a hardware counter: those
+      # tests are in the pmu tier (#612), which no job here runs.
+      - name: warm headless Chromium
+        run: cargo run -p vapors-text --example warm_chromium
       - name: unit
         run: cargo xtask test --tier unit
-      # bwrap making a user namespace: run here and in the gate, never in
-      # an API builder's sandbox (xtask/src/steps_tiers.rs HOST_TESTS)
+      # The host_ tests: run here and in the gate, never in an API builder's
+      # sandbox (xtask/src/steps_tiers.rs HOST_TESTS). Here they are the
+      # gate's two bwrap tests; with no render node on the runner, each
+      # checks the NoRenderNode path, without bwrap. The private SDK
+      # harness's host tests are not in this tier (SDK_HARNESS_TESTS, Tom
+      # 2026-11-25): on GitHub's runner AppArmor refuses their bwrap user
+      # namespace (run 45482514993), and changing that is not authorised
+      # (Tom, 2026-11-23). `cargo xtask test --tier sdk-host` runs them.
       - name: host
         run: cargo xtask test --tier host
       # Bins and examples only: the unit step's nextest built the test
@@ -98,7 +137,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 48
         run: .github/scripts/report-timeout.sh
 
   web:
@@ -199,7 +238,16 @@ jobs:
           case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device after installing lavapipe; fix: check the install step and mesa-major"; exit 1 ;; esac
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
+      # cache-on-failure: a job that fails still saves what it compiled. One
+      # killed at its own timeout does not: the post step that saves never
+      # runs (run 45072756560). Without it the cache saved 2026-11-12 went stale when the
+      # environment hash changed (cdee7d24 to c7ddb2ea), every later run
+      # restored nothing ("No cache found"), timed out cold, and saved nothing:
+      # ci cancelled in unit on main and in #602 (run 45067990897, twice);
+      # gpu tier 10m56 cold against 3m40 warm (run 43204069045).
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - uses: cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f # v1.26.1, committed 2026-10-24
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused

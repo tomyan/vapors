@@ -134,6 +134,7 @@ mod queue_state;
 mod quiet_command;
 mod quiet_lock;
 mod quiet_wait;
+mod reference;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -279,6 +280,7 @@ fn main() -> ExitCode {
         Command::Scaling => return scaling::run(&reporter),
         Command::Quiet { args } => return quiet_command::run(&args),
         Command::Lint => steps::lint(),
+        Command::Reference { target } => reference::steps(&target),
         Command::Deny => steps::deny_check(),
         Command::Test { tier } => {
             if let Err(why) = quiet_wait::before("test") {
@@ -288,6 +290,7 @@ fn main() -> ExitCode {
                 Tier::Unit => steps::unit_tests(),
                 Tier::Gpu => steps::gpu_tests(),
                 Tier::Host => steps::host_tests(),
+                Tier::SdkHost => steps::sdk_host_tests(),
                 Tier::Pmu => steps::pmu_tests(),
             }
         }
