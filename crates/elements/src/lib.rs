@@ -167,6 +167,7 @@ mod scene_view;
 mod scroll;
 mod scroll_chains;
 mod scroll_event;
+mod scroll_reveal;
 mod scrolling;
 mod shortcuts;
 mod slab;

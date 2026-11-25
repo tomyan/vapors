@@ -90,24 +90,25 @@ impl Part {
     }
 
     /// Puts this part's entries into `painted`'s maps, their positions
-    /// in scroll frame `frame`: its inline elements' frames noted here;
-    /// a range's or text field's own element's, by `kept_maps.rs`,
-    /// which owns them and must agree.
+    /// in scroll frame `frame`: its inline elements' frames noted here,
+    /// and a field's text origin's beside it, as its run's part is in
+    /// the field's frame when the field scrolls; a range's own
+    /// element's, by `kept_maps.rs`, which owns them and must agree.
     pub(crate) fn enter(&self, painted: &mut Painted, frame: usize) {
         let rare = self.rare();
         for (node, _) in &rare.rects {
             painted.node_frames.insert(*node, frame);
         }
-        for node in self.own_element_entries() {
-            assert_framed(painted, node, frame);
+        for (node, _) in &rare.ranges {
+            assert_framed(painted, *node, frame);
         }
         painted.cursors.extend(self.cursors.iter().copied());
         painted.visible.extend(self.visible.iter().copied());
         painted.rects.extend(rare.rects.iter().copied());
         painted.ranges.extend(rare.ranges.iter().copied());
-        painted
-            .text_origins
-            .extend(rare.text_origins.iter().copied());
+        let origins = rare.text_origins.iter();
+        let framed = origins.map(|&(node, origin)| (node, (origin, frame)));
+        painted.text_origins.extend(framed);
     }
 
     /// Removes this part's entries from `painted`'s maps.
@@ -123,14 +124,6 @@ impl Part {
         for node in &self.visible {
             painted.visible.remove(node);
         }
-    }
-
-    /// The elements of this part's range tracks and text origins: its
-    /// own box's element, whose frame `kept_maps.rs` notes.
-    fn own_element_entries(&self) -> impl Iterator<Item = NodeId> + '_ {
-        let rare = self.rare();
-        let ranges = rare.ranges.iter().map(|(node, _)| *node);
-        ranges.chain(rare.text_origins.iter().map(|(node, _)| *node))
     }
 }
 

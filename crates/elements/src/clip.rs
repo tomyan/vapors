@@ -13,7 +13,8 @@ use crate::paint::PaintInput;
 
 /// The clip box `index` gives its content, from `own`, the clip it
 /// paints under, CSS pixels, `None` for none: its padding box within
-/// `own` when it cuts off its content.
+/// `own` when it cuts off its content, a scrolling text field's
+/// narrowed to its content box on x ([`content_clip`]).
 pub(crate) fn inner(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
@@ -22,7 +23,7 @@ pub(crate) fn inner(
     input: &PaintInput<'_>,
 ) -> Option<BoxRect> {
     if clipping(boxes, index, input) {
-        Some(within(own, padding_box(&boxes[index], rects[index])))
+        Some(within(own, content_clip(&boxes[index], rects[index])))
     } else {
         own
     }
@@ -40,6 +41,23 @@ pub(crate) fn within(clip: Option<BoxRect>, rect: BoxRect) -> BoxRect {
         y,
         width: ((rect.x + rect.width).min(clip.x + clip.width) - x).max(0.0),
         height: ((rect.y + rect.height).min(clip.y + clip.height) - y).max(0.0),
+    }
+}
+
+/// What a clipping box cuts its content off at, from its border box:
+/// its padding box, or for a text field that scrolls on x its content
+/// box on x, as Chromium cuts a field's text off where its inner editor
+/// ends (entry 44); on y still its padding box.
+pub(crate) fn content_clip(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
+    let padding = padding_box(layout_box, border_box);
+    if !(layout_box.text_field && layout_box.style.overflow.x == taffy::Overflow::Scroll) {
+        return padding;
+    }
+    let content = content_box(layout_box, border_box);
+    BoxRect {
+        x: content.x,
+        width: content.width,
+        ..padding
     }
 }
 

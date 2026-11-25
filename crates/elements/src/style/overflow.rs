@@ -9,7 +9,7 @@
 //! 3.3), which vapors does not scroll: there `scroll` and `auto` are
 //! refused.
 
-use taffy::{Overflow, Point, Style};
+use taffy::{CompactLength, LengthPercentage, Overflow, Point, Style};
 use vapors_css::property::longhands::{OVERFLOW_X, OVERFLOW_Y};
 use vapors_css::value::Value;
 
@@ -37,14 +37,43 @@ pub(crate) fn overflow(reader: &mut Reader<'_>, style: &mut Style) {
     style.overflow = Point { x, y };
 }
 
-/// Refuses a clip with rounded corners.
-pub(crate) fn refuse_rounded_clip(reader: &mut Reader<'_>, style: &Style, decoration: &Decoration) {
-    if clips(style) && decoration.radii.iter().any(|r| *r > 0.0) {
-        reader.refuse(
-            OVERFLOW_X,
-            "clips to a box with a border-radius, and rounded clips are refused until a slice needs them (docs/F2c.md); remove the radius or the clip".to_owned(),
-        );
+/// Refuses a clip with rounded corners, but for a text field's whose
+/// text is clipped to its content box on x (`clip.rs`) clear of every
+/// corner's curve, where the rectangle is the rounded clip.
+pub(crate) fn refuse_rounded_clip(
+    reader: &mut Reader<'_>,
+    style: &Style,
+    decoration: &Decoration,
+    text_field: bool,
+) {
+    if !clips(style) || decoration.radii.iter().all(|r| *r <= 0.0) {
+        return;
     }
+    if text_field && clear_of_corners(style, decoration) {
+        return;
+    }
+    reader.refuse(
+        OVERFLOW_X,
+        "clips to a box with a border-radius, and rounded clips are refused until a slice needs them (docs/F2c.md); remove the radius or the clip, or, on a text field, give it side padding at least its corners' radius less its border".to_owned(),
+    );
+}
+
+/// Whether a text field's content box, on x, starts and ends clear of
+/// its inner corners' curves: each side's padding at least the radius
+/// of its corners less that side's border (CSS Backgrounds 3 section
+/// 5.2). A percentage padding is not known here, so it is not clear.
+fn clear_of_corners(style: &Style, decoration: &Decoration) -> bool {
+    let [_, right, _, left] = decoration.border;
+    let [top_left, top_right, bottom_right, bottom_left] = decoration.radii;
+    let fixed = |side: LengthPercentage| {
+        let raw = side.into_raw();
+        (raw.tag() == CompactLength::LENGTH_TAG).then(|| raw.value())
+    };
+    let clear = |padding: LengthPercentage, radius: f32, border: f32| {
+        fixed(padding).is_some_and(|padding| padding >= radius - border)
+    };
+    clear(style.padding.left, top_left.max(bottom_left), left)
+        && clear(style.padding.right, top_right.max(bottom_right), right)
 }
 
 /// Whether an element's overflow belongs to the viewport: the root's
@@ -63,15 +92,13 @@ pub(crate) fn refuse_viewport_scroll(reader: &mut Reader<'_>, style: &Style, to_
     }
 }
 
-/// Refuses a text or number field that scrolls: its text origin and
-/// marks come from its text child's rect, which is in the field's own
-/// scroll frame, while they are kept in the frame the field is in
-/// (`frames.rs`, IU4).
-pub(crate) fn refuse_scrolling_field(reader: &mut Reader<'_>, style: &Style, field: bool) {
-    if field && scrolls(style) {
+/// Refuses a number field that scrolls: its text is not scrolled to
+/// its caret (`scroll_reveal.rs` reveals a text field's).
+pub(crate) fn refuse_scrolling_field(reader: &mut Reader<'_>, style: &Style, number: bool) {
+    if number && scrolls(style) {
         reader.refuse(
             OVERFLOW_X,
-            "scrolls a text or number field, which vapors does not do: its text is placed from the field's box; use overflow: hidden or clip".to_owned(),
+            "scrolls a number field, which vapors does not do (a text field's text scrolls to its caret, a number field's does not yet); use overflow: hidden or clip".to_owned(),
         );
     }
 }

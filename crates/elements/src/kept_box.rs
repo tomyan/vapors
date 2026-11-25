@@ -15,10 +15,10 @@ use crate::painted::Painted;
 /// they change only with a rebuilt box: border widths, which come only
 /// from style (CSS has no % border); and whether its background became
 /// the canvas's, which reads only html's and body's style, whose
-/// restyle rebuilds the tree or body; and a text field's text origin,
-/// which follows from its rect, padding, border and style, while a
-/// value or style change rebuilds the field. The debug check
-/// (`kept_paint_check.rs`) guards all three.
+/// restyle rebuilds the tree or body; and a text field's text origin
+/// and marks, which its run paints from the run's rect, while a value,
+/// focus or style change rebuilds the field and its run. The debug
+/// check (`kept_paint_check.rs`) guards all three.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct BoxFrom {
     /// Its border box, scroll offsets applied.

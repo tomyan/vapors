@@ -57,13 +57,16 @@ pub(crate) struct LayoutBox {
     pub(crate) checked: Option<bool>,
     /// Whether that checkbox is a switch (`switch.rs`).
     pub(crate) switch: bool,
-    /// Whether the element is a text or number field (E6a, 3-E3c),
-    /// whose text origin paint keeps for the pointer.
+    /// Whether the element is a text or number field (E6a, 3-E3c).
     pub(crate) text_field: bool,
     /// The placeholder an empty text or number field shows, for paint
     /// (`placeholder.rs`).
     pub(crate) placeholder: Option<String>,
-    /// A focused text field's caret and selection, for paint.
+    /// On a text or number field's run, its text: the field, whose
+    /// text origin paint keeps for the pointer from this box, in the
+    /// field's scroll frame when it scrolls (entry 44).
+    pub(crate) field_text: Option<NodeId>,
+    /// On a focused field's run, its caret and selection, for paint.
     pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
     /// Whether the box was kept from the last update rather than built
     /// in this one: only a kept box's kept paint may stay in place
@@ -92,6 +95,7 @@ impl LayoutBox {
             switch: false,
             text_field: false,
             placeholder: None,
+            field_text: None,
             text_marks: None,
             kept: false,
         }

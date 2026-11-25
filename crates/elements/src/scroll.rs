@@ -8,6 +8,7 @@ use crate::node_map::NodeMap;
 use vapors_dom::NodeId;
 
 use crate::layout::{Content, Lanes, LayoutBox};
+use crate::scroll_reveal::Revealed;
 
 /// The offsets, by scroll container, and the containers scrolled
 /// since the last update.
@@ -28,6 +29,9 @@ struct Offset {
     /// as last settled.
     alpha: u8,
     settled_alpha: u8,
+    /// A text field's caret, as its offset last followed it
+    /// (`scroll_reveal.rs`).
+    revealed: Revealed,
 }
 
 impl Offsets {
@@ -124,7 +128,8 @@ impl Offsets {
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let offset = self.clamped_to(node, max);
+        let kept = &self.by_node[&node];
+        let offset = self.clamped_to(node, max, (kept.at, kept.revealed));
         self.settled_to(node, offset, scale)
     }
 
@@ -159,13 +164,24 @@ impl Offsets {
         self.by_node == other.by_node
     }
 
+    /// `node`'s offset, a text field's moved to its caret
+    /// (`scroll_reveal.rs`), clamped to its range as laid out now.
     fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
-        self.clamped_to(node, range(laid, index))
+        let kept = self.by_node.get(&node);
+        let at = kept.map_or([0.0; 2], |kept| kept.at);
+        let last = kept.and_then(|kept| kept.revealed);
+        let moved = crate::scroll_reveal::revealed(laid.0, index, at, last);
+        self.clamped_to(node, range(laid, index), moved)
     }
 
-    /// `node`'s offset clamped to `max`, its range.
-    fn clamped_to(&self, node: NodeId, max: [f32; 2]) -> Offset {
-        let at = self.get(node).unwrap_or_default();
+    /// `node`'s offset `at` clamped to `max`, its range, kept with what
+    /// it was `revealed` for.
+    fn clamped_to(
+        &self,
+        node: NodeId,
+        max: [f32; 2],
+        (at, revealed): ([f32; 2], Revealed),
+    ) -> Offset {
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
         Offset {
@@ -174,6 +190,7 @@ impl Offsets {
             settled: [at, max],
             alpha,
             settled_alpha: alpha,
+            revealed,
         }
     }
 
@@ -231,7 +248,8 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its padding box, on the axes that scroll (`auto`, `scroll`; a
 /// `hidden` or `clip` axis has none). Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
-/// counts, so the larger of the two is taken.
+/// counts, so the larger of the two is taken. A text field's on x is
+/// its text's and caret's past its content box (`scroll_reveal.rs`).
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
     let (border, padding) = (layout.border, layout.padding);
@@ -246,6 +264,11 @@ fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
             .scroll_height()
             .max(end[1] + padding.bottom - inner[1]),
     ];
+    let reach = if boxes[index].text_field {
+        [crate::scroll_reveal::field_reach(boxes, index), reach[1]]
+    } else {
+        reach
+    };
     let overflow = boxes[index].style.overflow;
     let scrolls = |axis: taffy::Overflow| axis == taffy::Overflow::Scroll;
     [

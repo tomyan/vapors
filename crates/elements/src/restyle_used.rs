@@ -98,10 +98,10 @@ impl Document {
             initial: &kept.initial,
             flex_item: parent_used.is_some_and(|p| blockifies(p.layout.display)),
             in_inline: parent_used.is_some_and(|p| p.inline),
-            text_like_field: self.arena.get(node, "restyle").element().is_some_and(|e| {
-                e.tag == "input"
-                    && (crate::check::is_type(e, "number") || crate::text_field::is_text_input(e))
+            text_like_field: self.input_is(node, |e| {
+                crate::check::is_type(e, "number") || crate::text_field::is_text_input(e)
             }),
+            number_field: self.input_is(node, |e| crate::check::is_type(e, "number")),
             surface: crate::surfaces::is_surface(&self.arena, node),
             to_viewport: crate::style::to_viewport(
                 node == self.root(),
@@ -110,6 +110,12 @@ impl Document {
             ),
             scale: viewport.scale,
         }
+    }
+
+    /// Whether `node` is an `input` that `test` holds for.
+    fn input_is(&self, node: NodeId, test: impl Fn(&crate::node::Element) -> bool) -> bool {
+        let element = self.arena.get(node, "restyle").element();
+        element.is_some_and(|e| e.tag == "input" && test(e))
     }
 
     pub(crate) fn element_styles(&self, node: NodeId) -> ElementStyles<'_> {
