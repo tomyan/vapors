@@ -11,9 +11,7 @@ A text field or number field with no value paints its `placeholder`.
 - The text of the attribute with line feeds and carriage returns removed
   (as Chromium's `StrippedPlaceholder` does; an input has one line). A
   placeholder of only line breaks is empty and paints nothing.
-- In the input's font and in Chromium's placeholder colour, `#757575` (its
-  html.css has `-internal-light-dark(#757575, #A9A9A9)`; vapors has the
-  light scheme only), the constant `placeholder::COLOR`.
+- In the input's font and in its placeholder colour (below).
 - Left-aligned at the left of the content box, on one line, centred in the
   content box's height as Chromium's `LayoutTextControlSingleLine` centres
   the inner editor (also when the line is taller than the box), and cut to
@@ -40,8 +38,16 @@ parser turns the rule into one on the input that sets
 any property's value. Refused, naming them: another property in the rule;
 `inherit`, `initial` or `unset`, also from a `var()`; `::placeholder`
 anywhere else in a selector; the longhand written by name, also in
-`transition-property`. vapors-elements refuses a declared one until it paints
-it (the next slice).
+`transition-property`.
+
+Unstyled, a placeholder is `#757575`, opaque, whatever the input's own
+`color`: the pinned Chromium's (157.0.8103.0) computed `::placeholder`
+colour and opacity, saved in
+`crates/elements/tests/placeholder_chromium/computed.txt` (regenerate with
+`scripts/placeholder-chromium.sh` when the pin changes; the tests read the
+saved file and run no browser, and fail when it names another Chromium than
+the pin). vapors has the light scheme only. A class set at run time
+recolours it. The text typed into the field keeps the input's `color`.
 
 ## Which inputs
 
@@ -60,7 +66,7 @@ so give the field an `aria-label`).
 
 ## Left
 
-- `::placeholder { color }` (vapors-css refuses every pseudo-element) and
-  `:placeholder-shown`; search, url, tel, email and password inputs (not
+- Placeholder styles other than its colour (`opacity`, fonts and the rest),
+  and `:placeholder-shown`; search, url, tel, email and password inputs (not
   built); a right-to-left or wrapping placeholder; vertical centring of the
   typed text.

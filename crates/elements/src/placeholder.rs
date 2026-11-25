@@ -1,20 +1,8 @@
 //! The placeholder of an empty text or number field (`docs/placeholder.md`):
-//! which inputs take one, its text, and its colour.
-
-use vapors_scene::Color;
+//! which inputs take one, and its text. Its colour is a style
+//! (`-vapors-placeholder-color`, from `::placeholder { color }`).
 
 use crate::node::Element;
-
-/// The placeholder's colour: Chromium's, `#757575` (`rgb(117, 117, 117)`,
-/// what `getComputedStyle(input, '::placeholder').color` reads in its
-/// light scheme; its html.css has `-internal-light-dark(#757575,
-/// #A9A9A9)`). `::placeholder { color }` is left (`docs/placeholder.md`).
-pub(crate) const COLOR: Color = Color {
-    r: 117.0 / 255.0,
-    g: 117.0 / 255.0,
-    b: 117.0 / 255.0,
-    a: 1.0,
-};
 
 /// Whether `element` is an input that paints a placeholder: one with an
 /// editor (`text_field::is_edited`), a text or number field.

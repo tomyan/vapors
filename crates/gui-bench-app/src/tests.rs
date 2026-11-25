@@ -25,4 +25,5 @@ mod order_rows;
 mod orders_behaviour;
 mod pages;
 mod progress_fill;
+mod search_hint;
 mod support;
