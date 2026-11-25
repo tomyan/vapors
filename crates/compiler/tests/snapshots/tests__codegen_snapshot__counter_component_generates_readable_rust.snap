@@ -1,6 +1,5 @@
 ---
 source: crates/compiler/tests/codegen_snapshot.rs
-assertion_line: 16
 expression: code
 ---
 // Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
@@ -20,7 +19,7 @@ pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
 static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elements::__wisp::dom::KeyWinners {
     sheets: &[
-        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0x8eda_9c93_9284_8c8f),
+        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0x33b9_92d5_b7f6_c20a),
         (vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
     ],
     base: &[
@@ -268,11 +267,11 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
     conditional: &[
         vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
-            rule: 69,
+            rule: 71,
         },
         vapors_elements::__wisp::dom::RuleRef {
             sheet: 0,
-            rule: 70,
+            rule: 72,
         },
     ],
     blocked_by: &[],
