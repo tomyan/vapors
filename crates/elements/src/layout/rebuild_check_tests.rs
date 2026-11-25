@@ -81,6 +81,17 @@ fn a_kept_box_with_paint_a_fresh_build_makes_differently_panics() {
 
 #[test]
 #[should_panic(expected = "is not the box a fresh build makes")]
+fn a_kept_box_showing_a_placeholder_a_fresh_build_does_not_make_panics() {
+    // Given: the second div's kept box shows a placeholder
+    let (mut doc, second) = two_divs();
+    second_box(&mut doc, second).placeholder = Some("Search".to_owned());
+
+    // When, then
+    check(&doc);
+}
+
+#[test]
+#[should_panic(expected = "is not the box a fresh build makes")]
 fn a_box_not_built_this_update_that_is_not_flagged_kept_panics() {
     // Given
     let (mut doc, second) = two_divs();

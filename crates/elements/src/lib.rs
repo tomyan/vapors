@@ -135,6 +135,8 @@ mod painted;
 mod painted_batches;
 mod painted_positions;
 mod painting;
+mod placeholder;
+mod placeholder_paint;
 mod placement;
 mod placement_changes;
 mod placement_check;
