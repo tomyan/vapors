@@ -88,13 +88,14 @@ fn the_unit_tier_leaves_out_the_gpu_pmu_and_host_tests() {
 // a counter, so the pmu tier runs it and the gpu and host tiers leave it.
 #[test]
 fn the_gpu_tier_leaves_out_the_pmu_tests() {
-    for (step, tests) in [(gpu(), GPU_TESTS)] {
-        // Then
-        assert_eq!(
-            step.args.last().map(String::as_str),
-            Some(format!("({tests}) and not ({PMU_TESTS})").as_str())
-        );
-    }
+    // When
+    let step = gpu();
+
+    // Then
+    assert_eq!(
+        step.args.last().map(String::as_str),
+        Some(format!("({GPU_TESTS}) and not ({PMU_TESTS})").as_str())
+    );
 }
 
 #[test]
