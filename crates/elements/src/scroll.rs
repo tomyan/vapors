@@ -19,11 +19,13 @@ pub(crate) struct Offsets {
 }
 
 /// One container's offset and how far it can go, and both as last
-/// settled: a scroll moves `at` before the update settles it.
+/// settled: a scroll moves `at` before the update settles it; and its
+/// client size as last laid out.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Offset {
     at: [f32; 2],
     max: [f32; 2],
+    client: [f32; 2],
     settled: [[f32; 2]; 2],
     /// How opaque its own thumbs are drawn, 0 to 255 (`thumb.rs`), and
     /// as last settled.
@@ -43,6 +45,14 @@ impl Offsets {
     /// Each scroll container and its offset, in no order.
     pub(crate) fn each(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
         self.by_node.iter().map(|(node, offset)| (*node, offset.at))
+    }
+
+    /// Each scroll container and its client size as last laid out
+    /// (`client_size`), in no order.
+    pub(crate) fn sizes(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
+        self.by_node
+            .iter()
+            .map(|(node, offset)| (*node, offset.client))
     }
 
     /// The offset of `node` and how far it can go, if it scrolls.
@@ -127,8 +137,8 @@ impl Offsets {
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let (max, at) = (kept.max, (kept.at, kept.revealed));
-        let offset = self.clamped_to(node, max, at);
+        let (max, client) = (kept.max, kept.client);
+        let offset = self.clamped_to(node, (max, client), (kept.at, kept.revealed));
         self.settled_to(node, offset, scale)
     }
 
@@ -170,15 +180,16 @@ impl Offsets {
         let at = kept.map_or([0.0; 2], |kept| kept.at);
         let last = kept.and_then(|kept| kept.revealed);
         let moved = crate::scroll_reveal::revealed(laid.0, index, at, last);
-        self.clamped_to(node, range(laid, index), moved)
+        let laid_out = (range(laid, index), client_size(laid.0, index));
+        self.clamped_to(node, laid_out, moved)
     }
 
-    /// `node`'s offset `at` clamped to `max`, its range, kept with what
-    /// it was `revealed` for.
+    /// `node`'s offset `at` clamped to `max`, its range, with `client`,
+    /// its client size, kept with what it was `revealed` for.
     fn clamped_to(
         &self,
         node: NodeId,
-        max: [f32; 2],
+        (max, client): ([f32; 2], [f32; 2]),
         (at, revealed): ([f32; 2], Revealed),
     ) -> Offset {
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
@@ -186,6 +197,7 @@ impl Offsets {
         Offset {
             at,
             max,
+            client,
             settled: [at, max],
             alpha,
             settled_alpha: alpha,
@@ -251,12 +263,9 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its text's and caret's past its content box (`scroll_reveal.rs`).
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
-    let (border, padding) = (layout.border, layout.padding);
+    let padding = layout.padding;
     let end = content_end((boxes, lanes), index);
-    let inner = [
-        layout.size.width - border.left - border.right,
-        layout.size.height - border.top - border.bottom,
-    ];
+    let inner = client_size(boxes, index);
     let x = if crate::scroll_reveal::scrolls_text(&boxes[index]) {
         crate::scroll_reveal::field_reach(boxes, index)
     } else {
@@ -270,6 +279,17 @@ fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     [
         if scrolls(overflow.x) { x } else { 0.0 },
         if scrolls(overflow.y) { y } else { 0.0 },
+    ]
+}
+
+/// Box `index`'s client size: its padding box, the border box less its
+/// borders (scroll thumbs overlay it and take none of it).
+fn client_size(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+    let layout = &boxes[index].layout;
+    let border = layout.border;
+    [
+        layout.size.width - border.left - border.right,
+        layout.size.height - border.top - border.bottom,
     ]
 }
 
