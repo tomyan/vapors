@@ -1,5 +1,5 @@
-//! The test tiers, split on the test function's name: unit, gpu, host,
-//! and pmu, which `ci` never runs.
+//! The test tiers, split on the test's name: unit, gpu, host, and two
+//! that `ci` never runs, sdk-host and pmu.
 
 use super::Step;
 
@@ -34,14 +34,24 @@ pub(super) const PMU_TESTS: &str = "test(/^pmu_/) | test(/::pmu_[^:]*$/)";
 
 /// Tests that use what only the host has, named `host_`: bwrap making a
 /// user namespace, which an API builder's sandbox forbids
-/// (`--disable-userns`, `docs/plans/api-builder.md`), and the user's
-/// systemd. `ci` and ci.yml run them in their own tier, so the gate does
-/// (each gate step runs inside the gate's bwrap, the host tier
-/// included). An API builder's sandboxed ci will run every tier but this
-/// one, once `request_push` lands (the plan's slice 4); until then a
-/// sandboxed ci fails at this step, loudly. Each has a unit-tier twin
+/// (`--disable-userns`, `docs/plans/api-builder.md`). `ci` and ci.yml run
+/// them in their own tier, so the gate does (each gate step runs inside
+/// the gate's bwrap, the host tier included), except the SDK harness's
+/// ([`SDK_HARNESS_TESTS`]). An API builder's sandboxed ci runs
+/// `ci --except host` (`api_push_ci.rs` `CI`). Each has a unit-tier twin
 /// that gives the host's answer instead of asking for it.
 pub(super) const HOST_TESTS: &str = "test(/^host_/) | test(/::host_[^:]*$/)";
+
+/// The private SDK (API builder) harness's tests: xtask's `api_` modules.
+/// Their host tests are in no tier `ci`, ci.yml or the gate runs (Tom,
+/// 2026-11-25: SDK adoption deprioritised; its harness tests leave routine
+/// public CI). Relaxed guard: on GitHub's runner `AppArmor` refuses their
+/// bwrap user namespace (run 45482514993), and nothing routine checks
+/// them now. `cargo xtask test --tier sdk-host` runs them, on a host that
+/// lets bwrap make a user namespace. Retire this when the harness leaves
+/// vapors (the lead's runner extraction) or SDK work resumes. Their unit
+/// tests stay in the unit tier.
+pub(super) const SDK_HARNESS_TESTS: &str = "package(xtask) and test(/^api_/)";
 
 pub(super) fn unit() -> Step {
     tier(
@@ -62,7 +72,16 @@ pub(super) fn gpu() -> Step {
 pub(super) fn host() -> Step {
     tier(
         "host",
-        &format!("({HOST_TESTS}) and not ({PMU_TESTS})"),
+        &format!("({HOST_TESTS}) and not ({PMU_TESTS}) and not ({SDK_HARNESS_TESTS})"),
+        "needs bwrap able to make a user namespace; run the failing test alone with `cargo nextest run <name>`",
+    )
+}
+
+/// The SDK harness's host tests, which the host tier leaves out.
+pub(super) fn sdk_host() -> Step {
+    tier(
+        "sdk-host",
+        &format!("({HOST_TESTS}) and ({SDK_HARNESS_TESTS}) and not ({PMU_TESTS})"),
         "needs bwrap able to make a user namespace; run the failing test alone with `cargo nextest run <name>`",
     )
 }
