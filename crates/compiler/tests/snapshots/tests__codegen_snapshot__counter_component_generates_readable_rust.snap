@@ -24,7 +24,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
     ],
     base: &[
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(13),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(14),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
@@ -34,23 +34,13 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(14),
-            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
-                rule: vapors_elements::__wisp::dom::RuleRef {
-                    sheet: 0,
-                    rule: 60,
-                },
-                declaration: 3,
-            },
-        },
-        vapors_elements::__wisp::dom::BaseWinner {
             property: vapors_elements::__wisp::dom::PropertyRef::Longhand(15),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 4,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -70,7 +60,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 3,
+                declaration: 4,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -160,7 +150,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 4,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -180,7 +170,7 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 3,
+                declaration: 4,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -194,13 +184,13 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(32),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(30),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 1,
+                declaration: 3,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
@@ -210,25 +200,25 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 6,
+                declaration: 1,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(38),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(34),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 0,
                     rule: 60,
                 },
-                declaration: 0,
+                declaration: 6,
             },
         },
         vapors_elements::__wisp::dom::BaseWinner {
-            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(83),
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(39),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
-                    sheet: 1,
-                    rule: 0,
+                    sheet: 0,
+                    rule: 60,
                 },
                 declaration: 0,
             },
@@ -255,6 +245,16 @@ static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elemen
         },
         vapors_elements::__wisp::dom::BaseWinner {
             property: vapors_elements::__wisp::dom::PropertyRef::Longhand(86),
+            declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
+                rule: vapors_elements::__wisp::dom::RuleRef {
+                    sheet: 1,
+                    rule: 0,
+                },
+                declaration: 0,
+            },
+        },
+        vapors_elements::__wisp::dom::BaseWinner {
+            property: vapors_elements::__wisp::dom::PropertyRef::Longhand(87),
             declaration: vapors_elements::__wisp::dom::DeclarationRef::Rule {
                 rule: vapors_elements::__wisp::dom::RuleRef {
                     sheet: 1,

@@ -2,6 +2,7 @@
 //! selectors, at-rules, units and functions it accepts, found by parsing
 //! each candidate from CSS's own lists.
 
+use vapors_css::property::longhands::PLACEHOLDER_COLOR;
 use vapors_css::property::scene::SceneTag;
 use vapors_css::property::{IGNORED_VENDOR_PROPERTIES, PROPERTIES, PropertyId, SHORTHANDS};
 
@@ -33,8 +34,11 @@ fn accepted<'a>(candidates: &[&'a str], wrap: impl Fn(&str) -> String) -> Vec<&'
 }
 
 fn properties() -> String {
+    // `-vapors-placeholder-color` is written as `::placeholder { color }`
+    // (under Selectors), never by name
     let rows = PROPERTIES
         .iter()
+        .filter(|def| def.name != PLACEHOLDER_COLOR.name())
         .map(|def| {
             let inherited = if def.inherited { "yes" } else { "no" };
             format!(
@@ -79,7 +83,8 @@ fn selectors() -> String {
     format!(
         "## Selectors\n\nType, `*`, `.class`, `#id`, attribute selectors and the combinators \
          (descendant, `>`, `+`, `~`). Pseudo-classes accepted: {}.\n\nRefused: {}, and every \
-         pseudo-element (`::before`, `::after`).\n",
+         pseudo-element (`::before`, `::after`) but `::placeholder` at the end of a selector, \
+         with only `color`.\n",
         codes(pseudo.iter().map(|p| p.split('(').next().unwrap_or(p))),
         codes(refused.iter().map(|p| p.split('(').next().unwrap_or(p))),
     )

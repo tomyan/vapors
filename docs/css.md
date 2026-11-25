@@ -101,7 +101,8 @@ accepted. The parser refuses rather than drops:
   `@layer`: sumi had no layers either);
 - values that fail the property's grammar, named with the grammar;
 - unknown pseudo-classes and all pseudo-elements (`::before`,
-  `::after`: generate the content as an element);
+  `::after`: generate the content as an element) but `::placeholder` at
+  the end of a selector with only `color` (`docs/placeholder.md`);
 - sumi's terminal extras by name, with the replacement: `bold`, `dim`,
   `italic`, `underline`, `strikethrough`, `inverse`, `border-title`,
   the `cell` unit, `opacity: dim`, the box-drawing border styles;
