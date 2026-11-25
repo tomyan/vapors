@@ -112,3 +112,19 @@ fn a_placeholder_of_only_spaces_describes_nothing() {
     // Then
     assert_eq!(textbox(&doc), ("Search".into(), None));
 }
+
+#[test]
+fn the_placeholder_stays_the_description_once_the_field_has_a_value() {
+    // Given
+    let (doc, _) = field(&[
+        ("aria-label", "Search"),
+        ("placeholder", "Find a report"),
+        ("value", "ada"),
+    ]);
+
+    // Then
+    assert_eq!(
+        textbox(&doc),
+        ("Search".into(), Some("Find a report".into()))
+    );
+}
