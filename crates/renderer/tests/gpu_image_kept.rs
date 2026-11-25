@@ -6,8 +6,8 @@
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::{
-    FrameEncoder, ImagePipeline, KeptRange, Sampling, Target, TextureBinding, TransformTable,
-    clear, translation, upload_rgba8,
+    ClipEntry, ClipTable, FrameEncoder, ImagePipeline, KeptRange, Sampling, Target, TextureBinding,
+    TransformTable, clear, translation, upload_rgba8,
 };
 use vapors_scene::{Color, Rect, Size};
 
@@ -32,6 +32,8 @@ struct Scene {
     blue: TextureBinding,
     /// The transform table the kept draws bind.
     table: TransformTable,
+    /// The clip table they bind.
+    clips: ClipTable,
 }
 
 impl Scene {
@@ -46,6 +48,7 @@ impl Scene {
         };
         let (red, blue) = (bound(RED), bound(BLUE));
         let table = TransformTable::new(&gpu.device, "test transforms");
+        let clips = ClipTable::new(&gpu.device, "test clips");
         Self {
             gpu,
             target,
@@ -53,6 +56,7 @@ impl Scene {
             red,
             blue,
             table,
+            clips,
         }
     }
 
@@ -103,12 +107,18 @@ fn gpu_kept_image_quads_draw_by_their_place_in_a_later_frame_with_nothing_writte
 
     // When: blue drawn over the right half, red over the left
     scene.frame(|scene, at| {
-        scene
-            .pipeline
-            .draw_kept(at, &scene.blue, (&kept, 1), (&mut scene.table, 0, 0));
-        scene
-            .pipeline
-            .draw_kept(at, &scene.red, (&kept, 0), (&mut scene.table, 0, 0));
+        scene.pipeline.draw_kept(
+            at,
+            &scene.blue,
+            (&kept, 1),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
+        scene.pipeline.draw_kept(
+            at,
+            &scene.red,
+            (&kept, 0),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
     });
 
     // Then
@@ -116,9 +126,10 @@ fn gpu_kept_image_quads_draw_by_their_place_in_a_later_frame_with_nothing_writte
     let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
     assert_eq!([pixel(&pixels, 2, 2), pixel(&pixels, 12, 5)], [RED, BLUE]);
     assert_eq!(written.buffer_bytes, 2 * 6 * 16);
-    // No vertex bytes: the 16 are the view uniform's first value.
+    // No vertex bytes: the 32 are the view uniform's first value (its
+    // size, frame, row and clip entries, padded: flat-scene F3.1b).
     let uniform = (work.buffer_bytes, work.uniform_writes);
-    assert_eq!((uniform, work.draw_calls), ((16, 1), 2));
+    assert_eq!((uniform, work.draw_calls), ((32, 1), 2));
     assert_eq!(scene.pipeline.retained_bytes(), 2 * 6 * 16);
 }
 
@@ -131,9 +142,12 @@ fn gpu_a_kept_image_quad_past_the_range_panics() {
     // When
     scene.frame(|scene, at| {
         let kept = scene.keep_halves(at);
-        scene
-            .pipeline
-            .draw_kept(at, &scene.red, (&kept, 2), (&mut scene.table, 0, 0));
+        scene.pipeline.draw_kept(
+            at,
+            &scene.red,
+            (&kept, 2),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
     });
 }
 
@@ -150,7 +164,7 @@ fn gpu_a_kept_image_quad_far_past_the_range_panics() {
             at,
             &scene.red,
             (&kept, u32::MAX / 6 + 1),
-            (&mut scene.table, 0, 0),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
         );
     });
 }
@@ -169,12 +183,18 @@ fn gpu_kept_image_quads_draw_on_a_target_of_another_viewport() {
         height: 8,
     };
     scene.frame_on(resized, |scene, at| {
-        scene
-            .pipeline
-            .draw_kept(at, &scene.blue, (&kept, 0), (&mut scene.table, 0, 0));
-        scene
-            .pipeline
-            .draw_kept(at, &scene.red, (&kept, 1), (&mut scene.table, 0, 0));
+        scene.pipeline.draw_kept(
+            at,
+            &scene.blue,
+            (&kept, 0),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
+        scene.pipeline.draw_kept(
+            at,
+            &scene.red,
+            (&kept, 1),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
     });
 
     // Then: device pixels, the same place on any viewport: the left half
@@ -198,7 +218,7 @@ fn gpu_kept_image_quads_in_a_moved_frame_land_moved_by_it() {
         scene
             .table
             .set(at.encoder, at.queue, frame, &[translation([4.0, 2.0])]);
-        let table = (&mut scene.table, frame, 0);
+        let table = ((&mut scene.table, frame, 0), (&mut scene.clips, 0));
         scene.pipeline.draw_kept(at, &scene.blue, (&kept, 0), table);
     });
 
@@ -217,11 +237,59 @@ fn gpu_an_image_pipeline_given_a_second_transform_table_refuses_it() {
     scene.frame(|scene, at| {
         let kept = scene.keep_halves(at);
         let mut second = TransformTable::new(at.device, "second");
+        scene.pipeline.draw_kept(
+            at,
+            &scene.blue,
+            (&kept, 0),
+            ((&mut scene.table, 0, 0), (&mut scene.clips, 0)),
+        );
+        scene.pipeline.draw_kept(
+            at,
+            &scene.blue,
+            (&kept, 0),
+            ((&mut second, 0, 0), (&mut scene.clips, 0)),
+        );
+    });
+}
+
+#[test]
+fn gpu_a_kept_image_quad_is_cut_by_its_clip_entry() {
+    // Given: the halves kept, and a clip entry covering the left 4 columns
+    let mut scene = Scene::new();
+    let mut kept = None;
+    scene.frame(|scene, at| kept = Some(scene.keep_halves(at)));
+    let kept = kept.expect("kept");
+
+    // When: the left half drawn under that clip
+    scene.frame(|scene, at| {
+        let frame = scene.table.take(at.encoder, 1).expect("room");
         scene
-            .pipeline
-            .draw_kept(at, &scene.blue, (&kept, 0), (&mut scene.table, 0, 0));
-        scene
-            .pipeline
-            .draw_kept(at, &scene.blue, (&kept, 0), (&mut second, 0, 0));
+            .table
+            .set(at.encoder, at.queue, frame, &[translation([0.0, 0.0])]);
+        let clip = scene.clips.take(at.encoder, 1).expect("room");
+        let entry = ClipEntry::rect([0.0, 0.0, 4.0, 8.0], frame);
+        scene.clips.set(at.encoder, at.queue, clip, entry);
+        let place = ((&mut scene.table, frame, 0), (&mut scene.clips, clip));
+        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 0), place);
+    });
+
+    // Then: blue inside the clip, grey past it in the same half
+    let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
+    let grey = [40, 40, 40, 255];
+    assert_eq!([pixel(&pixels, 3, 4), pixel(&pixels, 4, 4)], [BLUE, grey]);
+    scene.pipeline.release(kept);
+}
+
+#[test]
+#[should_panic(expected = "a pipeline draws from one clip table")]
+fn gpu_an_image_pipeline_given_a_second_clip_table_refuses_it() {
+    let mut scene = Scene::new();
+    scene.frame(|scene, at| {
+        let kept = scene.keep_halves(at);
+        let mut second = ClipTable::new(at.device, "second");
+        let first = ((&mut scene.table, 0, 0), (&mut scene.clips, 0));
+        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 0), first);
+        let other = ((&mut scene.table, 0, 0), (&mut second, 0));
+        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 0), other);
     });
 }

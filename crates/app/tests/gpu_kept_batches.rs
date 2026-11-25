@@ -135,11 +135,12 @@ fn gpu_image_quads_kept_for_one_viewport_draw_on_another_with_the_same_view_unwr
     let pixels = draw_on(&mut rig, &doc, (32, None));
 
     // Then: the image's quad, in device pixels, is drawn as kept; the
-    // 16 bytes are the new viewport's uniform value
+    // 32 bytes are the new viewport's uniform value (with its frame, row
+    // and clip entries: flat-scene F3.1b)
     let counts = rig.painter.frame_counts();
     assert_eq!(counts.batches_written, 0, "{counts:?}");
     let images = counts.images;
-    assert_eq!((images.buffer_bytes, images.uniform_writes), (16, 1));
+    assert_eq!((images.buffer_bytes, images.uniform_writes), (32, 1));
     let at = |x: u32, y: u32| pixels[((y * 32 + x) * 4) as usize..][..4].to_vec();
     assert_eq!([at(14, 4), at(20, 4)], [RED.to_vec(), WHITE.to_vec()]);
 }

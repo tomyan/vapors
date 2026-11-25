@@ -2,7 +2,9 @@
 // y down) in the quad's frame and row, are placed by their entries in the
 // transform table (transform_table.rs) and go to clip space by the
 // viewport; the fragment samples the texture with whatever sampler
-// is bound (nearest, for an image canvas).
+// is bound (nearest, for an image canvas) and takes the coverage of the
+// quad's clip in the clip table (clip.wgsl, concatenated after this:
+// flat-scene F3.1b).
 
 struct VertexIn {
     @location(0) position: vec2<f32>,
@@ -17,12 +19,14 @@ struct VertexOut {
 @group(0) @binding(0) var image: texture_2d<f32>;
 @group(0) @binding(1) var image_sampler: sampler;
 
-// The target's size, the quad's frame's entry in the transform table, and
-// its row's (0, the identity, for a quad in no lane row).
+// The target's size, the quad's frame's entry in the transform table,
+// its row's (0, the identity, for a quad in no lane row), and its clip's
+// entry in the clip table (0 for none).
 struct View {
     size: vec2<f32>,
     frame: u32,
     row: u32,
+    clip: u32,
 }
 
 @group(1) @binding(0) var<uniform> view: View;
@@ -42,5 +46,7 @@ fn vs_main(in: VertexIn) -> VertexOut {
 
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
-    return textureSample(image, image_sampler, in.uv);
+    let colour = textureSample(image, image_sampler, in.uv);
+    // the row is already an entry of its own, so no draw base is added
+    return vec4(colour.rgb, colour.a * clip_coverage(in.position.xy, view.clip, view.row, 0u));
 }

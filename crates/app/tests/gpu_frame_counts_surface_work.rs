@@ -10,8 +10,9 @@ use vapors_elements::Document;
 
 /// An image quad: 6 vertices of 4 floats.
 const IMAGE_QUAD_BYTES: u64 = 6 * 16;
-/// The image pipeline's viewport and shift uniform, written on its first draw.
-const VIEW_UNIFORM_BYTES: u64 = 16;
+/// The image pipeline's view uniform (the viewport, and the quad's frame,
+/// row and clip entries: flat-scene F3.1b), written on its first draw.
+const VIEW_UNIFORM_BYTES: u64 = 32;
 /// What [`Writer`] writes each render.
 const WRITTEN: u64 = 64;
 
