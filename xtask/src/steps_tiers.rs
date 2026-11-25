@@ -34,12 +34,11 @@ pub(super) const PMU_TESTS: &str = "test(/^pmu_/) | test(/::pmu_[^:]*$/)";
 
 /// Tests that use what only the host has, named `host_`: bwrap making a
 /// user namespace, which an API builder's sandbox forbids
-/// (`--disable-userns`, `docs/plans/api-builder.md`), and the user's
-/// systemd. `ci` and ci.yml run them in their own tier, so the gate does
-/// (each gate step runs inside the gate's bwrap, the host tier
-/// included). An API builder's sandboxed ci will run every tier but this
-/// one, once `request_push` lands (the plan's slice 4); until then a
-/// sandboxed ci fails at this step, loudly. Each has a unit-tier twin
+/// (`--disable-userns`, `docs/plans/api-builder.md`). `ci` and ci.yml run
+/// them in their own tier, so the gate does (each gate step runs inside
+/// the gate's bwrap, the host tier included), except the SDK harness's
+/// ([`SDK_HARNESS_TESTS`]). An API builder's sandboxed ci runs
+/// `ci --except host` (`api_push_ci.rs` `CI`). Each has a unit-tier twin
 /// that gives the host's answer instead of asking for it.
 pub(super) const HOST_TESTS: &str = "test(/^host_/) | test(/::host_[^:]*$/)";
 

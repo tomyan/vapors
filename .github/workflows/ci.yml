@@ -50,20 +50,20 @@ jobs:
       # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
       # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
       # stalled on the mirror past the old 1-minute limit (run 40036716064).
-      # bubblewrap: the host tier's gate tests run steps under bwrap
-      # (xtask/src/gate_run_tests.rs, gate_sandbox_tests.rs); the runner
-      # image has no bwrap (run 45082608870: "bwrap: not found").
-      - name: install a CJK system font for the fallback test, and bubblewrap
+      # No bubblewrap (Tom, 2026-11-25): nothing in this job runs bwrap on
+      # the runner. The SDK harness's tests that did are out of the host
+      # tier; the host tier's gate tests, on a machine with no render node
+      # (the runner), take the NoRenderNode path and run steps without it;
+      # the unit tier's tests use fake bwraps. Where there is a render node
+      # the gate still refuses to run without bwrap (gate_sandbox.rs).
+      - name: install a CJK system font for the fallback test
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
-          packages: fonts-noto-cjk bubblewrap
+          packages: fonts-noto-cjk
       - name: the CJK font is there
         run: |
           fc-list :lang=zh | head -1 | grep . || { echo "::error::no CJK font after the install; fix: check the apt-install step"; exit 1; }
-      - name: bwrap is there
-        run: |
-          bwrap --version || { echo "::error::no bwrap after the install; fix: check the apt-install step"; exit 1; }
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
@@ -104,13 +104,14 @@ jobs:
         run: cargo run -p vapors-text --example warm_chromium
       - name: unit
         run: cargo xtask test --tier unit
-      # What only the host has (bwrap, the user's systemd): run here and in
-      # the gate, never in an API builder's sandbox (xtask/src/steps_tiers.rs
-      # HOST_TESTS). The private SDK harness's host tests are not in this
-      # tier (SDK_HARNESS_TESTS, Tom 2026-11-25): on GitHub's runner
-      # AppArmor refuses their bwrap user namespace (run 45482514993), and
-      # changing that is not authorised (Tom, 2026-11-23). They run only by
-      # `cargo xtask test --tier sdk-host`.
+      # The host_ tests: run here and in the gate, never in an API builder's
+      # sandbox (xtask/src/steps_tiers.rs HOST_TESTS). Here they are the
+      # gate's two bwrap tests; with no render node on the runner, each
+      # checks the NoRenderNode path, without bwrap. The private SDK
+      # harness's host tests are not in this tier (SDK_HARNESS_TESTS, Tom
+      # 2026-11-25): on GitHub's runner AppArmor refuses their bwrap user
+      # namespace (run 45482514993), and changing that is not authorised
+      # (Tom, 2026-11-23). `cargo xtask test --tier sdk-host` runs them.
       - name: host
         run: cargo xtask test --tier host
       # Bins and examples only: the unit step's nextest built the test
