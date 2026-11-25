@@ -47,9 +47,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Step timeout: about 2.5x the worst measured, rounded up to a minute.
-      # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
-      # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
-      # stalled on the mirror past the old 1-minute limit (run 40036716064).
+      # Over 13 runs with #626 that installed this list (2026-11-24 to 25): a
+      # cache hit took 12 to 32 s (23 s on average), a miss 12 to 34 s (run
+      # 45457321390). A hit saves the download, not the unpacking, so it is
+      # not reliably faster. apt-install saves the .debs inside this limit
+      # (1 to 3 s, run 45361157497). Not counted: one miss stalled on the
+      # mirror and was killed at the old 1-minute limit (run 40036716064),
+      # so how long it would have taken is unknown.
       # No bubblewrap (Tom, 2026-11-25): nothing in this job runs bwrap on
       # the runner. The SDK harness's tests that did are out of the host
       # tier. The host tier's two gate tests, on a machine with no render
@@ -236,8 +240,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Step timeout: about 2.5x the worst measured, rounded up to a minute.
-      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 11 s,
-      # a hit 14 s on average and 32 s at worst (run 40028433485).
+      # Over 19 runs with #626 (2026-11-24 to 25): a cache hit took 12 to 38 s
+      # (23 s on average, worst run 45489378697), a miss 14 to 36 s.
+      # apt-install saves the .debs inside this limit (1 to 3 s, run
+      # 45361157497).
       - name: install lavapipe
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
@@ -334,8 +340,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Step timeout: about 2.5x the worst measured, rounded up to a minute.
-      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 52 s
-      # (run 40030067596), a hit 15 s on average and 21 s at worst.
+      # Over 20 runs with #626 (2026-11-24 to 25), all cache hits: 13 to 46 s
+      # (25 s on average, worst run 45457321390). The worst miss measured is
+      # 52 s (run 40030067596, 2026-10-23). apt-install saves the .debs
+      # inside this limit (1 to 3 s, run 45361157497).
       - name: install lavapipe, Xvfb and winit's X11 libraries
         timeout-minutes: 3
         uses: ./.github/actions/apt-install
