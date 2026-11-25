@@ -7,18 +7,22 @@
 //! cargo run -p vapors-elements-corpus --example events_oracle -- --check # fail on any difference
 //! ```
 //!
-//! `--check` is what CI runs: a fixture edited without rerunning the
-//! oracle, or a Chromium whose answers differ, fails it, naming the first
-//! line that differs. Without `--check` every answer is written, or none
+//! `--check` is run on request, not in CI: a fixture edited without
+//! rerunning the oracle, or a Chromium whose answers differ, fails it,
+//! naming the first line that differs. CI plays every script on vapors
+//! against the committed answers (`tests/events_every_script.rs`) and
+//! holds the answers to the scripts (`tests/committed_references.rs`)
+//! without a browser. Without `--check` every answer is written, or none
 //! when one fails. An `.events` or `*.events.json` with no fixture is refused.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use vapors_elements_corpus::answer_files::refuse_orphans;
 use vapors_elements_corpus::ax::start;
 use vapors_elements_corpus::events_oracle::{answers, scripted};
 use vapors_elements_corpus::oracle::{fixtures_dir, write_fonts};
-use vapors_elements_corpus::oracle_files::{Committed, Work, compare, refuse_orphans};
+use vapors_elements_corpus::oracle_files::{Committed, Work, compare};
 use vapors_text::comparison::Chromium;
 
 fn main() -> ExitCode {
@@ -37,7 +41,7 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
-    refuse_orphans(".events.json", ".events")?;
+    refuse_orphans(&scripted()?, ".events.json")?;
     let trees = trees()?;
     if check {
         checked(&trees)
