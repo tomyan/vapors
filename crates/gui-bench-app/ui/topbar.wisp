@@ -28,7 +28,7 @@ let toggle_menu = move || menu.update(|open| *open = !*open);
 <div class="topbar">
   <div class="title">{title}</div>
   <div class="search">
-    <input class="search-input" type="text" aria-label="Search" placeholder={placeholder} bind:value={search} />
+    <input class="search-input" type="text" aria-label={placeholder} placeholder={placeholder} bind:value={search} />
   </div>
   <div class="export-anchor">
     <button class="export" onclick={toggle_menu}>{export}</button>

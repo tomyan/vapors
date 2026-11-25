@@ -1,6 +1,7 @@
 //! The search input's hint (`SEARCH_PLACEHOLDER`): the input's own
 //! placeholder in the spec's `MUTED`, gone while it holds text, which
-//! is painted in `TEXT`.
+//! is painted in `TEXT`; and its accessible name, the hint's text, as
+//! zgui's reference app labels it.
 use super::support::*;
 use crate::dashboard::*;
 use vapors_elements::Document;
@@ -64,4 +65,29 @@ fn typed_search_text_is_the_specs_text_colour_and_clearing_it_brings_the_hint_ba
     // Then
     assert_eq!((shown, hint), (vec![spec(TEXT)], vec![]));
     assert_eq!(painted(&mounted, SEARCH_PLACEHOLDER), [spec(MUTED)]);
+}
+
+/// The search input's ax role and name.
+fn ax(mounted: &crate::app::Mounted) -> (String, String) {
+    let doc = mounted.document.borrow();
+    let input = by_class(&doc, "search-input")[0];
+    let mut stack = doc.ax_tree().expect("laid out");
+    while let Some(n) = stack.pop() {
+        if n.node == input {
+            return (n.role, n.name);
+        }
+        stack.extend(n.children);
+    }
+    panic!(
+        "the search input is not in the ax tree (cargo test -p vapors-gui-bench-app search_hint)"
+    );
+}
+
+#[test]
+fn the_search_input_is_a_textbox_named_as_the_reference_names_it() {
+    // Given, when
+    let mounted = laid_out();
+
+    // Then: zgui labels its search input with the hint's text
+    assert_eq!(ax(&mounted), ("textbox".into(), SEARCH_PLACEHOLDER.into()));
 }
