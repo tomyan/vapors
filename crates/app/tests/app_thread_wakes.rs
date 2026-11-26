@@ -4,16 +4,13 @@
 //! polls are never lost.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use vapors_app::AppThread;
 use vapors_signals::{Deadline, spawn};
 
 use super::app_thread::{ignore, wait_for};
-
-/// How long the idle-thread test leaves the thread before its send.
-const IDLE: Duration = Duration::from_millis(20);
 
 #[test]
 fn wakes_before_a_turn_cost_one_turn() {
@@ -91,24 +88,24 @@ fn a_wake_from_another_thread_reaches_an_idle_thread() {
     let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<u32>();
     let arrived = Arc::new(AtomicU64::new(0));
     let counted = Arc::clone(&arrived);
+    let waiting = Arc::new(AtomicBool::new(false));
+    let parked = Arc::clone(&waiting);
     let mut receiver = Some(receiver);
     let app = AppThread::start(
         move || {
             move |(): ()| {
                 let receiver = receiver.take().expect("one message");
-                spawn_receiver(receiver, Arc::clone(&counted));
+                spawn_waiting(receiver, Arc::clone(&counted), Arc::clone(&parked));
             }
         },
         ignore,
     )
     .expect("the thread starts");
     app.send(()).expect("the thread runs");
-    wait_for("the receiver's first poll", || app.turns() == 2);
-    // The turn count rises as a turn begins; a send landing while that
-    // poll runs would be taken without a wake. The poll takes
-    // microseconds; IDLE is far past it, and no wake may come meanwhile.
-    std::thread::sleep(IDLE);
-    assert_eq!(app.turns(), 2, "the thread was not idle");
+    // Waiting, not the turn count: the count rises as a turn begins, and
+    // a send landing during the receiver's first poll is taken unwoken
+    wait_for("the receiver to wait", || waiting.load(Ordering::SeqCst));
+    assert_eq!(app.turns(), 2, "the message and the spawn's wake");
 
     // When: one send from off the thread
     std::thread::spawn(move || sender.send(1).unwrap())
@@ -119,6 +116,28 @@ fn a_wake_from_another_thread_reaches_an_idle_thread() {
     wait_for("the value", || arrived.load(Ordering::SeqCst) == 1);
     assert_eq!(app.turns(), 3, "one wake cost other than one turn");
     app.stop().expect("the thread stops");
+}
+
+/// A task that takes one value, setting `waiting` once its receiver's
+/// waker is registered and it returns `Pending`.
+fn spawn_waiting(
+    mut receiver: tokio::sync::mpsc::UnboundedReceiver<u32>,
+    arrived: Arc<AtomicU64>,
+    waiting: Arc<AtomicBool>,
+) {
+    // Deadline::User: a test task that ends on its value
+    spawn(Deadline::User, async move {
+        let value = std::future::poll_fn(|cx| {
+            let polled = receiver.poll_recv(cx);
+            waiting.store(polled.is_pending(), Ordering::SeqCst);
+            polled
+        })
+        .await;
+        if value.is_some() {
+            arrived.fetch_add(1, Ordering::SeqCst);
+        }
+        Ok::<(), String>(())
+    });
 }
 
 fn spawn_receiver(

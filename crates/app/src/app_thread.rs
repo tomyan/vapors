@@ -9,7 +9,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 use std::thread::ThreadId;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 
@@ -93,9 +93,13 @@ impl<M: Send + 'static> AppThread<M> {
             .name("vapors-app".to_owned())
             .spawn(move || body.run(make, &ready))
             .map_err(|error| AppThreadError::Spawn(error.to_string()))?;
+        let exit = Exit::watch(thread).inspect_err(|_| {
+            // Err: the thread already ended; there is nothing to stop
+            let _ = sender.send(Turn::Stop);
+        })?;
         let app = AppThread {
             sender,
-            exit: Some(Exit::watch(thread)?),
+            exit: Some(exit),
             turns,
             stop_deadline: deadlines.stop,
         };
@@ -107,12 +111,14 @@ impl<M: Send + 'static> AppThread<M> {
         readied: &mpsc::Receiver<Ready>,
         deadline: Duration,
     ) -> Result<Self, AppThreadError> {
+        let started = Instant::now();
         match readied.recv_timeout(deadline) {
             Ok(Ok(())) => Ok(self),
             Ok(Err(runtime)) => Err(AppThreadError::Runtime(runtime)),
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                Err(self.ended_within("build the app side", deadline))
-            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(self.ended_within(
+                "build the app side",
+                deadline.saturating_sub(started.elapsed()),
+            )),
             Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
                 what: "build the app side",
                 after: deadline,
@@ -133,7 +139,8 @@ impl<M: Send + 'static> AppThread<M> {
     /// The application thread's id.
     ///
     /// # Panics
-    /// Never: the handle is only taken by `stop`, which consumes `self`.
+    /// Never: the handle is taken only by `stop` and by a refused
+    /// `start`, and each consumes `self`.
     #[must_use]
     pub fn thread_id(&self) -> ThreadId {
         self.exit.as_ref().expect("held until stop").id()

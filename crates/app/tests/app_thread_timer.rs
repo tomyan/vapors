@@ -18,10 +18,10 @@ const TICK: Duration = Duration::from_millis(20);
 /// The longest five ticks may take from the `On` message: the plan's
 /// 200 ms. Thirty runs took 81.5 to 82.9 ms, with 7 turns for the 5
 /// ticks in every run, ticks plus two (debug build, this machine,
-/// 2026-11-26). The message's turn, the spawn's wake (the first tick
-/// comes in its poll) and one wake for each later tick make 6; the
-/// seventh is measured, not accounted for. The plan's "one turn per tick
-/// plus one" counts neither the message nor that turn.
+/// 2026-11-26): the message's turn, the spawn's wake, and one wake per
+/// tick, the first included (a probe, not kept, read 3 turns once the
+/// first tick had come, in 5 of 5 runs). That is the plan's "one turn
+/// per tick plus one", with the message's turn.
 const FIVE_TICKS: Duration = Duration::from_millis(200);
 
 enum Live {
@@ -66,7 +66,8 @@ fn a_running_interval_wakes_the_thread_about_once_per_tick() {
     wait_for("five ticks", || ticks.load(Ordering::SeqCst) >= 5);
     let took = started.elapsed();
 
-    // Then: five ticks within FIVE_TICKS, and one turn per tick plus two
+    // Then: five ticks within FIVE_TICKS; the message's turn, the spawn's
+    // wake, and one turn per tick
     let (turns, ticks) = (app.turns(), ticks.load(Ordering::SeqCst));
     assert!(
         took < FIVE_TICKS,
