@@ -123,8 +123,10 @@ fn a_pending_task_whose_drop_blocks_past_the_stop_deadline_is_refused_naming_it(
 
 #[test]
 fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
-    // Given: an app side that leaves a task holding a slow drop, then
-    // panics, so the thread ends past what is left of start's deadline
+    // Given: an app side that leaves a task holding a slow drop and
+    // panics at once, so its thread ends past the whole start deadline.
+    // No sleep before the panic: one could push start into its Timeout
+    // arm, which names the same deadline without the code under test
     let deadlines = Deadlines {
         start: SHORT,
         stop: SHORT,
@@ -136,7 +138,6 @@ fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
             let _held = held;
             std::future::pending::<Result<(), String>>().await
         });
-        std::thread::sleep(SHORT / 2);
         panic!("the app side fails after spawning");
     };
 
