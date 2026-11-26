@@ -21,9 +21,9 @@ const SELECTION: Color = Color {
     a: 0.3,
 };
 
-/// Paints the marks of box `index` when it is a focused text field,
-/// and keeps every text field's text origin; `rects` are every box's
-/// rect, for the field's text child.
+/// Paints the marks of box `index` when it is a focused field's run,
+/// and keeps every field's text origin, the run's box; `rects` are
+/// every box's rect.
 pub(crate) fn paint(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
@@ -31,13 +31,10 @@ pub(crate) fn paint(
     input: &PaintInput<'_>,
     out: &mut Painting,
 ) {
-    let Some(node) = boxes[index].element_in(index) else {
+    let Some(node) = boxes[index].run_of_field else {
         return;
     };
-    if !boxes[index].text_field {
-        return;
-    }
-    let origin = text_origin(boxes, rects, index);
+    let origin = rects[index];
     out.text_origins.insert(node, [origin.x, origin.y]);
     let Some(marks) = &boxes[index].text_marks else {
         return;
@@ -71,13 +68,4 @@ fn push(out: &mut Painting, origin: BoxRect, mark: [f32; 4], color: Color, input
     }
     out.scene
         .push(Item::Quad(Quad::fill(input.snapped(rect), color)));
-}
-
-/// Where the field's text starts: its text child's box, else its
-/// content box.
-pub(crate) fn text_origin(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> BoxRect {
-    boxes[index].children.first().map_or_else(
-        || crate::clip::content_box(&boxes[index], rects[index]),
-        |child| rects[*child],
-    )
 }

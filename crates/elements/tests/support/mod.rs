@@ -16,6 +16,7 @@ pub mod frame_page;
 pub mod hidden_page;
 pub mod lane_page;
 pub mod link_page;
+pub mod long_field;
 pub mod mirror;
 pub mod mirror_model;
 pub mod narrow_list;

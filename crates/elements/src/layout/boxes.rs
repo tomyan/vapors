@@ -97,6 +97,7 @@ fn add_element(
         }
     }
     add_run(run, index, boxes);
+    super::field_box::mark_run(boxes, index, node);
     Some(index)
 }
 
