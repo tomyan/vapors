@@ -1,6 +1,7 @@
 //! Wakes on the application thread (`docs/plans/desktop-app-thread.md`,
-//! L1a): wakes before a turn cost one turn, and wakes from another thread
-//! while the thread polls are never lost.
+//! L1a): wakes before a turn cost one turn, a wake from another thread
+//! reaches an idle thread, and wakes from another thread while the thread
+//! polls are never lost.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -10,6 +11,9 @@ use vapors_app::AppThread;
 use vapors_signals::{Deadline, spawn};
 
 use super::app_thread::{ignore, wait_for};
+
+/// How long the idle-thread test leaves the thread before its send.
+const IDLE: Duration = Duration::from_millis(20);
 
 #[test]
 fn wakes_before_a_turn_cost_one_turn() {
@@ -78,6 +82,42 @@ fn wakes_from_another_thread_while_the_thread_polls_are_none_of_them_lost() {
 
     // Then
     wait_for("all thousand", || arrived.load(Ordering::SeqCst) == 1000);
+    app.stop().expect("the thread stops");
+}
+
+#[test]
+fn a_wake_from_another_thread_reaches_an_idle_thread() {
+    // Given: an idle thread whose only task waits on a channel
+    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<u32>();
+    let arrived = Arc::new(AtomicU64::new(0));
+    let counted = Arc::clone(&arrived);
+    let mut receiver = Some(receiver);
+    let app = AppThread::start(
+        move || {
+            move |(): ()| {
+                let receiver = receiver.take().expect("one message");
+                spawn_receiver(receiver, Arc::clone(&counted));
+            }
+        },
+        ignore,
+    )
+    .expect("the thread starts");
+    app.send(()).expect("the thread runs");
+    wait_for("the receiver's first poll", || app.turns() == 2);
+    // The turn count rises as a turn begins; a send landing while that
+    // poll runs would be taken without a wake. The poll takes
+    // microseconds; IDLE is far past it, and no wake may come meanwhile.
+    std::thread::sleep(IDLE);
+    assert_eq!(app.turns(), 2, "the thread was not idle");
+
+    // When: one send from off the thread
+    std::thread::spawn(move || sender.send(1).unwrap())
+        .join()
+        .unwrap();
+
+    // Then: the receiver continues, in one more turn
+    wait_for("the value", || arrived.load(Ordering::SeqCst) == 1);
+    assert_eq!(app.turns(), 3, "one wake cost other than one turn");
     app.stop().expect("the thread stops");
 }
 

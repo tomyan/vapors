@@ -31,15 +31,15 @@ vapors-shapes.workspace = true
 vapors-signals.workspace = true
 tracing.workspace = true
 
-# The loop's waker behind a std::task::Waker for GPU error scopes
-# (elements_app_scope_wake.rs): on the web vapors_platform::Waker is not Send.
-# wasm-bindgen-futures (as vapors-platform's) drives an unresolved scope
-# on the page's task queue (painter_surface_scope_watch.rs).
 # The desktop application thread (app_thread.rs): a current_thread runtime,
 # its timer, and the channel into it. Native only: the web has one thread.
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 
+# The loop's waker behind a std::task::Waker for GPU error scopes
+# (elements_app_scope_wake.rs): on the web vapors_platform::Waker is not Send.
+# wasm-bindgen-futures (as vapors-platform's) drives an unresolved scope
+# on the page's task queue (painter_surface_scope_watch.rs).
 [target.'cfg(target_family = "wasm")'.dependencies]
 send_wrapper = "=0.6.0"
 wasm-bindgen-futures = "0.4.79"

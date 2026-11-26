@@ -8,13 +8,14 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
-use std::thread::{JoinHandle, ThreadId};
+use std::thread::ThreadId;
 use std::time::Duration;
 
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 
 use body::{Body, Ready, Turn};
 pub use error::AppThreadError;
+use exit::Exit;
 
 /// How long `start` waits for the thread's runtime and the caller's app
 /// side. The floor is measured: with an empty app side, 50 starts took
@@ -24,9 +25,12 @@ pub use error::AppThreadError;
 /// Re-measured with the first app side that builds a document (L1b).
 const START_DEADLINE: Duration = Duration::from_secs(5);
 
-/// How long `stop` waits for the thread to finish its turn and exit. The
-/// floor: the same 50 idle threads stopped in 16 µs median and 119 µs at
-/// most. The 5 s ceiling is a judgement, as for `START_DEADLINE`.
+/// How long `stop` waits for the thread to finish its turn, drop its
+/// pending tasks and exit. The floor: the same 50 idle threads stopped
+/// in 16 µs median and 119 µs at most; with the end learned through a
+/// joining thread (`app_thread_exit.rs`), 18 µs and 155 µs, and starts
+/// 28 µs and 155 µs (two runs of 50, 2026-11-26, a probe test not kept).
+/// The 5 s ceiling is a judgement, as for `START_DEADLINE`.
 const STOP_DEADLINE: Duration = Duration::from_secs(5);
 
 /// The two waits. Apart from the constants so the unit tests can prove
@@ -54,9 +58,8 @@ const DEADLINES: Deadlines = Deadlines {
 /// calls `stop` when its loop ends, reporting the result.
 pub struct AppThread<M: Send + 'static> {
     sender: UnboundedSender<Turn<M>>,
-    thread: Option<JoinHandle<()>>,
+    exit: Option<Exit>,
     turns: Arc<AtomicU64>,
-    exited: mpsc::Receiver<()>,
     stop_deadline: Duration,
 }
 
@@ -84,18 +87,16 @@ impl<M: Send + 'static> AppThread<M> {
     ) -> Result<Self, AppThreadError> {
         let (sender, receiver) = unbounded_channel();
         let (ready, readied) = mpsc::channel();
-        let (exit, exited) = mpsc::channel();
         let turns = Arc::new(AtomicU64::new(0));
         let body = Body::new(receiver, sender.clone(), Arc::clone(&turns), report);
         let thread = std::thread::Builder::new()
             .name("vapors-app".to_owned())
-            .spawn(move || body.run(make, &ready, exit))
+            .spawn(move || body.run(make, &ready))
             .map_err(|error| AppThreadError::Spawn(error.to_string()))?;
         let app = AppThread {
             sender,
-            thread: Some(thread),
+            exit: Some(Exit::watch(thread)?),
             turns,
-            exited,
             stop_deadline: deadlines.stop,
         };
         app.wait_ready(&readied, deadlines.start)
@@ -109,7 +110,9 @@ impl<M: Send + 'static> AppThread<M> {
         match readied.recv_timeout(deadline) {
             Ok(Ok(())) => Ok(self),
             Ok(Err(runtime)) => Err(AppThreadError::Runtime(runtime)),
-            Err(mpsc::RecvTimeoutError::Disconnected) => Err(self.join()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(self.ended_within("build the app side", deadline))
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
                 what: "build the app side",
                 after: deadline,
@@ -133,7 +136,7 @@ impl<M: Send + 'static> AppThread<M> {
     /// Never: the handle is only taken by `stop`, which consumes `self`.
     #[must_use]
     pub fn thread_id(&self) -> ThreadId {
-        self.thread.as_ref().expect("held until stop").thread().id()
+        self.exit.as_ref().expect("held until stop").id()
     }
 
     /// The turns the thread has taken: one per message and one per
@@ -151,36 +154,30 @@ impl<M: Send + 'static> AppThread<M> {
     /// # Errors
     /// [`AppThreadError::Panicked`] with the panic's message when a
     /// handler, a task or the app side panicked; a deadline error when it
-    /// did not exit within `STOP_DEADLINE`.
+    /// did not end within `STOP_DEADLINE`, its pending tasks dropped.
     pub fn stop(mut self) -> Result<(), AppThreadError> {
         // Err: the thread already ended; its join says why
         let _ = self.sender.send(Turn::Stop);
-        match self.exited.recv_timeout(self.stop_deadline) {
-            Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
-                what: "stop",
-                after: self.stop_deadline,
-            }),
-            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => match self.join() {
-                AppThreadError::Stopped => Ok(()),
-                error => Err(error),
-            },
+        match self.ended_within("stop", self.stop_deadline) {
+            AppThreadError::Stopped => Ok(()),
+            error => Err(error),
         }
     }
 
-    /// Joins the exited thread: `Stopped` when it ended normally, else
-    /// its panic.
-    fn join(&mut self) -> AppThreadError {
-        let thread = self.thread.take().expect("joined once");
-        match thread.join() {
-            Ok(()) => AppThreadError::Stopped,
-            Err(payload) => AppThreadError::Panicked(error::panic_message(&*payload)),
-        }
+    /// How the thread ended, once it has, within `deadline`: `Stopped`, its
+    /// panic, or a deadline error naming `what` it was doing.
+    fn ended_within(&mut self, what: &'static str, deadline: Duration) -> AppThreadError {
+        let exit = self.exit.take().expect("waited for once");
+        exit.within(deadline).unwrap_or(AppThreadError::Deadline {
+            what,
+            after: deadline,
+        })
     }
 }
 
 impl<M: Send + 'static> Drop for AppThread<M> {
     fn drop(&mut self) {
-        if self.thread.is_some() {
+        if self.exit.is_some() {
             // Err: already ended; nothing to ask
             let _ = self.sender.send(Turn::Stop);
         }
@@ -191,6 +188,8 @@ impl<M: Send + 'static> Drop for AppThread<M> {
 mod body;
 #[path = "app_thread_error.rs"]
 mod error;
+#[path = "app_thread_exit.rs"]
+mod exit;
 #[cfg(test)]
 #[path = "app_thread_tests.rs"]
 mod tests;

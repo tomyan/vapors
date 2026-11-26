@@ -28,16 +28,6 @@ pub(super) struct Body<M> {
     report: fn(&str),
 }
 
-/// Tells `stop` the thread has exited, from its drop, so a panic tells it too.
-struct Exiting(mpsc::Sender<()>);
-
-impl Drop for Exiting {
-    fn drop(&mut self) {
-        // Err: nobody waits for the exit any more
-        let _ = self.0.send(());
-    }
-}
-
 impl<M: Send + 'static> Body<M> {
     pub(super) fn new(
         receiver: UnboundedReceiver<Turn<M>>,
@@ -57,13 +47,7 @@ impl<M: Send + 'static> Body<M> {
 
     /// The thread's whole life. The app side is built inside the
     /// runtime's context, so it may make Tokio timers.
-    pub(super) fn run<H: FnMut(M)>(
-        self,
-        make: impl FnOnce() -> H,
-        ready: &mpsc::Sender<Ready>,
-        exit: mpsc::Sender<()>,
-    ) {
-        let _exiting = Exiting(exit);
+    pub(super) fn run<H: FnMut(M)>(self, make: impl FnOnce() -> H, ready: &mpsc::Sender<Ready>) {
         let runtime = match runtime() {
             Ok(runtime) => runtime,
             // Err: start gave up waiting; its deadline error is the report
