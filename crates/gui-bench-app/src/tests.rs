@@ -28,3 +28,4 @@ mod pages;
 mod progress_fill;
 mod search_hint;
 mod support;
+mod switch_knob;

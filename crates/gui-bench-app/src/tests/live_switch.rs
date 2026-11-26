@@ -1,6 +1,7 @@
-//! The live switch is the framework's `switch` part: its pointer, keyboard,
-//! name, checked state and painted geometry, as a browser checkbox has them
-//! (`tests/live_switch_oracle.rs` holds the same to Chromium).
+//! The live switch is a checkbox with `appearance: none` and a decorative
+//! knob: its pointer, keyboard, name, checked state and painted track and
+//! knob, as a browser checkbox has them
+//! (the corpus fixture `live_switch` holds the same to Chromium).
 use super::support::*;
 use crate::app::Mounted;
 use crate::dashboard::*;
@@ -49,7 +50,7 @@ fn quads(mounted: &Mounted) -> Vec<Quad> {
 }
 
 #[test]
-fn a_click_toggles_it_and_the_part_paints_the_track_and_knob_of_each_state() {
+fn a_click_toggles_it_and_paints_the_track_and_knob_of_each_state() {
     // Given: off, a grey track with the knob at the start
     let mounted = laid_out();
     let off = quads(&mounted);

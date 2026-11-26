@@ -1,7 +1,7 @@
 # The live switch by mouse and keys. `live` is at x 736..776, y 21..43 and
-# off; `on` at x 600..640 and checked. Browser checkbox semantics are the oracle.
+# off, its knob at x 738..756, y 23..41; `on` at x 600..640 and checked. Browser checkbox semantics are the oracle.
 listen pointerdown pointerup click input change keydown keyup focusin
-click 756 32                  a click toggles on, input and change after the click
+click 747 32                  a click on the knob toggles on, input and change after the click
 expect event pointerdown input#live
 expect event click input#live
 expect event input input#live
