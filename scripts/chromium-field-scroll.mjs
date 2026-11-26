@@ -8,7 +8,14 @@
 // columns its caret is painted in (caret-color red, from a screenshot;
 // "-" where none shows, as after blur), one line per step.
 //
-// Usage: node scripts/chromium-field-scroll.mjs
+// With `scrollbar` (tests/field_scrollbar.rs), scrollbars are shown
+// and the same input with a green scrollbar-color and scrollbar-width
+// auto, then thin, is typed into 60 times and wheel-scrolled; a
+// scrolling div styled the same is the control that a thumb would be
+// seen. Each step prints the case, the computed scrollbar-width, the
+// scrollLeft and the columns painted green ("-" for none).
+//
+// Usage: node scripts/chromium-field-scroll.mjs [scrollbar]
 // Needs node 22 or later and the pinned Chromium (.config/tools.toml
 // `chromium.version`, installed by `cargo xtask setup` under
 // ~/.local/share/factory); $CHROME overrides. Exits 1 naming the step
@@ -28,10 +35,18 @@ const WHEEL_MS = 500;
 // the caret blinks, so a screenshot can miss it: up to 6 taken 200 ms
 // apart cover more than one blink period
 const SHOTS = 6, SHOT_GAP_MS = 200;
-const PAGE = `<!doctype html><style>html,body{margin:0;background:#fff}
+const SCROLLBAR = process.argv[2] === 'scrollbar';
+const STYLE = `<!doctype html><style>html,body{margin:0;background:#fff}
 #s{position:absolute;left:676px;top:14px;box-sizing:border-box;width:280px;height:36px;margin:0;padding:0 12px;
-border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;color:#111827;font:14px sans-serif;outline:none;caret-color:#ff0000}</style>
-<input id=s type=text>`;
+border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;color:#111827;font:14px sans-serif;outline:none;caret-color:#ff0000}</style>`;
+const PAGE = `${STYLE}<input id=s type=text>`;
+// the scrollbar cases: [name, page]
+const BAR = (width, element) => `${STYLE}<style>#s{scrollbar-width:${width};scrollbar-color:#00ff00 transparent}</style>${element}`;
+const BAR_CASES = [
+  ['input, auto', BAR('auto', '<input id=s type=text>')],
+  ['input, thin', BAR('thin', '<input id=s type=text>')],
+  ['div, auto (control)', BAR('auto', `<div id=s style="overflow-x:auto;white-space:nowrap">${'W'.repeat(60)}</div>`)],
+];
 
 function pinned() {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,9 +56,11 @@ function pinned() {
   return join(homedir(), `.local/share/factory/chromium-${version[1]}/chrome-linux/chrome`);
 }
 
-// The x range of red pixels in rows 15..48 of an 8-bit RGB(A),
-// non-interlaced PNG: the caret.
-function redColumns(png) {
+// The x range of pixels `is` picks in rows 15..48 of an 8-bit RGB(A),
+// non-interlaced PNG: red for the caret, green for a thumb.
+const RED = (r, g, b) => r > 0xc0 && g < 0x40 && b < 0x40;
+const GREEN = (r, g, b) => r < 0x40 && g > 0xc0 && b < 0x40;
+function columns(png, is) {
   let p = 8, w, h, ct;
   const idat = [];
   while (p < png.length) {
@@ -71,7 +88,7 @@ function redColumns(png) {
   const xs = [];
   for (let y = 15; y < 49; y++) for (let x = 0; x < w; x++) {
     const o = y * stride + x * bpp;
-    if (img[o] > 0xc0 && img[o + 1] < 0x40 && img[o + 2] < 0x40) xs.push(x);
+    if (is(img[o], img[o + 1], img[o + 2])) xs.push(x);
   }
   return xs.length ? `${Math.min(...xs)}..${Math.max(...xs)}` : '-';
 }
@@ -80,7 +97,7 @@ async function main() {
   const chrome = process.env.CHROME || pinned();
   const profile = mkdtempSync(join(tmpdir(), 'field-scroll-'));
   const proc = spawn(chrome, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--window-size=1280,800', '--hide-scrollbars', '--force-device-scale-factor=1', 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
+    '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
   const deadline = setTimeout(() => { console.error(`no Chromium page within ${START_MS} ms; fix: check ${chrome} starts headless`); proc.kill(); process.exit(1); }, START_MS);
   try {
     await run(proc, deadline);
@@ -111,7 +128,7 @@ async function run(proc, deadline) {
   const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
   const s = (m, p) => send(m, p, sessionId);
   const {frameTree} = await s('Page.getFrameTree');
-  await s('Page.setDocumentContent', {frameId: frameTree.frame.id, html: PAGE});
+  const load = html => s('Page.setDocumentContent', {frameId: frameTree.frame.id, html});
   const value = async expr => (await s('Runtime.evaluate', {expression: expr, returnByValue: true})).result.value;
   const step = async op => {
     const [len, left, x] = await value(`(() => { const i = document.getElementById('s');
@@ -122,7 +139,7 @@ async function run(proc, deadline) {
     for (let k = 0; k < SHOTS && caret === '-'; k++) {
       if (k) await new Promise(r => setTimeout(r, SHOT_GAP_MS));
       const shot = await s('Page.captureScreenshot', {format: 'png'});
-      caret = redColumns(Buffer.from(shot.data, 'base64'));
+      caret = columns(Buffer.from(shot.data, 'base64'), RED);
     }
     console.log(`${op}\t${len}\t${left}\t${x}\t${caret}`);
   };
@@ -130,6 +147,8 @@ async function run(proc, deadline) {
     await s('Input.dispatchMouseEvent', {type: 'mouseWheel', x: 800, y: 32, deltaX, deltaY});
     await new Promise(r => setTimeout(r, WHEEL_MS));
   };
+  if (SCROLLBAR) return bars(s, load, value, wheel, await send('Browser.getVersion'));
+  await load(PAGE);
   console.log(`# ${(await send('Browser.getVersion')).product}\nop\tlength\tscrollLeft\tcaret x\tcaret columns`);
   await value("document.getElementById('s').focus()");
   for (let k = 1; k <= 60; k++) {
@@ -152,6 +171,21 @@ async function run(proc, deadline) {
   await step('blurred, wheel deltaY 100');
   await wheel(100, 0);
   await step('blurred, wheel deltaX 100');
+}
+
+async function bars(s, load, value, wheel, version) {
+  console.log(`# ${version.product}\ncase\top\tscrollbar-width\tscrollLeft\tgreen columns`);
+  for (const [name, html] of BAR_CASES) {
+    await load(html);
+    await value("document.getElementById('s').focus()");
+    if (name.startsWith('input')) for (let k = 1; k <= 60; k++) await s('Input.insertText', {text: 'W'});
+    for (const op of ['typed 60', 'wheel deltaX -100']) {
+      if (op !== 'typed 60') await wheel(-100, 0);
+      const [width, left] = await value("[getComputedStyle(document.getElementById('s')).scrollbarWidth, document.getElementById('s').scrollLeft]");
+      const shot = await s('Page.captureScreenshot', {format: 'png'});
+      console.log(`${name}\t${op}\t${width}\t${left}\t${columns(Buffer.from(shot.data, 'base64'), GREEN)}`);
+    }
+  }
 }
 
 main().then(() => process.exit(0), error => {
