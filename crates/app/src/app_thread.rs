@@ -115,10 +115,9 @@ impl<M: Send + 'static> AppThread<M> {
         match readied.recv_timeout(deadline) {
             Ok(Ok(())) => Ok(self),
             Ok(Err(runtime)) => Err(AppThreadError::Runtime(runtime)),
-            Err(mpsc::RecvTimeoutError::Disconnected) => Err(self.ended_within(
-                "build the app side",
-                deadline.saturating_sub(started.elapsed()),
-            )),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(self.ended_within("build the app side", deadline, started))
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => Err(AppThreadError::Deadline {
                 what: "build the app side",
                 after: deadline,
@@ -165,17 +164,24 @@ impl<M: Send + 'static> AppThread<M> {
     pub fn stop(mut self) -> Result<(), AppThreadError> {
         // Err: the thread already ended; its join says why
         let _ = self.sender.send(Turn::Stop);
-        match self.ended_within("stop", self.stop_deadline) {
+        match self.ended_within("stop", self.stop_deadline, Instant::now()) {
             AppThreadError::Stopped => Ok(()),
             error => Err(error),
         }
     }
 
-    /// How the thread ended, once it has, within `deadline`: `Stopped`, its
-    /// panic, or a deadline error naming `what` it was doing.
-    fn ended_within(&mut self, what: &'static str, deadline: Duration) -> AppThreadError {
+    /// How the thread ended, once it has, by `deadline` after `since`:
+    /// `Stopped`, its panic, or a deadline error naming `what` it was
+    /// doing and the whole deadline.
+    fn ended_within(
+        &mut self,
+        what: &'static str,
+        deadline: Duration,
+        since: Instant,
+    ) -> AppThreadError {
         let exit = self.exit.take().expect("waited for once");
-        exit.within(deadline).unwrap_or(AppThreadError::Deadline {
+        let left = deadline.saturating_sub(since.elapsed());
+        exit.within(left).unwrap_or(AppThreadError::Deadline {
             what,
             after: deadline,
         })

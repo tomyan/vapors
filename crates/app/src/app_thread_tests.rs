@@ -120,3 +120,35 @@ fn a_pending_task_whose_drop_blocks_past_the_stop_deadline_is_refused_naming_it(
         })
     );
 }
+
+#[test]
+fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
+    // Given: an app side that leaves a task holding a slow drop, then
+    // panics, so the thread ends past what is left of start's deadline
+    let deadlines = Deadlines {
+        start: SHORT,
+        stop: SHORT,
+    };
+    let make = || -> fn(()) {
+        let held = SlowDrop;
+        // Deadline::User: a test task that never ends; the thread drops it
+        vapors_signals::spawn(vapors_signals::Deadline::User, async move {
+            let _held = held;
+            std::future::pending::<Result<(), String>>().await
+        });
+        std::thread::sleep(SHORT / 2);
+        panic!("the app side fails after spawning");
+    };
+
+    // When
+    let started = AppThread::<()>::start_within(make, ignore, deadlines);
+
+    // Then
+    assert_eq!(
+        started.err(),
+        Some(AppThreadError::Deadline {
+            what: "build the app side",
+            after: SHORT
+        })
+    );
+}
