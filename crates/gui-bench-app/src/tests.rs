@@ -18,6 +18,7 @@ mod list_support;
 mod live_behaviour;
 mod live_rows;
 mod live_switch;
+mod long_search;
 mod menu;
 mod menu_anchor;
 mod order_parts;

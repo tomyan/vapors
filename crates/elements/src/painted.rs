@@ -52,8 +52,10 @@ pub struct Painted {
     pub(crate) order: crate::kept_order::KeptOrder,
     /// Each range input's track, for the pointer (3-E3a).
     pub(crate) ranges: NodeMap<crate::range_paint::Track>,
-    /// Each text field's text origin, for the pointer (E6a).
-    pub(crate) text_origins: NodeMap<[f32; 2]>,
+    /// Each text field's text origin, for the pointer (E6a), and the
+    /// scroll frame it is in: its run's, the field's own when the field
+    /// scrolls (entry 44), not the field's entries' frame.
+    pub(crate) text_origins: NodeMap<([f32; 2], usize)>,
     /// What this was painted from (`kept_paint`).
     pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the

@@ -89,10 +89,19 @@ fn a_scroll_containers_thumbs_are_kept_apart() {
 }
 
 #[test]
-fn a_text_fields_origin_is_kept_apart() {
+fn a_text_fields_origin_is_kept_apart_on_its_run() {
     // When
     let (doc, input) = kept_box("input", "");
 
-    // Then
-    assert_eq!(of(&doc, input).boxed_apart(), (false, true));
+    // Then: the field's own box keeps nothing apart, and one box, its
+    // run (its text, which paints its marks and origin), keeps rarer
+    // entries apart: the page has no other
+    let painted = doc.painted.as_ref().expect("painted");
+    let apart = painted
+        .kept_boxes
+        .iter()
+        .flatten()
+        .filter(|kept| kept.boxed_apart().1);
+    assert_eq!(of(&doc, input).boxed_apart(), (false, false));
+    assert_eq!(apart.count(), 1);
 }

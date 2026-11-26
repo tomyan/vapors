@@ -64,6 +64,8 @@ pub(crate) struct Context<'a> {
     /// The element is an `input type=number` or a text field, which
     /// needs a width of its own (3-E3c, E6a).
     pub(crate) text_like_field: bool,
+    /// Of those, an `input type=number`, whose text does not scroll.
+    pub(crate) number_field: bool,
     /// The element is a `gpu-surface` (docs/gpu-surface.md).
     pub(crate) surface: bool,
 }
@@ -80,10 +82,18 @@ impl Context<'_> {
             flex_item,
             in_inline,
             text_like_field,
+            number_field,
             surface,
             to_viewport,
         } = self;
-        let facts = [flex_item, in_inline, text_like_field, surface, to_viewport];
+        let facts = [
+            flex_item,
+            in_inline,
+            text_like_field,
+            number_field,
+            surface,
+            to_viewport,
+        ];
         facts
             .iter()
             .enumerate()
@@ -117,9 +127,10 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     if context.surface {
         super::surface::refuse(&mut reader, &layout, &decoration, inline);
     }
-    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
+    let text_field = context.text_like_field && !context.number_field;
+    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration, text_field);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
-    super::overflow::refuse_scrolling_field(&mut reader, &layout, context.text_like_field);
+    super::overflow::refuse_scrolling_field(&mut reader, &layout, context.number_field);
     let mut result = Used {
         parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
