@@ -32,6 +32,7 @@ longhands! {
     ANIMATION_NAME = "animation-name",
     ANIMATION_PLAY_STATE = "animation-play-state",
     ANIMATION_TIMING_FUNCTION = "animation-timing-function",
+    APPEARANCE = "appearance",
     ASPECT_RATIO = "aspect-ratio",
     BACKGROUND_COLOR = "background-color",
     BORDER_BOTTOM_COLOR = "border-bottom-color",

@@ -103,6 +103,7 @@ impl Document {
             }),
             number_field: self.input_is(node, |e| crate::check::is_type(e, "number")),
             surface: crate::surfaces::is_surface(&self.arena, node),
+            range: self.input_is(node, |e| crate::check::is_type(e, "range")),
             to_viewport: crate::style::to_viewport(
                 node == self.root(),
                 node == self.body(),

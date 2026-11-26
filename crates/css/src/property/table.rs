@@ -106,6 +106,10 @@ pub(super) const FIRST_HALF: &[PropertyDef] = &[
         "ease",
         "<easing-function>#",
     ),
+    // `auto` on the controls vapors draws parts of (the user-agent
+    // sheet), `none` elsewhere, as CSS UI 4 has it; its compat keywords
+    // are refused (docs/appearance.md).
+    def("appearance", false, "none", "none | auto"),
     def("aspect-ratio", false, "auto", "auto | <ratio>"),
     def("background-color", false, "transparent", "<color>"),
     def("border-bottom-color", false, "currentcolor", "<color>"),

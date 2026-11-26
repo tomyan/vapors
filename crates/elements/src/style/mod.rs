@@ -3,6 +3,8 @@
 //! means to layout, text and paint.
 
 mod accent;
+mod appearance;
+pub(crate) use appearance::Appearance;
 mod box_align;
 mod box_style;
 mod cursor;

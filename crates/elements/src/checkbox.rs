@@ -24,6 +24,13 @@ use crate::node::Element;
 /// as Chromium's does.
 pub(crate) const NATURAL_SIZE: [f32; 2] = [11.0, 11.0];
 
+/// A checkbox's natural size: [`NATURAL_SIZE`], or none with
+/// `appearance: none` (`native` false), as Chromium 157 lays one out
+/// (docs/appearance.md).
+pub(crate) fn natural_size(native: bool) -> [f32; 2] {
+    if native { NATURAL_SIZE } else { [0.0, 0.0] }
+}
+
 /// Whether `element` is a checkbox that is checked, or `None` for
 /// another element.
 pub(crate) fn checked_of(element: &Element) -> Option<bool> {

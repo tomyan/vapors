@@ -1,0 +1,45 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Bare",
+      "properties": [
+        "checked=false",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "checkbox"
+    },
+    {
+      "depth": 1,
+      "name": "Track",
+      "properties": [
+        "checked=false",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "checkbox"
+    },
+    {
+      "depth": 1,
+      "name": "On",
+      "properties": [
+        "checked=true",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "checkbox"
+    }
+  ],
+  "viewport": [
+    400,
+    100
+  ]
+}

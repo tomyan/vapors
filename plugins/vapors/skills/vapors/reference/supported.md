@@ -61,6 +61,7 @@ The parser's table: each property, whether it inherits, and its grammar. Custom 
 | `animation-name` | no | `[ none \| <custom-ident> ]#` |
 | `animation-play-state` | no | `[ running \| paused ]#` |
 | `animation-timing-function` | no | `<easing-function>#` |
+| `appearance` | no | `none \| auto` |
 | `aspect-ratio` | no | `auto \| <ratio>` |
 | `background-color` | no | `<color>` |
 | `border-bottom-color` | no | `<color>` |

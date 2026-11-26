@@ -28,8 +28,8 @@ pub(crate) fn paint(
         return; // a switch draws a track and a knob (`switch.rs`)
     }
     let used = &input.used[&node];
-    if !used.visible {
-        return;
+    if !used.visible || !used.native() {
+        return; // `appearance: none` draws no mark (`style/appearance.rs`)
     }
     let content = crate::clip::content_box(layout_box, border_box);
     let inset = content.width.min(content.height) * INSET;

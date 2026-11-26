@@ -70,6 +70,7 @@ macro_rules! fixtures {
 }
 
 fixtures![
+    appearance::Appearance,
     block_margins::BlockMargins,
     borders::Borders,
     buttons::Buttons,

@@ -38,6 +38,9 @@ pub(crate) struct Used {
     pub(crate) placeholder: Color,
     /// `accent-color`, `None` for `auto` (a switch's checked track).
     pub(crate) accent: Option<Color>,
+    /// `appearance`: with `none` a checkbox draws no mark and a switch
+    /// no track or knob (`appearance.rs`).
+    pub(crate) appearance: super::Appearance,
     /// How its thumb is drawn, when it scrolls.
     pub(crate) scrollbar: super::Scrollbar,
     /// How its track and thumb are drawn, when it is a range (3-E3a).
@@ -68,6 +71,9 @@ pub(crate) struct Context<'a> {
     pub(crate) number_field: bool,
     /// The element is a `gpu-surface` (docs/gpu-surface.md).
     pub(crate) surface: bool,
+    /// The element is an `input type=range`, which refuses
+    /// `appearance: none`.
+    pub(crate) range: bool,
 }
 
 impl Context<'_> {
@@ -85,6 +91,7 @@ impl Context<'_> {
             number_field,
             surface,
             to_viewport,
+            range,
         } = self;
         let facts = [
             flex_item,
@@ -93,6 +100,7 @@ impl Context<'_> {
             number_field,
             surface,
             to_viewport,
+            range,
         ];
         facts
             .iter()
@@ -114,15 +122,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse(DISPLAY, inline::BLOCK_IN_INLINE.to_owned());
     }
-    // pushed directly: `Reader::refuse` leaves an undeclared value to
-    // its declarer, and `auto` here is nobody's declaration
-    if context.text_like_field && layout.size.width == taffy::Dimension::auto() {
-        reader.refusals.push(Refusal {
-            property: "width",
-            value: "auto".to_owned(),
-            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
-            declared: None,
-        });
+    if context.text_like_field {
+        refuse_field_auto_width(&mut reader, &layout);
     }
     if context.surface {
         super::surface::refuse(&mut reader, &layout, &decoration, inline);
@@ -136,6 +137,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
         accent: super::accent::accent(&mut reader),
+        appearance: super::appearance::appearance(&mut reader, context.range),
         placeholder: reader.read(PLACEHOLDER_COLOR, color, Color::default()),
         layout,
         inline,
@@ -158,7 +160,27 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
 }
 
+/// Refuses a number or text field whose width is `auto`.
+fn refuse_field_auto_width(reader: &mut Reader<'_>, layout: &taffy::Style) {
+    // pushed directly: `Reader::refuse` leaves an undeclared value to
+    // its declarer, and `auto` here is nobody's declaration
+    if layout.size.width == taffy::Dimension::auto() {
+        reader.refusals.push(Refusal {
+            property: "width",
+            value: "auto".to_owned(),
+            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
+            declared: None,
+        });
+    }
+}
+
 impl Used {
+    /// `appearance: auto`: a checkbox draws its mark, a switch its track
+    /// and knob (`appearance.rs`).
+    pub(crate) fn native(&self) -> bool {
+        self.appearance == super::Appearance::Auto
+    }
+
     /// `overflow` is `hidden` or `clip`: descendants are cut off at the
     /// padding box.
     pub(crate) fn clips(&self) -> bool {
@@ -182,6 +204,7 @@ impl Used {
             z_index,
             scrollbar,
             accent,
+            appearance,
             placeholder,
             parts,
             svg,
@@ -198,6 +221,7 @@ impl Used {
             ("z_index", *z_index == other.z_index),
             ("scrollbar", *scrollbar == other.scrollbar),
             ("accent", *accent == other.accent),
+            ("appearance", *appearance == other.appearance),
             ("placeholder", *placeholder == other.placeholder),
             ("parts", *parts == other.parts),
             ("svg", *svg == other.svg),
