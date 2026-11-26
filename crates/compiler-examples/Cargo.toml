@@ -9,6 +9,8 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+# virtual_rows.wisp mounts vapors' VirtualList
+vapors-components.workspace = true
 vapors-dom.workspace = true
 vapors-signals.workspace = true
 

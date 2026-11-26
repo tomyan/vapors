@@ -3038,6 +3038,7 @@ version = "0.0.0"
 dependencies = [
  "trybuild",
  "vapors-compiler",
+ "vapors-components",
  "vapors-css",
  "vapors-dom",
  "vapors-elements",

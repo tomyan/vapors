@@ -165,6 +165,14 @@ pub fn is_ignored(name: &str) -> bool {
 /// # Errors
 /// Unknown properties and sumi's terminal extras.
 pub fn check_name(name: &str, position: Position) -> Result<()> {
+    if name == longhands::PLACEHOLDER_COLOR.name() {
+        return Err(Error::new(
+            position,
+            format!(
+                "{name:?} is the placeholder's colour, set only by `::placeholder {{ color: .. }}`; write that rule instead"
+            ),
+        ));
+    }
     if is_supported(name) {
         return Ok(());
     }

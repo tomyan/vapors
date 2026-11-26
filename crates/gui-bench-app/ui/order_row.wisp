@@ -3,6 +3,8 @@ use crate::dashboard::order;
 use crate::data_colours::{avatar, pill_background, pill_text};
 use crate::order_parts::{fill_width, parts};
 #[prop] let index: usize = 0;
+// The `list` scenario's rows end their amount 24 px from their right edge.
+#[prop] let amount_at_end: bool = false;
 let found = order(index);
 let (number, name, initials, amount) = (found.number_text(), found.customer.clone(), found.initials.clone(), found.amount());
 // Refuses an order the CSS below has no class for (order_parts.rs).
@@ -21,6 +23,7 @@ let label = found.status.label().to_string();
 .c-status { left: 440px; }
 .c-progress { left: 600px; }
 .c-amount { left: 848px; width: 120px; justify-content: flex-end; font-size: 14px; font-weight: 600; color: #111827; }
+.c-amount.at-end { left: auto; right: 24px; }
 .order-avatar { flex: none; width: 28px; height: 28px; border-radius: 14px; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
 .pill { height: 22px; padding: 0 10px; border-radius: 11px; font-size: 12px; font-weight: 600; display: flex; align-items: center; }
 .track { position: relative; width: 120px; height: 6px; border-radius: 3px; background-color: #e5e7eb; }
@@ -36,5 +39,5 @@ let label = found.status.label().to_string();
   </div>
   <div class="cell c-status"><div class="pill" style:background-color={pill_back} style:color={pill_fore}>{label}</div></div>
   <div class="cell c-progress"><div class="track"><div class="fill" style:width={fill_width}></div></div></div>
-  <div class="cell c-amount"><span class="order-amount">{amount}</span></div>
+  <div class="cell c-amount" class:at-end={amount_at_end}><span class="order-amount">{amount}</span></div>
 </div>

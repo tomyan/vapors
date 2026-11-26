@@ -14,6 +14,8 @@ mod chromium_live;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_name;
 #[cfg(not(target_family = "wasm"))]
+mod chromium_pin;
+#[cfg(not(target_family = "wasm"))]
 mod chromium_process;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_tmp;

@@ -54,7 +54,7 @@ impl Chromium {
                 self.binary().display(),
                 self.version()
             )),
-            ChromiumError::NotFound => ChromiumError::NotFound,
+            unresolved @ (ChromiumError::NotFound(_) | ChromiumError::NoHome) => unresolved,
         }
     }
 }

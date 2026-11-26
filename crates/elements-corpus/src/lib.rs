@@ -13,6 +13,7 @@ use vapors_elements::Document;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod answer_files;
 pub mod ax;
 pub mod ax_projection;
 pub mod ax_tree;
@@ -33,6 +34,9 @@ pub mod oracle;
 pub mod oracle_files;
 pub mod page;
 pub mod paint_check;
+pub mod paint_reference;
+mod paint_reference_capture;
+mod paint_reference_states;
 pub mod web_input;
 
 /// Mounts a fixture's component into `parent`.

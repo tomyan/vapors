@@ -60,6 +60,9 @@ pub(crate) struct LayoutBox {
     /// Whether the element is a text or number field (E6a, 3-E3c),
     /// whose text origin paint keeps for the pointer.
     pub(crate) text_field: bool,
+    /// The placeholder an empty text or number field shows, for paint
+    /// (`placeholder.rs`).
+    pub(crate) placeholder: Option<String>,
     /// A focused text field's caret and selection, for paint.
     pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
     /// Whether the box was kept from the last update rather than built
@@ -88,6 +91,7 @@ impl LayoutBox {
             checked: None,
             switch: false,
             text_field: false,
+            placeholder: None,
             text_marks: None,
             kept: false,
         }

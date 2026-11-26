@@ -1,7 +1,6 @@
 //! The request against a local stand-in: the key arrives as a header and
 //! is in no argument; a failed status or connection is refused.
 
-use std::net::TcpListener;
 use std::path::PathBuf;
 
 use super::*;
@@ -105,12 +104,12 @@ fn a_response_echoing_the_key_is_refused_without_showing_it() {
 
 #[test]
 fn a_connection_that_fails_is_refused_with_curl_s_reason() {
-    // Given a port nothing listens on
-    let port = TcpListener::bind("127.0.0.1:0")
-        .expect("bound")
-        .local_addr()
-        .expect("address")
-        .port();
+    // Given a port nothing listens on, below 1024, so no concurrent test can
+    // be given it (as api_mcp_inner_tests' NOBODY). A port bound at :0 and
+    // dropped could be: a stand-in running alongside was given one, this
+    // request took its one answer, and both tests failed (seen in #627's
+    // gate at 5b49721f).
+    let port = 9;
     let (_dir, body, response) = files("refused");
 
     // When
