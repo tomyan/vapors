@@ -178,6 +178,7 @@ mod paint_labels;
 mod placeholder;
 mod placeholder_attributes;
 mod placeholder_box;
+mod placeholder_colour;
 mod placeholder_refused;
 mod pointer_capture;
 mod pointer_capture_edges;
