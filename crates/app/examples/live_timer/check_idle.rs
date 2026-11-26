@@ -1,16 +1,18 @@
 //! Live off: no frames, no ticks, and no turns of the application thread
 //! beyond the ones the script itself takes.
 
+use crate::TICK;
 use crate::check::Window;
 use crate::record::{Drawn, Record};
 
 /// Turns before the window serves the request to switch Live on: the
-/// `Started` message, the script's first poll, and its 1 s timer.
+/// `Started` message, the script's first poll, and its 1 s timer. An
+/// exact count, not a margin: three runs read 3 (2026-11-26).
 const OFF_TURNS: u64 = 3;
 
 /// Turns from the request to switch Live off to the end: the `Toggle`
 /// message, at most one tick already on its way, and the script's last
-/// timer.
+/// timer. Three runs read 2 (2026-11-26): no tick was on its way.
 const OFF_AGAIN_TURNS: u64 = 3;
 
 pub fn problems(record: &Record, window: &Window) -> Vec<String> {
@@ -28,16 +30,23 @@ pub fn problems(record: &Record, window: &Window) -> Vec<String> {
         .filter(own)
         .filter(|f| f.at > window.off_at)
         .count();
+    let late = record
+        .frames
+        .iter()
+        .filter(own)
+        .filter(|f| f.at > window.off_at + TICK)
+        .count();
     let ticks_after = record
         .ticks
         .iter()
         .filter(|(at, _)| *at > window.off_at)
         .count();
-    if before > 0 || after > 1 || ticks_after > 0 {
+    if before > 0 || after > 1 || late > 0 || ticks_after > 0 {
         found.push(format!(
             "with Live off: {before} frames before it went on; {after} frames (at most one, \
-             for a tick on its way) and {ticks_after} ticks after it went off; fix: the \
-             interval's owner, or what else wakes the window"
+             for a tick on its way, within a period), {late} of them over a period after, \
+             and {ticks_after} ticks after it went off; fix: the interval's owner, or what \
+             else wakes the window"
         ));
     }
     found.extend(turns(record));

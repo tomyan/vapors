@@ -10,8 +10,8 @@ use crate::record::Record;
 use crate::script::STALL;
 
 /// The fewest ticks with Live on. On lasts about 1.35 s, which loses
-/// three ticks to the stall: nine were seen in every run; seven leaves
-/// room for two late ones.
+/// three ticks to the stall: nine were seen in six runs (2026-11-22) and
+/// ten in three (2026-11-26); seven leaves room for two late ones.
 const MIN_TICKS: usize = 7;
 
 /// The shortest and longest gap between ticks, but for the one across the
