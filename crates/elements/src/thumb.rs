@@ -45,7 +45,9 @@ fn rect(x: f32, y: f32, width: f32, height: f32) -> BoxRect {
 
 /// Paints the thumbs of the scroll container `layout_box` (border box
 /// `border_box`) at the higher of every container's alpha and its own,
-/// unless that is 0.
+/// unless that is 0. A text field whose text scrolls draws none, whatever
+/// its `scrollbar-width`, as Chromium 157's does not
+/// (`tests/field_scrollbar.rs`).
 pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
@@ -55,6 +57,9 @@ pub(crate) fn paint(
     let Content::Element(node) = layout_box.content else {
         return;
     };
+    if crate::scroll_reveal::scrolls_text(layout_box) {
+        return;
+    }
     let alpha = input.thumb_alpha.max(input.scroll.alpha(node));
     let Some((at, max)) = input.scroll.state(node).filter(|_| alpha > 0) else {
         return;

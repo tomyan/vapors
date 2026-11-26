@@ -14,7 +14,7 @@ let toggle_menu = move || menu.update(|open| *open = !*open);
 .topbar { position: relative; flex: none; height: 64px; box-sizing: border-box; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }
 .title { position: absolute; left: 24px; top: 0; height: 63px; display: flex; align-items: center; font-size: 20px; font-weight: 600; color: #111827; }
 .search { display: flex; position: absolute; right: 324px; top: 14px; width: 280px; height: 36px; }
-.search-input { overflow: visible; box-sizing: border-box; width: 280px; height: 36px; margin: 0; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; background-color: #f9fafb; color: #111827; font-size: 14px; }
+.search-input { box-sizing: border-box; width: 280px; height: 36px; margin: 0; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; background-color: #f9fafb; color: #111827; font-size: 14px; }
 .search-input::placeholder { color: #6b7280; }
 .export-anchor { position: absolute; right: 84px; top: 14px; width: 96px; height: 36px; }
 .export { width: 96px; height: 36px; box-sizing: border-box; margin: 0; padding: 0; border: none; border-radius: 8px; background-color: #4f46e5; color: #ffffff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }

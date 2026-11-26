@@ -24,10 +24,10 @@ impl Painted {
         Some(self.frames.point(self.frame_of(node), origin))
     }
 
-    /// A text field's text origin, CSS pixels.
+    /// A text field's text origin, CSS pixels, in its run's frame.
     pub(crate) fn text_origin(&self, node: NodeId) -> Option<[f32; 2]> {
-        let origin = *self.text_origins.get(&node)?;
-        Some(self.frames.point(self.frame_of(node), origin))
+        let (origin, frame) = *self.text_origins.get(&node)?;
+        Some(self.frames.point(frame, origin))
     }
 
     /// A range input's track.

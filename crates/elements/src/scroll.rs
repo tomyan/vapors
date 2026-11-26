@@ -8,6 +8,7 @@ use crate::node_map::NodeMap;
 use vapors_dom::NodeId;
 
 use crate::layout::{Content, Lanes, LayoutBox};
+use crate::scroll_reveal::Revealed;
 
 /// The offsets, by scroll container, and the containers scrolled
 /// since the last update.
@@ -30,6 +31,9 @@ struct Offset {
     /// as last settled.
     alpha: u8,
     settled_alpha: u8,
+    /// A text field's caret, as its offset last followed it
+    /// (`scroll_reveal.rs`).
+    revealed: Revealed,
 }
 
 impl Offsets {
@@ -126,15 +130,15 @@ impl Offsets {
     /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
     /// never settled.
     pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
-        let kept = self.by_node.get(&node).map(|kept| (kept.max, kept.client));
-        let (max, client) = kept.unwrap_or_else(|| {
+        let kept = self.by_node.get(&node).unwrap_or_else(|| {
             panic!(
                 "scroll container {node:?} is marked as only scrolled but kept no offset, so \
                  no range to clamp to: a box marked Scrolled was never settled \
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let offset = self.clamped_to(node, max, client);
+        let (max, client) = (kept.max, kept.client);
+        let offset = self.clamped_to(node, (max, client), (kept.at, kept.revealed));
         self.settled_to(node, offset, scale)
     }
 
@@ -169,14 +173,25 @@ impl Offsets {
         self.by_node == other.by_node
     }
 
+    /// `node`'s offset, a text field's moved to its caret
+    /// (`scroll_reveal.rs`), clamped to its range as laid out now.
     fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
-        self.clamped_to(node, range(laid, index), client_size(laid.0, index))
+        let kept = self.by_node.get(&node);
+        let at = kept.map_or([0.0; 2], |kept| kept.at);
+        let last = kept.and_then(|kept| kept.revealed);
+        let moved = crate::scroll_reveal::revealed(laid.0, index, at, last);
+        let laid_out = (range(laid, index), client_size(laid.0, index));
+        self.clamped_to(node, laid_out, moved)
     }
 
-    /// `node`'s offset clamped to `max`, its range, with `client`, its
-    /// client size.
-    fn clamped_to(&self, node: NodeId, max: [f32; 2], client: [f32; 2]) -> Offset {
-        let at = self.get(node).unwrap_or_default();
+    /// `node`'s offset `at` clamped to `max`, its range, with `client`,
+    /// its client size, kept with what it was `revealed` for.
+    fn clamped_to(
+        &self,
+        node: NodeId,
+        (max, client): ([f32; 2], [f32; 2]),
+        (at, revealed): ([f32; 2], Revealed),
+    ) -> Offset {
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
         Offset {
@@ -186,6 +201,7 @@ impl Offsets {
             settled: [at, max],
             alpha,
             settled_alpha: alpha,
+            revealed,
         }
     }
 
@@ -243,23 +259,26 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its padding box, on the axes that scroll (`auto`, `scroll`; a
 /// `hidden` or `clip` axis has none). Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
-/// counts, so the larger of the two is taken.
+/// counts, so the larger of the two is taken. A text field's on x is
+/// its text's and caret's past its content box (`scroll_reveal.rs`).
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
     let padding = layout.padding;
     let end = content_end((boxes, lanes), index);
     let inner = client_size(boxes, index);
-    let reach = [
-        layout.scroll_width().max(end[0] + padding.right - inner[0]),
-        layout
-            .scroll_height()
-            .max(end[1] + padding.bottom - inner[1]),
-    ];
+    let x = if crate::scroll_reveal::scrolls_text(&boxes[index]) {
+        crate::scroll_reveal::field_reach(boxes, index)
+    } else {
+        layout.scroll_width().max(end[0] + padding.right - inner[0])
+    };
+    let y = layout
+        .scroll_height()
+        .max(end[1] + padding.bottom - inner[1]);
     let overflow = boxes[index].style.overflow;
     let scrolls = |axis: taffy::Overflow| axis == taffy::Overflow::Scroll;
     [
-        if scrolls(overflow.x) { reach[0] } else { 0.0 },
-        if scrolls(overflow.y) { reach[1] } else { 0.0 },
+        if scrolls(overflow.x) { x } else { 0.0 },
+        if scrolls(overflow.y) { y } else { 0.0 },
     ]
 }
 

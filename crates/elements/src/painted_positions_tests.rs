@@ -170,7 +170,7 @@ fn items_batches_and_hits_move_with_the_frame() {
 fn the_hits_an_update_changed_are_put_on_the_page_through_their_frame() {
     // Given: a hit in the list's frame
     let mut page = page();
-    let list_frame = page.doc.painted().expect("painted").order.thumbs[0];
+    let list_frame = page.doc.painted().expect("painted").node_frames[&page.row];
     let rect = crate::layout::BoxRect {
         x: 0.0,
         y: 0.0,
