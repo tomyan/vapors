@@ -9,10 +9,10 @@
 // "-" where none shows, as after blur), one line per step.
 //
 // With `scrollbar` (tests/field_scrollbar.rs), scrollbars are shown
-// and the same input with a green scrollbar-color and scrollbar-width
-// auto, then thin, is typed into 60 times and wheel-scrolled; a
-// scrolling div styled the same is the control that a thumb would be
-// seen. Each step prints the case, the computed scrollbar-width, the
+// and the same input with a green scrollbar-color and no
+// scrollbar-width, then auto, then thin, is typed into 60 times and
+// wheel-scrolled; scrolling divs styled the same, auto and thin, are
+// the controls that a thumb would be seen. Each step prints the case, the computed scrollbar-width, the
 // scrollLeft and the columns painted green ("-" for none).
 //
 // Usage: node scripts/chromium-field-scroll.mjs [scrollbar]
@@ -35,17 +35,25 @@ const WHEEL_MS = 500;
 // the caret blinks, so a screenshot can miss it: up to 6 taken 200 ms
 // apart cover more than one blink period
 const SHOTS = 6, SHOT_GAP_MS = 200;
-const SCROLLBAR = process.argv[2] === 'scrollbar';
+const MODE = process.argv[2];
+if (MODE !== undefined && MODE !== 'scrollbar') {
+  console.error(`chromium-field-scroll: unknown argument ${MODE}; fix: give none or \`scrollbar\``);
+  process.exit(1);
+}
+const SCROLLBAR = MODE === 'scrollbar';
 const STYLE = `<!doctype html><style>html,body{margin:0;background:#fff}
 #s{position:absolute;left:676px;top:14px;box-sizing:border-box;width:280px;height:36px;margin:0;padding:0 12px;
 border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;color:#111827;font:14px sans-serif;outline:none;caret-color:#ff0000}</style>`;
 const PAGE = `${STYLE}<input id=s type=text>`;
 // the scrollbar cases: [name, page]
-const BAR = (width, element) => `${STYLE}<style>#s{scrollbar-width:${width};scrollbar-color:#00ff00 transparent}</style>${element}`;
+const BAR = (width, element) => `${STYLE}<style>#s{${width ? `scrollbar-width:${width};` : ''}scrollbar-color:#00ff00 transparent}</style>${element}`;
+const INPUT = '<input id=s type=text>', DIV = `<div id=s style="overflow-x:auto;white-space:nowrap">${'W'.repeat(60)}</div>`;
 const BAR_CASES = [
-  ['input, auto', BAR('auto', '<input id=s type=text>')],
-  ['input, thin', BAR('thin', '<input id=s type=text>')],
-  ['div, auto (control)', BAR('auto', `<div id=s style="overflow-x:auto;white-space:nowrap">${'W'.repeat(60)}</div>`)],
+  ['input, none given', BAR(null, INPUT)],
+  ['input, auto', BAR('auto', INPUT)],
+  ['input, thin', BAR('thin', INPUT)],
+  ['div, auto (control)', BAR('auto', DIV)],
+  ['div, thin (control)', BAR('thin', DIV)],
 ];
 
 function pinned() {
@@ -189,6 +197,6 @@ async function bars(s, load, value, wheel, version) {
 }
 
 main().then(() => process.exit(0), error => {
-  console.error(`chromium-field-scroll: ${error.message}; rerun: node scripts/chromium-field-scroll.mjs`);
+  console.error(`chromium-field-scroll: ${error.message}; rerun: node scripts/chromium-field-scroll.mjs${SCROLLBAR ? ' scrollbar' : ''}`);
   process.exit(1);
 });
