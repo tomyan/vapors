@@ -186,6 +186,14 @@ pub enum Command {
     },
     /// Check formatting and lints without running tests.
     Lint,
+    /// Capture saved Chromium references for the paint tests, on request
+    /// only, into crates/elements-corpus/fixtures/references/: `all`, or
+    /// `<fixture> <scale> [<state>]`. Look at each before committing it.
+    Reference {
+        /// `all`, or a paint fixture, its scale and optionally a state.
+        #[arg(required = true, num_args = 1..=3)]
+        target: Vec<String>,
+    },
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,
     /// Fail naming each file where ./xtask differs from <sibling>/xtask.
@@ -219,6 +227,9 @@ pub enum Tier {
     /// Needs what only the host has (bwrap making a user namespace); run by ci and the gate,
     /// never in an API builder's sandbox.
     Host,
+    /// The private SDK harness's host tests, which the host tier leaves out; never run by ci,
+    /// ci.yml or the gate.
+    SdkHost,
     /// Needs hardware performance counters and a GPU adapter; run in a quiet window, never by ci.
     Pmu,
 }

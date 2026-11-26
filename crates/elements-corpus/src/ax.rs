@@ -52,6 +52,40 @@ pub fn tree(session: &mut Session, work: &Path, name: &str) -> Result<Value, Str
     Ok(json!({ "viewport": [viewport.0, viewport.1], "tree": tree }))
 }
 
+/// The size and device scale a page is opened at.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PageSize {
+    /// Width in CSS px.
+    pub width: u32,
+    /// Height in CSS px.
+    pub height: u32,
+    /// Device pixels per CSS px.
+    pub scale: f64,
+}
+
+/// Fixture `name`'s first viewport, from its `.wisp`.
+///
+/// # Errors
+/// A fixture that cannot be read or does not split, or has no viewport.
+pub fn first_viewport(name: &str) -> Result<PageSize, String> {
+    let source = source(name)?;
+    let first = source
+        .viewports
+        .first()
+        .ok_or_else(|| format!("{name}: no viewport"))?;
+    Ok(PageSize {
+        width: first.width,
+        height: first.height,
+        scale: first.scale,
+    })
+}
+
+fn source(name: &str) -> Result<crate::page::Source, String> {
+    let path = fixtures_dir().join(format!("{name}.wisp"));
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    split(name, &text)
+}
+
 /// Fixture `name`'s page, written under `work` and opened at `size`, else
 /// at the fixture's first viewport; returns the size it was opened at.
 ///
@@ -62,22 +96,17 @@ pub fn open(
     session: &mut Session,
     work: &Path,
     name: &str,
-    size: Option<(u32, u32)>,
+    size: Option<PageSize>,
 ) -> Result<(u32, u32), String> {
-    let path = fixtures_dir().join(format!("{name}.wisp"));
-    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let source = split(name, &text)?;
-    let first = source
-        .viewports
-        .first()
-        .ok_or_else(|| format!("{name}: no viewport"))?;
-    let (width, height) = size.unwrap_or((first.width, first.height));
+    let size = match size {
+        Some(size) => size,
+        None => first_viewport(name)?,
+    };
     let page = work.join(format!("{name}.page.html"));
-    std::fs::write(&page, html(&source)).map_err(|e| format!("{}: {e}", page.display()))?;
-    let metrics = json!({ "width": width, "height": height, "deviceScaleFactor": first.scale, "mobile": false });
-    session.call("Emulation.setDeviceMetricsOverride", &metrics, DEADLINE)?;
+    std::fs::write(&page, html(&source(name)?)).map_err(|e| format!("{}: {e}", page.display()))?;
+    emulate(session, size)?;
     load(session, &page)?;
-    Ok((width, height))
+    Ok((size.width, size.height))
 }
 
 /// The page `file` under `fixtures/` (another page than a fixture's,
@@ -85,11 +114,15 @@ pub fn open(
 ///
 /// # Errors
 /// A page that does not load or whose fonts do not.
-pub fn open_file(session: &mut Session, file: &str, size: (u32, u32)) -> Result<(), String> {
-    let metrics =
-        json!({ "width": size.0, "height": size.1, "deviceScaleFactor": 1, "mobile": false });
-    session.call("Emulation.setDeviceMetricsOverride", &metrics, DEADLINE)?;
+pub fn open_file(session: &mut Session, file: &str, size: PageSize) -> Result<(), String> {
+    emulate(session, size)?;
     load(session, &fixtures_dir().join(file))
+}
+
+fn emulate(session: &mut Session, size: PageSize) -> Result<(), String> {
+    let metrics = json!({ "width": size.width, "height": size.height, "deviceScaleFactor": size.scale, "mobile": false });
+    session.call("Emulation.setDeviceMetricsOverride", &metrics, DEADLINE)?;
+    Ok(())
 }
 
 /// Open `page` and wait for its load event and its fonts.

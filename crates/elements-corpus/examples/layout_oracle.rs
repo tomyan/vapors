@@ -5,11 +5,16 @@
 //! cargo run -p vapors-elements-corpus --example layout_oracle -- --check # fail on any difference
 //! ```
 //!
-//! `--check` is what CI runs: a fixture edited without rerunning the
-//! oracle, or a Chromium that lays a fixture out differently, fails it.
+//! `--check` is run on request, not in CI: a fixture edited without
+//! rerunning the oracle, or a Chromium that lays a fixture out
+//! differently, fails it. CI holds vapors to the committed boxes
+//! (`tests/corpus.rs`) and the boxes to the fixtures
+//! (`tests/committed_references.rs`) without a browser. A `*.boxes.json`
+//! that no laid-out fixture needs is refused before Chromium starts.
 
 use std::process::ExitCode;
 
+use vapors_elements_corpus::answer_files::refuse_orphans;
 use vapors_elements_corpus::oracle::{
     boxes, fixtures_dir, laid_out_fixture_names, to_text, write_fonts, write_images,
 };
@@ -31,6 +36,8 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
+    let names = laid_out_fixture_names()?;
+    refuse_orphans(&names, ".boxes.json")?;
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     println!("chromium: {}", chromium.version());
     let scratch = tempfile::Builder::new()
@@ -41,7 +48,7 @@ fn run(check: bool) -> Result<(), String> {
     write_fonts(work)?;
     write_images(work)?;
     let mut differ = Vec::new();
-    for name in laid_out_fixture_names()? {
+    for name in names {
         let text = to_text(&boxes(&chromium, work, &name)?);
         let path = fixtures_dir().join(format!("{name}.boxes.json"));
         let current = std::fs::read_to_string(&path).unwrap_or_default();

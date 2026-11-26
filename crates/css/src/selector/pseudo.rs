@@ -20,7 +20,7 @@ pub(super) fn pseudo_class(items: &mut Items<'_>, at: Position) -> Result<Pseudo
             ..
         })) => Err(Error::new(
             at,
-            "pseudo-elements (::before, ::after) are not supported; generate the content as an element",
+            "pseudo-elements are not supported but for `::placeholder` at the end of a selector, with only `color` (docs/placeholder.md); generate other content as an element",
         )),
         _ => Err(Error::new(at, "expected a pseudo-class name after \":\"")),
     }
@@ -48,7 +48,9 @@ fn simple(name: &str, at: Position) -> Result<PseudoClass> {
         "before" | "after" => {
             return Err(Error::new(
                 at,
-                format!(":{name} is a pseudo-element and pseudo-elements are not supported"),
+                format!(
+                    ":{name} is a pseudo-element, and pseudo-elements but a trailing `::placeholder` are not supported"
+                ),
             ));
         }
         "nth-child" | "nth-last-child" | "nth-of-type" | "nth-last-of-type" | "not" | "is"

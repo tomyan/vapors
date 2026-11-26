@@ -1,15 +1,12 @@
 //! What the oracles share about their committed files: a committed
 //! answer compared with Chromium's (missing, malformed, different at its
-//! first line, or the same), outputs with no fixture refused, a
-//! scratch directory removed however the run ends, and files written
-//! whole into a directory other runs read.
+//! first line, or the same), a scratch directory removed however the
+//! run ends, and files written whole into a directory other runs read.
 
 use std::io::Write;
 use std::path::Path;
 
 use serde_json::Value;
-
-use crate::oracle::fixtures_dir;
 
 /// A committed answer, against Chromium's.
 #[derive(Debug, PartialEq, Eq)]
@@ -89,28 +86,6 @@ fn first_difference(committed: &str, chromium: &str) -> Option<(usize, String, S
     (0..longest)
         .find(|&i| at(committed, i) != at(chromium, i))
         .map(|i| (i + 1, at(committed, i), at(chromium, i)))
-}
-
-/// Every `fixtures/<name><suffix>` with no `<name><source>` beside it,
-/// refused: an answer whose fixture or script was removed.
-///
-/// # Errors
-/// The first such file, or the directory cannot be read.
-pub fn refuse_orphans(suffix: &str, source: &str) -> Result<(), String> {
-    let dir = fixtures_dir();
-    let entries = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    for entry in entries.filter_map(Result::ok) {
-        let file = entry.file_name().to_string_lossy().into_owned();
-        if let Some(name) = file.strip_suffix(suffix)
-            && !dir.join(format!("{name}{source}")).is_file()
-        {
-            return Err(format!(
-                "{}: no {name}{source} beside it; fix: remove it, or add {name}{source}",
-                dir.join(&file).display()
-            ));
-        }
-    }
-    Ok(())
 }
 
 /// A scratch directory, removed when dropped, whatever the run did.

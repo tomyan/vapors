@@ -15,6 +15,7 @@ pub mod child_deadline;
 pub mod circuit;
 pub mod counted_frames;
 pub mod counter_samples;
+pub mod counter_tier;
 pub mod counters_report;
 pub mod driver;
 pub mod element_memory;

@@ -120,6 +120,11 @@ const GROUPS: &[Group] = &[
     },
     Group {
         readers: NONE,
+        instead: "it is a `::placeholder` colour, and a scene node has no placeholder; give the rule an input selector (`input::placeholder`) so it does not match the scene",
+        longhands: "-vapors-placeholder-color",
+    },
+    Group {
+        readers: NONE,
         instead: "a scene node has no box: its shape is `<Mesh geometry>`, and the surface's box is the `gpu-surface` element's",
         longhands: BOX_MODEL,
     },

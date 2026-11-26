@@ -60,9 +60,9 @@ impl Fresh {
         let mut scroll = before.scroll.clone();
         let laid = (boxes.boxes, boxes.lanes);
         let offsets = scroll.settle(laid, boxes.scrolls, boxes.scale);
-        let (mut rects, paddings) = placed(laid, &vec![[0.0; 2]; offsets.len()]);
-        in_lane_frames(&mut rects, kept, boxes.lanes);
-        let (on_page, _) = placed(laid, &offsets);
+        let zero = vec![[0.0; 2]; offsets.len()];
+        let (rects, paddings) = placed(laid, &zero, &|slot| in_lane_frame(kept, boxes.lanes, slot));
+        let (on_page, _) = placed(laid, &offsets, &|_| None);
         let fresh = Self {
             rects,
             paddings,
@@ -81,12 +81,23 @@ impl Fresh {
     }
 }
 
-/// Fresh `rects`, each in its scroll frame, put in the lane frames the
-/// kept placement holds them in, as kept rects are.
-fn in_lane_frames(rects: &mut [BoxRect], kept: &Placement, lanes: &Lanes) {
-    for (slot, rect) in rects.iter_mut().enumerate().take(kept.framed.len()) {
-        rect.y -= crate::placement_check_page::lane_offset(kept, lanes, slot);
-    }
+/// Where slot `slot` is along the axis in the lane frame the kept
+/// placement holds it in, when it is a framed lane child: its relative
+/// offset alone, as placement puts it. Composing the fresh rects from
+/// there keeps the kept arithmetic, so the two agree to the bit, and a
+/// box 52,000,000 px down keeps its half pixels; an absolute f32 rect
+/// with the lane's offset taken off afterwards would not. This side of
+/// the check therefore holds a framed child's place in its frame to
+/// placement's own arithmetic, not to Taffy's: its lane start and its
+/// container's place are held to Taffy only by the on-page comparison
+/// (`placement_check_page.rs`, `lane_offset`). RELAXED: that comparison
+/// is in f32, so it holds a start to whole device pixels only where an
+/// f32 resolves one, below 16,777,216 / scale CSS px; deeper, only to
+/// the f32 step there (4 px at 52,000,000 px), and a start wrong by less
+/// passes. An on-page comparison in f64 retires this.
+fn in_lane_frame(kept: &Placement, lanes: &Lanes, slot: usize) -> Option<f32> {
+    let framed = slot < kept.framed.len() && kept.framed[slot];
+    framed.then(|| lanes.relative(kept.up[slot], slot))
 }
 
 /// The slots of `boxes` that hold a box.
