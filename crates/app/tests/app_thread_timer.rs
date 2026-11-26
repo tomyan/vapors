@@ -15,6 +15,15 @@ use super::app_thread::{ignore, wait_for};
 /// The interval these tests run.
 const TICK: Duration = Duration::from_millis(20);
 
+/// The longest five ticks may take from the `On` message: the plan's
+/// 200 ms. Thirty runs took 81.5 to 82.9 ms, with 7 turns for the 5
+/// ticks in every run, ticks plus two (debug build, this machine,
+/// 2026-11-26). The message's turn, the spawn's wake (the first tick
+/// comes in its poll) and one wake for each later tick make 6; the
+/// seventh is measured, not accounted for. The plan's "one turn per tick
+/// plus one" counts neither the message nor that turn.
+const FIVE_TICKS: Duration = Duration::from_millis(200);
+
 enum Live {
     On,
     Off,
@@ -52,12 +61,18 @@ fn a_running_interval_wakes_the_thread_about_once_per_tick() {
     let app = AppThread::start(move || live(counted), ignore).expect("the thread starts");
 
     // When
+    let started = std::time::Instant::now();
     app.send(Live::On).expect("the thread runs");
     wait_for("five ticks", || ticks.load(Ordering::SeqCst) >= 5);
+    let took = started.elapsed();
 
-    // Then: the message's turn, the spawn's wake, then one per tick
+    // Then: five ticks within FIVE_TICKS, and one turn per tick plus two
     let (turns, ticks) = (app.turns(), ticks.load(Ordering::SeqCst));
-    assert!(turns <= ticks + 3, "{turns} turns for {ticks} ticks");
+    assert!(
+        took < FIVE_TICKS,
+        "five ticks took {took:?}, over {FIVE_TICKS:?}"
+    );
+    assert!(turns <= ticks + 2, "{turns} turns for {ticks} ticks");
     app.stop().expect("the thread stops");
 }
 

@@ -72,3 +72,51 @@ fn a_handler_blocking_past_the_stop_deadline_is_refused_naming_it() {
         })
     );
 }
+
+/// Blocks for `BLOCK` when dropped, as app-authored `Drop` code may.
+struct SlowDrop;
+
+impl Drop for SlowDrop {
+    fn drop(&mut self) {
+        std::thread::sleep(BLOCK);
+    }
+}
+
+#[test]
+fn a_pending_task_whose_drop_blocks_past_the_stop_deadline_is_refused_naming_it() {
+    // Given: a task, pending forever, holding a value whose drop blocks;
+    // the thread drops it on its way out, after its last turn
+    let deadlines = Deadlines {
+        start: Duration::from_secs(5),
+        stop: SHORT,
+    };
+    let make = || {
+        |(): ()| {
+            let held = SlowDrop;
+            // Deadline::User: a test task that never ends; the thread drops it
+            vapors_signals::spawn(vapors_signals::Deadline::User, async move {
+                let _held = held;
+                std::future::pending::<Result<(), String>>().await
+            });
+        }
+    };
+    let app = AppThread::start_within(make, ignore, deadlines).expect("the thread starts");
+    app.send(()).expect("the thread runs");
+    let started = Instant::now();
+    while app.turns() < 2 {
+        assert!(started.elapsed() < BLOCK, "the task's turn did not run");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+
+    // When
+    let stopped = app.stop();
+
+    // Then
+    assert_eq!(
+        stopped,
+        Err(AppThreadError::Deadline {
+            what: "stop",
+            after: SHORT
+        })
+    );
+}
