@@ -38,8 +38,9 @@ pub(crate) struct ChangedSlots {
     /// The lanes whose children became frames of their own or stopped
     /// being (`Placed::reframed`): scroll containers in them are in other
     /// frames, so the scroll frames are made afresh (`paint_frames.rs`),
-    /// and their clips are redone, as a framed lane under a rounded clip
-    /// is refused (`kept_order.rs` `reclipped`, `clip_refusals.rs`).
+    /// and their clips are redone, as a framed lane's rows under a rounded
+    /// clip are in a rounded frame (`kept_order.rs` `reclipped`,
+    /// `kept_clips_round.rs`).
     pub(crate) reframed: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are

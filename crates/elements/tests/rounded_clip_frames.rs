@@ -101,8 +101,11 @@ fn a_framed_lane_that_does_not_clip_in_a_rounded_frame_is_refused() {
         element(&mut doc, inner, "div", "tiny");
     }
 
-    // Then
-    assert_refused(&refusals(&mut doc), "inside a frame with a rounded clip");
+    // Then: named with the fix that works
+    assert_refused(
+        &refusals(&mut doc),
+        "give this box overflow: hidden or clip",
+    );
 }
 
 #[test]
@@ -150,4 +153,31 @@ fn a_scroller_moved_into_a_rounded_frames_corner_by_rows_above_it_is_refused() {
 
     // Then
     assert_refused(&refusals(&mut doc), "inside a frame with a rounded clip");
+}
+
+#[test]
+fn an_img_in_a_lane_row_is_refused_once_the_card_rounds_and_not_after() {
+    // Given: a square card's framed lane, an image in its first row,
+    // updated
+    let (mut doc, card, rows) = card_list(".square { border-radius: 0; } img { display: block; }");
+    doc.set_attribute(card, "class", "card square");
+    let image = vapors_scene::RgbaImage {
+        size: vapors_scene::Size {
+            width: 2,
+            height: 2,
+        },
+        rgba: [0, 0, 0, 255].repeat(4),
+    };
+    doc.register_image("a.png", image).expect("registers");
+    let img = element(&mut doc, rows[0], "img", "");
+    doc.set_attribute(img, "src", "a.png");
+    doc.update(at(1.0)).expect("updates");
+
+    // When: the card rounds
+    doc.set_attribute(card, "class", "card");
+
+    // Then: refused; and accepted again once it is square
+    assert_refused(&refusals(&mut doc), "is an img under a rounded clip");
+    doc.set_attribute(card, "class", "card square");
+    doc.update(at(1.0)).expect("updates");
 }

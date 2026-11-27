@@ -32,6 +32,13 @@ pub(crate) enum RoundedRefusal {
     /// content's clip is its frame's, which is not rounded while a rounded
     /// scroller is deferred (`docs/plans/frame-clips.md`).
     Frame,
+    /// A lane container whose children are frames and which does not
+    /// clip, in a frame rounded by box `rounded_by`: its rows reach past
+    /// its box, wherever it is.
+    UnclippedLane {
+        /// The slot of the box whose rounded clip the outer frame has.
+        rounded_by: usize,
+    },
     /// A scroll container, or a lane container whose children are frames,
     /// in a frame rounded by box `rounded_by` and not held clear of its
     /// corners: its frame's clip would not take the corners until frame
@@ -91,7 +98,7 @@ pub(crate) fn in_round_frame(
     } else if layout_box.svg_shapes.is_some() {
         Some(RoundedRefusal::Svg)
     } else if is_frame && !clips {
-        Some(RoundedRefusal::NestedFrame { rounded_by: by })
+        Some(RoundedRefusal::UnclippedLane { rounded_by: by })
     } else {
         None
     };
@@ -108,14 +115,26 @@ pub(crate) fn nested_frames(
     clips: &crate::kept_clips::Clips,
     frames: &crate::frames::Frames,
 ) -> Vec<(usize, RoundedRefusal)> {
-    let crosses = |&(slot, by): &(usize, usize)| {
-        let frame = clips.frame(slot);
-        let round = frames.get(frame).and_then(|at| at.rounded)?;
-        let clip = clips.inner(slot)?;
-        let region = frames.on_page(frame, clip.rect);
-        let held = crate::clip_rounded::holds(round.rect, round.radii, region);
-        (!held).then_some((slot, RoundedRefusal::NestedFrame { rounded_by: by }))
-    };
+    let crosses =
+        |&(slot, by): &(usize, usize)| {
+            let frame = clips.frame(slot);
+            let round = frames.get(frame).and_then(|at| at.rounded).unwrap_or_else(|| {
+            panic!(
+                "box slot {slot} is kept as a frame in a lane frame rounded by box slot {by} \
+                 (`Clips::nested`), and its frame {frame} has no rounded clip: the two must agree \
+                 (kept_clips_round.rs, frames_lane_prime.rs); reproduce with `cargo xtask test`"
+            )
+        });
+            let clip = clips.inner(slot).unwrap_or_else(|| {
+                panic!(
+                    "box slot {slot}, kept as a clipping frame in a rounded lane frame, gives no \
+                 clip (clip_refusals.rs `in_round_frame`); reproduce with `cargo xtask test`"
+                )
+            });
+            let region = frames.on_page(frame, clip.rect);
+            let held = crate::clip_rounded::holds(round.rect, round.radii, region);
+            (!held).then_some((slot, RoundedRefusal::NestedFrame { rounded_by: by }))
+        };
     clips.nested().iter().filter_map(crosses).collect()
 }
 
@@ -148,7 +167,9 @@ pub(crate) fn field_text_overlaps(
 }
 
 /// `clips`' refusals and the rounded frames' `frames`, one a slot, in
-/// slot order: a box both refuse is counted once.
+/// slot order: a box both refuse is counted once, under the reason that
+/// comes first in `RoundedRefusal`'s order (`Frame` before `NestedFrame`,
+/// so a scroller is told about its own rounded clip first).
 pub(crate) fn by_slot(
     clips: Vec<(usize, RoundedRefusal)>,
     frames: Vec<(usize, RoundedRefusal)>,
@@ -203,7 +224,21 @@ impl Document {
 }
 
 fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
-    let (what, fix) = match why {
+    let (what, fix) = wording(why);
+    let also = match others {
+        0 => String::new(),
+        1 => "; 1 other box is refused too".to_owned(),
+        n => format!("; {n} other boxes are refused too"),
+    };
+    format!(
+        "{element}: {what} (docs/plans/flat-scene-f3.md F3.2b){also}; fix: {fix}; reproduce: \
+         update the document, as `cargo test -p vapors-elements --test tests rounded_clip` does"
+    )
+}
+
+/// What `why` says went wrong, and its fix.
+fn wording(why: RoundedRefusal) -> (&'static str, &'static str) {
+    match why {
         RoundedRefusal::Overlap => (
             "its clip and a rounded clip it is under (overflow: hidden or clip with a \
              border-radius) overlap without either holding the other, which needs clip chains",
@@ -236,20 +271,19 @@ fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
              while rounded scrollers are deferred",
             "fit this box inside the rounded box's padding box clear of its corners",
         ),
+        RoundedRefusal::UnclippedLane { .. } => (
+            "frames a lane's rows without clipping them, inside a frame with a rounded clip, so \
+             its rows can reach the corners, and a frame's clip takes an outer frame's corners \
+             only once frame entries chain to their outer frame's (docs/plans/frame-clips.md, \
+             the follow-up)",
+            "give this box overflow: hidden or clip, and keep it clear of the rounded box's \
+             corners",
+        ),
         RoundedRefusal::NestedFrame { .. } => (
             "scrolls, or frames a lane's rows, inside a frame with a rounded clip, crossing its \
              corners, and a frame's clip takes an outer frame's corners only once frame entries \
              chain to their outer frame's (docs/plans/frame-clips.md, the follow-up)",
             "keep this box inside the rounded box's padding box clear of its corners",
         ),
-    };
-    let also = match others {
-        0 => String::new(),
-        1 => "; 1 other box is refused too".to_owned(),
-        n => format!("; {n} other boxes are refused too"),
-    };
-    format!(
-        "{element}: {what} (docs/plans/flat-scene-f3.md F3.2b){also}; fix: {fix}; reproduce: \
-         update the document, as `cargo test -p vapors-elements --test tests rounded_clip` does"
-    )
+    }
 }

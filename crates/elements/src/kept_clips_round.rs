@@ -13,7 +13,14 @@ use crate::frames::PAGE;
 
 impl Clips {
     /// The box rounding frame `frame`, when it is a lane row whose
-    /// container's clip is rounded; its container is redone before it.
+    /// container's clip is rounded; its container is redone before it. A
+    /// row's clip does not take its container's, so a change of rounding
+    /// alone would not reach the boxes in it here: it comes from a restyle
+    /// of the rounding box, which builds its whole subtree again
+    /// (`restyle_pass.rs`, `layout/marks.rs`), each box then redone
+    /// (`tests/rounded_clip_frames.rs`, the card rounding after an
+    /// update). `Clips::first_differing` holds `nested` and `refused` to a
+    /// fresh paint's in a debug build.
     pub(super) fn round_frame(
         &self,
         frame: usize,

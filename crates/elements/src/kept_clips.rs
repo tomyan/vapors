@@ -258,19 +258,21 @@ impl Clips {
                 clips.frame.get(slot).copied(),
                 clips.refused.get(&slot).copied(),
                 clips.rounding.get(&slot).copied(),
+                clips.nested.get(&slot).copied(),
             )
         };
-        // the refusals and roundings of slots past both lists' ends too
+        // the refusals, roundings and nested frames of slots past both lists' ends too
         let past = self.refused.keys().chain(other.refused.keys());
         let past = past
             .chain(self.rounding.keys())
             .chain(other.rounding.keys());
+        let past = past.chain(self.nested.keys()).chain(other.nested.keys());
         let slots = past
             .map(|&slot| slot + 1)
             .fold(self.own.len().max(other.own.len()), usize::max);
         let slot = (0..slots).find(|&slot| at(self, slot) != at(other, slot))?;
         Some(format!(
-            "clips at slot {slot}: kept (own, inner, frame, refused, rounding) {:?}, fresh {:?}",
+            "clips at slot {slot}: kept (own, inner, frame, refused, rounding, nested) {:?}, fresh {:?}",
             at(self, slot),
             at(other, slot)
         ))

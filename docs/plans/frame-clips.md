@@ -178,9 +178,12 @@ held clear of its corners. That applies Tom's nesting rule to frames.
   - Decided with each box's clips, not its place (`in_round_frame`, kept
     by `Clips`, `kept_clips_round.rs`): a box in a rounded lane row is
     refused when it is an img, a gpu-surface or an svg drawing shapes
-    (`Image`, `Surface`, `Svg`), which draw under the scissor. A framed
-    lane there that does not clip is refused too, since its rows reach
-    past its box (`NestedFrame`).
+    (`Image`, `Surface`, `Svg`), which draw under the scissor.
+  - A framed lane that does not clip in a rounded lane row is refused
+    wherever it is (`UnclippedLane`, whose fix is to give it a clip).
+  - A rounded lane row's state comes with a restyle of the rounding box,
+    which builds its subtree again. `nested_frames` asserts each kept
+    frame's rounding is there, and the debug check compares `nested`.
   - A scroller or clipping framed lane in a rounded lane row is checked
     after every paint against the frame's rounded clip on the page
     (`nested_frames`, one check per such frame), because rows move with
@@ -198,7 +201,9 @@ held clear of its corners. That applies Tom's nesting rule to frames.
 - Elements' chain count counts a rounded lane row's boundary as two
   links, the painter's rounded entry under its square one
   (`clip_chain.rs` `boundary`), so it stays an upper bound on the
-  painter's chain, at most 3 today. `assert_no_parent_in` also refuses
+  painter's chain. A box with a clip in a rounded lane row counts 3; a
+  clipping framed lane held clear inside such a row gives its own boxes
+  4, under `MAX_CLIP_CHAIN` (8). `assert_no_parent_in` also refuses
   giving back a frame's square entry while its rounded one is held.
 - `assert_no_parent_in` returns early when nothing is given back.
   Measured over 1723 frames of a 2000-order dashboard scrolled down and
