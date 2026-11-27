@@ -91,7 +91,7 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
             .scene()
             .to_scene()
             .clips()
-            .map(|clip| clip.map(|clip| clip.rect))
+            .map(|clip| clip.map(|clip| clip.rect()))
             .collect(),
         hits: hits(painted, viewport),
         focus,

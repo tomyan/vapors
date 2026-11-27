@@ -44,8 +44,8 @@ fn bits(clip: Clip) -> [u32; 8] {
         top,
         right,
         bottom,
-    } = clip.rect;
-    let [a, b, c, d] = clip.radii;
+    } = clip.rect();
+    let [a, b, c, d] = clip.radii();
     [left, top, right, bottom, a, b, c, d].map(f32::to_bits)
 }
 
@@ -78,9 +78,9 @@ impl Clips {
         (frame, frame_entry): (BatchFrame, u32),
         clip: Clip,
     ) -> Option<u32> {
-        assert_whole(clip.rect);
+        assert_whole(clip.rect());
         assert!(
-            clip.outer.is_none(),
+            clip.outer().is_none(),
             "clip {clip:?} reached the clip table cut to an outer rectangle: a batch's clips are \
              in its frame, whose own clip is the scissor (painter_runs.rs), and only a clip put on \
              the page carries one (vapors-scene clip.rs `cut`); reproduce with `cargo xtask test`"
@@ -91,16 +91,16 @@ impl Clips {
             None => self.table.take(target.encoder, 1)?,
         };
         let rect = [
-            clip.rect.left,
-            clip.rect.top,
-            clip.rect.right,
-            clip.rect.bottom,
+            clip.rect().left,
+            clip.rect().top,
+            clip.rect().right,
+            clip.rect().bottom,
         ];
         self.table.set(
             target.encoder,
             target.queue,
             at,
-            ClipEntry::rounded(rect, clip.radii, frame_entry),
+            ClipEntry::rounded(rect, clip.radii(), frame_entry),
         );
         self.hold(key, at, frame_entry);
         Some(at)

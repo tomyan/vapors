@@ -158,7 +158,7 @@ pub fn caret_column(page: &Page) -> Option<f32> {
     let items = painted.scene().items();
     let shown = items.filter_map(|(item, clip)| match item {
         Item::Quad(q) if q.background == INK && q.rect.right - q.rect.left == 1.0 => {
-            let clip = clip.map_or(q.rect, |clip| clip.rect);
+            let clip = clip.map_or(q.rect, |clip| clip.rect());
             (q.rect.left >= clip.left && q.rect.right <= clip.right).then_some(q.rect.left)
         }
         _ => None,
@@ -174,7 +174,7 @@ pub fn text_clip(page: &Page) -> Option<Rect> {
         .scene()
         .items()
         .filter_map(|(item, clip)| {
-            matches!(item, Item::Text { .. }).then_some(clip.map(|clip| clip.rect))
+            matches!(item, Item::Text { .. }).then_some(clip.map(|clip| clip.rect()))
         })
         .collect();
     let [clip] = texts[..] else {

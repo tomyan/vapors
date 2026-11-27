@@ -11,19 +11,41 @@
 
 use crate::display::Rect;
 
-/// A clip: `rect` with corner `radii`, device pixels.
+/// A clip: `rect` with corner `radii`, device pixels. The fields are
+/// private, so a clip is made only by [`Clip::square`],
+/// [`Clip::rounded`], which refuses a negative or non-finite radius, and
+/// [`Clip::cut`], which alone sets `outer`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Clip {
     /// The rectangle.
-    pub rect: Rect,
+    rect: Rect,
     /// Each corner's radius: top-left, top-right, bottom-right,
     /// bottom-left.
-    pub radii: [f32; 4],
+    radii: [f32; 4],
     /// A rectangle the clip is also cut to; only a rounded clip has one.
-    pub outer: Option<Rect>,
+    outer: Option<Rect>,
 }
 
 impl Clip {
+    /// The rectangle, before any cut to `outer`.
+    #[must_use]
+    pub const fn rect(&self) -> Rect {
+        self.rect
+    }
+
+    /// Each corner's radius: top-left, top-right, bottom-right,
+    /// bottom-left.
+    #[must_use]
+    pub const fn radii(&self) -> [f32; 4] {
+        self.radii
+    }
+
+    /// The rectangle a rounded clip is also cut to, if any.
+    #[must_use]
+    pub const fn outer(&self) -> Option<Rect> {
+        self.outer
+    }
+
     /// `rect` with square corners.
     #[must_use]
     pub const fn square(rect: Rect) -> Self {

@@ -3284,6 +3284,9 @@ dependencies = [
 [[package]]
 name = "vapors-scene"
 version = "0.0.0"
+dependencies = [
+ "trybuild",
+]
 
 [[package]]
 name = "vapors-scene3d"
