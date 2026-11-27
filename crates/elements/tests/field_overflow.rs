@@ -25,9 +25,10 @@ const CLIPPING: [&str; 3] = ["overflow: hidden", "overflow-x: hidden", "overflow
 fn typed(declarations: &str) -> Page {
     let sheet = format!("{SHEET} input {{ {declarations} }}");
     let page = page_with(&sheet, 1280.0);
-    while length(&page) < 60 {
+    for _ in 0..60 {
         type_w(&page);
     }
+    assert_eq!(length(&page), 60, "{declarations}: typed");
     page
 }
 
@@ -75,9 +76,10 @@ fn a_visible_overflow_leaves_the_text_unscrolled_as_before() {
 
 #[test]
 fn a_field_shorter_than_its_line_with_a_y_scroll_draws_no_thumb() {
-    // Given: Chromium draws no thumb on an input whatever its overflow
+    // Given: Chromium draws no thumb on an input whatever its overflow;
+    // square, so a y-scrolling field loaded before this change too
     let sheet = format!(
-        "{SHEET} input {{ overflow-x: hidden; overflow-y: auto; height: 12px; scrollbar-color: #00ff00 transparent; }}"
+        "{SHEET} input {{ border-radius: 0; overflow-x: hidden; overflow-y: auto; height: 12px; scrollbar-color: #00ff00 transparent; }}"
     );
     let page = page_with(&sheet, 1280.0);
 
