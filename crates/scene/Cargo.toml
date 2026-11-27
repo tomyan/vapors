@@ -10,8 +10,5 @@ publish = false
 
 [dependencies]
 
-[dev-dependencies]
-trybuild.workspace = true
-
 [lints]
 workspace = true
