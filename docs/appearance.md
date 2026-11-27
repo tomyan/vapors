@@ -1,6 +1,6 @@
 # appearance
 
-`appearance: none | auto` (CSS UI 4, section 7.2), not inherited. The
+`appearance: none | auto` (CSS UI 4), not inherited. The
 initial value is `none`; the user-agent sheet (`crates/css/src/ua.css`)
 sets `auto` on the controls vapors draws parts of: a range, a checkbox
 and a switch. Read by `crates/elements/src/style/appearance.rs`.
@@ -10,7 +10,7 @@ and a switch. Read by `crates/elements/src/style/appearance.rs`.
 | Control | `auto` | `none` |
 |---|---|---|
 | checkbox | its mark when checked (`checkbox_paint.rs`); 11 x 11 px content when unsized (`checkbox.rs`) | no mark; no content when unsized |
-| switch | its track and knob (`switch.rs`) | neither: the box's own background, border and radius are all it draws |
+| switch | its track and knob (`switch.rs`) | neither: it draws only the box's own background, border, radius and outline |
 | range | its track and thumb (`range_paint.rs`) | refused (below) |
 | any other element | nothing of its own | nothing of its own |
 
@@ -47,6 +47,16 @@ size, where Chromium, which has no switch, would have 0 x 0.
 - `none` on a range: Chromium takes the track away and still draws the
   thumb, whose appearance is its own; vapors draws both as one part.
   Remove it, or style the range through its `--vapors-*` parts.
-- CSS UI 4's compat keywords (`menulist-button`, `textfield`, and the
-  `<compat-special>` ones such as `checkbox`), which the grammar does
-  not take, and `-webkit-appearance`, which is not a vapors property.
+- Every keyword but `none` and `auto`, by the grammar: CSS UI 4's
+  `<compat-special>` (`textfield`, `menulist-button`) and
+  `<compat-auto>` (`checkbox`, `radio` and the rest), and the draft's
+  `base` and `base-select`.
+- `-webkit-appearance` and `-moz-appearance`, as unknown properties,
+  naming `appearance` to write instead.
+
+`type` is matched without regard to case (`input[type=checkbox i]` in
+the user-agent sheet), as HTML and Chromium 157 do: `type=Checkbox` is
+a checkbox with `appearance: auto`. The older user-agent rules for a
+checkbox's border and background, a switch's size and a range's margin
+still match `type` with regard to case, so `type=Checkbox` draws its
+mark without that border; not changed here.

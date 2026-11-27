@@ -102,10 +102,11 @@ impl Context<'_> {
             to_viewport,
             range,
         ];
-        facts
-            .iter()
-            .enumerate()
-            .fold(0, |bits, (at, &&fact)| bits | (u8::from(fact) << at))
+        facts.iter().enumerate().fold(0, |bits, (at, &&fact)| {
+            let at = u32::try_from(at).expect("a handful of facts");
+            let bit = u8::from(fact).checked_shl(at);
+            bits | bit.expect("Context holds more facts than the key's 8 bits; widen `bits`")
+        })
     }
 }
 

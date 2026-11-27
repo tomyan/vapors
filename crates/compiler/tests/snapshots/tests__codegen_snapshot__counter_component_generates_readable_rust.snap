@@ -19,7 +19,7 @@ pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
 static WINNERS_BUTTON0: vapors_elements::__wisp::dom::KeyWinners = vapors_elements::__wisp::dom::KeyWinners {
     sheets: &[
-        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0xf7c2_36d1_26de_e5ab),
+        (vapors_elements::__wisp::dom::SheetRef::UserAgent, 0xf0b3_0c17_63ef_fb16),
         (vapors_elements::__wisp::dom::SheetRef::Scope(SCOPE), 0x20a6_deea_d601_c3e4),
     ],
     base: &[

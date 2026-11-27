@@ -84,8 +84,36 @@ fn a_checked_checkbox_with_appearance_none_draws_no_mark() {
     let style = "input { appearance: none; width: 20px; height: 20px }";
     let (mut checked, _) = page(style, false, &[("checked", "")]);
 
-    // When, Then: the user-agent box alone, no mark
-    assert_eq!(quads(&mut checked), quads(&mut unchecked));
+    // When
+    let (checked, unchecked) = (quads(&mut checked), quads(&mut unchecked));
+
+    // Then: the user-agent box alone, no mark
+    assert_eq!(checked, unchecked);
+}
+
+#[test]
+fn a_type_written_in_capitals_keeps_its_parts_as_in_chromium() {
+    // Given: Chromium 157 gives `type=Checkbox` `appearance: auto` (docs/appearance.md)
+    let (mut plain, _) = page(
+        "input { width: 20px; height: 20px }",
+        false,
+        &[("checked", "")],
+    );
+    let (mut capitals, input) = page(
+        "input { width: 20px; height: 20px }",
+        false,
+        &[("checked", "")],
+    );
+    capitals.set_attribute(input, "type", "Checkbox");
+
+    // When
+    let (plain, capitals) = (quads(&mut plain), quads(&mut capitals));
+
+    // Then: its mark is drawn in the mark colour, as a lowercase type's is
+    // (the user-agent border rule still matches `type` with regard to case,
+    // so the box and the mark's place differ, docs/appearance.md)
+    let mark = |quads: &[Quad]| quads.last().map(|q| q.background);
+    assert_eq!(mark(&capitals), mark(&plain), "{capitals:?}");
 }
 
 #[test]
@@ -143,21 +171,22 @@ fn appearance_none_on_a_range_is_refused_naming_what_chromium_keeps() {
 
     // Then
     assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(
-        errors[0].contains("appearance") && errors[0].contains("range"),
-        "{errors:?}"
-    );
+    let named = ["app.css:1:", "appearance", "range", "thumb"];
+    assert!(named.iter().all(|n| errors[0].contains(n)), "{errors:?}");
 }
 
 #[test]
-fn a_compatibility_keyword_is_refused() {
+fn a_compatibility_keyword_is_refused_naming_its_sheet_and_line() {
     // Given: CSS UI 4's compat keywords, which vapors does not take
-    let parsed = document().add_stylesheet("app.css", "input { appearance: checkbox }");
+    let mut doc = document();
+
+    // When
+    let parsed = doc.add_stylesheet("app.css", "input {\n  appearance: checkbox }");
 
     // Then
     let error = parsed.expect_err("refused").to_string();
     assert!(
-        error.contains("appearance") && error.contains("app.css"),
+        error.contains("appearance") && error.contains("app.css:2:"),
         "{error}"
     );
 }
@@ -174,4 +203,23 @@ fn a_class_that_sets_appearance_none_takes_the_track_and_knob_away_on_the_next_u
 
     // Then
     assert_eq!(quads(&mut doc), []);
+}
+
+#[test]
+fn a_class_that_sets_appearance_none_takes_an_unsized_checkboxs_content_away() {
+    // Given: an unsized checkbox in a row, 11 x 11 inside a 1 px border
+    let style = "body { display: flex; align-items: flex-start } .bare { appearance: none }";
+    let (mut doc, input) = page(style, false, &[]);
+    let size = |doc: &mut Document| {
+        let painted = doc.update(viewport(400.0, 200.0)).expect("updates");
+        let r = painted.border_box(input).expect("a box");
+        (r.width, r.height)
+    };
+    assert_eq!(size(&mut doc), (13.0, 13.0), "before");
+
+    // When
+    doc.set_attribute(input, "class", "bare");
+
+    // Then: the user-agent border alone
+    assert_eq!(size(&mut doc), (2.0, 2.0));
 }

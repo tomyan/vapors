@@ -354,8 +354,9 @@ Effects call `set_text`, `set_attribute`, `insert_before` and
   artefact, as F1 does for text.
 - Buttons are compared with an author style and `appearance: none` on
   the Chromium side only, because Chromium's native button look is not
-  a target. `appearance` is not a vapors property, so the oracle page
-  adds that rule itself.
+  a target. The oracle page adds that rule itself; vapors' buttons have
+  no look of their own for `appearance` to take away
+  (`docs/appearance.md`).
 
 **Interaction.** `ElementsApp::event` is driven with synthetic
 platform events and no device. Tests assert dispatch order, `click`

@@ -182,6 +182,14 @@ pub fn check_name(name: &str, position: Position) -> Result<()> {
             format!("shorthand {name:?} is not supported; {hint}"),
         ));
     }
+    if let Some(plain) = names::unprefixed(name).filter(|plain| is_supported(plain)) {
+        return Err(Error::new(
+            position,
+            format!(
+                "property {name:?} is the vendor-prefixed twin of {plain:?}, which vapors supports; write {plain:?} alone"
+            ),
+        ));
+    }
     if let Some(hint) = names::sumi_extra_hint(name) {
         return Err(Error::new(
             position,

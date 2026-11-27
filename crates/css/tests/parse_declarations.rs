@@ -195,3 +195,16 @@ fn vendor_prefixed_properties_off_the_allowlist_are_refused() {
     // Then
     assert!(err.message.contains("-moz-appearance"), "{err}");
 }
+
+#[test]
+fn a_prefixed_twin_of_a_supported_property_is_refused_naming_the_plain_one() {
+    // When
+    let err = refusal(".x { -webkit-appearance: none; }");
+
+    // Then
+    assert!(
+        err.message.contains("-webkit-appearance")
+            && err.message.contains("write \"appearance\" alone"),
+        "{err}"
+    );
+}
