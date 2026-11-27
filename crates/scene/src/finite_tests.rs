@@ -74,7 +74,26 @@ fn a_clip_with_a_nan_radius_is_named_as_the_clip() {
     // Given
     let mut scene = Scene::new();
     let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
-    scene.set_rounded_clip(Some(crate::Clip::rounded(rect, [f32::NAN, 0.0, 0.0, 0.0])));
+    // (a literal: `Clip::rounded` refuses a NaN radius itself)
+    scene.set_rounded_clip(Some(crate::Clip {
+        radii: [f32::NAN, 0.0, 0.0, 0.0],
+        ..crate::Clip::square(rect)
+    }));
+    scene.push(quad(4.0));
+
+    // Then
+    assert_eq!(scene.non_finite().map(|found| found.kind), Some("clip"));
+}
+
+#[test]
+fn a_clip_cut_to_a_nan_outer_rectangle_is_named_as_the_clip() {
+    // Given
+    let mut scene = Scene::new();
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    scene.set_rounded_clip(Some(crate::Clip {
+        outer: Some(Rect::new(0.0, 0.0, f32::NAN, 4.0)),
+        ..crate::Clip::rounded(rect, [1.0; 4])
+    }));
     scene.push(quad(4.0));
 
     // Then

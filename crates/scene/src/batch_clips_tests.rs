@@ -62,3 +62,13 @@ fn the_union_holds_every_clip_and_is_unclipped_when_an_item_is() {
     clips.push(2, None);
     assert_eq!(clips.union(), None);
 }
+
+#[test]
+fn the_union_holds_a_cut_rounded_clip_by_its_bounds() {
+    // Given: a rounded clip cut to its left half on the page
+    let rounded = Clip::rounded(Rect::new(0.0, 0.0, 20.0, 10.0), [4.0; 4]);
+    let clips = Clips::one(Some(rounded.cut(Rect::new(0.0, 0.0, 10.0, 10.0))));
+
+    // Then
+    assert_eq!(clips.union(), Some(Rect::new(0.0, 0.0, 10.0, 10.0)));
+}

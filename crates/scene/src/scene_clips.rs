@@ -20,8 +20,12 @@ impl Scene {
     }
 
     /// Puts every item, and those pushed from now on, under `clip`.
+    /// The list then holds `clip` alone: a kept box's scene is set
+    /// again on every shift, and a list that kept each clip it was
+    /// given would grow for as long as the box is kept.
     pub fn set_every_clip(&mut self, clip: Option<Clip>) {
-        let name = self.name(clip);
+        self.palette = clip.map(|clip| Box::from([clip]));
+        let name = u32::from(clip.is_some());
         self.clip_of.fill(name);
         self.pen = name;
     }
@@ -58,11 +62,14 @@ impl Scene {
     }
 }
 
-/// Scenes are equal when their items are and each item's clip is, however
-/// each list orders its clips.
+/// Scenes are equal when their items are, each item's clip is and the
+/// clip the next item would be pushed under is, however each list
+/// orders its clips.
 impl PartialEq for Scene {
     fn eq(&self, other: &Self) -> bool {
-        self.items == other.items && self.clips().eq(other.clips())
+        self.items == other.items
+            && self.clips().eq(other.clips())
+            && self.clip_named(self.pen) == other.clip_named(other.pen)
     }
 }
 

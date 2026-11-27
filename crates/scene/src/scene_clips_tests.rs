@@ -76,6 +76,34 @@ fn every_clip_set_at_once_covers_the_items_and_the_pen() {
 }
 
 #[test]
+fn every_clip_set_at_once_is_the_only_clip_listed() {
+    // Given: a kept box's scene shifted under one clip after another
+    let mut scene = Scene::new();
+    scene.set_rounded_clip(Some(clip(0.0)));
+    scene.push(quad());
+
+    // When
+    scene.set_every_clip(Some(clip(10.0)));
+    scene.set_every_clip(Some(clip(20.0)));
+
+    // Then
+    assert_eq!(scene.palette(), [clip(20.0)]);
+    scene.set_every_clip(None);
+    assert_eq!(scene.palette(), []);
+}
+
+#[test]
+fn scenes_that_would_push_under_different_clips_are_unequal() {
+    // Given
+    let (mut a, mut b) = (Scene::new(), Scene::new());
+    a.set_rounded_clip(Some(clip(0.0)));
+    b.set_rounded_clip(Some(clip(10.0)));
+
+    // Then
+    assert_ne!(a, b);
+}
+
+#[test]
 fn a_scene_is_no_larger_than_an_option_rect_clip_made_it() {
     // Then: items, the clip names, the list (a boxed slice), the pen
     assert!(

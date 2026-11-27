@@ -64,3 +64,28 @@ fn an_offset_moves_the_rectangle_and_the_outer_one() {
     assert_eq!(moved.outer, Some(Rect::new(1.0, 2.0, 101.0, 52.0)));
     assert_eq!(moved.radii, [12.0, 12.0, 0.0, 0.0]);
 }
+
+#[test]
+#[should_panic(expected = "a clip's corner radii must be finite and not negative")]
+fn a_negative_radius_is_refused() {
+    let _ = Clip::rounded(FRAME, [-4.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+#[should_panic(expected = "a clip's corner radii must be finite and not negative")]
+fn a_nan_radius_is_refused() {
+    let _ = Clip::rounded(FRAME, [0.0, f32::NAN, 0.0, 0.0]);
+}
+
+#[test]
+#[should_panic(expected = "a square clip carries an outer rectangle")]
+fn cutting_a_square_clip_that_carries_an_outer_rectangle_is_refused() {
+    // Given: only a rounded clip is cut to an outer rectangle
+    let clip = Clip {
+        outer: Some(FRAME),
+        ..Clip::square(FRAME)
+    };
+
+    // When
+    let _ = clip.cut(FRAME);
+}

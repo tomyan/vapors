@@ -169,7 +169,7 @@ pub enum Item {
 /// Items in painting order: later items draw over earlier ones, each
 /// with the clip that was set when it was pushed. Each item names its
 /// clip by its place in the scene's own list of the clips it uses
-/// (`scene_clips.rs`), 4 bytes an item where a clip is 32: a kept box
+/// (`scene_clips.rs`), 4 bytes an item where a clip is 52: a kept box
 /// holds a scene, and its slot is held to a budget
 /// (`vapors-elements` `kept_box_size_tests.rs`).
 #[derive(Clone, Debug, Default)]

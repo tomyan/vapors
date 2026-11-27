@@ -36,8 +36,19 @@ impl Clip {
 
     /// `rect` with corner `radii` (top-left, top-right, bottom-right,
     /// bottom-left), already fitted to it.
+    ///
+    /// # Panics
+    ///
+    /// When a radius is negative or not finite: `is_rounded` would take
+    /// it for a square corner, and a scissor would then cut what the
+    /// caller meant to round.
     #[must_use]
-    pub const fn rounded(rect: Rect, radii: [f32; 4]) -> Self {
+    pub fn rounded(rect: Rect, radii: [f32; 4]) -> Self {
+        assert!(
+            radii.iter().all(|r| r.is_finite() && *r >= 0.0),
+            "a clip's corner radii must be finite and not negative, not {radii:?} (vapors-elements \
+             paint.rs `device_clip` fits them); reproduce with `cargo xtask test`"
+        );
         Self {
             rect,
             radii,
@@ -64,9 +75,18 @@ impl Clip {
     /// The clip cut to `by`: a square clip becomes the intersection; a
     /// rounded one inside `by` is unchanged, and one that is not keeps
     /// its corners and is cut to `by` as `outer`.
+    ///
+    /// # Panics
+    ///
+    /// When a square clip carries `outer`, which only a rounded one can.
     #[must_use]
     pub fn cut(self, by: Rect) -> Self {
         if !self.is_rounded() {
+            assert!(
+                self.outer.is_none(),
+                "a square clip carries an outer rectangle: {self:?}; only `cut` sets one, and \
+                 only on a rounded clip; reproduce with `cargo xtask test`"
+            );
             return Self::square(self.rect.intersection(by));
         }
         if by.contains(&self.rect) {

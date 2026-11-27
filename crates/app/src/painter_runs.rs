@@ -176,8 +176,8 @@ pub(super) fn scissor_clip(run: &Run, clips: &Clips) -> Option<Rect> {
     assert!(
         !clip.is_rounded(),
         "a {run:?} batch the scissor clips is under the rounded clip {clip:?}: a scissor cuts \
-         square, so only runs on the clip table can be rounded (vapors-elements refuses an \
-         image, surface or mesh under one until F3.1b moves them onto the table); reproduce with \
+         square, so only runs on the clip table can be rounded (vapors-elements is to refuse \
+         an image, surface or mesh under one from F3.2b, until F3.1b moves them onto the table); reproduce with \
          `cargo xtask test`"
     );
     Some(clip.rect)
