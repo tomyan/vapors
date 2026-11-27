@@ -111,6 +111,49 @@ the one difference from the brief in this slice.
   (`n += 1`, `&mut n`) is refused, naming the binding. Events bubble.
   `event.stop_propagation()` and `event.prevent_default()` work as in
   the DOM.
+- **Scroll:** `onscroll={handler}` on a scroll container (`overflow:
+  auto` or `scroll`) hears `scroll` once per frame, before the frame's
+  update, when its offset has changed since its last `scroll`: by wheel,
+  touch, fling, `Document::scroll_to`, a press's scroll into view, or an
+  update clamping the offset to content that shrank. A scroll that leaves
+  the offset where it was (a `scroll_to` the same offset, a wheel at the
+  end of the range, a scroll and its reverse in one frame) fires none.
+  `event.scroll_offset()` is `Some([x, y])`, the offset in CSS pixels;
+  a change the handler makes is drawn in the same frame. It does not
+  bubble, as an element's `scroll` does not in the DOM. A container
+  fires at most one `scroll` a frame: a `scroll_to` made by a handler
+  later in the frame (a `resize`'s, a blur's) fires in the next. A host
+  that runs its own frames runs each frame's Update phase with
+  `Document::update_frame`, which settles the `scroll`s and `resize`s;
+  until a frame does, `Document::take_changed` answers true.
+- **Resize:** `onresize={handler}` on a scroll container hears `resize`
+  when an update lays it out at a client size (its padding box) other
+  than its last `resize` carried, including its first layout at any
+  size above (0, 0): after the frame's first update, or, for a size the
+  last frame's last update changed, at the next frame's start, after
+  the `scroll`s.
+  `event.client_size()` is `Some([width, height])` in CSS pixels, and
+  `event.scroll_offset()` the container's offset as that update laid it
+  out: an offset the update clamped (a taller list at its end) is there
+  a frame before its `scroll`. Only
+  a container with a `resize` listener is observed: one without owes
+  none and never asks for a frame. It
+  does not bubble, and other elements never fire it: the DOM has no
+  element `resize`, and this stands in for a `ResizeObserver` on a
+  scroll container. It differs from a `ResizeObserver`, which by
+  default observes the content box: a change of padding alone fires a
+  `resize` and no observation when the content size is fixed, and an
+  observation and no `resize` when the border-box size is fixed (a set
+  `border-box` size, an auto width that fills its container, or
+  `top`/`bottom` insets with an auto height). A `ResizeObserver`'s
+  callbacks run before the browser paints; the app's frame
+  (`Document::update_frame`) fires `resize` after its first update and lays out what the handler changed
+  in its second, so that frame draws it, and a third update runs when
+  the second left the document changed (the hover moved by rows built
+  under a resting pointer, or the fixup's blur). A
+  frame whose `resize`s fired runs at most three updates, any other at
+  most two, and a size the last changes again is owed to the next
+  frame.
 - **Classes:** `class:name={bool}` gives the element class `name`
   while the expression is true, beside the names in a literal
   `class="..."`; one effect sets the `class` attribute from both.
@@ -218,6 +261,14 @@ the one difference from the brief in this slice.
   `Clone`; a `Signal<..>` or `Memo<..>` parameter is refused, since the
   parameter is reactive already. Recursion, direct or through another
   snippet, is refused for now.
+- **A component inside a snippet.** A snippet's body is built against
+  `dyn Dom`, and a component tag in it is mounted there: a `.wisp`
+  component of the same directory as `Name::mount_before::<dyn Dom>`,
+  any other tag with the plain call, as a hand-written mount (the scene
+  tags' `&impl DynDom`) needs. A `.wisp` component of another crate
+  inside a snippet does not compile yet (rustc reports mismatched
+  types at its `mount_before`): the compiler cannot tell it from a
+  hand-written one until it reads another crate's components.
 
 ## Page-level keys: `<vapors:window>`
 
@@ -668,5 +719,6 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   implements `Dom` over the real element tree, with layout and paint.
 - **Accessibility (F2d).** Implicit roles, ARIA attributes and the
   AccessKit tree are not generated or checked.
-- **In the compiler:** recursive snippets. Props passed to a child are
+- **In the compiler:** recursive snippets; another crate's `.wisp`
+  component inside a snippet (see "A component inside a snippet"). Props passed to a child are
   not reactive unless they are `Signal`s. There is no hot reload, LSP or inspector yet.

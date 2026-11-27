@@ -50,8 +50,10 @@ impl HardwareCounters {
     ///
     /// # Errors
     /// Why the group cannot be opened, naming the fix; an unreadable line
-    /// size; or an event that does not count.
+    /// size; or an event that does not count. In a test tier other than
+    /// pmu, the refusal of `counter_tier::allowed`.
     pub fn open() -> Result<Self, String> {
+        crate::counter_tier::allowed()?;
         llc_line_bytes()?;
         let mut counters = imp::open().map(Self).map_err(|why| refusal(&why))?;
         check::every_event_counts(&mut counters)?;

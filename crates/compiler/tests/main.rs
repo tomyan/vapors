@@ -23,6 +23,7 @@ mod build_props_required;
 mod build_props_resolve;
 mod build_script;
 mod build_sites;
+mod build_snippet_mount;
 mod build_styles;
 mod codegen_attribute_refusals;
 mod codegen_basic_shape_refusals;

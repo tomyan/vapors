@@ -99,12 +99,13 @@ fn a_body_scrolls_when_the_root_takes_the_viewport() {
 }
 
 #[test]
-fn a_text_field_that_scrolls_is_refused_naming_its_declaration() {
-    // Given: a text field given `overflow: auto`
+fn a_number_field_that_scrolls_is_refused_naming_its_declaration() {
+    // Given: a number field given `overflow: auto` (a text field's
+    // text scrolls, `field_scroll.rs`; a number field's does not yet)
     let mut doc = document();
     let body = doc.body();
     let field = element(&mut doc, body, "input", "field");
-    doc.set_attribute(field, "type", "text");
+    doc.set_attribute(field, "type", "number");
     doc.add_stylesheet("app.css", ".field { width: 6em; overflow: auto; }")
         .expect("parses");
 
@@ -113,9 +114,70 @@ fn a_text_field_that_scrolls_is_refused_naming_its_declaration() {
 
     // Then
     assert!(
-        errors
-            .iter()
-            .any(|e| e.starts_with("app.css:1") && e.contains("overflow-x") && e.contains("field")),
+        errors.iter().any(|e| e.starts_with("app.css:1")
+            && e.contains("overflow-x")
+            && e.contains("number field")),
         "{errors:?}"
     );
+}
+
+#[test]
+fn a_rounded_text_field_whose_padding_does_not_clear_its_corners_is_refused() {
+    // Given: an 8 px radius over a 1 px border needs 7 px side padding
+    let mut doc = document();
+    let body = doc.body();
+    let field = element(&mut doc, body, "input", "field");
+    doc.set_attribute(field, "type", "text");
+    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 6px; }";
+    doc.add_stylesheet("app.css", css).expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("border-radius") && e.contains("side padding")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn a_rounded_text_field_with_overflow_hidden_scrolls_so_is_refused_by_its_padding() {
+    // Given: `overflow: hidden` scrolls a text field's text, as Chromium
+    // does (tests/field_overflow.rs), and 6 px padding falls short of
+    // an 8 px radius over a 1 px border
+    let mut doc = document();
+    let body = doc.body();
+    let field = element(&mut doc, body, "input", "field");
+    doc.set_attribute(field, "type", "text");
+    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 6px; overflow: hidden; }";
+    doc.add_stylesheet("app.css", css).expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then: the advice for scrolling text, not "or the clip"
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("border-radius") && e.contains("side padding")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn a_rounded_text_field_whose_padding_clears_its_corners_is_drawn() {
+    // Given: 7 px side padding clears an 8 px radius over a 1 px border
+    let mut doc = document();
+    let body = doc.body();
+    let field = element(&mut doc, body, "input", "field");
+    doc.set_attribute(field, "type", "text");
+    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 7px; }";
+    doc.add_stylesheet("app.css", css).expect("parses");
+
+    // Then
+    doc.update(support::viewport(400.0, 300.0))
+        .expect("updates");
 }

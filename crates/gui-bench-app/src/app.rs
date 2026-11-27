@@ -1,5 +1,4 @@
-//! The window of the `app` scenario, and the refusal for the `list`
-//! scenario, which a later slice builds.
+//! The window of the `app` scenario or the `list` scenario (`list.rs`).
 
 use crate::bench_app::{BenchApp, BenchAppProps};
 use crate::cli::Scenario;
@@ -13,20 +12,19 @@ use vapors_platform::WindowOptions;
 use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
-/// Opens the window for `scenario`; the `list` scenario is refused, naming
-/// the slice and the command that works. `--rows` sizes the messages feed.
+/// Opens the window for `scenario`; `--rows` sizes the messages feed and
+/// the orders, or the list's rows.
 pub fn run(scenario: Scenario) -> Result<(), String> {
     match scenario {
-        Scenario::List { .. } => Err(not_built("the `list` scenario")),
-        Scenario::App { count } => open(scenario.title(), count),
+        Scenario::List { count } => {
+            let list = crate::list::mount(count);
+            open(scenario.title(), &list.document)
+        }
+        Scenario::App { count } => {
+            let app = mount(count);
+            open(scenario.title(), &app.document)
+        }
     }
-}
-
-/// The refusal for something a later slice builds.
-pub fn not_built(what: &str) -> String {
-    format!(
-        "{what} is not built yet: s3b (docs/decisions/2026-11-19-gui-bench.md); run `vapors-bench --scenario app` for the dashboard"
-    )
 }
 
 /// The dashboard's document, mounted, with the active nav item.
@@ -94,9 +92,10 @@ pub fn order_ids(base: &[Order], shown: [bool; PILLS], search: &str, sorted: boo
         .collect()
 }
 
-fn open(title: &str, rows: usize) -> Result<(), String> {
-    let mounted = mount(rows);
-    let app = ElementsApp::new(Rc::clone(&mounted.document));
+/// Runs the loop over `document` in the spec's window until it closes.
+/// The mounted root stays alive in the caller for the loop's length.
+fn open(title: &str, document: &Rc<RefCell<Document>>) -> Result<(), String> {
+    let app = ElementsApp::new(Rc::clone(document));
     let failure = app.failure();
     vapors_platform::run(options(title), app).map_err(|error| error.to_string())?;
     failure.get().map_or(Ok(()), Err)

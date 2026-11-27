@@ -63,6 +63,9 @@ pub struct Document {
     pub(crate) compare_every_element: bool,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
+    /// The offset each container's last `scroll` carried (`scroll_event`).
+    pub(crate) scroll_reported: crate::scroll_event::Reported,
+    pub(crate) sizes_reported: crate::resize_event::ReportedSizes,
     /// How opaque scroll thumbs are drawn now, 0 (hidden) to 255.
     pub(crate) thumb_alpha: u8,
     /// The images `img` elements show, by name.
@@ -118,6 +121,8 @@ impl Document {
             counts: crate::UpdateCounts::default(),
             compare_every_element: cfg!(debug_assertions),
             scroll: crate::scroll::Offsets::default(),
+            scroll_reported: crate::scroll_event::Reported::default(),
+            sizes_reported: crate::resize_event::ReportedSizes::default(),
             thumb_alpha: u8::MAX,
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
@@ -133,10 +138,16 @@ impl Document {
     /// Whether anything that would change the next update happened since
     /// the last call: the tree, an attribute, a text, a stylesheet, the
     /// pointer's hover and active state, or a scroll. An app that redraws on change
-    /// asks this after each event. True for a new document.
+    /// asks this after each event. True for a new document, and while a
+    /// `scroll` or a `resize` is owed (`Document::settle_scroll`), so an
+    /// update that clamped an offset or resized a scroll container gets
+    /// the frame that fires it.
     pub fn take_changed(&mut self) -> bool {
         // a refused scene hit is due in the next update (`scene_hit`)
-        std::mem::replace(&mut self.changes.since_asked, false) || self.hit_refusals_pending()
+        std::mem::replace(&mut self.changes.since_asked, false)
+            || self.hit_refusals_pending()
+            || self.scroll_owed()
+            || self.resize_owed()
     }
 
     /// The `html` element.

@@ -97,6 +97,7 @@ fn add_element(
         }
     }
     add_run(run, index, boxes);
+    super::field_box::mark_run(boxes, index, node);
     Some(index)
 }
 
@@ -115,7 +116,7 @@ pub(super) fn element_box(source: &Source<'_>, node: NodeId) -> (LayoutBox, Opti
         .natural(source.arena, node)
         .or_else(|| crate::svg::natural(source.arena, node))
         .or(range.map(|_| crate::range::NATURAL_SIZE))
-        .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
+        .or(checked.map(|_| crate::checkbox::natural_size(style.appearance)));
     let mut own = LayoutBox::replaced(
         Content::Element(node),
         crate::svg::layout_style(source.arena, node, &style.layout),

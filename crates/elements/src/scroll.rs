@@ -8,6 +8,7 @@ use crate::node_map::NodeMap;
 use vapors_dom::NodeId;
 
 use crate::layout::{Content, Lanes, LayoutBox};
+use crate::scroll_reveal::Revealed;
 
 /// The offsets, by scroll container, and the containers scrolled
 /// since the last update.
@@ -18,22 +19,40 @@ pub(crate) struct Offsets {
 }
 
 /// One container's offset and how far it can go, and both as last
-/// settled: a scroll moves `at` before the update settles it.
+/// settled: a scroll moves `at` before the update settles it; and its
+/// client size as last laid out.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Offset {
     at: [f32; 2],
     max: [f32; 2],
+    client: [f32; 2],
     settled: [[f32; 2]; 2],
     /// How opaque its own thumbs are drawn, 0 to 255 (`thumb.rs`), and
     /// as last settled.
     alpha: u8,
     settled_alpha: u8,
+    /// A text field's caret, as its offset last followed it
+    /// (`scroll_reveal.rs`).
+    revealed: Revealed,
 }
 
 impl Offsets {
     /// The offset of `node`, if it is a scroll container.
     pub(crate) fn get(&self, node: NodeId) -> Option<[f32; 2]> {
         self.by_node.get(&node).map(|offset| offset.at)
+    }
+
+    /// Each scroll container and its offset, in no order.
+    pub(crate) fn each(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
+        self.by_node.iter().map(|(node, offset)| (*node, offset.at))
+    }
+
+    /// Each scroll container and its client size as last laid out
+    /// (`client_size`), in no order.
+    pub(crate) fn sizes(&self) -> impl Iterator<Item = (NodeId, [f32; 2])> + '_ {
+        self.by_node
+            .iter()
+            .map(|(node, offset)| (*node, offset.client))
     }
 
     /// The offset of `node` and how far it can go, if it scrolls.
@@ -111,15 +130,15 @@ impl Offsets {
     /// holds one (`scroll`), so the walk marked a box `Scrolled` that was
     /// never settled.
     pub(crate) fn settle_scrolled(&mut self, node: NodeId, scale: f32) -> ([f32; 2], bool) {
-        let max = self.by_node.get(&node).map(|kept| kept.max);
-        let max = max.unwrap_or_else(|| {
+        let kept = self.by_node.get(&node).unwrap_or_else(|| {
             panic!(
                 "scroll container {node:?} is marked as only scrolled but kept no offset, so \
                  no range to clamp to: a box marked Scrolled was never settled \
                  (placement_marks.rs); reproduce with `cargo xtask test`"
             )
         });
-        let offset = self.clamped_to(node, max);
+        let (max, client) = (kept.max, kept.client);
+        let offset = self.clamped_to(node, (max, client), (kept.at, kept.revealed));
         self.settled_to(node, offset, scale)
     }
 
@@ -154,21 +173,35 @@ impl Offsets {
         self.by_node == other.by_node
     }
 
+    /// `node`'s offset, a text field's moved to its caret
+    /// (`scroll_reveal.rs`), clamped to its range as laid out now.
     fn clamped(&self, node: NodeId, laid: (&[LayoutBox], &Lanes), index: usize) -> Offset {
-        self.clamped_to(node, range(laid, index))
+        let kept = self.by_node.get(&node);
+        let at = kept.map_or([0.0; 2], |kept| kept.at);
+        let last = kept.and_then(|kept| kept.revealed);
+        let moved = crate::scroll_reveal::revealed(laid.0, index, at, last);
+        let laid_out = (range(laid, index), client_size(laid.0, index));
+        self.clamped_to(node, laid_out, moved)
     }
 
-    /// `node`'s offset clamped to `max`, its range.
-    fn clamped_to(&self, node: NodeId, max: [f32; 2]) -> Offset {
-        let at = self.get(node).unwrap_or_default();
+    /// `node`'s offset `at` clamped to `max`, its range, with `client`,
+    /// its client size, kept with what it was `revealed` for.
+    fn clamped_to(
+        &self,
+        node: NodeId,
+        (max, client): ([f32; 2], [f32; 2]),
+        (at, revealed): ([f32; 2], Revealed),
+    ) -> Offset {
         let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         let alpha = self.alpha(node);
         Offset {
             at,
             max,
+            client,
             settled: [at, max],
             alpha,
             settled_alpha: alpha,
+            revealed,
         }
     }
 
@@ -226,26 +259,37 @@ pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
 /// its padding box, on the axes that scroll (`auto`, `scroll`; a
 /// `hidden` or `clip` axis has none). Taffy 0.15's scrollable overflow leaves out the end
 /// margins of the in-flow children and the end padding, which Chromium
-/// counts, so the larger of the two is taken.
+/// counts, so the larger of the two is taken. A text field's on x is
+/// its text's and caret's past its content box (`scroll_reveal.rs`).
 fn range((boxes, lanes): (&[LayoutBox], &Lanes), index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
-    let (border, padding) = (layout.border, layout.padding);
+    let padding = layout.padding;
     let end = content_end((boxes, lanes), index);
-    let inner = [
-        layout.size.width - border.left - border.right,
-        layout.size.height - border.top - border.bottom,
-    ];
-    let reach = [
-        layout.scroll_width().max(end[0] + padding.right - inner[0]),
-        layout
-            .scroll_height()
-            .max(end[1] + padding.bottom - inner[1]),
-    ];
+    let inner = client_size(boxes, index);
+    let x = if crate::scroll_reveal::scrolls_text(&boxes[index]) {
+        crate::scroll_reveal::field_reach(boxes, index)
+    } else {
+        layout.scroll_width().max(end[0] + padding.right - inner[0])
+    };
+    let y = layout
+        .scroll_height()
+        .max(end[1] + padding.bottom - inner[1]);
     let overflow = boxes[index].style.overflow;
     let scrolls = |axis: taffy::Overflow| axis == taffy::Overflow::Scroll;
     [
-        if scrolls(overflow.x) { reach[0] } else { 0.0 },
-        if scrolls(overflow.y) { reach[1] } else { 0.0 },
+        if scrolls(overflow.x) { x } else { 0.0 },
+        if scrolls(overflow.y) { y } else { 0.0 },
+    ]
+}
+
+/// Box `index`'s client size: its padding box, the border box less its
+/// borders (scroll thumbs overlay it and take none of it).
+fn client_size(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+    let layout = &boxes[index].layout;
+    let border = layout.border;
+    [
+        layout.size.width - border.left - border.right,
+        layout.size.height - border.top - border.bottom,
     ]
 }
 

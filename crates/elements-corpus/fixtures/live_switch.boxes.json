@@ -4,6 +4,8 @@
 {"height":64,"tag":"html","width":800,"x":0,"y":0},
 {"height":64,"tag":"body","width":800,"x":0,"y":0},
 {"height":22,"tag":"input","width":40,"x":736,"y":21},
-{"height":22,"tag":"input","width":40,"x":600,"y":21}
+{"height":18,"tag":"div","width":18,"x":738,"y":23},
+{"height":22,"tag":"input","width":40,"x":600,"y":21},
+{"height":18,"tag":"div","width":18,"x":620,"y":23}
 ]}
 ]}

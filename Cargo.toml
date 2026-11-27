@@ -21,6 +21,10 @@ wgpu = "30"
 # wgpu's shader front end, for the tests that read a shader's layout
 naga = { version = "30", features = ["wgsl-in"] }
 pollster = "1"
+# The desktop application thread's runtime: a current_thread Tokio
+# runtime with its timer (docs/plans/desktop-app-thread.md, L1a). Each
+# crate turns on only the features it uses.
+tokio = { version = "1.54", default-features = false }
 # winit's default features, except Wayland's client-side decorations
 # without their title text (`-notitle`): the titled variant pulls in
 # ab_glyph and ttf-parser, which is unmaintained (RUSTSEC-2026-0192). On a

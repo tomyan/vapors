@@ -160,6 +160,8 @@ pub(crate) fn paint_box(
     out: &mut crate::painting::Painting,
 ) {
     let (layout_box, rect) = (&boxes[index], rects[index]);
+    // a field's run: its marks under its text (`text_paint.rs`)
+    crate::text_paint::paint(boxes, rects, index, input, out);
     crate::paint_own::paint_own(boxes, rects, index, input, out);
     crate::images::paint(layout_box, rect, input, out);
     crate::svg_paint::paint(layout_box, rect, input, out);
@@ -167,7 +169,8 @@ pub(crate) fn paint_box(
     crate::range_paint::paint(layout_box, rect, input, out);
     crate::checkbox_paint::paint(layout_box, rect, input, out);
     crate::switch::paint(layout_box, rect, input, out);
-    crate::text_paint::paint(boxes, rects, index, input, out);
+    // an empty field's placeholder, on its own box (`placeholder_paint.rs`)
+    crate::placeholder_paint::paint(boxes, rects, index, input, out);
 }
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so

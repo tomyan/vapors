@@ -5,13 +5,16 @@ use crate::{Capture, Modifiers, NodeId, Pointer};
 /// An event delivered to a listener. The payload fields are set by
 /// the kind of event: `input` and `change` carry `value`, and on a
 /// range or number input the value as a number too; `change` on a
-/// checkbox carries `checked`.
+/// checkbox carries `checked`; `scroll` carries the container's offset,
+/// `resize` its client size.
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     name: String,
     value: Option<String>,
     value_number: Option<f64>,
     checked: Option<bool>,
+    scroll_offset: Option<[f32; 2]>,
+    client_size: Option<[f32; 2]>,
     propagation_stopped: bool,
     default_prevented: bool,
     pointer: Option<Pointer>,
@@ -77,6 +80,40 @@ impl Event {
     pub fn with_checked(mut self, checked: bool) -> Event {
         self.checked = Some(checked);
         self
+    }
+
+    /// Attaches the scroll container's offset, on a `scroll` or a
+    /// `resize`.
+    #[must_use]
+    pub fn with_scroll_offset(mut self, offset: [f32; 2]) -> Event {
+        self.scroll_offset = Some(offset);
+        self
+    }
+
+    /// The scroll container's offset (CSS px, x then y; the DOM's
+    /// `scrollLeft` and `scrollTop` of the target) on a `scroll`, and on
+    /// a `resize` as the update that changed the size laid it out (an
+    /// offset that update clamped, whose `scroll` fires in the next
+    /// frame); `None` on any other event.
+    #[must_use]
+    pub fn scroll_offset(&self) -> Option<[f32; 2]> {
+        self.scroll_offset
+    }
+
+    /// Attaches the scroll container's client size, on a `resize`.
+    #[must_use]
+    pub fn with_client_size(mut self, size: [f32; 2]) -> Event {
+        self.client_size = Some(size);
+        self
+    }
+
+    /// The scroll container's laid-out client size (CSS px, width then
+    /// height of its padding box: the DOM's `clientWidth` and
+    /// `clientHeight`, unrounded) on a `resize`; `None` on any other
+    /// event.
+    #[must_use]
+    pub fn client_size(&self) -> Option<[f32; 2]> {
+        self.client_size
     }
 
     /// Attaches where a pointer event happened.

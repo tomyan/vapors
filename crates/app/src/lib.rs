@@ -7,6 +7,8 @@
 //! [`ScenePainter::draw_over`] paints one over what a target already
 //! holds, for an app that shows a document over its own drawing.
 
+#[cfg(not(target_family = "wasm"))]
+mod app_thread;
 mod cursor;
 mod document_input;
 mod elements_app;
@@ -39,6 +41,8 @@ mod tooltip_style;
 mod touch_scroll;
 mod wheel_scroll;
 
+#[cfg(not(target_family = "wasm"))]
+pub use app_thread::{AppThread, AppThreadError};
 pub use document_input::{
     CURVE_SPEED_LIMIT, DocumentInput, FlingError, Given, MAX_FLING_SPEED, Route, Unplaced,
 };

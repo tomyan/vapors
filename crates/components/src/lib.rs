@@ -9,6 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 mod hold_output;
 pub use hold_output::hold_into;
+pub mod virtual_window;
 
 /// `prefix` and a number no other call on this process has had: a
 /// component's default id, so two left on their defaults never share

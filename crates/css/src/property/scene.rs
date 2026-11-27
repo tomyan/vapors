@@ -120,6 +120,11 @@ const GROUPS: &[Group] = &[
     },
     Group {
         readers: NONE,
+        instead: "it is a `::placeholder` colour, and a scene node has no placeholder; give the rule an input selector (`input::placeholder`) so it does not match the scene",
+        longhands: "-vapors-placeholder-color",
+    },
+    Group {
+        readers: NONE,
         instead: "a scene node has no box: its shape is `<Mesh geometry>`, and the surface's box is the `gpu-surface` element's",
         longhands: BOX_MODEL,
     },
@@ -169,8 +174,9 @@ const MOTION: &str = "
 
 /// The box model, text and layout longhands (section 3, first row).
 const BOX_MODEL: &str = "
-    accent-color align-content align-items align-self aspect-ratio background-color
-    border-bottom-color border-bottom-left-radius border-bottom-right-radius
+    accent-color align-content align-items align-self appearance aspect-ratio
+    background-color border-bottom-color border-bottom-left-radius
+    border-bottom-right-radius
     border-bottom-style border-bottom-width border-left-color border-left-style
     border-left-width border-right-color border-right-style border-right-width
     border-top-color border-top-left-radius border-top-right-radius

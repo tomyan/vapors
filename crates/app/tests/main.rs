@@ -14,6 +14,10 @@ mod support_surface;
 mod support_tooltip;
 mod surface_input_page;
 
+mod app_thread;
+mod app_thread_failures;
+mod app_thread_timer;
+mod app_thread_wakes;
 mod elements_app_animation;
 mod elements_app_drag;
 mod elements_app_errors;
@@ -76,6 +80,7 @@ mod gpu_paint_arena_full;
 mod gpu_painter_atlas;
 mod gpu_runtime_shapes;
 mod gpu_samples;
+mod gpu_scroll_event;
 mod gpu_selectionchange;
 mod gpu_shape_meshes;
 mod gpu_shapes;

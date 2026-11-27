@@ -55,11 +55,15 @@ pub fn assert_matches_full(doc: &Rc<RefCell<Document>>, viewport: Viewport, cont
 /// The settled frame: an update can move content under the pointer,
 /// which it notices after painting (it sets the hover flags and asks
 /// for another frame), so this updates until no change is pending; at
-/// most `SETTLE` times, or the test fails.
+/// most `SETTLE` times, or the test fails. Each update follows the
+/// `scroll` the containers owe, as the app's frame fires it before
+/// its update (`AppFrame::update`): `take_changed` holds true until
+/// it has fired.
 pub fn snapshot(doc: &Rc<RefCell<Document>>, viewport: Viewport) -> Snapshot {
-    let mut doc = doc.borrow_mut();
-    doc.take_changed();
+    doc.borrow_mut().take_changed();
     for _ in 0..SETTLE {
+        Document::settle_scroll(doc);
+        let mut doc = doc.borrow_mut();
         updated(&mut doc, viewport);
         if !doc.take_changed() {
             return settled(&mut doc, viewport);
