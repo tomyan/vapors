@@ -31,8 +31,11 @@ measured 2026-11-26 with `getBoundingClientRect` and
 `getComputedStyle`: a checkbox with `appearance: none` is 0 x 0 with its
 3px 3px 3px 4px margins, no border and a transparent background,
 `inline-block`, checked or not; without it, 13 x 13 and `appearance:
-auto`. `fixtures/appearance.wisp` holds the boxes, roles, names and
-states to Chromium (`layout_oracle`, `ax_oracle`).
+auto`; `type=Checkbox` matches `[type=checkbox]`, and it and
+`type=RANGE` compute `auto` (measured 2026-11-27), as HTML's
+case-insensitive `type` has it. `fixtures/appearance.wisp` holds the
+boxes, roles, names and states to Chromium (`layout_oracle`,
+`ax_oracle`).
 
 Chromium draws a checkbox's look in its theme, so `none` takes all of
 it away. vapors' look is the user-agent sheet's border, background and

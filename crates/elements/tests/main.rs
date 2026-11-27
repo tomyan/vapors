@@ -52,6 +52,7 @@ mod a_href_link_rule;
 mod a_href_modifiers;
 mod a_href_path;
 mod appearance;
+mod appearance_refused;
 mod bound_style;
 mod bound_style_parity;
 mod bound_style_refused;

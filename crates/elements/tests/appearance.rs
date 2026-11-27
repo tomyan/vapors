@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::support::{document, element, refusals, viewport};
+use crate::support::{document, element, viewport};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 use vapors_scene::{Color, Item, Quad, Rect};
@@ -156,42 +156,6 @@ fn a_switch_with_appearance_none_still_toggles_on_a_click_and_is_a_switch() {
 }
 
 #[test]
-fn appearance_none_on_a_range_is_refused_naming_what_chromium_keeps() {
-    // Given: Chromium takes a range's track away and keeps its thumb, which
-    // vapors draws as one part
-    let mut doc = document();
-    let body = doc.body();
-    let input = element(&mut doc, body, "input", "");
-    doc.set_attribute(input, "type", "range");
-    doc.add_stylesheet("app.css", "input { display: block; appearance: none }")
-        .expect("parses");
-
-    // When
-    let errors = refusals(&mut doc);
-
-    // Then
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    let named = ["app.css:1:", "appearance", "range", "thumb"];
-    assert!(named.iter().all(|n| errors[0].contains(n)), "{errors:?}");
-}
-
-#[test]
-fn a_compatibility_keyword_is_refused_naming_its_sheet_and_line() {
-    // Given: CSS UI 4's compat keywords, which vapors does not take
-    let mut doc = document();
-
-    // When
-    let parsed = doc.add_stylesheet("app.css", "input {\n  appearance: checkbox }");
-
-    // Then
-    let error = parsed.expect_err("refused").to_string();
-    assert!(
-        error.contains("appearance") && error.contains("app.css:2:"),
-        "{error}"
-    );
-}
-
-#[test]
 fn a_class_that_sets_appearance_none_takes_the_track_and_knob_away_on_the_next_update() {
     // Given: a drawn switch
     let style = "input { width: 40px; height: 22px } .bare { appearance: none }";
@@ -222,24 +186,4 @@ fn a_class_that_sets_appearance_none_takes_an_unsized_checkboxs_content_away() {
 
     // Then: the user-agent border alone
     assert_eq!(size(&mut doc), (2.0, 2.0));
-}
-
-#[test]
-fn a_range_type_written_in_capitals_computes_appearance_auto() {
-    // Given: `type=Range` with no `appearance` of the author's; Chromium 157
-    // computes `auto` (docs/appearance.md)
-    let mut doc = document();
-    let body = doc.body();
-    let input = element(&mut doc, body, "input", "");
-    doc.set_attribute(input, "type", "Range");
-    let sheet = "body { margin: 0 } input { display: block; margin: 0; width: 100px }";
-    doc.add_stylesheet("app.css", sheet).expect("parses");
-
-    // When
-    doc.update(viewport(400.0, 200.0)).expect("updates");
-
-    // Then
-    let style = doc.computed_style(input).expect("styled");
-    let appearance = style.get_by_name("appearance").expect("a property");
-    assert_eq!(appearance.to_css(), "auto");
 }
