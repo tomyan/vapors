@@ -14,14 +14,15 @@ use crate::frames::PAGE;
 impl Clips {
     /// The box rounding frame `frame`, when it is a lane row whose
     /// container's clip is rounded; its container is redone before it, and
-    /// a second answer to "is this lane frame rounded" is
+    /// a change of it reaches the boxes below through `set_round`.
+    /// `Clips::first_differing` holds `nested`, `refused` and `round` to a
+    /// fresh paint's in a debug build.
+    ///
+    /// A second answer to "is this lane frame rounded" is
     /// `paint_frames.rs` `lane_base`, which gives a scrolling container
     /// none: the two agree only while a rounded scroller is refused, and
     /// rounded scrollers must make them one before they land
-    /// (`docs/plans/frame-clips.md`, slice 3);
-    /// a change of it reaches the boxes below through `set_round`.
-    /// `Clips::first_differing` holds `nested` and `refused` to a fresh
-    /// paint's in a debug build.
+    /// (`docs/plans/frame-clips.md`, slice 3).
     pub(super) fn round_frame(
         &self,
         frame: usize,

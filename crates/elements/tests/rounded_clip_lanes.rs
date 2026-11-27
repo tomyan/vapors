@@ -6,10 +6,10 @@
 
 use crate::support;
 
-use support::element;
 use support::lane_page::header_list;
 use support::narrow_list::ROWS;
 use support::rounded_page::{at, card_list};
+use support::{element, refusals};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 
@@ -52,7 +52,7 @@ fn a_rounded_list_past_the_framing_depth_updates() {
     // Then: updated (`header_list` expects it) with its rows framed
     let doc = page.doc.borrow();
     assert!(
-        doc.update_counts().lanes_framed >= 1,
+        doc.update_counts().lanes_framed == 1,
         "{:?}",
         doc.update_counts()
     );
@@ -148,12 +148,8 @@ fn a_list_that_rounds_itself_frames_its_rows_cut_by_its_curve() {
         Some(page.list),
         "outside the curve"
     );
-    let inside = painted.hit([5.0, 15.0]).expect("a box inside the curve");
-    let in_row = inside == page.rows[0] || doc.children(page.rows[0]).contains(&inside);
-    assert!(
-        in_row,
-        "inside the curve: the first row or a cell of it, not {inside:?}"
-    );
+    let cell = doc.children(page.rows[0])[0];
+    assert_eq!(painted.hit([5.0, 15.0]), Some(cell), "inside the curve");
 }
 
 #[test]
@@ -173,14 +169,18 @@ fn an_img_in_a_list_that_rounds_itself_follows_its_radius() {
     doc.set_attribute(img, "src", "a.png");
     doc.append(page.rows[0], img);
 
-    // Then: refused while rounded; accepted once square; refused again
-    let refused = |doc: &mut Document| doc.update(at(1.0)).is_err();
-    assert!(
-        refused(&mut doc),
-        "rounded: the image draws under a scissor"
-    );
+    // Then: refused as an image under a rounded clip while rounded;
+    // accepted once square; refused so again
+    let image_refused = |doc: &mut Document| {
+        let errors = refusals(doc);
+        let named = errors
+            .iter()
+            .any(|e| e.contains("is an img under a rounded clip"));
+        assert!(named, "{errors:?}");
+    };
+    image_refused(&mut doc);
     doc.set_attribute(page.list, "class", "list");
     doc.update(at(1.0)).expect("square: accepted");
     doc.set_attribute(page.list, "class", "list round");
-    assert!(refused(&mut doc), "rounded again");
+    image_refused(&mut doc);
 }

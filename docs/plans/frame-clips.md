@@ -245,16 +245,17 @@ then, `NestedFrame` refuses it.
   frames, so the walk with entries given back is unmeasured (the lead,
   after #640: no synthetic case). Its cost is held × given back; held
   was 6 at most in this run, which bounds nothing beyond it.
-- What slice 2 refuses in a rounded lane row now also applies to a list
-  that rounds itself: an img, a gpu-surface or an svg drawing shapes in
-  its rows is refused wherever it sits, though the list used to decline
-  and accept them under a square clip. A scroller or clipping box in
-  its rows is checked against the corners after every paint
-  (`nested_frames`), one check per such frame, in view or not, each
-  update: 10,000 rows each holding a scroller would be 10,000 checks an
-  update. No page or scaling case has that shape, and it is not
-  measured.
   (~/.cache/vapors-evidence/parent-check, NOTES.md and run-filters.sh.)
+- What slice 2 refuses in a rounded lane row now also covers a list that
+  rounds itself, through `in_round_frame` rather than `of`: an img, a
+  gpu-surface or an svg drawing shapes in its rows was refused before
+  too (under the list's rounded clip as an item), so the outcome is the
+  same. A scroller or clipping framed lane in its rows is checked
+  against the corners after every paint (`nested_frames`), one check per
+  such frame, in view or not, each update: 10,000 rows each holding a
+  scroller would be 10,000 checks an update. No page or scaling case has
+  that shape, and it is not measured. A plain clipping box in a row is
+  held to the corners by `of` (`Overlap`).
 
 **Blocker before rounded scrollers land:** two answers to "is this lane
 frame rounded". `kept_clips_round.rs` `round_frame` reads the container's
