@@ -205,7 +205,8 @@ fn a_restyled_text_field_is_declined_for_its_centred_run() {
     // column (layout/field_box.rs, entry 84), is declined. Teaching
     // lane_flex_column a single-line `center` would lane the field
     // again and retire this test.
-    assert_eq!(counts.lanes_declined, 1, "{counts:?}");
+    // body and the field's parent stay lanes: only the field is declined
+    assert_eq!((counts.lanes, counts.lanes_declined), (2, 1), "{counts:?}");
     assert_eq!(counts.lane_decline, Some(LaneDecline::JustifyContent));
     assert_matches_full(&list.doc, VIEW(), "field restyled");
 }

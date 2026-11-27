@@ -24,22 +24,34 @@ const CARET_CENTRE: f32 = 32.0;
 /// The number fields are given `overflow: visible`: a rounded number
 /// field's user-agent `overflow: hidden` is a refused rounded clip
 /// (`clipping_refused.rs`), and Chromium's ignores the input's overflow.
-const CASES: [(&str, &str, &str, &str); 4] = [
+const CASES: [(&str, &str, &str, &str); 8] = [
     ("text", "text", "", "Ada"),
     ("number", "number", "overflow: visible;", "123"),
-    (
-        "text, author flex start",
-        "text",
-        "display: flex; align-items: flex-start;",
-        "Ada",
-    ),
+    ("text, author flex start", "text", FLEX_START, "Ada"),
     (
         "number, author flex start",
         "number",
-        "overflow: visible; display: flex; align-items: flex-start;",
+        NUMBER_FLEX_START,
         "123",
     ),
+    ("text, author wrapped row end", "text", ROW_END, "Ada"),
+    (
+        "number, author wrapped row end",
+        "number",
+        NUMBER_ROW_END,
+        "123",
+    ),
+    ("text, author grid end", "text", GRID_END, "Ada"),
+    ("number, author grid end", "number", NUMBER_GRID_END, "123"),
 ];
+
+const FLEX_START: &str = "display: flex; align-items: flex-start;";
+const NUMBER_FLEX_START: &str = "overflow: visible; display: flex; align-items: flex-start;";
+const ROW_END: &str =
+    "display: flex; flex-direction: row-reverse; flex-wrap: wrap; justify-content: flex-end;";
+const NUMBER_ROW_END: &str = "overflow: visible; display: flex; flex-direction: row-reverse; flex-wrap: wrap; justify-content: flex-end;";
+const GRID_END: &str = "display: grid; align-items: end;";
+const NUMBER_GRID_END: &str = "overflow: visible; display: grid; align-items: end;";
 
 fn page(kind: &str, declarations: &str) -> Page {
     let sheet = format!("{SHEET} input {{ {declarations} }}");
@@ -66,8 +78,14 @@ fn enter(page: &Page, kind: &str, typed: &str) {
 }
 
 /// The rows of the painted caret, a 1 px quad in the text's colour.
-#[allow(clippy::float_cmp)] // a caret's edges are snapped to whole device pixels
 fn caret_rows(page: &Page) -> (f32, f32) {
+    let caret = caret(page);
+    (caret.top, caret.bottom)
+}
+
+/// The painted caret, a 1 px quad in the text's colour.
+#[allow(clippy::float_cmp)] // a caret's edges are snapped to whole device pixels
+fn caret(page: &Page) -> Rect {
     let doc = page.doc.borrow();
     let painted = doc.painted().expect("updated");
     let carets: Vec<Rect> = painted
@@ -83,7 +101,7 @@ fn caret_rows(page: &Page) -> (f32, f32) {
     let [caret] = carets[..] else {
         panic!("one caret, got {carets:?}");
     };
-    (caret.top, caret.bottom)
+    caret
 }
 
 /// The tops of the text lines painted: an empty field's blank run and
@@ -159,5 +177,29 @@ fn the_imes_caret_area_is_the_painted_carets_rows() {
             (top, bottom),
             "{case}"
         );
+    }
+}
+
+#[test]
+fn an_authored_inner_layout_neither_moves_nor_narrows_the_run() {
+    for (case, kind, declarations, typed) in CASES {
+        // Given: the plain field of the same type, as a reference
+        let (plain, at) = if kind == "text" {
+            (CASES[0], 0)
+        } else {
+            (CASES[1], 1)
+        };
+        let reference = page(kind, plain.2);
+        let field = page(kind, declarations);
+        let empty = (caret(&reference), caret(&field));
+
+        // When
+        enter(&reference, kind, typed);
+        enter(&field, kind, typed);
+
+        // Then: Chromium's caret is at column 689 empty, 713 or 712 typed,
+        // under every authored layout
+        assert_eq!(empty.1, empty.0, "{case} empty (against case {at})");
+        assert_eq!(caret(&field), caret(&reference), "{case} typed");
     }
 }

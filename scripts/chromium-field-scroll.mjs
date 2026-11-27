@@ -24,11 +24,11 @@
 // (dark pixels, the text colour) in the field's rows.
 //
 // With `centre` (tests/field_text_centre.rs), a text and a number
-// input, each also with an author `display: flex; align-items:
-// flex-start`, show the placeholder "Search" while empty, then are
+// input, each also under an author flex start, a wrapped reversed row
+// packed to its end, and a grid aligned to its end, show the placeholder "Search" while empty, then are
 // typed into ("Ada", "123"). Each step prints the case, the rows of the
 // text's ink (dark or placeholder grey) and of the red caret, in the
-// field's columns ("-" for none).
+// field's columns, and the caret's columns ("-" for none).
 //
 // Usage: node scripts/chromium-field-scroll.mjs [scrollbar | overflow | centre]
 // Needs node 22 or later and the pinned Chromium (.config/tools.toml
@@ -84,6 +84,10 @@ const CENTRE_CASES = [
   ['number', 'number', '', '123'],
   ['text, author flex start', 'text', 'display:flex;align-items:flex-start', 'Ada'],
   ['number, author flex start', 'number', 'display:flex;align-items:flex-start', '123'],
+  ['text, author wrapped row end', 'text', 'display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end', 'Ada'],
+  ['number, author wrapped row end', 'number', 'display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end', '123'],
+  ['text, author grid end', 'text', 'display:grid;align-items:end', 'Ada'],
+  ['number, author grid end', 'number', 'display:grid;align-items:end', '123'],
 ];
 
 function pinned() {
@@ -246,15 +250,15 @@ async function bars(s, load, value, wheel, version) {
 }
 
 async function centres(s, load, value, version) {
-  console.log(`# ${version.product}\ncase\top\tink rows\tcaret rows`);
+  console.log(`# ${version.product}\ncase\top\tink rows\tcaret rows\tcaret columns`);
   const at = async (name, op) => {
-    let ink = '-', caret = '-';
+    let ink = '-', caret = '-', across = '-';
     for (let k = 0; k < SHOTS && caret === '-'; k++) {
       if (k) await new Promise(r => setTimeout(r, SHOT_GAP_MS));
       const png = Buffer.from((await s('Page.captureScreenshot', {format: 'png'})).data, 'base64');
-      [ink, caret] = [rows(png, INK), rows(png, RED)];
+      [ink, caret, across] = [rows(png, INK), rows(png, RED), columns(png, RED)];
     }
-    console.log(`${name}\t${op}\t${ink}\t${caret}`);
+    console.log(`${name}\t${op}\t${ink}\t${caret}\t${across}`);
   };
   for (const [name, type, css, text] of CENTRE_CASES) {
     await load(`${STYLE}<style>#s{${css}}</style><input id=s type=${type} placeholder=Search>`);

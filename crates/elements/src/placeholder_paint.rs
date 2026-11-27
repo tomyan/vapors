@@ -12,17 +12,10 @@ use crate::layout::{BoxRect, InlineRun, LayoutBox};
 use crate::paint::{PaintInput, clip_to};
 use crate::painting::Painting;
 
-/// The top of field `index`'s run, its first child: the blank line a
-/// placeholder shows on.
-///
-/// # Panics
-/// When the field has no run (`layout/field_box.rs` `mark_run`).
+/// The top of field `index`'s run (`scroll_reveal::run_index`): the
+/// blank line a placeholder shows on.
 fn run_top(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> f32 {
-    let run = *boxes[index]
-        .children
-        .first()
-        .unwrap_or_else(|| panic!("field box {index} has no run: a blank field's run is a no-break space (layout/boxes.rs)"));
-    rects[run].y
+    rects[crate::scroll_reveal::run_index(boxes, index)].y
 }
 
 /// Paints box `index`'s placeholder, when it shows one and is visible.

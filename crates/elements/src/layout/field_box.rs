@@ -67,3 +67,7 @@ pub(super) fn mark_run(boxes: &mut [LayoutBox], field: usize, node: NodeId) {
     boxes[run].run_of_field = Some(node);
     boxes[run].text_marks = boxes[field].text_marks.take();
 }
+
+#[cfg(test)]
+#[path = "field_box_tests.rs"]
+mod tests;
