@@ -90,10 +90,32 @@ impl FrameDraw {
                 clip.offset(self.shift)
             }
         };
-        match (clip.map(moved), self.clip) {
+        let clip = match (clip.map(moved), self.clip) {
             (Some(clip), Some(outer)) => Some(clip.cut(outer)),
             (clip, outer) => clip.or(outer.map(vapors_scene::Clip::square)),
-        }
+        };
+        under_round(clip, self.rounded)
+    }
+}
+
+/// `clip`, an item's clip on the page already cut to its frame's square
+/// clip, under the frame's rounded clip `round` too: a square clip
+/// becomes the rounded one cut to it (`Clip::cut`). A rounded item clip
+/// is kept as it is: the page view holds one rounding, where the painter
+/// chains both (`docs/plans/frame-clips.md`, slice 2). One answer for
+/// the page view (`Frames::item`) and the kept batches' debug check
+/// (`clip_on_page`).
+pub(crate) fn under_round(
+    clip: Option<vapors_scene::Clip>,
+    round: Option<vapors_scene::Clip>,
+) -> Option<vapors_scene::Clip> {
+    let Some(round) = round else {
+        return clip;
+    };
+    match clip {
+        Some(clip) if clip.is_rounded() => Some(clip),
+        Some(clip) => Some(round.cut(clip.bounds())),
+        None => Some(round),
     }
 }
 
@@ -138,7 +160,7 @@ impl Frames {
 impl Frames {
     /// `round` in device pixels, as paint sets an item's rounded clip:
     /// `paint.rs` `device_clip`, the one answer.
-    fn device_round(&self, round: crate::frames::FrameRound) -> vapors_scene::Clip {
+    pub(crate) fn device_round(&self, round: crate::frames::FrameRound) -> vapors_scene::Clip {
         let clip = crate::clip::BoxClip::rounded(round.rect, round.by);
         let device = crate::paint::device_clip(Some(clip), self.scale(), &|_| round.radii);
         device.expect("a clip given")

@@ -2,8 +2,8 @@
 //! `docs/plans/flat-scene-f3.md`): `.orders` has `overflow: hidden`, so
 //! the header no longer rounds its own top corners, and a row's hover
 //! background is cut by the card's bottom corners, as zgui's is. With 40
-//! orders the card's rows are a lane, which declines to frame them under
-//! its own rounded clip.
+//! orders the card's rows are a lane, framed, their frame's clip the
+//! card's rounded one (`docs/plans/frame-clips.md`, slices 2 and 3).
 use super::support::*;
 use vapors_scene::{Clip, Item};
 
@@ -83,15 +83,16 @@ fn a_hovered_rows_background_is_under_the_cards_rounded_clip() {
 }
 
 #[test]
-fn the_cards_rows_are_not_framed_under_its_rounded_clip() {
+fn the_cards_rows_are_framed_under_its_rounded_clip() {
     // When
     let mounted = with_rows(ORDERS);
 
-    // Then
+    // Then: no lane declined, the card's among those framed
     let counts = mounted.document.borrow().update_counts();
     assert_eq!(
-        counts.lane_unframed,
-        Some(vapors_elements::LaneDecline::LaneFrameRoundedClip),
+        (counts.lanes_unframed, counts.lane_unframed),
+        (0, None),
         "{counts:?}"
     );
+    assert!(counts.lanes_framed >= 1, "{counts:?}");
 }

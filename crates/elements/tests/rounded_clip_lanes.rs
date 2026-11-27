@@ -184,3 +184,17 @@ fn an_img_in_a_list_that_rounds_itself_follows_its_radius() {
     doc.set_attribute(page.list, "class", "list round");
     image_refused(&mut doc);
 }
+
+#[test]
+fn a_framed_rows_items_on_the_page_are_under_the_frames_rounded_clip() {
+    // Given: blue rows in a framed lane under the card's 12 px corners
+    let (mut doc, ..) = card_list(".row { background-color: blue; }");
+
+    // When
+    doc.update(at(1.0)).expect("updates");
+
+    // Then: the first row's quad, read on the page, is under the card's
+    // padding box with its 11 px radii, as the painter chains it
+    let clip = support::rounded_page::fill_clip(&doc).expect("a clip");
+    assert_eq!(clip.radii(), [11.0; 4]);
+}
