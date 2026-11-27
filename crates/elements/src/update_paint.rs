@@ -66,7 +66,7 @@ impl Document {
         let refused = crate::paint_refusals::Refused {
             unplaced: input.unresolvable,
             long_chains: input.long_chains,
-            rounded: crate::clip_refusals::by_slot(
+            rounded: crate::clip_refusals_report::by_slot(
                 painted.order.clips.refused(),
                 input.frame_refused,
             ),

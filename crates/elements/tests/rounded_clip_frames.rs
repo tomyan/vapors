@@ -251,3 +251,18 @@ fn a_scroller_in_a_lane_row_is_let_go_once_a_layout_change_squares_the_card() {
     // Then: updated, the scroller no longer kept as in a rounded frame
     doc.update(at(1.0)).expect("updates");
 }
+
+#[test]
+fn a_rounded_clipping_box_in_a_rounded_frame_crossing_its_corners_is_refused() {
+    // Given: the first row holds a box clipping to 4 px corners, as wide
+    // as the card, across its top corners
+    let (mut doc, _, rows) =
+        card_list(".bubble { overflow: hidden; height: 10px; border-radius: 4px; }");
+    element(&mut doc, rows[0], "div", "bubble");
+
+    // Then: refused as clips that overlap
+    assert_refused(
+        &refusals(&mut doc),
+        "overlap without either holding the other",
+    );
+}

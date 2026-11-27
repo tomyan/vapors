@@ -90,22 +90,31 @@ impl FrameDraw {
                 clip.offset(self.shift)
             }
         };
-        let clip = match (clip.map(moved), self.clip) {
-            (Some(clip), Some(outer)) => Some(clip.cut(outer)),
-            (clip, outer) => clip.or(outer.map(vapors_scene::Clip::square)),
-        };
-        under_round(clip, self.rounded)
+        on_page(clip.map(moved), (self.clip, self.rounded))
     }
+}
+
+/// `clip`, an item's clip moved onto the page, under its frame's square
+/// clip `square` and rounded clip `round`: one answer for the page view
+/// (`Frames::item`) and the kept batches' debug check (`clip_on_page`).
+pub(crate) fn on_page(
+    clip: Option<vapors_scene::Clip>,
+    (square, round): (Option<vapors_scene::Rect>, Option<vapors_scene::Clip>),
+) -> Option<vapors_scene::Clip> {
+    let clip = match (clip, square) {
+        (Some(clip), Some(outer)) => Some(clip.cut(outer)),
+        (clip, outer) => clip.or(outer.map(vapors_scene::Clip::square)),
+    };
+    under_round(clip, round)
 }
 
 /// `clip`, an item's clip on the page already cut to its frame's square
 /// clip, under the frame's rounded clip `round` too: a square clip
 /// becomes the rounded one cut to it (`Clip::cut`). A rounded item clip
-/// is kept as it is: the page view holds one rounding, where the painter
-/// chains both (`docs/plans/frame-clips.md`, slice 2). One answer for
-/// the page view (`Frames::item`) and the kept batches' debug check
-/// (`clip_on_page`).
-pub(crate) fn under_round(
+/// is kept as it is: a box rounding its content in a rounded frame is
+/// refused unless the frame's curve holds it (`clip_refusals.rs`
+/// `nested_frames`, `Overlap`), so it is the whole shape.
+fn under_round(
     clip: Option<vapors_scene::Clip>,
     round: Option<vapors_scene::Clip>,
 ) -> Option<vapors_scene::Clip> {

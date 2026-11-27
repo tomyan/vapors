@@ -198,3 +198,41 @@ fn a_framed_rows_items_on_the_page_are_under_the_frames_rounded_clip() {
     let clip = support::rounded_page::fill_clip(&doc).expect("a clip");
     assert_eq!(clip.radii(), [11.0; 4]);
 }
+
+/// The page clip of the blue quad of `doc`, a row's child `inner`, in a
+/// card list styled `css`.
+fn inner_clip(css: &str, inner: &str) -> vapors_scene::Clip {
+    let css = format!("{css} .blue {{ height: 4px; background-color: blue; }}");
+    let (mut doc, _, rows) = card_list(&css);
+    let holder = element(&mut doc, rows[2], "div", inner);
+    element(&mut doc, holder, "div", "blue");
+    doc.update(at(1.0)).expect("updates");
+    support::rounded_page::fill_clip(&doc).expect("a clip")
+}
+
+#[test]
+fn a_square_clip_in_a_rounded_frame_is_the_frames_rounded_clip_cut_to_it() {
+    // When: the third row, y 21..31, holds a clipping box x 31..71
+    let clip = inner_clip(
+        ".cut { overflow: hidden; height: 5px; margin: 0 30px; }",
+        "cut",
+    );
+
+    // Then: the card's rounded clip, cut to the box on the page
+    assert_eq!(clip.radii(), [11.0; 4]);
+    assert_eq!(
+        clip.bounds(),
+        vapors_scene::Rect::new(31.0, 21.0, 71.0, 26.0)
+    );
+}
+
+#[test]
+fn a_rounded_clip_held_clear_of_a_rounded_frames_corners_is_its_own() {
+    // When: the third row holds a box with 2 px corners, inset 30 px
+    let css = ".bubble { overflow: hidden; height: 5px; margin: 0 30px; border-radius: 2px; }";
+    let clip = inner_clip(css, "bubble");
+
+    // Then: on the page, its own corners, which the card's curve holds
+    assert_eq!(clip.radii(), [2.0; 4]);
+    assert_eq!(clip.rect(), vapors_scene::Rect::new(31.0, 21.0, 71.0, 26.0));
+}

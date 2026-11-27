@@ -115,12 +115,11 @@ impl Frames {
                 clip.map(|clip| clip.offset(at.shift)),
             )
         };
-        let clip = match (clip, at.device_clip) {
-            (Some(clip), Some(frame)) => Some(clip.cut(frame)),
-            (clip, frame) => clip.or(frame.map(Clip::square)),
-        };
         let round = at.rounded.map(|round| self.device_round(round));
-        (item, crate::frames_draw::under_round(clip, round))
+        (
+            item,
+            crate::frames_draw::on_page(clip, (at.device_clip, round)),
+        )
     }
 
     /// `rect` in a frame at `at`, on the page.
