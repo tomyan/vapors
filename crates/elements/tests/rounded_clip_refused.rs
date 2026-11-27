@@ -121,7 +121,9 @@ fn a_text_field_whose_text_crosses_a_rounded_corner_is_refused() {
 
     // Then
     assert!(
-        errors.iter().any(|e| e.contains("its text crosses")),
+        errors
+            .iter()
+            .any(|e| e.contains("its content box, where its text and placeholder paint, crosses")),
         "{errors:?}"
     );
 }

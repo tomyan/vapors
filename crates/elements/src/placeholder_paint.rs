@@ -55,9 +55,9 @@ pub(crate) fn paint(
     let ink = layout.ink().offset(origin);
     let text = TextId(out.slabs.texts.insert(layout));
     let before = input.clip;
-    // The field's content box is inside its own content clip, which a
-    // rounded clip it is under holds or the field is refused
-    // (`clip_refusals.rs`), so an overlap here is refused already.
+    // A content box that overlaps a rounded clip without being held by
+    // it is refused after paint (`clip_refusals.rs` `field_text_overlaps`,
+    // `FieldText`), so the square cut stands only until then.
     let radii_of = |slot| crate::clip::radii(boxes, rects, slot, input);
     let square = crate::clip::BoxClip::square(content);
     let (Met::Clip(clip) | Met::Overlap(clip)) =

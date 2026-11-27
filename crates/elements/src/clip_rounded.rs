@@ -24,7 +24,8 @@ pub(crate) enum Met {
 /// The padding box's corner radii, CSS pixels, of `layout_box` at
 /// `border_box` with border radii `radii`: the radii fitted to the
 /// border box as CSS scales them (Backgrounds 3 §5.5), less the border
-/// at each corner, at least 0 (§5.2). A corner's two borders are one
+/// at each corner, at least 0 (§5.2), fitted again to the padding box.
+/// A corner's two borders are one
 /// width: an elliptical inner corner is refused (`style/decoration.rs`).
 pub(crate) fn padding_radii(
     layout_box: &LayoutBox,
@@ -39,7 +40,11 @@ pub(crate) fn padding_radii(
         border.bottom.max(border.right),
         border.bottom.max(border.left),
     ];
-    std::array::from_fn(|i| (fitted[i] - corners[i]).max(0.0))
+    let inner = std::array::from_fn(|i| (fitted[i] - corners[i]).max(0.0));
+    // a corner clamped to 0 leaves the fit, so the rest are fitted again,
+    // to the padding box, as paint fits them to its snapped rectangle
+    let padding = crate::clip::padding_box(layout_box, border_box);
+    crate::corners::fitted(inner, rect(padding))
 }
 
 /// `candidate` met with `own`, the clip the box is under; `radii_of`
@@ -83,6 +88,9 @@ pub(crate) fn holds(outer: BoxRect, radii: [f32; 4], inner: BoxRect) -> bool {
 /// inner curve inside it (its centre's distance from the outer curve's
 /// centre plus its radius at most the outer radius). Past a curve's
 /// tangent points an inner edge runs away from the corner, so stays in.
+/// Sufficient, not necessary: an inner curve wider than the outer one
+/// at a shared corner can lie inside it and is still not held, so is
+/// refused as an overlap (loud, never drawn wrong).
 fn holds_shape(
     (outer, radii): (BoxRect, [f32; 4]),
     (inner, inner_radii): (BoxRect, [f32; 4]),

@@ -242,3 +242,17 @@ fn a_rounded_box_whose_corners_poke_past_a_rounded_clip_is_an_overlap() {
     // Then
     assert!(matches!(met, Met::Overlap(_)), "{met:?}");
 }
+
+#[test]
+fn padding_radii_past_the_padding_box_are_scaled_down_to_fit_it() {
+    // Given: a 20px border box, 5px borders and one 20px corner, so the
+    // padding corner would be 15px in a 10px padding box
+    let radii = padding_radii(
+        &bordered(5.0),
+        rect(0.0, 0.0, 20.0, 20.0),
+        [0.0, 20.0, 0.0, 0.0],
+    );
+
+    // Then: fitted to the 10px padding box
+    assert_eq!(radii, [0.0, 10.0, 0.0, 0.0]);
+}

@@ -7,7 +7,8 @@
 use crate::clip::BoxClip;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{LayoutBox, Placed};
+use crate::layout::{BoxRect, LayoutBox, Placed};
+use crate::paint::PaintInput;
 
 /// Why a rounded clip refuses a box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -58,6 +59,34 @@ pub(crate) fn of(
     }
 }
 
+/// Whether box `slot` of `boxes` at `rects` is a text field whose content
+/// box, where its text and placeholder paint, overlaps a rounded clip of
+/// `clips`, the clip it is under and the one it gives its content,
+/// without being held by it (`clip_rounded.rs`). Its value's run paints
+/// under the clip it gives, which rounds it; its placeholder is cut
+/// square to the content box (`placeholder_paint.rs`), so a field with
+/// no placeholder showing is refused too, which is more than needed.
+pub(crate) fn field_text_overlaps(
+    (boxes, rects, input): (&[LayoutBox], &[BoxRect], &PaintInput<'_>),
+    slot: usize,
+    (own, inner): (Option<BoxClip>, Option<BoxClip>),
+) -> bool {
+    if !boxes[slot].text_field {
+        return false;
+    }
+    let content = BoxClip::square(crate::clip::content_box(&boxes[slot], rects[slot]));
+    let radii_of = |at| crate::clip::radii(boxes, rects, at, input);
+    let crosses = |clip: Option<BoxClip>| {
+        let rounded = clip.filter(|clip| clip.rounded_by().is_some());
+        rounded.is_some_and(|clip| {
+            let met = crate::clip_rounded::meet(Some(clip), content, &radii_of);
+            matches!(met, crate::clip_rounded::Met::Overlap(_))
+        })
+    };
+    // one check when the field does not clip, and gives what it is under
+    crosses(own) || (inner != own && crosses(inner))
+}
+
 impl Document {
     /// One refusal for `refused` (slot, why), naming the first in tree
     /// order.
@@ -79,8 +108,8 @@ impl Document {
         let &(slot, why) = first.unwrap_or_else(|| {
             panic!(
                 "no box a rounded clip refuses is in the tree's order ({refused:?}): `Clips` \
-                 keeps refusals only for boxes placed this update (kept_clips.rs); reproduce \
-                 with `cargo xtask test`"
+                 keeps refusals only for kept slots, clearing a freed slot's (kept_clips.rs); \
+                 reproduce with `cargo xtask test`"
             )
         });
         let element = placed.slots.key(slot).map_or_else(
@@ -101,8 +130,9 @@ fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
              let it hold the rounded box whole",
         ),
         RoundedRefusal::FieldText => (
-            "is a text field and its text crosses the corner of a rounded clip it is under \
-             (overflow: hidden or clip with a border-radius), which would cut it square",
+            "is a text field and its content box, where its text and placeholder paint, crosses \
+             the corner of a rounded clip it is under (overflow: hidden or clip with a \
+             border-radius), which would cut its placeholder square",
             "move the field clear of the rounded box's corners, or give it padding past them",
         ),
         RoundedRefusal::Image => (
