@@ -1,24 +1,26 @@
 # Desktop application thread
 
-Status: proposal, 2026-11-22. The architecture in "Decided" is Tom's
-(2026-11-22); everything else is a plan, and nothing in it is built.
-The open choices in section 4 come before any change to the code that
-depends on them, and before design 01, design 02 or `threading.md` are
-rewritten. Read from vapors main at ba482514 (T2 merged, #599).
+Status: L1 built, the rest a plan, 2026-11-27. The architecture in
+"Decided" is Tom's (2026-11-22), and so are the answers marked in
+section 4. L1a merged as 4086fda2 (#602, with its start test tightened
+in e9102020, #631). L1b merged as bd79b510 (#604), and its check runs
+in the hosted `window` job and the gate since 20255bd0 (#632). Nothing
+after L1 is built. The open choices in section 4 come before any
+change to the code that depends on them, and before design 01, design
+02 or `threading.md` are rewritten. First read from vapors main at
+ba482514 (T2 merged, #599); the code references were checked again at
+d27f1843.
 
-Section 4 marks each decision as answered by Tom (AT1, AT3, AT5) or
-open (AT1c, AT2, AT4, AT6, AT7). In an open decision, every option,
-the proposed one included, is an alternative for Tom to choose between.
+Section 4 marks each decision as answered by Tom (AT1, AT2, AT3, AT4,
+AT5) or open (AT1c, AT6, AT7). In an open decision, every option, the
+proposed one included, is an alternative for Tom to choose between.
 
-## The smallest decision that unblocks work
+## The next decisions
 
-L1a, the application thread with no window, is authorised (Tom,
-2026-11-22) and in progress. It is built on the proposed options of
-AT2 (the `vapors_signals` executor driven inside Tokio) and AT4 (in
-`vapors-app`). AT2 is the one genuine open choice it rests on; see
-AT2 for why (a) follows from the async plan's earlier decisions. The
-next decisions are AT6 and AT7, which F1 needs. None of them changes
-L1a or L1b.
+L1a and L1b are built on AT2 (a), the `vapors_signals` executor
+driven inside Tokio, and AT4 (a), the code in `vapors-app`. Tom chose
+both on 2026-11-27. The next decisions are AT6 and AT7, which F1
+needs, and AT1c, proposed to be dropped.
 
 ## 1. Decided (Tom, 2026-11-22)
 
@@ -132,16 +134,17 @@ for drawing. Proposed, not decided: (a), as the smaller change.
 **AT2. The executor on the application thread.** (a) Keep
 `vapors_signals::spawn` and `run_ready` (owner-scoped, deadlines
 carried), driven by the application thread's loop inside Tokio's
-runtime context. The wake hook wakes that loop, for example through
-`tokio::sync::Notify`, and futures use `tokio::time` because they are
+runtime context, with futures using `tokio::time` because they are
 polled inside the runtime. (b) Use Tokio's `LocalSet::spawn_local`
 for app tasks, with owner disposal aborting through an `AbortHandle`.
-Proposed, not decided: (a). It keeps T1's ownership and disposal
-tests, and one executor that the web shares, while Tokio supplies only
-timers and IO. L1a is built on (a), because the async plan already
-places the executor in `vapors_signals` (its D6) and refuses
-`spawn_local` in scripts by name (its section 10). (b) would reverse
-those, so it stays open for Tom.
+Answered (Tom, 2026-11-27): (a). It keeps T1's ownership and disposal
+tests and one executor that the web shares, with Tokio supplying only
+timers and IO. It also keeps the async plan's executor in
+`vapors_signals` (its D6) and its refusal of `spawn_local` in scripts
+(its section 10). As built in L1a, the wake hook sends one wake on the
+thread's own message channel, coalesced by a flag the thread clears
+when it polls (`crates/app/src/app_thread_body.rs`); this plan's
+first draft suggested `tokio::sync::Notify` as an example.
 
 **AT3. The Tokio runtime's flavour.** (a) `current_thread`, so the one
 application thread is the whole runtime and every continuation runs
@@ -152,10 +155,10 @@ a dedicated `current_thread` runtime.
 **AT4. Where the application thread's code lives.** (a) `vapors-app`,
 native only, beside `ElementsApp`, which it runs. (b)
 `vapors-platform`, native only, beside the event loop. (c) A new
-crate. Proposed, not decided: (a). Tokio stays out of the platform
-crate, which the web also builds. L1a puts its code in `vapors-app`
-on (a); moving it to (b) or (c) later is a file move with no change
-to its behaviour.
+crate. Answered (Tom, 2026-11-27): (a), `vapors-app` owns the
+application thread. Tokio stays out of the platform crate, which the
+web also builds. L1a's code is in `crates/app/src/app_thread*.rs`,
+with `tokio` a native-only dependency of `vapors-app`.
 
 **AT5. What L1 shows.** (a) A standalone example with no document,
 which proves the thread model, the Tokio timer and idle behaviour
@@ -176,13 +179,13 @@ or `Box` moves by its pointer, and nothing it owns is deep-copied.
 cost. That is a cost only where a list is built fresh each frame,
 which AT6 (b) avoids; handing it over is a move. What does stand in
 the way is data that is shared, borrowed or tied to a thread. In
-today's code, read at ba482514:
+today's code, read at ba482514 and checked again at d27f1843:
 
 | What draw uses today | Where | What it is | For an owned, transferable description |
 |---|---|---|---|
 | `Painted`, borrowed for the draw | `ScenePainter::draw(&mut self, target, painted: &Painted)`, `crates/app/src/painter.rs:118` | A borrow of the document's paint result | The description owns what the consumer reads (AT6) |
 | Text layouts, images, icons | `Slabs`, `crates/elements/src/slab.rs:71-73` | `Rc<Layout>`, `Rc<RgbaImage>`, `Rc<Icon>`: shared and not `Send` | AT7 |
-| The document's run-time shapes | `Painted::shapes`, `crates/elements/src/painted.rs:19` | `Rc<RefCell<DocumentShapes>>`: shared, mutable, not `Send` | The changed slots taken out as owned values per frame |
+| The document's run-time shapes | `Painted::shapes`, `crates/elements/src/painted.rs:19` | `Option<Rc<RefCell<DocumentShapes>>>`: shared, mutable, not `Send` | The changed slots taken out as owned values per frame |
 | Hit-test cache | `Painted::hits`, `painted.rs` | `OnceCell<KeptHits>`, filled on the first hit test | Stays with layout and hit testing on the application thread; not in the description |
 | Pipelines, glyph atlas, retained GPU buffers | `ScenePainter`, `painter.rs:19-43` | GPU objects owned by whoever draws | Owned by the consumer. wgpu's `Device` and `Queue` are `Send + Sync` natively (`threading.md` 2.5) and not `Send` on the web |
 | Surface renderers | `SurfaceRenderer`, `crates/app/src/surface.rs:92` | App-authored code that encodes GPU work, sharing its scene through `Rc<RefCell<..>>` | App code, so it runs while the frame is prepared, on the application thread (section 1). When the UI thread presents, its encoded output travels in the description; whether that is a `wgpu::CommandBuffer` or owned uploads is settled in F1 |
@@ -201,7 +204,10 @@ change, no dashboard change, no frame description. It is split in two
 so the thread, its tasks and its timers can be judged before any
 window is involved.
 
-### L1a: the application thread, no window (authorised, in progress)
+### L1a: the application thread, no window (built: #602, 4086fda2)
+
+The plan as written before the build follows; "As built" after the
+mutations records where L1a differs from it.
 
 **Shape.** In `vapors-app`, native only (AT4 (a)): an `AppThread` that
 starts one thread running a `current_thread` Tokio runtime with its
@@ -241,7 +247,41 @@ thread (2, 4); drop the coalescing (4); skip `run_ready` after a
 message (2); leave a disposed task's interval polled (5); swallow a
 task's `Err` (6); continue after a handler's panic (7).
 
-### L1b: the Live timer in a window (next)
+**As built** (`crates/app/src/app_thread*.rs`, its unit tests in
+`app_thread_tests.rs` and `crates/app/tests/app_thread*.rs`; #602's
+description records every mutation and review):
+
+- The runtime has only its timer (`enable_time`). `tokio` is a
+  native-only dependency with the `rt`, `time` and `sync` features.
+- Test 4 requires five ticks within 200 ms and at most ticks plus two
+  turns. Tokio's first interval tick takes its own wake, so the turns
+  are the message, the spawn's wake and one per tick.
+- Tests beyond the seven above: wakes before a turn cost one turn;
+  wakes sent from another thread while the thread polls are not lost;
+  a wake from another thread reaches an idle thread; a panic while
+  building the app side is returned by `start`; the app side may make
+  a Tokio timer while it is built.
+- Start and stop have 5 s deadlines (`START_DEADLINE`,
+  `STOP_DEADLINE`), their measured floors stated beside them. Each is
+  proven by a unit test that sets a short deadline: a slow app side, a
+  handler blocking past stop, a pending task whose drop blocks past
+  stop, and a start whose thread ends slowly (the last tightened in
+  #631 so that `start`'s Timeout arm cannot pass it).
+- `JoinHandle::is_finished` is true before the thread's locals drop,
+  and the executor's tasks live in a `thread_local!`. So `stop` and
+  `start` learn that the thread ended from a second thread that joins
+  it (`app_thread_exit.rs`).
+- `AppThread` dropped without `stop` is asked to stop and not waited
+  for, declared RELAXED in `app_thread.rs`. That note says the guard
+  retires with "the desktop runner (L1b)", and `START_DEADLINE`'s
+  comment says it is re-measured with the first app side that builds
+  a document "(L1b)". L1b is an example with no document, so both
+  move to L2. The two code comments still name L1b.
+
+### L1b: the Live timer in a window (built: #604, bd79b510)
+
+The plan as written before the build follows; "As built" after it
+records where L1b differs.
 
 The example `live_timer`: a Live switch (a key press) on the
 application thread, a 100 ms `tokio::time::interval` with
@@ -261,6 +301,27 @@ and maximum. Mutations: the handler on the UI thread; the Live task
 polled through T2's path; the tick timed by `Next::WaitUntil`;
 `MissedTickBehavior::Burst`; the interval left armed with Live off.
 
+**As built** (`crates/app/examples/live_timer/`, no library change;
+#604's description records the runs, mutations and reviews):
+
+- A script on the application thread runs Live off, on and off for
+  1 s each, not 3 s, with a 350 ms stall of the thread while Live is
+  on. It switches Live through the window, the path Space takes.
+- Rules added to the plan's: every tick is shown within 50 ms; tick
+  gaps are 80 to 120 ms, except the one across the stall; no frame
+  may show nothing new, apart from frames marked as the script's; a
+  15 s watchdog ends a run that hangs.
+- Live off allows the turns the script itself takes, at most 3 at
+  the start and 3 after off, not 0. Polls of the Live task are not
+  counted; ticks and turns stand in for them.
+- The latency is taken over about 10 ticks per run, not 50, stamped
+  after the frame is submitted and before present.
+- The mutation "the Live task polled through T2's path" was not run.
+  The others, and more, each made the check exit 1.
+- Measured: 9 or 10 ticks per run, tick to frame at most 1.0 to
+  5.3 ms locally (Xvfb, llvmpipe). The hosted `window` step took 4 s
+  passing (#632).
+
 **Not in L1:** the document, the frame description, the dashboard, IO,
 deadlines, the web and mobile. L1b's UI side draws from an owned
 value, so AT6, AT7 and the rendering default do not change it.
@@ -270,7 +331,7 @@ value, so AT6, AT7 and the rendering default do not change it.
 | Slice | Content | Needs |
 |---|---|---|
 | F1 | The frame description on today's single thread: `ElementsApp` prepares an owned description and its painter consumes it on the same thread. No thread change, no toggle; `--scaling` must not regress; a native-only compile-time check that the description is `Send`; the surface renderers' output settled (section 4a) | AT6, AT7 |
-| L2 | The dashboard's Live switch on the application thread: the switch's handler and the tick there, frames prepared, submitted and presented there (the default), a frame per tick, 0 frames with Live off, held to Chromium's page; a live resize checked on each desktop available | L1, F1 |
+| L2 | The dashboard's Live switch on the application thread: the switch's handler and the tick there, frames prepared, submitted and presented there (the default), a frame per tick, 0 frames with Live off, held to Chromium's page; a live resize checked on each desktop available; `AppThread`'s RELAXED drop retired by the runner calling `stop`, and `START_DEADLINE` re-measured with the dashboard's app side (both noted as L1b in `app_thread.rs`) | L1, F1 |
 | Default judged | After parity: sustained scrolling of a million orders, p99 input-to-visible latency and missed frames, with presentation on the application thread and on the UI thread through the same frame description; a live resize correct in both | Parity, F1 |
 | L3 (replaces T3) | Task deadlines judged on the application thread with a Tokio timer for the earliest deadline, the work polled before the judgement; the refusal message; no `request_frame_at` | L1a |
 | Web worker (optional) | Only if measurements on the browser's main thread justify it: a Web Worker for app code, with WebGPU, input forwarding and the hop's latency measured | Measurements that justify it |
