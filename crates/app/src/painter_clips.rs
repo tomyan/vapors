@@ -40,6 +40,9 @@ enum Key {
     /// so the entries under it, and the kept bytes naming them, stay
     /// (vapors-perf `gpu_f3_baselines`).
     Frame(BatchFrame),
+    /// A frame's rounded clip, under its `Frame` entry, by the frame
+    /// alone too (`docs/plans/frame-clips.md`, slice 2).
+    FrameRound(BatchFrame),
 }
 
 /// An entry held: where, the frame entry it names, and the frame that
@@ -124,6 +127,23 @@ impl Clips {
         self.held_entry(target, Key::Frame(frame), entry)
     }
 
+    /// The entry of `frame`'s rounded clip `round`, on the page, under its
+    /// square clip's entry `square`: what the frame's item entries are
+    /// under in its place. `None` when the table could not grow.
+    ///
+    /// # Panics
+    ///
+    /// When an edge of `round` is not a whole device pixel.
+    pub(super) fn frame_round(
+        &mut self,
+        target: &Target<'_>,
+        (frame, round, square): (BatchFrame, Clip, u32),
+    ) -> Option<u32> {
+        assert_whole(round.rect());
+        let entry = ClipEntry::rounded(edges(round.rect()), round.radii(), 0).under(square);
+        self.held_entry(target, Key::FrameRound(frame), entry)
+    }
+
     /// The entry held by `key`, taken when it is not, set to `entry` for
     /// this frame.
     fn held_entry(&mut self, target: &Target<'_>, key: Key, entry: ClipEntry) -> Option<u32> {
@@ -173,6 +193,10 @@ impl Clips {
     /// (`painter_kept_entries.rs` `table_entries`), so it is held while
     /// they are, and the shader never walks to a freed entry.
     fn assert_no_parent_in(&self, released: &[u32]) {
+        // an idle frame gives nothing back: no walk over the held
+        if released.is_empty() {
+            return;
+        }
         let orphan = self.held.iter().find_map(|(key, held)| match key {
             Key::Item(_, _, parent) if released.contains(parent) => Some((held.at, *parent)),
             _ => None,

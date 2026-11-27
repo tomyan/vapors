@@ -66,6 +66,23 @@ impl Frames {
         self.get(frame).map(|at| self.hit_at(at, rect))
     }
 
+    /// Whether frame `frame`'s rounded clip, if it has one, holds `point`
+    /// on the page, CSS pixels: a hit in a rounded frame is cut by its
+    /// shape too (`kept_hits_query.rs`).
+    pub(crate) fn round_holds(&self, frame: usize, [x, y]: [f32; 2]) -> bool {
+        self.get(frame)
+            .and_then(|at| at.rounded)
+            .is_none_or(|round| {
+                let at = BoxRect {
+                    x,
+                    y,
+                    width: 0.0,
+                    height: 0.0,
+                };
+                crate::clip_rounded::holds(round.rect, round.radii, at)
+            })
+    }
+
     /// `rect` in frame `frame` on the page, uncut.
     pub(crate) fn on_page(&self, frame: usize, rect: BoxRect) -> BoxRect {
         self.css_rect(self.at(frame), rect)

@@ -54,6 +54,10 @@ pub(crate) struct PaintInput<'a> {
     /// [`crate::MAX_CLIP_CHAIN`], with the count: refused by the update
     /// after paint (`paint_refusals.rs`).
     pub(crate) long_chains: Vec<(usize, usize)>,
+    /// The boxes painted in a rounded frame that it refuses, and why
+    /// (`clip_refusals.rs` `in_frame`): refused by the update after
+    /// paint, with the rounded clips' other refusals.
+    pub(crate) frame_refused: Vec<(usize, crate::clip_refusals::RoundedRefusal)>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -88,6 +92,7 @@ impl<'a> PaintInput<'a> {
             class: None,
             unresolvable: Vec::new(),
             long_chains: Vec::new(),
+            frame_refused: Vec::new(),
         }
     }
 

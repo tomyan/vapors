@@ -25,11 +25,19 @@ pub(crate) enum RoundedRefusal {
     Image,
     /// A `gpu-surface` under a rounded clip, as an image.
     Surface,
-    /// A scroll container, or a lane container whose children are
-    /// frames, that a rounded clip above it reaches: its content's clip
-    /// is its frame's, a scissor, until F3.1b puts frame clips on the
-    /// clip table.
+    /// A scroll container that a rounded clip above it reaches: its
+    /// content's clip is its frame's, which is not rounded while a rounded
+    /// scroller is deferred (`docs/plans/frame-clips.md`).
     Frame,
+    /// A scroll container, or a lane container whose children are frames,
+    /// in a frame rounded by box `rounded_by` and not held clear of its
+    /// corners: its frame's clip would not take the corners until frame
+    /// entries chain to their outer frame's (`docs/plans/frame-clips.md`,
+    /// the follow-up).
+    NestedFrame {
+        /// The slot of the box whose rounded clip the outer frame has.
+        rounded_by: usize,
+    },
 }
 
 /// What a rounded clip refuses of box `layout_box`, under `own`, giving
@@ -54,6 +62,30 @@ pub(crate) fn of(
         Some(RoundedRefusal::Surface)
     } else if frames && rounded(inner) {
         Some(RoundedRefusal::Frame)
+    } else {
+        None
+    }
+}
+
+/// What a rounded frame, `round`, refuses of box `layout_box` painted in
+/// it: an img or a gpu-surface, which draw under the scissor; and a
+/// frame of its own (`frames`), its content's region on the page
+/// `region`, not held clear of the frame's corners (`clip_rounded.rs`
+/// `holds`). The first frame entries chain to their outer frame's lifts
+/// the second (`docs/plans/frame-clips.md`, the follow-up).
+pub(crate) fn in_frame(
+    layout_box: &LayoutBox,
+    round: crate::frames::FrameRound,
+    (frames, region): (bool, BoxRect),
+) -> Option<RoundedRefusal> {
+    if layout_box.image.is_some() {
+        Some(RoundedRefusal::Image)
+    } else if layout_box.surface.is_some() {
+        Some(RoundedRefusal::Surface)
+    } else if frames && !crate::clip_rounded::holds(round.rect, round.radii, region) {
+        Some(RoundedRefusal::NestedFrame {
+            rounded_by: round.by,
+        })
     } else {
         None
     }
@@ -112,10 +144,19 @@ impl Document {
                  reproduce with `cargo xtask test`"
             )
         });
-        let element = placed.slots.key(slot).map_or_else(
-            || "a box with no element".to_owned(),
-            |key| crate::check::describe(&self.arena, key.node()),
-        );
+        let describe = |slot: usize| {
+            placed.slots.key(slot).map_or_else(
+                || "a box with no element".to_owned(),
+                |key| crate::check::describe(&self.arena, key.node()),
+            )
+        };
+        let mut element = describe(slot);
+        if let RoundedRefusal::NestedFrame { rounded_by } = why {
+            element = format!(
+                "{element} (in the frame rounded by {})",
+                describe(rounded_by)
+            );
+        }
         let others = refused.len() - 1;
         Err(vec![ElementError::Refused(message(&element, why, others))])
     }
@@ -146,10 +187,15 @@ fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
             "remove the border-radius or the clip from the box above it",
         ),
         RoundedRefusal::Frame => (
-            "scrolls, or frames a lane's rows, under a rounded clip, and a frame's clip is a \
-             square scissor until F3.1b",
-            "fit this box inside the rounded box's padding box clear of its corners (a lane whose \
-             own box is the rounded one is not framed, and is not refused)",
+            "scrolls under a rounded clip that it holds, and a scroller's clip is not rounded \
+             while rounded scrollers are deferred",
+            "fit this box inside the rounded box's padding box clear of its corners",
+        ),
+        RoundedRefusal::NestedFrame { .. } => (
+            "scrolls, or frames a lane's rows, inside a frame with a rounded clip, crossing its \
+             corners, and a frame's clip takes an outer frame's corners only once frame entries \
+             chain to their outer frame's (docs/plans/frame-clips.md, the follow-up)",
+            "keep this box inside the rounded box's padding box clear of its corners",
         ),
     };
     let also = match others {

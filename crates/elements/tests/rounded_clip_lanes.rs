@@ -47,9 +47,9 @@ fn a_lane_whose_border_is_wider_than_its_radius_is_framed() {
 }
 
 /// A rounded card holding a list of 40 rows, a lane taller than the card,
-/// so its content clip is the card's rounded one; `odd` sets the 11th
-/// row's height.
-fn card_list(odd: &str) -> (Document, NodeId) {
+/// so its content clip is the card's rounded one; `css` added. The card,
+/// and the rows.
+fn card_list(css: &str) -> (Document, NodeId, Vec<NodeId>) {
     let mut doc = document();
     let body = doc.body();
     let card = element(&mut doc, body, "div", "card");
@@ -57,42 +57,98 @@ fn card_list(odd: &str) -> (Document, NodeId) {
     let rows: Vec<NodeId> = (0..40)
         .map(|_| element(&mut doc, list, "div", "row"))
         .collect();
-    doc.set_attribute(rows[10], "class", "row odd");
-    let css = format!(
-        "{CARD} .list {{ height: 400px; }} .row {{ height: 10px; }} .odd {{ height: {odd}; }}"
-    );
+    let css = format!("{CARD} .list {{ height: 400px; }} .row {{ height: 10px; }} {css}");
     doc.add_stylesheet("page.css", &css).expect("parses");
-    (doc, rows[10])
+    (doc, card, rows)
+}
+
+/// Asserts a point outside the card's top-left curve, inside its
+/// rectangle, hits the card, not the first row, and one inside the curve
+/// the row: the rows' frame is cut by the card's rounded clip.
+fn assert_rows_cut_round(doc: &Document, card: NodeId, row: NodeId) {
+    let painted = doc.painted().expect("painted");
+    assert_eq!(painted.hit([2.0, 2.0]), Some(card), "outside the curve");
+    assert_eq!(painted.hit([6.0, 6.0]), Some(row), "inside the curve");
 }
 
 #[test]
-fn a_framed_lane_under_a_rounded_clip_from_above_is_refused() {
+fn a_framed_lane_under_a_rounded_clip_from_above_is_cut_by_it() {
     // Given: whole-pixel rows, so the list frames them
-    let (mut doc, _) = card_list("10px");
+    let (mut doc, card, rows) = card_list("");
+
+    // When
+    doc.update(at(1.0)).expect("updates");
+
+    // Then
+    assert_eq!(doc.update_counts().lanes_framed, 1, "the rows are framed");
+    assert_rows_cut_round(&doc, card, rows[0]);
+}
+
+#[test]
+fn a_lane_under_a_rounded_clip_that_comes_to_be_framed_is_cut_by_it() {
+    // Given: a fractional row, so the list declines to frame
+    let (mut doc, card, rows) = card_list(".odd { height: 10.5px; }");
+    doc.set_attribute(rows[10], "class", "row odd");
+    doc.update(at(1.0)).expect("updates");
+
+    // When: the row becomes whole, and the list frames its rows
+    doc.set_attribute(rows[10], "class", "row");
+    doc.update(at(1.0)).expect("updates");
+
+    // Then
+    assert_rows_cut_round(&doc, card, rows[0]);
+}
+
+#[test]
+fn a_scroller_in_a_rounded_frame_clear_of_its_corners_is_accepted() {
+    // Given: the third row holds a scroller inset from the card's sides
+    let (mut doc, _, rows) = card_list(".pane { overflow: auto; height: 10px; margin: 0 20px; }");
+    element(&mut doc, rows[2], "div", "pane");
+
+    // Then: the update is not refused
+    doc.update(at(1.0)).expect("updates");
+}
+
+#[test]
+fn a_scroller_in_a_rounded_frame_crossing_its_corners_is_refused() {
+    // Given: the first row holds a scroller as wide as the card, across
+    // its top corners
+    let (mut doc, _, rows) = card_list(".pane { overflow: auto; height: 10px; }");
+    element(&mut doc, rows[0], "div", "pane");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then: named, with the box that rounds the frame
+    let named = |e: &&String| {
+        e.contains("inside a frame with a rounded clip") && e.contains("class=\"card\"")
+    };
+    assert!(errors.iter().any(|e| named(&e)), "{errors:?}");
+}
+
+#[test]
+fn an_img_in_a_rounded_frame_is_refused() {
+    // Given: an image in the third row
+    let (mut doc, _, rows) = card_list("img { display: block; }");
+    let image = vapors_scene::RgbaImage {
+        size: vapors_scene::Size {
+            width: 2,
+            height: 2,
+        },
+        rgba: [0, 0, 0, 255].repeat(4),
+    };
+    doc.register_image("a.png", image).expect("registers");
+    let img = element(&mut doc, rows[2], "img", "");
+    doc.set_attribute(img, "src", "a.png");
 
     // When
     let errors = refusals(&mut doc);
 
     // Then
     assert!(
-        errors.iter().any(|e| e.contains("frames a lane's rows")),
-        "{errors:?}"
-    );
-}
-
-#[test]
-fn a_lane_under_a_rounded_clip_that_comes_to_be_framed_is_refused() {
-    // Given: a fractional row, so the list declines to frame
-    let (mut doc, odd) = card_list("10.5px");
-    doc.update(at(1.0)).expect("updates");
-
-    // When: the row becomes whole, and the list frames its rows
-    doc.set_attribute(odd, "class", "row");
-    let errors = refusals(&mut doc);
-
-    // Then
-    assert!(
-        errors.iter().any(|e| e.contains("frames a lane's rows")),
+        errors
+            .iter()
+            .any(|e| e.contains("is an img under a rounded clip")),
         "{errors:?}"
     );
 }

@@ -165,8 +165,9 @@ impl ClipInputs for BoxClips<'_, '_> {
         own: Option<crate::clip::BoxClip>,
     ) -> crate::kept_clips::InnerClip {
         let inner = crate::clip::inner(self.boxes, self.rects, slot, own, self.input);
-        let framing = self.input.placement.framing.get(&slot);
-        let frames = self.scrolls(slot) || matches!(framing, Some(Ok(())));
+        // a framed lane under a rounded clip rounds its frame's clip
+        // (`frames_lane_prime.rs`); a scroller's stays refused
+        let frames = self.scrolls(slot);
         let clips = (own, inner.clip);
         let input = (self.boxes, self.rects, self.input);
         let field_text = crate::clip_refusals::field_text_overlaps(input, slot, clips);

@@ -45,6 +45,10 @@ pub struct FrameDraw {
     /// The clip every batch of the frame is under, device pixels on the
     /// page; `None` for none.
     pub clip: Option<Rect>,
+    /// Its rounded clip, device pixels on the page, which `clip` cuts too:
+    /// a lane's when its container rounds its content
+    /// (`docs/plans/frame-clips.md`, slice 2); `None` for none.
+    pub rounded: Option<vapors_scene::Clip>,
 }
 
 impl FrameDraw {
@@ -111,6 +115,7 @@ impl Frames {
         FrameDraw {
             shift: at.shift,
             clip: at.device_clip,
+            rounded: at.rounded.map(|round| self.device_round(round)),
         }
     }
 
@@ -127,6 +132,16 @@ impl Frames {
             [shift[0] - base[0], shift[1] - base[1]]
         };
         rows.iter().map(offset).collect()
+    }
+}
+
+impl Frames {
+    /// `round` in device pixels: its rectangle snapped, its radii scaled
+    /// and fitted to it, as paint sets an item's (`paint.rs` `device_clip`).
+    fn device_round(&self, round: crate::frames::FrameRound) -> vapors_scene::Clip {
+        let rect = crate::paint::snapped(round.rect, self.scale());
+        let radii = round.radii.map(|r| r * self.scale());
+        vapors_scene::Clip::rounded(rect, crate::corners::fitted(radii, rect))
     }
 }
 

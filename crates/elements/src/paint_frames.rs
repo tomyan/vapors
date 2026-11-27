@@ -91,13 +91,24 @@ fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBas
             parent: container,
             origin,
             inner: None,
+            rounding: None,
         };
     }
+    let inner = clips.inner(container);
+    let rounding = inner.and_then(|clip| clip.rounded_by()).map(|by| {
+        let (_, radii) = clips.rounding(by).unwrap_or_else(|| {
+            panic!(
+                "lane container {container}'s clip is rounded by box slot {by}, which rounds \
+                 nothing (kept_clips.rs `rounding`); reproduce with `cargo xtask test`"
+            )
+        });
+        (radii, by)
+    });
     LaneBase {
         parent: clips.frame(container),
         origin,
-        // A rounded one is refused after paint (`clip_refusals.rs` `Frame`).
-        inner: clips.inner(container).map(|clip| clip.rect),
+        inner: inner.map(|clip| clip.rect),
+        rounding,
     }
 }
 

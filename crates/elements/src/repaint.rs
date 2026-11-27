@@ -40,6 +40,9 @@ impl<'a> Repaint<'a> {
         painted: &mut Painted,
     ) {
         for (slot, from) in again {
+            if let Some(why) = self.in_rounded_frame(slot, from, input, painted) {
+                input.frame_refused.push((slot, why));
+            }
             let kept = self.painted(slot, from, input, painted);
             self.check_placed(slot, &kept, input);
             input.class = None;
@@ -48,6 +51,28 @@ impl<'a> Repaint<'a> {
             painted.items_built += kept.items();
             painted.kept_boxes[slot] = Some(kept);
         }
+    }
+
+    /// What box `slot`'s rounded frame refuses of it, if it is in one
+    /// (`clip_refusals.rs` `in_frame`): its region the clip it gives its
+    /// content, else its border box, on the page.
+    fn in_rounded_frame(
+        &self,
+        slot: usize,
+        from: BoxFrom,
+        input: &PaintInput<'_>,
+        painted: &Painted,
+    ) -> Option<crate::clip_refusals::RoundedRefusal> {
+        let round = painted.frames.at(from.frame).rounded?;
+        let framed = matches!(input.placement.framing.get(&slot), Some(Ok(())));
+        let a_frame = input.stackings.scrolls(slot) || framed;
+        let region = self
+            .order
+            .clips
+            .inner(slot)
+            .map_or(from.rect, |clip| clip.rect);
+        let region = painted.frames.on_page(from.frame, region);
+        crate::clip_refusals::in_frame(&self.boxes[slot], round, (a_frame, region))
     }
 
     /// Records box `slot`'s part as not placed when a coordinate is not

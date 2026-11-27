@@ -82,10 +82,16 @@ and their parent in the container frame's.
    - `RoundedRefusal::Frame` is retired for table runs. Images and
      surfaces under a rounded frame clip are refused, as under an item
      clip.
-   - A rounded scroller (`overflow: auto` with a radius) is no longer
-     refused: its frame clip rounds.
-   - Tests: a framed lane and a scroller under a rounded clip, painted
-     and hit, and a Chromium fixture of a rounded scroller.
+   - A rounded scroller (`overflow: auto` with a radius) stays refused,
+     deferred as Tom deferred it in F3.2b and outside the parity scope
+     (entry 99, action 43).
+   - A frame nested in a rounded frame is refused, naming the follow-up
+     that chains frame entries to their outer frames', unless it is held
+     clear of the rounded frame's corners, as an item clip is.
+   - `assert_no_parent_in` returns early when nothing is given back, and
+     its cost is measured on a large dashboard (the lead, after #639).
+   - Tests: a framed lane and a scroller under a rounded clip from a box
+     above them, painted and hit.
 3. **Lane decline retired, F3.2c measured again.**
    - `LaneFrameRoundedClip` is removed, so a rounded list frames its
      rows.
@@ -149,6 +155,44 @@ gives the same answer while the parent is made from that value.
 
 `tests/gpu_clip_entries.rs` counts one entry more for the list's frame
 clip, and a scroll still writes only the two row entries.
+
+## As built: slice 2
+
+The lead's go (2026-11-27, after #639): rounded frame clips, with rounded
+scrollers deferred and a frame nested in a rounded frame refused unless
+held clear of its corners. That applies Tom's nesting rule to frames.
+- A framed lane whose container's clip is rounded, by its own box once
+  slice 3 lets it frame or by a box above it, has a rounded clip:
+  - `FrameAt::rounded` is a `FrameRound`, the rounding box's padding box
+    on the page in CSS px, its padding radii and its slot.
+  - It is set on the lane's template (`frames_lane_prime.rs`), so every
+    row of the lane shares it.
+- `FrameDraw::rounded` carries it in device pixels to the painter, which
+  makes an entry for it under the frame's square entry
+  (`Key::FrameRound`). The frame's item entries are under the rounded
+  one.
+- A hit in a rounded frame is cut by its shape too
+  (`Frames::round_holds`).
+- `RoundedRefusal::Frame` is now for scrollers only. A scroller's clip
+  is not rounded while rounded scrollers are deferred.
+- At paint (`repaint.rs` `in_rounded_frame`, `clip_refusals.rs`
+  `in_frame`), a box in a rounded frame is refused when it is an img or
+  a gpu-surface (`Image`, `Surface`). It is also refused when it is a
+  frame of its own (a scroller or a framed lane) whose region on the
+  page is not held clear of the corners (`NestedFrame`, naming the
+  frame, the box that rounds the outer frame and this follow-up). The
+  debug fresh paint holds those refusals to the update's.
+- `assert_no_parent_in` returns early when nothing is given back.
+  Measured over 1723 frames of a 2000-order dashboard scrolled down and
+  back, every call took that return: at most 5 entries held, none given
+  back, mean 70 ns, max 600 ns with the timer's own cost.
+
+**Follow-up: frame entries chained to their outer frame's.** A frame
+whose clip crosses a rounded frame's corners would need its entry under
+the rounded frame's entry. A frame's entry is on the page and met with
+its outer frames' rectangles, so the outer corners are lost. Trigger: the
+first real page that needs a frame crossing a rounded corner. Until
+then, `NestedFrame` refuses it.
 
 ## Questions for the lead and Tom
 

@@ -215,3 +215,37 @@ fn gpu_a_framed_lanes_rows_are_cut_by_the_lane_clips_entry() {
     assert_eq!((at(&widened, 4, 7), at(&widened, 4, 9)), (BLUE, WHITE));
     assert!(widened == scissored, "the table cuts as the scissor does");
 }
+
+/// A white page holding a 16 px square card with 6 px corners that clips
+/// a list of 40 red 6 px rows: a lane, framed, under the card's rounded
+/// clip (`docs/plans/frame-clips.md`, slice 2).
+fn rounded_lane() -> Document {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let css = "body { margin: 0; background-color: #fff; } \
+        .card { overflow: hidden; width: 16px; height: 16px; border-radius: 6px; } \
+        .row { height: 6px; background-color: #f00; }";
+    doc.add_stylesheet("app.css", css).expect("parses");
+    let body = doc.body();
+    let card = child(&mut doc, body, "card");
+    let list = child(&mut doc, card, "list");
+    for _ in 0..40 {
+        child(&mut doc, list, "row");
+    }
+    doc
+}
+
+#[test]
+fn gpu_a_framed_lanes_rows_under_a_rounded_clip_are_cut_by_its_curve() {
+    // Given
+    let mut doc = rounded_lane();
+    let framed = updated(&mut doc);
+
+    // When
+    let (scissored, widened) = both(&doc);
+
+    // Then: the rows are framed, and the corner pixel, outside the 6 px
+    // curve, is the page's, with or without the scissor; inside, red
+    assert_eq!(framed, 1, "the list is a framed lane");
+    assert_eq!((at(&widened, 0, 0), at(&widened, 8, 3)), (WHITE, RED));
+    assert!(widened == scissored, "the table cuts as the scissor does");
+}
