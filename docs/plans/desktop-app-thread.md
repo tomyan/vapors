@@ -60,7 +60,7 @@ AT6 and AT7, which F1 needs, and AT1c, proposed to be dropped.
 | `docs/design/01-reactivity-async.md`, rule 6 | Futures run on the UI thread's executor in phase 2 | Overridden on desktop |
 | `docs/plans/threading.md` | Keeps design 02's rule. Section 2.4 rejects moving the update off the UI thread because it costs a hop of input latency per event | Its rule is overridden. Its hand-off estimate (20 to 100 µs, not measured, section 1.3) feeds AT1 |
 | `docs/plans/async-components.md` section 3.3 (T2, built) | The task wake reaches the winit thread, which polls `run_ready` | Built and correct for one thread. On desktop, task wakes move to the application thread (section 3) |
-| `docs/plans/async-components.md` section 4 and T3 | Deadlines armed through `Platform::request_frame_at` and `ControlFlow::WaitUntil` | Withdrawn for tasks. Deadlines are judged on the application thread with a Tokio timer (L3) |
+| `docs/plans/async-components.md` section 4 and T3 | Deadlines armed through `Platform::request_frame_at` and `ControlFlow::WaitUntil` | Withdrawn for tasks on desktop: deadlines are judged on the application thread with a Tokio timer (L3). The web's task deadlines have no slice yet (`async-components.md`, T3's row) |
 | `crates/gui-bench-app/src/live.rs` | The Live tick and spinner are derived from the frame clock, so the loop draws every frame while Live is on | To be replaced by a timer task on the application thread (L2) |
 
 ## 3. What T2 becomes
@@ -195,8 +195,9 @@ today's code, read at ba482514 and checked again at d27f1843:
 
 Platform constraints that stay: the web runs on the browser's main
 thread by default (section 1), and wgpu's types are not `Send` there,
-so the web consumes on the preparing thread. F1 adds a compile-time
-check that the description is `Send`, on native targets only.
+so the web consumes on the preparing thread. F1 would add a
+compile-time check that the description is `Send`, on native targets
+only.
 
 ## 5. L1: desktop Live timer on the application thread
 

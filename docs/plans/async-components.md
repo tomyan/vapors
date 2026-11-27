@@ -669,7 +669,9 @@ the document today.
   that case by declaration. A `Measured` task that is never woken is
   judged at its deadline because the executor arms a frame for it
   (section 4); without T3 a T1-only build could hang silently, so T3
-  is on the critical path before any product use.
+  is on the critical path before any product use. On desktop the
+  arming is withdrawn and L3's Tokio timer judges the deadline; on the
+  web no slice owns it yet (T3's row in section 13).
 - **Thread-local executor and parallel tests.** nextest runs each test
   in its own process (`.config/nextest.toml` sets its profile), so one
   executor per test; a test that uses `cargo test` instead shares a
