@@ -329,12 +329,17 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst cold run, 206 s (run 42714931127), plus about
-    # 9 s for the step added with the surface_gradient check: about 215 s,
-    # 2.5 x 215 s = 538 s, rounded up to 9 minutes. The uncached 733 s
+    # About 2.5x the worst measured run plus the live_timer step. The
+    # slowest of 41 passing window jobs from 2026-11-25 to 27 took 229 s
+    # (run 45915289797, a partial rust-cache miss: a restore-key fallback
+    # that left the first screenshot step at 80 s and surface_gradient's
+    # at 59 s, both mostly compiling; a full miss is not measured). The
+    # live_timer step took 4 s passing (run 45923046475) and 5 s failing
+    # at a deliberate break after its full 3.4 s check (run 45922653681).
+    # 2.5 x 234 s = 585 s, rounded up to 10 minutes. The uncached 733 s
     # apt install in run 39803145234 is excluded: it is the slow mirror
-    # the cache avoids. Cleared by Tom on 2026-11-10.
-    timeout-minutes: 9
+    # the cache avoids. Earlier limit cleared by Tom on 2026-11-10.
+    timeout-minutes: 10
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
@@ -372,6 +377,15 @@ jobs:
       # the loop is LoopClosed. Step text cleared by Tom 2026-11-10.
       - name: a gpu-surface in a window, idle, invalidated, animating and stopped
         run: xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
+      # The Live timer on the application thread (desktop-app-thread.md,
+      # L1b): handlers, toggles and ticks on that thread, no frame before
+      # Live goes on and at most one (a tick on its way, within a period)
+      # after it goes off, no turns then beyond the script's, no ticks
+      # after off, one frame per tick within 50 ms, 80 to 120 ms between
+      # ticks, and no frame that shows nothing new. Its own watchdog ends
+      # a hung run at 15 s.
+      - name: the Live timer on the application thread, in a window
+        run: xvfb-run -a cargo run -p vapors-app --example live_timer -- --check
       # The clipboard's image for Event::Paste: a PNG xclip sets reads
       # back as its pixels, text alone as no image, an unreachable
       # display as unreadable.
@@ -403,5 +417,5 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 10
         run: .github/scripts/report-timeout.sh
