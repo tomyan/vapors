@@ -76,7 +76,8 @@ xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
 xvfb-run -a cargo run -p vapors-app --example live_timer -- --check
                           the Live timer on the application thread (AppThread) in a
                           window: handlers and ticks on that thread, one frame per tick,
-                          none with Live off, nothing timed by winit; exits 1 naming
+                          none before Live goes on, at most one within a period after it
+                          goes off, nothing timed by winit; exits 1 naming
                           each rule broken (Space toggles Live without --check)
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures

@@ -566,7 +566,7 @@ checked against what it found.
 |---|---|---|---|---|
 | T1 | `vapors_signals`: `spawn`, `Task`, the arena, the ready list, `run_ready`, the wake hook; tasks on `OwnerNode`, dropped in `Released::finish`; `Deadline` as a type carried but not yet judged | The executor tests in section 12; a task's drop at disposal proven by a future that would have written a signal; the `!Send` of the task future asserted with a negative impl check, which design 02's threading oracle asks for the graph's types and is not built yet | none | C1 |
 | T2 | `App::tasks_woken`, `ElementsApp` installing the hook, `run_ready` on a wake, a frame only on change; `Phase::Tasks` time; `idle_fps` case | 0 frames in 3 s with a pending task natively; 1 frame per task that changes the tree; the wake-without-change case 0 frames | T1 | C1 |
-| T3 | Withdrawn as written (2026-11-22): winit deadlines do not time tasks. Replaced by L3 in `desktop-app-thread.md`: deadlines judged on the application thread with a Tokio timer for `earliest_deadline`, the refusal message, no `Platform::request_frame_at` | A paused Tokio clock: a task past its deadline refused naming its site and duration; the work-first rule proven by a task that completes exactly at the deadline | L1a of `desktop-app-thread.md` (built) | C1, W1 |
+| T3 | Withdrawn as written (2026-11-22): winit deadlines do not time tasks. Replaced on desktop by L3 in `desktop-app-thread.md`: deadlines judged on the application thread with a Tokio timer for `earliest_deadline`, the refusal message, no `Platform::request_frame_at`. On the web, T3's deadlines (a browser timer for `earliest_deadline`) are not withdrawn and have no slice yet; which slice owns them is open for Tom. Until then, every "T3" in this section's dependencies and critical path means L3 and that web work | A paused Tokio clock: a task past its deadline refused naming its site and duration; the work-first rule proven by a task that completes exactly at the deadline | L1a of `desktop-app-thread.md` (built) | C1, W1 |
 | W1 | The `task` demo on the web page and its page-contract case; `JsFuture` through the executor; hop latency recorded | `web-idle-frames.sh` 0 with a pending task; 1 frame per resolution; latency in `docs/web.md` | T2 | T3 |
 | C1 | Compiler: parse `{await}`, `{then}`, `{catch}`, `within=`; the AST node; refusals with positions; no emission yet (a refusal "await blocks are parsed and not yet built" at generation, so nothing half-works) | `wisp-check` cases for every refusal; the parse pinned by AST tests | none | T1 to T3 |
 | C2 | `vapors_dom::blocks::awaiting` and the emission; `expressions_in` for the block; the counter-style snapshot | The `RecordingDom` sequences in section 12; unmount while pending; the second-future rule | T3, C1 | R1 |
@@ -702,15 +702,18 @@ exercised until its row lands and its check runs.
 | T2 | `Platform::task_waker` posts `Wake::Tasks`, delivered to `App::tasks_woken`; `Platform::waker`'s wakes still ask for a frame without reaching the app. `ElementsApp::new` installs the executor's wake hook once per thread; a wake polls `run_ready` before any frame and asks for a frame only when the document changed or a task ended (completed or failed, its `Err` reported naming its spawn site). `Phase::Tasks` holds the polls' time since the last frame. `OneScene`, `Racer` and the app examples that wrap an `ElementsApp` forward `tasks_woken`. Proven: `crates/app/tests/elements_app_tasks.rs`, `crates/platform/src/waker_tests.rs`, the wrapper tests in `vapors-racer` and `vapors-one-scene`, each broken and restored | Desktop (Linux, Xvfb, llvmpipe): `idle_fps` `task-pending` 0 frames in 3 s, `task-quiet` 0 frames over 5 wakes, `task-change` 5 frames over 6 wakes (exits 1 with fewer than 2 wakes); `surface_gradient --check` unchanged. No web, Android or iOS run |
 | L1a | `vapors-app`'s `AppThread` (`desktop-app-thread.md`, AT2 (a) and AT4 (a)): a thread running a `current_thread` Tokio runtime with its timer, handlers and the `vapors_signals` executor driven on it, coalesced wakes, start and stop deadlines. Merged as 4086fda2 (#602); its start test tightened in e9102020 (#631). Proven: `crates/app/tests/app_thread*.rs` and `crates/app/src/app_thread_tests.rs`, each broken and restored | None: unit and integration tests with no window |
 | L1b | The example `live_timer`: the Live switch and a 100 ms Tokio interval on the application thread, the tick shown by the UI thread on a frame wake. Merged as bd79b510 (#604) | Desktop (Linux, Xvfb, llvmpipe): `live_timer --check`, locally, in the gate and in the hosted `window` job since 20255bd0 (#632). No web, Android or iOS run |
-| L2, L3 (replaces T3), W1, Mobile, C1, C2, S1 | Not started. L2 and L3 are in `desktop-app-thread.md`; W1 runs on the browser's main thread (the web decision above) | None |
+| F1, L2, L3 (replaces T3 on desktop), web task deadlines (no slice yet), W1, Mobile, C1, C2, S1 | Not started. F1, L2 and L3 are in `desktop-app-thread.md`; W1 runs on the browser's main thread (the web decision above) | None |
 
-Still open after L1: the dashboard's
-Live switch on the application thread (L2, which needs that plan's frame description, F1; frames are prepared, submitted and presented on the application thread by default, awaiting measurement), task deadlines on a Tokio
-timer (L3), the Chromium comparison, idle wake and frame counts on the
-web (W1, on the browser's main thread; a Web Worker only if
-measurements justify it), the Android and iOS contract runs after
-parity, and
-the "Test iOS host" workflow (a `.github` change for the lead).
+Still open after L1: the dashboard's Live switch on the application
+thread (L2, which needs that plan's frame description, F1; frames are
+prepared, submitted and presented on the application thread by
+default, awaiting measurement), task deadlines on a Tokio timer on
+desktop (L3), task deadlines on the web (a browser timer, as T3 had
+it; no slice owns them yet, open for Tom), the Chromium comparison,
+idle wake and frame counts on the web (W1, on the browser's main
+thread; a Web Worker only if measurements justify it), the Android and
+iOS contract runs after parity, and the "Test iOS host" workflow (a
+`.github` change for the lead).
 
 Docs handoff for T2 (merged as ba482514, #599): the mechanism is in
 section 3.3 and D8, and its proof and measured idle counts are in the

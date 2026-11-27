@@ -19,8 +19,8 @@ proposed one included, is an alternative for Tom to choose between.
 
 L1a and L1b are built on AT2 (a), the `vapors_signals` executor
 driven inside Tokio, and AT4 (a), the code in `vapors-app`. Tom chose
-both on 2026-11-27. The next decisions are AT6 and AT7, which F1
-needs, and AT1c, proposed to be dropped.
+both on 2026-11-27 (the lead's question 18). The next decisions are
+AT6 and AT7, which F1 needs, and AT1c, proposed to be dropped.
 
 ## 1. Decided (Tom, 2026-11-22)
 
@@ -44,11 +44,10 @@ needs, and AT1c, proposed to be dropped.
   available through an owned, transferable frame description, without
   a mandatory copy. No runtime toggle or second production backend is
   needed now (section 4).
-- This is a chosen default awaiting measurement, not a measured
-  advantage. It is judged after parity on sustained scrolling of a
-  million orders, p99 input-to-visible latency, and missed frames.
-  Live resize is a platform correctness check that must pass, not a
-  comparison.
+- This default is chosen and not yet measured. It is judged after
+  parity on sustained scrolling of a million orders, p99
+  input-to-visible latency, and missed frames. Live resize is a
+  platform correctness check that must pass in either placement.
 - The desktop application thread, its async tasks and timers come
   first, on a dedicated `current_thread` Tokio runtime (Tom,
   2026-11-22).
@@ -73,9 +72,10 @@ ended. The rule "a frame only when something visible changed" carries
 over unchanged.
 
 What changes is where the task wake goes. With an application thread,
-the executor's wake hook wakes that thread, not winit. The UI thread
-then only sees frame wakes, sent by the application thread when its
-poll changed something to show. `App::tasks_woken` and `Wake::Tasks`
+the executor's wake hook wakes that thread, as L1a's `AppThread` does.
+Once L2 moves the dashboard over, the UI thread would only see frame
+wakes, sent by the application thread when its poll changed something
+to show. `App::tasks_woken` and `Wake::Tasks`
 stay in use on the web, and on desktop until L2 moves the dashboard
 over. Whether they are removed on desktop after that is decided when
 L2 lands.
@@ -90,8 +90,8 @@ presents, and the UI thread runs winit, forwards input as owned
 messages and carries out the platform's main-thread requests (IME,
 clipboard, cursor, window operations, the a11y adapter). Handing the
 description to the winit thread to submit and present stays
-available, without a mandatory copy, because of the type boundary
-rather than a second implementation. Nothing toggles between the two
+available, without a mandatory copy, through the same type boundary
+and with no second implementation. Nothing toggles between the two
 at run time.
 
 **AT1 (answered: the default above, awaiting measurement).** It is
@@ -103,10 +103,10 @@ believed to require its event loop on the main thread on macOS (not
 checked against winit 0.30.13 here); the default keeps winit there.
 
 **AT1c. Only the graph and app state on the application thread.** An
-alternative to the direction above, kept so it is dropped explicitly
-rather than silently. It is not compatible with the default above,
-which prepares frames on the application thread. DOM operations would cross as owned messages
-(the `Dom` trait already has a recording implementation,
+alternative to the direction above, kept here so that dropping it is
+an explicit decision. It is not compatible with the default above,
+which prepares frames on the application thread. DOM operations would
+cross as owned messages (the `Dom` trait already has a recording implementation,
 `crates/dom/src/recording.rs`), and the UI thread would own the
 document, layout and paint. A handler's `preventDefault` and focus
 decisions would become asynchronous, against design 03. Proposed, not
@@ -114,18 +114,19 @@ decided: drop it, since frame preparation then sits on the UI thread
 and the frame description has no role.
 
 **AT6. What the frame description owns.** (a) The painted state for
-the frame, moved to the consumer. The application thread still needs
-one for layout and hit testing, so this means two `Painted` values,
-and the second is a real copy or a second build each frame. (b) Only what the consumer lacks: the batches and uploads
-that changed, plus ids for what the consumer already holds from
-earlier frames, with the painter's retained state (`KeptGpu`,
-`painter.rs:33`) keyed by those ids. Proposed, not decided: (b),
+the frame, moved to the consumer. The application thread would still
+need one for layout and hit testing, so this would mean two `Painted`
+values, the second a real copy or a second build each frame. (b) Only
+what the consumer lacks: the batches and uploads that changed, plus
+ids for what the consumer already holds from earlier frames, with the
+painter's retained state (`KeptGpu`, `painter.rs:33`) keyed by those
+ids. Proposed, not decided: (b),
 because the painter already keeps state between frames, so a frame
 that changes little carries little. To be measured against `--scaling`
 in F1.
 
 **AT7. Shared immutable paint data** (text layouts, images, icons;
-`slab.rs:71-73`). (a) `Arc` in the slabs: transferring one is a
+`slab.rs:71-73`). (a) `Arc` in the slabs: transferring one would be a
 reference count change, with no copy of the pixels or glyph runs. (b)
 Each value moved to the consumer the first time a frame names it, and
 named by id after that, so the application thread no longer holds it
@@ -189,13 +190,13 @@ today's code, read at ba482514 and checked again at d27f1843:
 | Hit-test cache | `Painted::hits`, `painted.rs` | `OnceCell<KeptHits>`, filled on the first hit test | Stays with layout and hit testing on the application thread; not in the description |
 | Pipelines, glyph atlas, retained GPU buffers | `ScenePainter`, `painter.rs:19-43` | GPU objects owned by whoever draws | Owned by the consumer. wgpu's `Device` and `Queue` are `Send + Sync` natively (`threading.md` 2.5) and not `Send` on the web |
 | Surface renderers | `SurfaceRenderer`, `crates/app/src/surface.rs:92` | App-authored code that encodes GPU work, sharing its scene through `Rc<RefCell<..>>` | App code, so it runs while the frame is prepared, on the application thread (section 1). When the UI thread presents, its encoded output travels in the description; whether that is a `wgpu::CommandBuffer` or owned uploads is settled in F1 |
-| The surface texture, acquired and presented | `crates/platform/src/surface_texture.rs:42` | Tied to wherever presentation runs; not `Send` on the web | Acquired and presented by the consumer |
+| The surface texture, acquired and presented | `crates/platform/src/surface_texture.rs:41` | Tied to wherever presentation runs; not `Send` on the web | Acquired and presented by the consumer |
 | The winit window | `crates/platform/src/handler.rs` | Winit's, on the UI thread | Stays on the UI thread in both placements |
 
 Platform constraints that stay: the web runs on the browser's main
-thread by default (section 1), and wgpu's types are not `Send` there, so the web
-consumes on the preparing thread. A compile-time check asserts that the
-description is `Send` on native targets only.
+thread by default (section 1), and wgpu's types are not `Send` there,
+so the web consumes on the preparing thread. F1 adds a compile-time
+check that the description is `Send`, on native targets only.
 
 ## 5. L1: desktop Live timer on the application thread
 
@@ -271,6 +272,8 @@ description records every mutation and review):
   and the executor's tasks live in a `thread_local!`. So `stop` and
   `start` learn that the thread ended from a second thread that joins
   it (`app_thread_exit.rs`).
+- After a handler's panic, `send` returns `Stopped`, and only `stop`
+  returns the panic's message (the Shape above says both name it).
 - `AppThread` dropped without `stop` is asked to stop and not waited
   for, declared RELAXED in `app_thread.rs`. That note says the guard
   retires with "the desktop runner (L1b)", and `START_DEADLINE`'s
@@ -316,8 +319,10 @@ polled through T2's path; the tick timed by `Next::WaitUntil`;
   counted; ticks and turns stand in for them.
 - The latency is taken over about 10 ticks per run, not 50, stamped
   after the frame is submitted and before present.
-- The mutation "the Live task polled through T2's path" was not run.
-  The others, and more, each made the check exit 1.
+- Mutations: "the handler on the UI thread" was run as the handler's
+  and the toggle's thread id recorded from a spawned thread. "The Live
+  task polled through T2's path" was not run. The plan's other three
+  were run, with more (#604 lists them), and each made the check exit 1.
 - Measured: 9 or 10 ticks per run, tick to frame at most 1.0 to
   5.3 ms locally (Xvfb, llvmpipe). The hosted `window` step took 4 s
   passing (#632).
