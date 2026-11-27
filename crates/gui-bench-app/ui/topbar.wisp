@@ -18,11 +18,7 @@ let toggle_menu = move || menu.update(|open| *open = !*open);
 .search-input::placeholder { color: #6b7280; }
 .export-anchor { position: absolute; right: 84px; top: 14px; width: 96px; height: 36px; }
 .export { width: 96px; height: 36px; box-sizing: border-box; margin: 0; padding: 0; border: none; border-radius: 8px; background-color: #4f46e5; color: #ffffff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-/* Drawn as the compare switch (filter_card.wisp): the checkbox's background and radius are the track, a decorative sibling the knob. */
-.live-switch { display: block; position: absolute; right: 264px; top: 21px; width: 40px; height: 22px; margin: 0; appearance: none; border-radius: 11px; background-color: #d1d5db; }
-.live-switch:checked { background-color: #4f46e5; }
-.live-knob { position: absolute; right: 284px; top: 23px; width: 18px; height: 18px; border-radius: 9px; background-color: #ffffff; box-shadow: 0 1px 3px #11182740; pointer-events: none; }
-.live-switch:checked + .live-knob { right: 266px; }
+.live-switch { display: block; position: absolute; right: 264px; top: 21px; width: 40px; height: 22px; margin: 0; accent-color: #4f46e5; --vapors-track-color: #d1d5db; }
 .spinner { position: absolute; right: 216px; top: 20px; width: 24px; height: 24px; }
 /* The turned square reaches 5 px past its box (24 * sqrt 2 = 34 wide): the svg is that much larger, centred on the box. */
 .spinner svg { display: block; margin: -5px; }
@@ -38,7 +34,7 @@ let toggle_menu = move || menu.update(|open| *open = !*open);
     <button class="export" onclick={toggle_menu}>{export}</button>
     <ExportMenu controls={controls} />
   </div>
-  <input class="live-switch" type="checkbox" switch="" bind:checked={live.on} aria-label={live_label} /><div class="live-knob" aria-hidden="true"></div>
+  <input class="live-switch" type="checkbox" switch="" bind:checked={live.on} aria-label={live_label} />
   {if live.on.get()}<div class="spinner"><svg viewBox="-5 -5 34 34" width="34" height="34" aria-hidden="true"><path d={live.spinner.get()} fill="#4f46e5" /></svg></div>{/if}
   <div class="avatar">{initials}</div>
 </div>

@@ -46,6 +46,11 @@ fn track(mounted: &Mounted) -> vapors_scene::Color {
     switch_quads(mounted)[0].background
 }
 
+fn rgb(color: u32) -> vapors_scene::Color {
+    let [_, r, g, b] = color.to_be_bytes();
+    vapors_scene::Color::from_rgba8(r, g, b, 255)
+}
+
 /// The left edge of the compare switch's knob.
 fn knob_x(mounted: &Mounted) -> f32 {
     switch_quads(mounted)[1].rect.left

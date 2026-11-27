@@ -120,7 +120,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     let mut reader = Reader::new(styles);
     let text = text_style(&mut reader);
     let decoration = decoration(&mut reader, context.scale, text.color);
-    let layout = box_style(&mut reader, context.flex_item, decoration.border);
+    let mut layout = box_style(&mut reader, context.flex_item, decoration.border);
     let inline = inline::is_inline(&mut reader, context.flex_item);
     if inline {
         inline::refuse_box_edges(&mut reader, &layout);
@@ -134,6 +134,9 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         super::surface::refuse(&mut reader, &layout, &decoration, inline);
     }
     let text_field = context.text_like_field && !context.number_field;
+    if text_field {
+        super::overflow::scroll_field_text(&mut layout);
+    }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration, text_field);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
     super::overflow::refuse_scrolling_field(&mut reader, &layout, context.number_field);

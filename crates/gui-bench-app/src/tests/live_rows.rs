@@ -3,7 +3,7 @@ use super::layout::{Row, assert_rows, at, row};
 use super::support::*;
 use crate::dashboard::*;
 
-/// The live switch's box (off), against `LIVE_*`; its knob is a sibling element, held by `switch_knob.rs`.
+/// The `switch` part's box (off), against `LIVE_*`: its knob is painted by the part, not an element.
 fn switch() -> Vec<Row> {
     vec![row(
         "live switch".into(),

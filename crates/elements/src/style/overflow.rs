@@ -99,6 +99,19 @@ pub(crate) fn refuse_viewport_scroll(reader: &mut Reader<'_>, style: &Style, to_
     }
 }
 
+/// Scrolls a text field's text on x where its author's overflow there
+/// is `hidden` or `clip`, as Chromium 157 does: its user-agent sheet
+/// gives every input `overflow: clip !important`, so the author's
+/// overflow never reaches the inner editor, which scrolls to the caret
+/// (`tests/field_overflow.rs`). `visible` is kept, not scrolled: a
+/// rounded field with visible overflow loads with no clip, and would be
+/// refused as a rounded clip if its padding fell short of its corners.
+pub(crate) fn scroll_field_text(style: &mut Style) {
+    if matches!(style.overflow.x, Overflow::Hidden | Overflow::Clip) {
+        style.overflow.x = Overflow::Scroll;
+    }
+}
+
 /// Refuses a number field that scrolls: its text is not scrolled to
 /// its caret (`scroll_reveal.rs` reveals a text field's).
 pub(crate) fn refuse_scrolling_field(reader: &mut Reader<'_>, style: &Style, number: bool) {
