@@ -115,27 +115,51 @@ pub(crate) fn nested_frames(
     clips: &crate::kept_clips::Clips,
     frames: &crate::frames::Frames,
 ) -> Vec<(usize, RoundedRefusal)> {
-    let crosses =
-        |&(slot, by): &(usize, usize)| {
-            let frame = clips.frame(slot);
-            let round = frames.get(frame).and_then(|at| at.rounded).unwrap_or_else(|| {
+    let crosses = |&(slot, by): &(usize, usize)| {
+        let frame = clips.frame(slot);
+        let region = frames.on_page(frame, nested_clip(clips, slot));
+        let round = frame_round(frames, (slot, by, frame));
+        let held = crate::clip_rounded::holds(round.rect, round.radii, region);
+        (!held).then_some((slot, RoundedRefusal::NestedFrame { rounded_by: by }))
+    };
+    clips.nested().iter().filter_map(crosses).collect()
+}
+
+/// The rounded clip of `frame`, which nested box `slot` is in, rounded by
+/// box `by`.
+///
+/// # Panics
+///
+/// When the frame has none: `Clips::nested` and the frames must agree.
+fn frame_round(
+    frames: &crate::frames::Frames,
+    (slot, by, frame): (usize, usize, usize),
+) -> crate::frames::FrameRound {
+    frames
+        .get(frame)
+        .and_then(|at| at.rounded)
+        .unwrap_or_else(|| {
             panic!(
                 "box slot {slot} is kept as a frame in a lane frame rounded by box slot {by} \
-                 (`Clips::nested`), and its frame {frame} has no rounded clip: the two must agree \
-                 (kept_clips_round.rs, frames_lane_prime.rs); reproduce with `cargo xtask test`"
+             (`Clips::nested`), and its frame {frame} has no rounded clip: the two must agree \
+             (kept_clips_round.rs, frames_lane_prime.rs); reproduce with `cargo xtask test`"
             )
-        });
-            let clip = clips.inner(slot).unwrap_or_else(|| {
-                panic!(
-                    "box slot {slot}, kept as a clipping frame in a rounded lane frame, gives no \
-                 clip (clip_refusals.rs `in_round_frame`); reproduce with `cargo xtask test`"
-                )
-            });
-            let region = frames.on_page(frame, clip.rect);
-            let held = crate::clip_rounded::holds(round.rect, round.radii, region);
-            (!held).then_some((slot, RoundedRefusal::NestedFrame { rounded_by: by }))
-        };
-    clips.nested().iter().filter_map(crosses).collect()
+        })
+}
+
+/// The clip nested box `slot` gives its content, in its frame.
+///
+/// # Panics
+///
+/// When it gives none: only a clipping frame is kept nested.
+fn nested_clip(clips: &crate::kept_clips::Clips, slot: usize) -> crate::layout::BoxRect {
+    let clip = clips.inner(slot).unwrap_or_else(|| {
+        panic!(
+            "box slot {slot}, kept as a clipping frame in a rounded lane frame, gives no clip \
+             (clip_refusals.rs `in_round_frame`); reproduce with `cargo xtask test`"
+        )
+    });
+    clip.rect
 }
 
 /// Whether box `slot` of `boxes` at `rects` is a text field whose content
@@ -212,7 +236,9 @@ impl Document {
             )
         };
         let mut element = describe(slot);
-        if let RoundedRefusal::NestedFrame { rounded_by } = why {
+        if let RoundedRefusal::NestedFrame { rounded_by }
+        | RoundedRefusal::UnclippedLane { rounded_by } = why
+        {
             element = format!(
                 "{element} (in the frame rounded by {})",
                 describe(rounded_by)

@@ -13,14 +13,10 @@ use crate::frames::PAGE;
 
 impl Clips {
     /// The box rounding frame `frame`, when it is a lane row whose
-    /// container's clip is rounded; its container is redone before it. A
-    /// row's clip does not take its container's, so a change of rounding
-    /// alone would not reach the boxes in it here: it comes from a restyle
-    /// of the rounding box, which builds its whole subtree again
-    /// (`restyle_pass.rs`, `layout/marks.rs`), each box then redone
-    /// (`tests/rounded_clip_frames.rs`, the card rounding after an
-    /// update). `Clips::first_differing` holds `nested` and `refused` to a
-    /// fresh paint's in a debug build.
+    /// container's clip is rounded; its container is redone before it, and
+    /// a change of it reaches the boxes below through `set_round`.
+    /// `Clips::first_differing` holds `nested` and `refused` to a fresh
+    /// paint's in a debug build.
     pub(super) fn round_frame(
         &self,
         frame: usize,
@@ -32,6 +28,25 @@ impl Clips {
         }
         let container = tree.parent(frame)?;
         self.inner[container].and_then(|clip: BoxClip| clip.rounded_by())
+    }
+
+    /// Sets the box rounding slot `slot`'s lane frame to `round`; whether
+    /// it changed. A row's clip does not take its container's, so a change
+    /// of rounding alone, as a layout change gives (the card growing
+    /// until its corners fit past its border), reaches the boxes in the
+    /// row through this, not through their clips.
+    ///
+    /// # Panics
+    ///
+    /// When `round` is past what a `u32` names.
+    pub(super) fn set_round(&mut self, slot: usize, round: Option<usize>) -> bool {
+        let named = round.map(|by| {
+            u32::try_from(by + 1)
+                .ok()
+                .and_then(std::num::NonZeroU32::new)
+                .unwrap_or_else(|| panic!("box slot {by} is past what a u32 names"))
+        });
+        std::mem::replace(&mut self.round[slot], named) != named
     }
 
     /// Notes `made`'s refusal, rounding and nesting for box `slot`; its

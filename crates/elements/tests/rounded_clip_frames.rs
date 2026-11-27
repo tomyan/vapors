@@ -156,7 +156,7 @@ fn a_scroller_moved_into_a_rounded_frames_corner_by_rows_above_it_is_refused() {
 }
 
 #[test]
-fn an_img_in_a_lane_row_is_refused_once_the_card_rounds_and_not_after() {
+fn an_img_in_a_lane_row_is_refused_once_the_card_rounds_and_accepted_once_square_again() {
     // Given: a square card's framed lane, an image in its first row,
     // updated
     let (mut doc, card, rows) = card_list(".square { border-radius: 0; } img { display: block; }");
@@ -179,5 +179,75 @@ fn an_img_in_a_lane_row_is_refused_once_the_card_rounds_and_not_after() {
     // Then: refused; and accepted again once it is square
     assert_refused(&refusals(&mut doc), "is an img under a rounded clip");
     doc.set_attribute(card, "class", "card square");
+    doc.update(at(1.0)).expect("updates");
+}
+
+/// A 100 px column holding a card with a 6 px border and 12 px corners,
+/// growing into what a 48 px sibling leaves of 60 px, the card holding a
+/// list of 40 rows, a `first` in the first row (an image, or a scroller
+/// clear of the corners); the sibling.
+fn growing_card(first: &str) -> (Document, NodeId) {
+    let mut doc = support::document();
+    let css = "body { margin: 0; } \
+        .wrap { display: flex; flex-direction: column; width: 100px; height: 60px; } \
+        .card { overflow: hidden; flex: 1 1 0; min-height: 0; border: 6px solid black; \
+            border-radius: 12px; } \
+        .sib { flex: none; height: 48px; } .sib.gone { height: 0; } \
+        .list { height: 400px; } .row { height: 10px; } img { display: block; } \
+        .pane { overflow: auto; height: 10px; margin: 0 20px; }";
+    doc.add_stylesheet("page.css", css).expect("parses");
+    let body = doc.body();
+    let wrap = element(&mut doc, body, "div", "wrap");
+    let card = element(&mut doc, wrap, "div", "card");
+    let sib = element(&mut doc, wrap, "div", "sib");
+    let list = element(&mut doc, card, "div", "list");
+    let rows: Vec<NodeId> = (0..40)
+        .map(|_| element(&mut doc, list, "div", "row"))
+        .collect();
+    if first == "img" {
+        let image = vapors_scene::RgbaImage {
+            size: vapors_scene::Size {
+                width: 2,
+                height: 2,
+            },
+            rgba: [0, 0, 0, 255].repeat(4),
+        };
+        doc.register_image("a.png", image).expect("registers");
+        let img = element(&mut doc, rows[0], "img", "");
+        doc.set_attribute(img, "src", "a.png");
+    } else {
+        element(&mut doc, rows[0], "div", "pane");
+    }
+    (doc, sib)
+}
+
+#[test]
+fn an_img_in_a_lane_row_is_refused_once_a_layout_change_rounds_the_card() {
+    // Given: the card 12 px tall, so its 12 px corners fit to 6 px, all
+    // border: its padding box square, the image accepted
+    let (mut doc, sib) = growing_card("img");
+    doc.update(at(1.0)).expect("updates");
+
+    // When: the sibling goes, the card grows to 60 px, nothing about it
+    // restyled, and its padding corners round
+    doc.set_attribute(sib, "class", "sib gone");
+
+    // Then
+    assert_refused(&refusals(&mut doc), "is an img under a rounded clip");
+}
+
+#[test]
+fn a_scroller_in_a_lane_row_is_let_go_once_a_layout_change_squares_the_card() {
+    // Given: the card 60 px tall, rounded, a scroller in its first row
+    // held clear of the corners, kept as a frame in a rounded one
+    let (mut doc, sib) = growing_card("pane");
+    doc.set_attribute(sib, "class", "sib gone");
+    doc.update(at(1.0)).expect("updates");
+
+    // When: the sibling comes back, the card shrinks to 12 px and its
+    // padding corners square, nothing about it restyled
+    doc.set_attribute(sib, "class", "sib");
+
+    // Then: updated, the scroller no longer kept as in a rounded frame
     doc.update(at(1.0)).expect("updates");
 }

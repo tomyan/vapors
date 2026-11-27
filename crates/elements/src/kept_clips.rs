@@ -54,6 +54,10 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
     own: SlotList<Option<BoxClip>>,
+    /// The box rounding each slot's lane frame, plus 1, when it is in one
+    /// (`kept_clips_round.rs` `round_frame`): a change of it reopens what
+    /// is below the slot, as a change of its clip does.
+    round: SlotList<Option<std::num::NonZeroU32>>,
     inner: SlotList<Option<BoxClip>>,
     frame: SlotList<usize>,
     /// The slots a rounded clip refuses, and why: refused after paint
@@ -73,6 +77,7 @@ impl Clips {
     pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
         vec![
             self.own.named("clips.own"),
+            self.round.named("clips.round"),
             self.inner.named("clips.inner"),
             self.frame.named("clips.frame"),
         ]
@@ -81,6 +86,7 @@ impl Clips {
     pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
             own: vec![None; tree.len()].into(),
+            round: vec![None; tree.len()].into(),
             inner: vec![None; tree.len()].into(),
             frame: vec![PAGE; tree.len()].into(),
             refused: FxHashMap::default(),
@@ -98,10 +104,12 @@ impl Clips {
     /// splice (`order_splice.rs`); the added slots are redone after.
     pub(crate) fn spliced(&mut self, len: usize, freed: impl Iterator<Item = usize>) {
         self.own.resize(len, None);
+        self.round.resize(len, None);
         self.inner.resize(len, None);
         self.frame.resize(len, PAGE);
         for slot in freed {
             (self.own[slot], self.inner[slot], self.frame[slot]) = (None, None, PAGE);
+            self.round[slot] = None;
             self.refused.remove(&slot);
             self.rounding.remove(&slot);
             self.nested.remove(&slot);
@@ -114,6 +122,7 @@ impl Clips {
     pub(crate) fn with(inner: Vec<Option<crate::layout::BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
             own: vec![None; inner.len()].into(),
+            round: vec![None; inner.len()].into(),
             inner: inner
                 .into_iter()
                 .map(|clip| clip.map(BoxClip::square))
@@ -231,11 +240,12 @@ impl Clips {
             None => PAGE,
         };
         let round = self.round_frame(frame, tree, inner);
+        let round_changed = self.set_round(slot, round);
         let new = self.note(slot, inner.inner(slot, own, round));
         self.own[slot] = own;
         let was = (self.inner[slot], self.frame[slot]);
         (self.inner[slot], self.frame[slot]) = (new, frame);
-        was != (new, frame)
+        was != (new, frame) || round_changed
     }
 
     /// The frame of the content of box `slot`: its own when it scrolls,
@@ -259,6 +269,7 @@ impl Clips {
                 clips.refused.get(&slot).copied(),
                 clips.rounding.get(&slot).copied(),
                 clips.nested.get(&slot).copied(),
+                clips.round.get(slot).copied().flatten(),
             )
         };
         // the refusals, roundings and nested frames of slots past both lists' ends too
@@ -272,7 +283,7 @@ impl Clips {
             .fold(self.own.len().max(other.own.len()), usize::max);
         let slot = (0..slots).find(|&slot| at(self, slot) != at(other, slot))?;
         Some(format!(
-            "clips at slot {slot}: kept (own, inner, frame, refused, rounding, nested) {:?}, fresh {:?}",
+            "clips at slot {slot}: kept (own, inner, frame, refused, rounding, nested, round) {:?}, fresh {:?}",
             at(self, slot),
             at(other, slot)
         ))

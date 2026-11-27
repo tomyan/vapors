@@ -181,9 +181,12 @@ held clear of its corners. That applies Tom's nesting rule to frames.
     (`Image`, `Surface`, `Svg`), which draw under the scissor.
   - A framed lane that does not clip in a rounded lane row is refused
     wherever it is (`UnclippedLane`, whose fix is to give it a clip).
-  - A rounded lane row's state comes with a restyle of the rounding box,
-    which builds its subtree again. `nested_frames` asserts each kept
-    frame's rounding is there, and the debug check compares `nested`.
+  - Each box keeps the box rounding its lane frame (`Clips::round`); a
+    change of it reopens what is below the box, so a layout change that
+    rounds or squares the container (the card growing until its corners
+    fit past its border) reaches the boxes in its rows, which their clips
+    alone would not. `nested_frames` asserts each kept frame's rounding
+    is there, and the debug check compares `nested` and `round`.
   - A scroller or clipping framed lane in a rounded lane row is checked
     after every paint against the frame's rounded clip on the page
     (`nested_frames`, one check per such frame), because rows move with
