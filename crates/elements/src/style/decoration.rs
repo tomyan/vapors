@@ -76,6 +76,25 @@ fn refuse_elliptical_inner_corners(reader: &mut Reader<'_>, decoration: &Decorat
     }
 }
 
+impl Decoration {
+    /// Whether some corner's radius is past its border, so the padding
+    /// box's corner is rounded too (CSS Backgrounds 3 §5.2; a corner's two
+    /// borders are one width, `refuse_elliptical_inner_corners`).
+    pub(crate) fn rounds_its_padding_box(&self) -> bool {
+        let [top, right, bottom, left] = self.border;
+        let corners = [
+            top.max(left),
+            top.max(right),
+            bottom.max(right),
+            bottom.max(left),
+        ];
+        self.radii
+            .iter()
+            .zip(corners)
+            .any(|(radius, border)| *radius > border)
+    }
+}
+
 /// The used width of the side whose border style and width are `side`.
 fn border_width(reader: &mut Reader<'_>, side: [PropertyId; 2], scale: f32) -> f32 {
     let drawn = reader.read(side[0], border_style, false);

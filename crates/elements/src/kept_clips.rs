@@ -272,12 +272,21 @@ impl Clips {
                 get(&clips.own),
                 get(&clips.inner),
                 clips.frame.get(slot).copied(),
+                clips.refused.get(&slot).copied(),
+                clips.rounding.get(&slot).copied(),
             )
         };
-        let slots = self.own.len().max(other.own.len());
+        // the refusals and roundings of slots past both lists' ends too
+        let past = self.refused.keys().chain(other.refused.keys());
+        let past = past
+            .chain(self.rounding.keys())
+            .chain(other.rounding.keys());
+        let slots = past
+            .map(|&slot| slot + 1)
+            .fold(self.own.len().max(other.own.len()), usize::max);
         let slot = (0..slots).find(|&slot| at(self, slot) != at(other, slot))?;
         Some(format!(
-            "clips at slot {slot}: kept (own, inner, frame) {:?}, fresh {:?}",
+            "clips at slot {slot}: kept (own, inner, frame, refused, rounding) {:?}, fresh {:?}",
             at(self, slot),
             at(other, slot)
         ))

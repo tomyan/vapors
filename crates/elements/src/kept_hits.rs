@@ -166,12 +166,12 @@ impl KeptHits {
     }
 }
 
-/// `kept`'s own hits, each with its frame.
 /// The box whose rounded clip `kept` is under, if any.
 fn rounded_by(kept: &KeptBox) -> Option<usize> {
     kept.from.clip.and_then(|clip| clip.rounded_by())
 }
 
+/// `kept`'s own hits, each with its frame.
 fn framed(kept: &KeptBox) -> impl Iterator<Item = FramedHit> + '_ {
     kept.own.hits.iter().map(|&hit| (kept.from.frame, hit))
 }

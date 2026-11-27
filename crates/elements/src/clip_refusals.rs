@@ -15,6 +15,10 @@ pub(crate) enum RoundedRefusal {
     /// Its clip and the clip it is under overlap without either holding
     /// the other, so neither is the clip (Tom, 2026-11-27).
     Overlap,
+    /// A text field whose content box, where its text and placeholder
+    /// paint, overlaps a rounded clip it paints under without being held
+    /// by it: its text would be cut square.
+    FieldText,
     /// An `img` under a rounded clip: an image draws under the scissor,
     /// which cuts square, until F3.1b moves images onto the clip table.
     Image,
@@ -29,19 +33,20 @@ pub(crate) enum RoundedRefusal {
 
 /// What a rounded clip refuses of box `layout_box`, under `own`, giving
 /// its content `inner`: `overlaps` when the two overlap as they must not
-/// (`clip_rounded.rs`), `frames` when its content is a frame of its own.
+/// (`clip_rounded.rs`), `field_text` when it is a text field whose
+/// content box overlaps a rounded clip so, `frames` when its content is
+/// a frame of its own.
 pub(crate) fn of(
     layout_box: &LayoutBox,
     (own, inner): (Option<BoxClip>, Option<BoxClip>),
-    overlaps: bool,
+    (overlaps, field_text): (bool, bool),
     frames: bool,
 ) -> Option<RoundedRefusal> {
     let rounded = |clip: Option<BoxClip>| clip.is_some_and(|clip| clip.rounded_by().is_some());
-    // A text field whose own clip is rounded by a box above it holds that
-    // box whole, so its text and placeholder, in its content box, could
-    // cross the corners: refused as an overlap.
-    if overlaps || (layout_box.text_field && rounded(inner)) {
+    if overlaps {
         Some(RoundedRefusal::Overlap)
+    } else if field_text {
+        Some(RoundedRefusal::FieldText)
     } else if rounded(own) && layout_box.image.is_some() {
         Some(RoundedRefusal::Image)
     } else if rounded(own) && layout_box.surface.is_some() {
@@ -71,9 +76,13 @@ impl Document {
         let first = order
             .iter()
             .find_map(|&slot| refused.iter().find(|(at, _)| *at == slot));
-        let Some(&(slot, why)) = first else {
-            return Ok(());
-        };
+        let &(slot, why) = first.unwrap_or_else(|| {
+            panic!(
+                "no box a rounded clip refuses is in the tree's order ({refused:?}): `Clips` \
+                 keeps refusals only for boxes placed this update (kept_clips.rs); reproduce \
+                 with `cargo xtask test`"
+            )
+        });
         let element = placed.slots.key(slot).map_or_else(
             || "a box with no element".to_owned(),
             |key| crate::check::describe(&self.arena, key.node()),
@@ -90,6 +99,11 @@ fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
              border-radius) overlap without either holding the other, which needs clip chains",
             "keep the clipping box inside the rounded box's padding box clear of its corners, or \
              let it hold the rounded box whole",
+        ),
+        RoundedRefusal::FieldText => (
+            "is a text field and its text crosses the corner of a rounded clip it is under \
+             (overflow: hidden or clip with a border-radius), which would cut it square",
+            "move the field clear of the rounded box's corners, or give it padding past them",
         ),
         RoundedRefusal::Image => (
             "is an img under a rounded clip, and an image draws under a square scissor until \

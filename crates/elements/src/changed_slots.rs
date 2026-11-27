@@ -35,10 +35,12 @@ pub(crate) struct ChangedSlots {
     /// from when it was last settled (exact): their thumbs move, even
     /// when no slot is built or moved and no offset as applied moved.
     pub(crate) scroll_states: Vec<usize>,
-    /// A lane's children became frames of their own or stopped being
-    /// (`Placed::reframed`): scroll containers in them are in other
-    /// frames, so the scroll frames are made afresh (`paint_frames.rs`).
-    pub(crate) reframed: bool,
+    /// The lanes whose children became frames of their own or stopped
+    /// being (`Placed::reframed`): scroll containers in them are in other
+    /// frames, so the scroll frames are made afresh (`paint_frames.rs`),
+    /// and their clips are redone, as a framed lane under a rounded clip
+    /// is refused (`kept_order.rs` `reclipped`, `clip_refusals.rs`).
+    pub(crate) reframed: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are
     /// spliced (`order_splice.rs`) or walked again (`kept_order.rs`).
@@ -68,7 +70,7 @@ impl ChangedSlots {
             offsets_moved: Vec::new(),
             started: Vec::new(),
             scroll_states: Vec::new(),
-            reframed: false,
+            reframed: Vec::new(),
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
             to_chain: rebuilt.to_chain,
@@ -89,7 +91,7 @@ impl ChangedSlots {
             offsets_moved: Vec::new(),
             started: Vec::new(),
             scroll_states: Vec::new(),
-            reframed: false,
+            reframed: Vec::new(),
             shape_changed: true,
             reshaped: Vec::new(),
             stackings: Patched {

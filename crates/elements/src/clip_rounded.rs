@@ -53,10 +53,11 @@ pub(crate) fn meet(
         return Met::Clip(candidate);
     };
     let radii = |clip: BoxClip| clip.rounded_by().map_or([0.0; 4], radii_of);
-    if holds(own.rect, radii(own), candidate.rect) {
+    let shape = |clip: BoxClip| (clip.rect, radii(clip));
+    if holds_shape(shape(own), shape(candidate)) {
         return Met::Clip(candidate);
     }
-    if holds(candidate.rect, radii(candidate), own.rect) {
+    if holds_shape(shape(candidate), shape(own)) {
         return Met::Clip(own);
     }
     let cut = BoxClip::square(within(Some(own.rect), candidate.rect));
@@ -73,6 +74,19 @@ pub(crate) fn meet(
 /// it is nearest. The rounded shape is convex, so its four corners in
 /// it put the whole rectangle in it.
 pub(crate) fn holds(outer: BoxRect, radii: [f32; 4], inner: BoxRect) -> bool {
+    holds_shape((outer, radii), (inner, [0.0; 4]))
+}
+
+/// Whether the rectangle `inner` rounded by its radii lies within
+/// `outer` rounded by its: inside its rectangle, and at each corner
+/// either the inner rectangle's corner inside the outer curve, or the
+/// inner curve inside it (its centre's distance from the outer curve's
+/// centre plus its radius at most the outer radius). Past a curve's
+/// tangent points an inner edge runs away from the corner, so stays in.
+fn holds_shape(
+    (outer, radii): (BoxRect, [f32; 4]),
+    (inner, inner_radii): (BoxRect, [f32; 4]),
+) -> bool {
     let (o, i) = (rect(outer), rect(inner));
     let inside = o.left <= i.left && o.top <= i.top && i.right <= o.right && i.bottom <= o.bottom;
     let points = [
@@ -81,7 +95,11 @@ pub(crate) fn holds(outer: BoxRect, radii: [f32; 4], inner: BoxRect) -> bool {
         (i.right, i.bottom),
         (i.left, i.bottom),
     ];
-    inside && (0..4).all(|corner| in_corner(o, radii[corner], corner, points[corner]))
+    let held = |corner: usize| {
+        in_corner(o, radii[corner], corner, points[corner])
+            || curve_in_curve((o, radii[corner]), (i, inner_radii[corner]), corner)
+    };
+    inside && (0..4).all(held)
 }
 
 /// Whether `point` is inside `rect`'s corner `corner` rounded by
@@ -90,16 +108,7 @@ fn in_corner(rect: Rect, radius: f32, corner: usize, (x, y): (f32, f32)) -> bool
     if radius <= 0.0 {
         return true;
     }
-    let cx = if corner == 0 || corner == 3 {
-        rect.left + radius
-    } else {
-        rect.right - radius
-    };
-    let cy = if corner < 2 {
-        rect.top + radius
-    } else {
-        rect.bottom - radius
-    };
+    let (cx, cy) = centre(rect, radius, corner);
     let beyond_x = if corner == 0 || corner == 3 {
         x < cx
     } else {
@@ -107,6 +116,32 @@ fn in_corner(rect: Rect, radius: f32, corner: usize, (x, y): (f32, f32)) -> bool
     };
     let beyond_y = if corner < 2 { y < cy } else { y > cy };
     !(beyond_x && beyond_y) || (x - cx).hypot(y - cy) <= radius
+}
+
+/// Whether `inner`'s curve at `corner`, radius `r`, lies inside
+/// `outer`'s, radius `big`.
+fn curve_in_curve((outer, big): (Rect, f32), (inner, r): (Rect, f32), corner: usize) -> bool {
+    if r <= 0.0 || big <= 0.0 {
+        return false;
+    }
+    let (ox, oy) = centre(outer, big, corner);
+    let (ix, iy) = centre(inner, r, corner);
+    (ix - ox).hypot(iy - oy) + r <= big
+}
+
+/// The centre of `rect`'s curve at `corner`, radius `radius`.
+fn centre(rect: Rect, radius: f32, corner: usize) -> (f32, f32) {
+    let x = if corner == 0 || corner == 3 {
+        rect.left + radius
+    } else {
+        rect.right - radius
+    };
+    let y = if corner < 2 {
+        rect.top + radius
+    } else {
+        rect.bottom - radius
+    };
+    (x, y)
 }
 
 fn rect(at: BoxRect) -> Rect {

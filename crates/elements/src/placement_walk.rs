@@ -64,7 +64,7 @@ impl<'a, 'b> Walk<'a, 'b> {
                 chained: 0,
                 ranges_measured: 0,
                 unframed: Vec::new(),
-                reframed: false,
+                reframed: Vec::new(),
             },
         }
     }
@@ -112,7 +112,9 @@ impl<'a, 'b> Walk<'a, 'b> {
         self.put(slot, origin, mark);
         let inner = content_origin(self.kept.rects[slot]);
         let reframed = self.frame_lane(slot, inner);
-        self.placed.reframed |= reframed;
+        if reframed {
+            self.placed.reframed.push(slot);
+        }
         let rebuilt = mark == Mark::Rebuilt && !self.framed_in_place(slot, inner, before);
         let moved = rebuilt || reframed || self.children_moved(slot, inner, before);
         self.visit_placed_in(slot, inner, moved);

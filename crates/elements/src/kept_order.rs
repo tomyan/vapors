@@ -9,6 +9,7 @@
 //! (`kept_order_check.rs`).
 
 use crate::changed_slots::ChangedSlots;
+use crate::clip::BoxClip;
 use crate::clip_tree::ClipTree;
 use crate::kept_clips::{ClipInputs, Clips};
 use crate::layout::{BoxRect, LayoutBox};
@@ -129,7 +130,8 @@ impl KeptOrder {
         input: &PaintInput<'_>,
         changed: &ChangedSlots,
     ) -> Self {
-        let slots = changed.rebuilt.iter().chain(&changed.moved).copied();
+        let slots = changed.rebuilt.iter().chain(&changed.moved);
+        let slots = slots.chain(&changed.reframed).copied();
         self.redone = self.clips.redo_under(
             slots.collect(),
             &self.tree,
@@ -157,6 +159,30 @@ struct BoxClips<'a, 'b> {
     input: &'a PaintInput<'b>,
 }
 
+impl BoxClips<'_, '_> {
+    /// Whether box `slot` is a text field whose content box, where its
+    /// text and placeholder paint, overlaps the rounded clip it is under
+    /// or gives its content without being held by it (`clip_rounded.rs`).
+    fn field_text_overlaps(&self, slot: usize, clips: (Option<BoxClip>, Option<BoxClip>)) -> bool {
+        if !self.boxes[slot].text_field {
+            return false;
+        }
+        let content = BoxClip::square(crate::clip::content_box(
+            &self.boxes[slot],
+            self.rects[slot],
+        ));
+        let radii_of = |at| crate::clip::radii(self.boxes, self.rects, at, self.input);
+        let crosses = |clip: Option<BoxClip>| {
+            clip.filter(|clip| clip.rounded_by().is_some())
+                .is_some_and(|clip| {
+                    let met = crate::clip_rounded::meet(Some(clip), content, &radii_of);
+                    matches!(met, crate::clip_rounded::Met::Overlap(_))
+                })
+        };
+        crosses(clips.0) || crosses(clips.1)
+    }
+}
+
 impl ClipInputs for BoxClips<'_, '_> {
     fn inner(
         &self,
@@ -167,7 +193,9 @@ impl ClipInputs for BoxClips<'_, '_> {
         let framing = self.input.placement.framing.get(&slot);
         let frames = self.scrolls(slot) || matches!(framing, Some(Ok(())));
         let clips = (own, inner.clip);
-        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, inner.overlaps, frames);
+        let field_text = self.field_text_overlaps(slot, clips);
+        let overlaps = (inner.overlaps, field_text);
+        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, overlaps, frames);
         crate::kept_clips::InnerClip {
             clip: inner.clip,
             refused,

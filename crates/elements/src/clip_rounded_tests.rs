@@ -211,3 +211,34 @@ fn two_square_clips_meet_at_their_intersection() {
         Met::Clip(BoxClip::square(rect(50.0, 10.0, 50.0, 20.0)))
     );
 }
+
+/// A box at the card's top, filling its width, slot 5, its corners
+/// rounded by `radius`.
+fn media(radius: f32) -> (BoxClip, impl Fn(usize) -> [f32; 4]) {
+    let radii = move |slot| if slot == CARD { [12.0; 4] } else { [radius; 4] };
+    (BoxClip::rounded(rect(0.0, 0.0, 100.0, 30.0), 5), radii)
+}
+
+#[test]
+fn a_rounded_box_whose_corners_follow_a_rounded_clip_keeps_its_own() {
+    // Given: the same 12px corners, so its curves are the card's
+    let (media, radii) = media(12.0);
+
+    // When
+    let met = meet(Some(card()), media, &radii);
+
+    // Then
+    assert_eq!(met, Met::Clip(media));
+}
+
+#[test]
+fn a_rounded_box_whose_corners_poke_past_a_rounded_clip_is_an_overlap() {
+    // Given: 4px corners, outside the card's 12px curve
+    let (media, radii) = media(4.0);
+
+    // When
+    let met = meet(Some(card()), media, &radii);
+
+    // Then
+    assert!(matches!(met, Met::Overlap(_)), "{met:?}");
+}

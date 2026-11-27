@@ -27,7 +27,7 @@ pub(crate) fn updated(
 ) -> bool {
     // a lane that started or stopped framing moved the scroll containers
     // in its rows to other frames, which a kept update cannot follow
-    let reshaped = !kept || order.walks.reshaped() || changed.reframed;
+    let reshaped = !kept || order.walks.reshaped() || !changed.reframed.is_empty();
     let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
     // Relaxed in a release build: the scan runs only when the frames are
     // made afresh. The scroll containers change only when paint order is
