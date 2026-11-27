@@ -66,6 +66,11 @@ impl Frames {
         self.get(frame).map(|at| self.hit_at(at, rect))
     }
 
+    /// `rect` in frame `frame` on the page, uncut.
+    pub(crate) fn on_page(&self, frame: usize, rect: BoxRect) -> BoxRect {
+        self.css_rect(self.at(frame), rect)
+    }
+
     fn hit_at(&self, at: FrameAt, rect: BoxRect) -> BoxRect {
         crate::clip::within(at.clip, self.css_rect(at, rect))
     }

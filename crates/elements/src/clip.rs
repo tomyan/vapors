@@ -77,22 +77,49 @@ impl BoxClip {
 /// overlap as a rounded clip must not (`clip_rounded.rs`): when it cuts
 /// off its content, its padding box, rounded by its own padding radii
 /// ([`radii`]), or a scrolling text field's narrowed to its content box
-/// on x ([`content_clip`]), met with `own`.
+/// on x ([`content_clip`]), met with `own`; and its own rounded padding
+/// box, when it has one.
 pub(crate) fn inner(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     index: usize,
     own: Option<BoxClip>,
     input: &PaintInput<'_>,
-) -> (Option<BoxClip>, bool) {
+) -> Inner {
     if !clipping(boxes, index, input) {
-        return (own, false);
+        return Inner {
+            clip: own,
+            overlaps: false,
+            rounding: None,
+        };
     }
     let radii_of = |slot| radii(boxes, rects, slot, input);
-    match crate::clip_rounded::meet(own, cut_to(boxes, rects, index, input), &radii_of) {
-        Met::Clip(clip) => (Some(clip), false),
-        Met::Overlap(clip) => (Some(clip), true),
+    let candidate = cut_to(boxes, rects, index, input);
+    let rounding = candidate
+        .rounded_by()
+        .map(|slot| (candidate.rect, radii_of(slot)));
+    let (clip, overlaps) = match crate::clip_rounded::meet(own, candidate, &radii_of) {
+        Met::Clip(clip) => (clip, false),
+        Met::Overlap(clip) => (clip, true),
+    };
+    Inner {
+        clip: Some(clip),
+        overlaps,
+        rounding,
     }
+}
+
+/// What [`inner`] works out for a box.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Inner {
+    /// The clip it gives its content.
+    pub(crate) clip: Option<BoxClip>,
+    /// Whether that clip and the clip it is under overlap as a rounded
+    /// clip must not.
+    pub(crate) overlaps: bool,
+    /// Its own padding box and padding radii, CSS pixels, when it rounds
+    /// its content: hit testing cuts by them (`kept_hits_query.rs`).
+    pub(crate) rounding: Option<(BoxRect, [f32; 4])>,
 }
 
 /// What clipping box `index` cuts its content to: its content clip,

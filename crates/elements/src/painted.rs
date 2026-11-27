@@ -261,7 +261,8 @@ impl Painted {
     /// scrolling starts here, at the box under the pointer.
     #[must_use]
     pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
-        self.kept_hits().hit([x, y], &self.frames)
+        let rounding = |slot| self.order.clips.rounding(slot);
+        self.kept_hits().hit([x, y], &self.frames, &rounding)
     }
 
     /// The kept hits, gathered from the scene view when none are kept.

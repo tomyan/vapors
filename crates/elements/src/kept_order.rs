@@ -162,15 +162,17 @@ impl ClipInputs for BoxClips<'_, '_> {
         &self,
         slot: usize,
         own: Option<crate::clip::BoxClip>,
-    ) -> (
-        Option<crate::clip::BoxClip>,
-        Option<crate::clip_refusals::RoundedRefusal>,
-    ) {
-        let (inner, overlaps) = crate::clip::inner(self.boxes, self.rects, slot, own, self.input);
+    ) -> crate::kept_clips::InnerClip {
+        let inner = crate::clip::inner(self.boxes, self.rects, slot, own, self.input);
         let framing = self.input.placement.framing.get(&slot);
         let frames = self.scrolls(slot) || matches!(framing, Some(Ok(())));
-        let refused = crate::clip_refusals::of(&self.boxes[slot], (own, inner), overlaps, frames);
-        (inner, refused)
+        let clips = (own, inner.clip);
+        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, inner.overlaps, frames);
+        crate::kept_clips::InnerClip {
+            clip: inner.clip,
+            refused,
+            rounding: inner.rounding,
+        }
     }
 
     fn scrolls(&self, slot: usize) -> bool {

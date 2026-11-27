@@ -40,6 +40,10 @@ pub(crate) struct KeptHits {
     by_frame: FxHashMap<usize, Vec<(Label, FramedHit)>>,
     /// The frame each label's hits are in.
     frames: FxHashMap<Label, usize>,
+    /// The box whose rounded clip each label's part is under, for the
+    /// labels under one: a hit there is cut by that box's rounded padding
+    /// box (`kept_hits_query.rs`).
+    rounded: FxHashMap<Label, usize>,
 }
 
 impl KeptHits {
@@ -56,7 +60,7 @@ impl KeptHits {
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
         let mut hits = Self::default();
         for (label, kept) in scene.labelled_parts() {
-            hits.put(label, framed(kept));
+            hits.put(label, framed(kept), rounded_by(kept));
         }
         hits
     }
@@ -80,7 +84,10 @@ impl KeptHits {
         let differs = |label: &Label| self.frames.get(label) != other.frames.get(label);
         let first = labels.into_iter().find(differs);
         Some(first.map_or_else(
-            || "kept hits: the same labels and frames, other hits under them".to_owned(),
+            || {
+                "kept hits: the same labels and frames, other hits or rounded clips under them"
+                    .to_owned()
+            },
             |label| {
                 let (kept, fresh) = (self.frames.get(&label), other.frames.get(&label));
                 format!("kept hits' label {label}: in frame {kept:?}, gathered afresh {fresh:?}")
@@ -88,8 +95,17 @@ impl KeptHits {
         ))
     }
 
-    /// Puts `hits`, of the box step at `label`, in their frame's list.
-    fn put(&mut self, label: Label, hits: impl Iterator<Item = FramedHit>) {
+    /// Puts `hits`, of the box step at `label`, in their frame's list,
+    /// under the rounded clip of box `rounded_by`, if any.
+    fn put(
+        &mut self,
+        label: Label,
+        hits: impl Iterator<Item = FramedHit>,
+        rounded_by: Option<usize>,
+    ) {
+        if let Some(slot) = rounded_by {
+            self.rounded.insert(label, slot);
+        }
         for hit in hits {
             let list = self.by_frame.entry(hit.0).or_default();
             crate::slot_list::reserve(list, list.len() + 1);
@@ -101,6 +117,7 @@ impl KeptHits {
 
     /// Takes out the hits of the box step at `label`; them.
     pub(super) fn take(&mut self, label: Label) -> Vec<FramedHit> {
+        self.rounded.remove(&label);
         let Some(frame) = self.frames.remove(&label) else {
             return Vec::new();
         };
@@ -135,7 +152,7 @@ impl KeptHits {
             let kept = boxes.get(slot).and_then(Option::as_ref);
             let hits: Vec<FramedHit> = kept.into_iter().flat_map(framed).collect();
             changed.extend_from_slice(&hits);
-            self.put(label, hits.into_iter());
+            self.put(label, hits.into_iter(), kept.and_then(rounded_by));
         }
         changed
     }
@@ -150,6 +167,11 @@ impl KeptHits {
 }
 
 /// `kept`'s own hits, each with its frame.
+/// The box whose rounded clip `kept` is under, if any.
+fn rounded_by(kept: &KeptBox) -> Option<usize> {
+    kept.from.clip.and_then(|clip| clip.rounded_by())
+}
+
 fn framed(kept: &KeptBox) -> impl Iterator<Item = FramedHit> + '_ {
     kept.own.hits.iter().map(|&hit| (kept.from.frame, hit))
 }

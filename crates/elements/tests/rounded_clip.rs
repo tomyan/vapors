@@ -194,3 +194,18 @@ fn a_radius_change_alone_paints_what_the_box_clips_deeper_down_again() {
     let want = Clip::rounded(Rect::new(1.0, 1.0, 101.0, 61.0), [20.0; 4]);
     assert_eq!(fill_clip(&doc), Some(want));
 }
+
+#[test]
+fn a_point_outside_a_rounded_corner_misses_what_the_box_clips() {
+    // Given
+    let (mut doc, card) = card("", "");
+    doc.update(at(1.0)).expect("updates");
+    let painted = doc.painted().expect("painted");
+    let fill = painted.hit([50.0, 30.0]).expect("the fill is hit");
+
+    // Then: inside the padding box's rectangle, outside its 11px curve,
+    // the card is hit, not the fill; just inside the curve, the fill
+    assert_eq!(painted.hit([2.0, 2.0]), Some(card));
+    assert_eq!(painted.hit([5.0, 5.0]), Some(fill));
+    assert_ne!(fill, card);
+}

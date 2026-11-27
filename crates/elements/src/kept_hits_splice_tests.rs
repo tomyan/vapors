@@ -21,7 +21,11 @@ fn one_hit_under(label: u64) -> KeptHits {
         height: 10.0,
     };
     let mut hits = KeptHits::default();
-    hits.put(label, std::iter::once((0, (vapors_dom::NodeId(1), rect))));
+    hits.put(
+        label,
+        std::iter::once((0, (vapors_dom::NodeId(1), rect))),
+        None,
+    );
     hits
 }
 
