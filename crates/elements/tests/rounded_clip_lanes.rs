@@ -1,51 +1,61 @@
 //! Lanes and rounded clips (flat-scene F3.2b, `docs/plans/frame-clips.md`
-//! slice 2): a lane whose own box rounds its clip declines to frame its
-//! rows (until slice 3); a framed lane a rounded clip from above reaches
-//! is cut by it, also when it comes to be framed, its rows hit by the
+//! slices 2 and 3): a lane whose own box rounds its clip frames its rows,
+//! an insert costing what it does in a square one; a framed lane a
+//! rounded clip from above reaches is cut by it, also when it comes to be framed, its rows hit by the
 //! curve. What such a frame refuses is in `rounded_clip_frames.rs`.
 
 use crate::support;
 
-use support::element;
 use support::lane_page::header_list;
 use support::narrow_list::ROWS;
 use support::rounded_page::{at, card_list};
+use support::{element, refusals};
 use vapors_dom::{Dom, NodeId};
-use vapors_elements::{Document, LaneDecline};
+use vapors_elements::Document;
 
-#[test]
-fn a_lane_whose_own_box_clips_to_rounded_corners_is_not_framed() {
-    // Given: 100 rows in a list that clips them to rounded corners
-    let css = format!(
-        "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} .list {{ overflow: hidden; border-radius: 8px; }}"
-    );
-    let page = header_list(100, &css, at(1.0));
-
-    // When
-    let counts = page.edited(at(1.0), |page| _ = page.insert_at(50));
-
-    // Then
-    assert_eq!(
-        counts.lane_unframed,
-        Some(LaneDecline::LaneFrameRoundedClip),
-        "{counts:?}"
-    );
+/// The counts of one row put in at the middle of `count` rows in a list
+/// styled `list`.
+fn insert_counts(count: usize, list: &str) -> vapors_elements::UpdateCounts {
+    let css = format!("body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} .list {{ {list} }}");
+    let page = header_list(count, &css, at(1.0));
+    page.edited(at(1.0), |page| _ = page.insert_at(count / 2))
 }
 
 #[test]
-fn a_lane_whose_border_is_wider_than_its_radius_is_framed() {
-    // Given: the list's 6px border leaves its 4px corners square inside
+fn a_row_put_in_a_rounded_list_costs_what_it_does_in_a_square_one() {
+    for count in [100, 1000] {
+        // When
+        let square = insert_counts(count, "overflow: hidden;");
+        let rounded = insert_counts(count, "overflow: hidden; border-radius: 8px;");
+
+        // Then: framed, the same boxes moved and painted (F3.2c measured
+        // 306 and 3006 painted while a rounded list declined to frame)
+        assert_eq!(rounded.lanes_framed, 1, "{rounded:?}");
+        let costs = |c: &vapors_elements::UpdateCounts| (c.boxes_moved, c.boxes_painted);
+        assert_eq!(costs(&rounded), costs(&square), "{count} rows");
+    }
+}
+
+#[test]
+fn a_rounded_list_past_the_framing_depth_updates() {
+    // Given: 4000 rows of 20 px, 80,000 px, past the 65,536 px at which a
+    // lane frames whatever its children (refused before slice 2, while
+    // the list declined to frame and its rows' cells framed for depth)
     let css = format!(
         "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
-         .list {{ overflow: hidden; border: 6px solid black; border-radius: 4px; }}"
+         .list {{ overflow: hidden; border-radius: 8px; }}"
     );
-    let page = header_list(100, &css, at(1.0));
 
-    // When
-    let counts = page.edited(at(1.0), |page| _ = page.insert_at(50));
+    // When: laid out (an update the page makes, `header_list`)
+    let page = header_list(4000, &css, at(1.0));
 
-    // Then
-    assert_eq!(counts.lanes_unframed, 0, "{counts:?}");
+    // Then: updated (`header_list` expects it) with its rows framed
+    let doc = page.doc.borrow();
+    assert!(
+        doc.update_counts().lanes_framed == 1,
+        "{:?}",
+        doc.update_counts()
+    );
 }
 
 /// Asserts a point outside the card's top-left curve, inside its
@@ -101,4 +111,76 @@ fn a_clipped_box_in_a_rounded_lane_row_counts_the_rounded_link() {
     // entry under its square one, two links, so three, as the painter's
     // chain (docs/plans/frame-clips.md, slice 2)
     assert_eq!(painted.longest_clip_chain(), 3);
+}
+
+/// A list of 40 rows whose own box clips to 8 px corners when its class
+/// holds `round`; the page.
+fn self_rounded_list() -> support::lane_page::HeaderList {
+    let css = format!(
+        "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
+         .list {{ overflow: hidden; }} .round {{ border-radius: 8px; }}"
+    );
+    let page = header_list(40, &css, at(1.0));
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.list, "class", "list round");
+    page.doc.borrow_mut().update(at(1.0)).expect("updates");
+    page
+}
+
+#[test]
+fn a_list_that_rounds_itself_frames_its_rows_cut_by_its_curve() {
+    // Given: the list at y 10, its 8 px top-left curve about (8, 18),
+    // laid out in one update
+    let css = format!(
+        "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
+         .list {{ overflow: hidden; border-radius: 8px; }}"
+    );
+    let page = header_list(40, &css, at(1.0));
+    let doc = page.doc.borrow();
+
+    // Then: framed; outside the curve the list is hit, inside it the first
+    // row (its first cell, there)
+    assert_eq!(doc.update_counts().lanes_framed, 1, "the rows are framed");
+    let painted = doc.painted().expect("painted");
+    assert_eq!(
+        painted.hit([1.0, 11.0]),
+        Some(page.list),
+        "outside the curve"
+    );
+    let cell = doc.children(page.rows[0])[0];
+    assert_eq!(painted.hit([5.0, 15.0]), Some(cell), "inside the curve");
+}
+
+#[test]
+fn an_img_in_a_list_that_rounds_itself_follows_its_radius() {
+    // Given: the rounded list, an image in its first row
+    let page = self_rounded_list();
+    let mut doc = page.doc.borrow_mut();
+    let image = vapors_scene::RgbaImage {
+        size: vapors_scene::Size {
+            width: 2,
+            height: 2,
+        },
+        rgba: [0, 0, 0, 255].repeat(4),
+    };
+    doc.register_image("a.png", image).expect("registers");
+    let img = doc.create_element("img");
+    doc.set_attribute(img, "src", "a.png");
+    doc.append(page.rows[0], img);
+
+    // Then: refused as an image under a rounded clip while rounded;
+    // accepted once square; refused so again
+    let image_refused = |doc: &mut Document| {
+        let errors = refusals(doc);
+        let named = errors
+            .iter()
+            .any(|e| e.contains("is an img under a rounded clip"));
+        assert!(named, "{errors:?}");
+    };
+    image_refused(&mut doc);
+    doc.set_attribute(page.list, "class", "list");
+    doc.update(at(1.0)).expect("square: accepted");
+    doc.set_attribute(page.list, "class", "list round");
+    image_refused(&mut doc);
 }

@@ -271,12 +271,11 @@ The six recommendations of the first draft are taken:
     rounded `overflow: auto` or `scroll` stays refused, naming F3.1b:
     a scroller's clip is its frame's scissor, which F3.1b moves onto
     the table.
-    A lane whose container is a rounded clipping box declines to frame
-    its children (Tom, 2026-11-27): a framed child's clip is its frame's
-    scissor, which cuts square, and gui-bench's order card is such a
-    lane once it has 32 rows. Its children then paint under the rounded
-    clip on the table, and an insert repaints the rows after it; F3.1b,
-    with frame clips on the table, would retire the decline. A framed
+    A lane whose container is a rounded clipping box declined to frame
+    its children (Tom, 2026-11-27), as a framed child's clip was its
+    frame's scissor, which cuts square; frame clips on the table retired
+    the decline (`docs/plans/frame-clips.md`, slice 3), and such a lane
+    frames its rows under its rounded clip. A framed
     lane whose container's clip is rounded by a box above it was refused
     naming F3.1b, until frame clips went on the table
     (`docs/plans/frame-clips.md`, slice 2), which rounds its frame's
@@ -289,8 +288,8 @@ The six recommendations of the first draft are taken:
     its rows' cells framing for depth under the rounded clip (the order
     card at about 1,260 orders). Tom chose (2026-11-27) to put frame
     clips on the clip table first, so a framed lane can be under a
-    rounded clip; F3.2c's order card waits for it, and the lane decline
-    is retired with it.
+    rounded clip; F3.2c's order card waited for it, and the lane decline
+    was retired with it (frame-clips slice 3).
   - **F3.2c:** gui-bench's order card clips its rows, its header's own
     corners and the relaxed guard retired, compared with zgui idle and
     with the last row hovered.
