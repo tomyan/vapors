@@ -255,7 +255,10 @@ then, `NestedFrame` refuses it.
   such frame, in view or not, each update: 10,000 rows each holding a
   scroller would be 10,000 checks an update. No page or scaling case has
   that shape, and it is not measured. A plain clipping box in a row is
-  held to the corners by `of` (`Overlap`).
+  not refused: a framed row gives its boxes no clip of its own, so its
+  clip entry chains under the row frame's rounded entry, and the shader
+  cuts the corners (three links,
+  `a_clipped_box_in_a_rounded_lane_row_counts_the_rounded_link`).
 
 **Blocker before rounded scrollers land:** two answers to "is this lane
 frame rounded". `kept_clips_round.rs` `round_frame` reads the container's
