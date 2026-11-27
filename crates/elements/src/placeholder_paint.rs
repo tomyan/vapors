@@ -1,8 +1,9 @@
 //! Painting an empty field's placeholder (`docs/placeholder.md`): one
 //! line of text in the field's font and Chromium's placeholder grey,
-//! from the left of the content box, centred in it as Chromium's
-//! `LayoutTextControlSingleLine` centres its inner editor, and cut to
-//! the content box. It is no hit, no mark and no part of the editor:
+//! from the left of the content box, on the line of the field's run,
+//! which layout centres in it as Chromium's `LayoutTextControlSingleLine`
+//! centres its inner editor (`layout/field_box.rs`), and cut to the
+//! content box. It is no hit, no mark and no part of the editor:
 //! the pointer and the selection never reach it.
 
 use vapors_scene::{Item, TextId};
@@ -10,6 +11,12 @@ use vapors_scene::{Item, TextId};
 use crate::layout::{BoxRect, InlineRun, LayoutBox};
 use crate::paint::{PaintInput, clip_to};
 use crate::painting::Painting;
+
+/// The top of field `index`'s run (`scroll_reveal::run_index`): the
+/// blank line a placeholder shows on.
+fn run_top(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> f32 {
+    rects[crate::scroll_reveal::run_index(boxes, index)].y
+}
 
 /// Paints box `index`'s placeholder, when it shows one and is visible.
 pub(crate) fn paint(
@@ -40,10 +47,9 @@ pub(crate) fn paint(
     };
     let layout = input.cache.layout(input.fonts, input.scale, &run, None);
     let content = crate::clip::content_box(&boxes[index], rects[index]);
-    let spare = content.height - layout.height() / input.scale;
     let origin = [
         content.x * input.scale,
-        (content.y + spare / 2.0) * input.scale,
+        run_top(boxes, rects, index) * input.scale,
     ];
     let ink = layout.ink().offset(origin);
     let text = TextId(out.slabs.texts.insert(layout));

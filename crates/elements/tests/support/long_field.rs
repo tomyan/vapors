@@ -62,10 +62,15 @@ pub fn page() -> Page {
 /// A page whose field is styled by `sheet`, at a `width` px window,
 /// focused by a click at the field's left.
 pub fn page_with(sheet: &str, width: f32) -> Page {
+    page_of("text", sheet, width)
+}
+
+/// As [`page_with`], the field an `<input type=kind>`.
+pub fn page_of(kind: &str, sheet: &str, width: f32) -> Page {
     let mut doc = document();
     let body = doc.body();
     let field = doc.create_element("input");
-    doc.set_attribute(field, "type", "text");
+    doc.set_attribute(field, "type", kind);
     doc.append(body, field);
     doc.add_stylesheet("app.css", sheet).expect("parses");
     let page = Page {
@@ -107,8 +112,14 @@ pub fn click(page: &Page, point: [f32; 2]) {
 /// One more "W" at the caret, as the platform's text input sends it,
 /// then an update.
 pub fn type_w(page: &Page) {
+    type_text(page, "W");
+}
+
+/// `typed` at the caret, as the platform's text input sends it, then
+/// an update.
+pub fn type_text(page: &Page, typed: &str) {
     let before = page.doc.borrow().value(page.field).expect("a value");
-    let text = format!("{before}W");
+    let text = format!("{before}{typed}");
     let end = text.encode_utf16().count();
     let edit = TextEdit {
         before,

@@ -23,7 +23,14 @@
 // the scrollLeft, the red caret's columns and the text's ink columns
 // (dark pixels, the text colour) in the field's rows.
 //
-// Usage: node scripts/chromium-field-scroll.mjs [scrollbar | overflow]
+// With `centre` (tests/field_text_centre.rs), a text and a number
+// input, each also under an author flex start, a wrapped reversed row
+// packed to its end, and a grid aligned to its end, show the placeholder "Search" while empty, then are
+// typed into ("Ada", "123"). Each step prints the case, the rows of the
+// text's ink (dark or placeholder grey) and of the red caret, in the
+// field's columns, and the caret's columns ("-" for none).
+//
+// Usage: node scripts/chromium-field-scroll.mjs [scrollbar | overflow | centre]
 // Needs node 22 or later and the pinned Chromium (.config/tools.toml
 // `chromium.version`, installed by `cargo xtask setup` under
 // ~/.local/share/factory); $CHROME overrides. Exits 1 naming the step
@@ -44,8 +51,8 @@ const WHEEL_MS = 500;
 // apart cover more than one blink period
 const SHOTS = 6, SHOT_GAP_MS = 200;
 const MODE = process.argv[2];
-if (process.argv.length > 3 || ![undefined, 'scrollbar', 'overflow'].includes(MODE)) {
-  console.error(`chromium-field-scroll: unknown arguments ${process.argv.slice(2).join(' ')}; fix: give none, \`scrollbar\` or \`overflow\``);
+if (process.argv.length > 3 || ![undefined, 'scrollbar', 'overflow', 'centre'].includes(MODE)) {
+  console.error(`chromium-field-scroll: unknown arguments ${process.argv.slice(2).join(' ')}; fix: give none, \`scrollbar\`, \`overflow\` or \`centre\``);
   process.exit(1);
 }
 const SCROLLBAR = MODE === 'scrollbar';
@@ -71,6 +78,17 @@ const OVERFLOW_CASES = [
   ['overflow: clip', 'overflow:clip'],
   ['overflow: visible', 'overflow:visible'],
 ];
+// the centring cases: [name, type, author declarations, typed text]
+const CENTRE_CASES = [
+  ['text', 'text', '', 'Ada'],
+  ['number', 'number', '', '123'],
+  ['text, author flex start', 'text', 'display:flex;align-items:flex-start', 'Ada'],
+  ['number, author flex start', 'number', 'display:flex;align-items:flex-start', '123'],
+  ['text, author wrapped row end', 'text', 'display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end', 'Ada'],
+  ['number, author wrapped row end', 'number', 'display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end', '123'],
+  ['text, author grid end', 'text', 'display:grid;align-items:end', 'Ada'],
+  ['number, author grid end', 'number', 'display:grid;align-items:end', '123'],
+];
 
 function pinned() {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,6 +105,17 @@ const GREEN = (r, g, b) => r < 0x40 && g > 0xc0 && b < 0x40;
 // the text's colour, #111827, and its antialiased edge
 const INK = (r, g, b) => r < 0x80 && g < 0x80 && b < 0x90;
 function columns(png, is) {
+  return extent(png, is, 0);
+}
+
+// The y range of pixels `is` picks in the field's columns 677..955.
+function rows(png, is) {
+  return extent(png, is, 1);
+}
+
+// The x (axis 0, rows 15..48) or y (axis 1, columns 677..955) range of
+// the pixels `is` picks.
+function extent(png, is, axis) {
   let p = 8, w, h, ct;
   const idat = [];
   while (p < png.length) {
@@ -111,12 +140,13 @@ function columns(png, is) {
       img[y * stride + x] = (row[x] + pr) & 255;
     }
   }
-  const xs = [];
-  for (let y = 15; y < 49; y++) for (let x = 0; x < w; x++) {
+  const found = [];
+  const [y0, y1, x0, x1] = axis ? [0, h, 677, 956] : [15, 49, 0, w];
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
     const o = y * stride + x * bpp;
-    if (is(img[o], img[o + 1], img[o + 2])) xs.push(x);
+    if (is(img[o], img[o + 1], img[o + 2])) found.push(axis ? y : x);
   }
-  return xs.length ? `${Math.min(...xs)}..${Math.max(...xs)}` : '-';
+  return found.length ? `${Math.min(...found)}..${Math.max(...found)}` : '-';
 }
 
 async function main() {
@@ -176,6 +206,7 @@ async function run(proc, deadline) {
   };
   if (SCROLLBAR) return bars(s, load, value, wheel, await send('Browser.getVersion'));
   if (MODE === 'overflow') return overflows(s, load, value, wheel, await send('Browser.getVersion'));
+  if (MODE === 'centre') return centres(s, load, value, await send('Browser.getVersion'));
   await load(PAGE);
   console.log(`# ${(await send('Browser.getVersion')).product}\nop\tlength\tscrollLeft\tcaret x\tcaret columns`);
   await value("document.getElementById('s').focus()");
@@ -215,6 +246,26 @@ async function bars(s, load, value, wheel, version) {
       const shot = await s('Page.captureScreenshot', {format: 'png'});
       console.log(`${name}\t${op}\t${width}\t${left}\t${columns(Buffer.from(shot.data, 'base64'), GREEN)}`);
     }
+  }
+}
+
+async function centres(s, load, value, version) {
+  console.log(`# ${version.product}\ncase\top\tink rows\tcaret rows\tcaret columns`);
+  const at = async (name, op) => {
+    let ink = '-', caret = '-', across = '-';
+    for (let k = 0; k < SHOTS && caret === '-'; k++) {
+      if (k) await new Promise(r => setTimeout(r, SHOT_GAP_MS));
+      const png = Buffer.from((await s('Page.captureScreenshot', {format: 'png'})).data, 'base64');
+      [ink, caret, across] = [rows(png, INK), rows(png, RED), columns(png, RED)];
+    }
+    console.log(`${name}\t${op}\t${ink}\t${caret}\t${across}`);
+  };
+  for (const [name, type, css, text] of CENTRE_CASES) {
+    await load(`${STYLE}<style>#s{${css}}</style><input id=s type=${type} placeholder=Search>`);
+    await value("document.getElementById('s').focus()");
+    await at(name, 'empty, placeholder');
+    await s('Input.insertText', {text});
+    await at(name, `typed ${text}`);
   }
 }
 

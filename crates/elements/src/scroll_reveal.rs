@@ -71,17 +71,21 @@ pub(crate) fn scrolls_text(layout_box: &LayoutBox) -> bool {
 }
 
 /// The run of the field in box `index`: its text, its first child.
+fn run(boxes: &[LayoutBox], index: usize) -> &LayoutBox {
+    &boxes[run_index(boxes, index)]
+}
+
+/// The box index of the run of the field in box `index`.
 ///
 /// # Panics
 /// When it has none: every field's text is its run, a blank one a
 /// no-break space (`layout/field_box.rs` `mark_run`).
-fn run(boxes: &[LayoutBox], index: usize) -> &LayoutBox {
-    let run = boxes[index].children.first().unwrap_or_else(|| {
+pub(crate) fn run_index(boxes: &[LayoutBox], index: usize) -> usize {
+    let run = *boxes[index].children.first().unwrap_or_else(|| {
         panic!("field box {index} has no run: every field's text is its run (layout/field_box.rs `mark_run`); reproduce with `cargo xtask test`")
     });
-    let run = &boxes[*run];
     assert!(
-        run.run_of_field.is_some(),
+        boxes[run].run_of_field.is_some(),
         "field box {index}'s first child is not its run: every field's text is its first child (layout/field_box.rs `mark_run`); reproduce with `cargo xtask test`"
     );
     run
