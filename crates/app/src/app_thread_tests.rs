@@ -2,7 +2,7 @@
 //! longer than `start`'s, and a handler that blocks past `stop`'s. The
 //! blocked threads end on their own when their sleep does.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use super::{AppThread, AppThreadError, Deadlines};
@@ -123,11 +123,12 @@ fn a_pending_task_whose_drop_blocks_past_the_stop_deadline_is_refused_naming_it(
 }
 
 /// A `SlowDrop` that records when its drop began.
-struct TimedSlowDrop(Arc<Mutex<Option<Instant>>>);
+struct TimedSlowDrop(Arc<OnceLock<Instant>>);
 
 impl Drop for TimedSlowDrop {
     fn drop(&mut self) {
-        *self.0.lock().expect("no test thread panics holding it") = Some(Instant::now());
+        // Err: already set; this value is dropped once
+        let _ = self.0.set(Instant::now());
         std::thread::sleep(BLOCK);
     }
 }
@@ -142,7 +143,7 @@ fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
         start: SHORT,
         stop: SHORT,
     };
-    let dropping = Arc::new(Mutex::new(None));
+    let dropping = Arc::new(OnceLock::new());
     let held = TimedSlowDrop(Arc::clone(&dropping));
     let make = move || -> fn(()) {
         // Deadline::User: a test task that never ends; the thread drops it
@@ -154,12 +155,14 @@ fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
     };
 
     // When
+    let called = Instant::now();
     let started = AppThread::<()>::start_within(make, ignore, deadlines);
-    let returned = Instant::now();
 
     // Then: the whole deadline, reached by waiting for the thread's end.
-    // Start's Timeout arm names the same deadline; it is taken while the
-    // thread still holds `ready`, so before any drop began
+    // Start's Timeout arm names the same deadline. It is taken once
+    // `called + SHORT` has passed with the thread still holding `ready`,
+    // and the thread drops its tasks only after `ready`, so a drop that
+    // began before `called + SHORT` rules that arm out
     assert_eq!(
         started.err(),
         Some(AppThreadError::Deadline {
@@ -167,11 +170,12 @@ fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
             after: SHORT
         })
     );
-    let began = *dropping.lock().expect("the drop does not panic");
     assert!(
-        began.is_some_and(|began| began < returned),
-        "start returned before the thread began dropping its tasks, so by its Timeout arm, \
-         not by waiting for the thread's end; fix: what delayed the thread past {SHORT:?}; \
+        dropping.get().is_some_and(|began| *began < called + SHORT),
+        "the thread had not begun dropping its tasks within {SHORT:?} of the call: start \
+         took its Timeout arm (the thread delayed before it built the app side), or the \
+         thread was descheduled between dropping `ready` and dropping its tasks; either way \
+         the path under test did not decide the result; fix: what delayed the thread; \
          reproduce: cargo nextest run -p vapors-app --lib \
          a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline"
     );
