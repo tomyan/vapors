@@ -75,20 +75,36 @@ fn every_clip_set_at_once_covers_the_items_and_the_pen() {
     assert_eq!(clips, [Some(clip(10.0)), Some(clip(10.0))]);
 }
 
-#[test]
-fn every_clip_set_at_once_is_the_only_clip_listed() {
-    // Given: a kept box's scene shifted under one clip after another
+fn shifted_scene() -> Scene {
+    // A kept box's scene, shifted under one clip after another
     let mut scene = Scene::new();
     scene.set_rounded_clip(Some(clip(0.0)));
     scene.push(quad());
+    scene.set_every_clip(Some(clip(10.0)));
+    scene
+}
+
+#[test]
+fn every_clip_set_at_once_is_the_only_clip_listed() {
+    // Given
+    let mut scene = shifted_scene();
 
     // When
-    scene.set_every_clip(Some(clip(10.0)));
     scene.set_every_clip(Some(clip(20.0)));
 
     // Then
     assert_eq!(scene.palette(), [clip(20.0)]);
+}
+
+#[test]
+fn every_clip_cleared_at_once_leaves_no_clip_listed() {
+    // Given
+    let mut scene = shifted_scene();
+
+    // When
     scene.set_every_clip(None);
+
+    // Then
     assert_eq!(scene.palette(), []);
 }
 

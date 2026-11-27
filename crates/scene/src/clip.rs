@@ -47,7 +47,7 @@ impl Clip {
         assert!(
             radii.iter().all(|r| r.is_finite() && *r >= 0.0),
             "a clip's corner radii must be finite and not negative, not {radii:?} (vapors-elements \
-             paint.rs `device_clip` fits them); reproduce with `cargo xtask test`"
+             `corners::fitted` makes them, from F3.2b); reproduce with `cargo xtask test`"
         );
         Self {
             rect,

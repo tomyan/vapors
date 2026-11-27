@@ -2,7 +2,8 @@
 //! by a `u32`, 0 for none or 1 + its place in the scene's list of the
 //! distinct clips it uses, a boxed slice that grows by one when a clip
 //! not yet in it is set, which is rare: a box paints under one clip, its
-//! outline or thumb under another.
+//! outline or thumb under another. `set_every_clip` replaces the list
+//! with the one clip it sets.
 
 use crate::clip::Clip;
 use crate::display::Scene;
