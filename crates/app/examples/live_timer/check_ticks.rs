@@ -71,7 +71,9 @@ fn unshown(record: &Record) -> Option<String> {
 }
 
 /// Frames of the window's own (not serving a request) after the first
-/// that show the same tick as the one before.
+/// that show the same tick as the one before. Assumes Xvfb, where nothing
+/// exposes or resizes the window: under a window manager those frames
+/// would count here too.
 fn unexplained(record: &Record) -> Option<String> {
     let own: Vec<u64> = record
         .frames

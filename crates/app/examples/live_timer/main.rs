@@ -57,7 +57,15 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     match (check, outcome.get()) {
-        (_, Some(false)) | (true, None) => ExitCode::FAILURE,
+        (_, Some(false)) => ExitCode::FAILURE,
+        (true, None) => {
+            eprintln!(
+                "live_timer --check: the loop ended before the check judged; fix: what \
+                 closed the window or ended the loop; {}",
+                check::REPRODUCE
+            );
+            ExitCode::FAILURE
+        }
         _ => ExitCode::SUCCESS,
     }
 }
@@ -68,7 +76,8 @@ fn watchdog() {
         std::thread::sleep(CHECK_DEADLINE);
         eprintln!(
             "live_timer --check: did not finish within {CHECK_DEADLINE:?}; fix: the phase \
-             that hung; {}",
+             that hung, or a panic of the application thread printed above (the script \
+             runs there, so it stops with it); {}",
             check::REPRODUCE
         );
         std::process::exit(1);

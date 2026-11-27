@@ -84,6 +84,15 @@ impl Window {
         true
     }
 
+    /// Stops the application thread, if it is still held, printing why it
+    /// ended when that was not a plain stop: a refused send says only
+    /// that the thread stopped, and its panic comes from `stop`.
+    fn stop_and_report(&mut self) {
+        if let Some(Err(error)) = self.app.take().map(AppThread::stop) {
+            eprintln!("live_timer: the application thread ended: {error}; {REPRODUCE}");
+        }
+    }
+
     /// Stops the application thread and judges the record.
     fn judge(&mut self) -> bool {
         let app = self.app.take().expect("judged once, after the start");
@@ -156,6 +165,7 @@ impl App for Window {
         self.draw(frame, request);
         if let Some(refused) = self.refused.take() {
             eprintln!("live_timer: the application thread refused: {refused}; {REPRODUCE}");
+            self.stop_and_report();
             self.outcome.set(Some(false));
             return Next::Exit;
         }
@@ -179,4 +189,12 @@ fn clear(frame: &Frame<'_>, color: Color) {
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
     vapors_renderer::clear_view(frame.device, frame.queue, &view, color);
+}
+
+/// A window closed without `--check` judging still stops the
+/// application thread, so its panic is printed, not lost.
+impl Drop for Window {
+    fn drop(&mut self) {
+        self.stop_and_report();
+    }
 }
