@@ -25,7 +25,7 @@ impl Scene {
         let items = self.items().iter().zip(self.clips());
         items.enumerate().find_map(|(index, (item, clip))| {
             let kind = item_non_finite(item)
-                .or_else(|| clip.filter(|clip| !rect_finite(*clip)).map(|_| "clip"))?;
+                .or_else(|| clip.filter(|clip| !clip_finite(clip)).map(|_| "clip"))?;
             Some(NonFinite { index, kind })
         })
     }
@@ -52,6 +52,12 @@ fn item_non_finite(item: &Item) -> Option<&'static str> {
         ),
     };
     (!finite).then_some(kind)
+}
+
+fn clip_finite(clip: &crate::Clip) -> bool {
+    rect_finite(clip.rect)
+        && clip.radii.iter().all(|r| r.is_finite())
+        && clip.outer.is_none_or(rect_finite)
 }
 
 fn rect_finite(rect: Rect) -> bool {

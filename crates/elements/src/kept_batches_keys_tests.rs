@@ -32,7 +32,8 @@ fn filled(top: f32) -> Item {
 
 /// The batches of `items`, each under its clip.
 pub(super) fn batches(items: &[(Item, Option<Rect>)]) -> Batched {
-    batched(items.iter().map(|(item, clip)| (item, *clip)), VIEW)
+    let square = |clip: &Option<Rect>| clip.map(vapors_scene::Clip::square);
+    batched(items.iter().map(|(item, clip)| (item, square(clip))), VIEW)
 }
 
 /// `batched` on the page, keyed against `was`.

@@ -147,7 +147,13 @@ pub(crate) fn clip_to(clip: Option<BoxRect>, input: &mut PaintInput<'_>, scene: 
     // gets it snapped to device pixels, as every painted edge is.
     // They differ by under a device pixel at an edge.
     input.clip = clip;
-    scene.set_clip(clip.map(|clip| snapped(clip, input.scale)));
+    scene.set_rounded_clip(device_clip(clip, input.scale));
+}
+
+/// A clip in CSS pixels as the scene takes it: snapped to device pixels.
+/// One answer for paint and a kept part's shift (`kept_shift.rs`).
+pub(crate) fn device_clip(clip: Option<BoxRect>, scale: f32) -> Option<vapors_scene::Clip> {
+    clip.map(|clip| vapors_scene::Clip::square(snapped(clip, scale)))
 }
 
 /// Box `index`'s own step: its own painting and its replaced content,

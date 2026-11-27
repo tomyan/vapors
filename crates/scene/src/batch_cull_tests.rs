@@ -210,3 +210,13 @@ fn a_shape_is_culled_by_its_bounds_not_its_transform() {
     assert_eq!(kinds(&batched), [('h', 1), ('q', 2)]);
     assert_eq!(batched.culled, 1);
 }
+
+#[test]
+fn an_item_inside_a_rounded_clip_but_outside_the_frame_it_was_cut_to_is_culled() {
+    // Given: a rounded clip over the item, cut on the page to above it
+    let rounded = crate::Clip::rounded(Rect::new(0.0, 0.0, 50.0, 50.0), [4.0; 4]);
+    let clip = rounded.cut(Rect::new(0.0, 0.0, 50.0, 20.0));
+
+    // Then
+    assert!(culled(&quad_at(30.0), Some(clip), VIEW));
+}

@@ -27,7 +27,7 @@ pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched
 }
 
 /// An item, its clip and whether its batch is culled.
-type Placed = ((Item, Option<vapors_scene::Rect>), bool);
+type Placed = ((Item, Option<vapors_scene::Clip>), bool);
 
 /// `kept`'s items put on the page as the painter draws them: each
 /// item's clip moved by its frame's (or lane template's) shift and cut
@@ -92,16 +92,16 @@ fn item_offset(offsets: &[[f32; 2]], rows: BatchRows<'_>, at: usize) -> [f32; 2]
 #[allow(clippy::float_cmp)]
 fn as_painted(
     item: &Item,
-    clip: Option<vapors_scene::Rect>,
+    clip: Option<vapors_scene::Clip>,
     (draw, offset): (FrameDraw, [f32; 2]),
-) -> (Item, Option<vapors_scene::Rect>) {
+) -> (Item, Option<vapors_scene::Clip>) {
     let shift = [draw.shift[0] + offset[0], draw.shift[1] + offset[1]];
     let item = if shift == [0.0, 0.0] {
         *item
     } else {
         shifted(*item, shift)
     };
-    (item, draw.on_page(clip))
+    (item, draw.clip_on_page(clip))
 }
 
 /// `page`'s items, each with its clip.

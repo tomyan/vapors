@@ -6,17 +6,17 @@
 //! clip table ([`crate::Run::clipped_by_table`]) joins items across clip
 //! changes, each run naming its own entry.
 
-use crate::display::Rect;
+use crate::clip::Clip;
 
 /// A batch's items' clips, as runs `(first item, clip)`; never empty,
 /// the first run at item 0.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Clips(Vec<(u32, Option<Rect>)>);
+pub struct Clips(Vec<(u32, Option<Clip>)>);
 
 impl Clips {
     /// Every item under `clip`.
     #[must_use]
-    pub fn one(clip: Option<Rect>) -> Self {
+    pub fn one(clip: Option<Clip>) -> Self {
         Self(vec![(0, clip)])
     }
 
@@ -27,7 +27,7 @@ impl Clips {
     ///
     /// When `at` is not past the last run's first item: the runs must
     /// rise, each item reading the last run at or before it.
-    pub fn push(&mut self, at: u32, clip: Option<Rect>) {
+    pub fn push(&mut self, at: u32, clip: Option<Clip>) {
         let last_first = self.0.last().map_or(0, |&(first, _)| first);
         assert!(
             at > last_first,
@@ -42,14 +42,14 @@ impl Clips {
 
     /// The last item's clip.
     #[must_use]
-    pub fn last(&self) -> Option<Rect> {
+    pub fn last(&self) -> Option<Clip> {
         self.0.last().and_then(|&(_, clip)| clip)
     }
 
     /// The one clip every item has; `None` when the items have more than
     /// one.
     #[must_use]
-    pub fn uniform(&self) -> Option<Option<Rect>> {
+    pub fn uniform(&self) -> Option<Option<Clip>> {
         match self.0.as_slice() {
             [(_, clip)] => Some(*clip),
             _ => None,
@@ -58,23 +58,26 @@ impl Clips {
 
     /// Item `at`'s clip.
     #[must_use]
-    pub fn at(&self, at: usize) -> Option<Rect> {
+    pub fn at(&self, at: usize) -> Option<Clip> {
         let after = self.0.partition_point(|&(first, _)| first as usize <= at);
         self.0[after.saturating_sub(1)].1
     }
 
-    /// The smallest clip holding every item's: unclipped (`None`) when
-    /// any item is.
+    /// The smallest rectangle holding every item's clip: unclipped
+    /// (`None`) when any item is.
     #[must_use]
-    pub fn union(&self) -> Option<Rect> {
-        let mut clips = self.0.iter().map(|&(_, clip)| clip);
+    pub fn union(&self) -> Option<crate::display::Rect> {
+        let mut clips = self
+            .0
+            .iter()
+            .map(|&(_, clip)| clip.map(|clip| clip.bounds()));
         let first = clips.next().flatten()?;
         clips.try_fold(first, |union, clip| clip.map(|clip| union.union(clip)))
     }
 
     /// The runs, `(first item, clip)`.
     #[must_use]
-    pub fn runs(&self) -> &[(u32, Option<Rect>)] {
+    pub fn runs(&self) -> &[(u32, Option<Clip>)] {
         &self.0
     }
 }

@@ -34,9 +34,17 @@ impl ClipEntry {
     /// relative to a row.
     #[must_use]
     pub fn rect(rect: [f32; 4], frame: u32) -> Self {
+        Self::rounded(rect, [0.0; 4], frame)
+    }
+
+    /// A rectangle in `frame`'s space with circular corner `radii`
+    /// (top-left, top-right, bottom-right, bottom-left, already fitted to
+    /// it), no parent, not relative to a row.
+    #[must_use]
+    pub fn rounded(rect: [f32; 4], radii: [f32; 4], frame: u32) -> Self {
         Self {
             rect,
-            radii: [0.0; 4],
+            radii,
             frame,
             parent: 0,
             row_relative: false,

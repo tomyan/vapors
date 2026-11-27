@@ -2,7 +2,7 @@
 //! a point, a hit or a scene item in a frame's coordinates put on the
 //! page by the frame's shift and cut to its clip.
 
-use vapors_scene::{Item, Rect};
+use vapors_scene::{Clip, Item};
 
 use super::{FrameAt, Frames, PAGE};
 use crate::layout::BoxRect;
@@ -78,8 +78,8 @@ impl Frames {
         &self,
         frame: usize,
         item: &Item,
-        clip: Option<Rect>,
-    ) -> (Item, Option<Rect>) {
+        clip: Option<Clip>,
+    ) -> (Item, Option<Clip>) {
         let at = self.at(frame);
         // An unshifted frame keeps every coordinate's bits: adding 0.0
         // turns -0.0 into 0.0, which the kept batches' keys tell apart
@@ -94,8 +94,8 @@ impl Frames {
             )
         };
         let clip = match (clip, at.device_clip) {
-            (Some(clip), Some(frame)) => Some(clip.intersection(frame)),
-            (clip, frame) => clip.or(frame),
+            (Some(clip), Some(frame)) => Some(clip.cut(frame)),
+            (clip, frame) => clip.or(frame.map(Clip::square)),
         };
         (item, clip)
     }
