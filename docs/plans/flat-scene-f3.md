@@ -279,6 +279,16 @@ The six recommendations of the first draft are taken:
     with frame clips on the table, would retire the decline. A framed
     lane whose container's clip is rounded by a box above it is refused
     naming F3.1b.
+    Measured in F3.2c (2026-11-27, one row inserted mid-list, counts):
+    under a rounded `overflow: hidden` list an insert painted 306 boxes
+    at 100 rows and 3006 at 1000, against 6 under a square one (not
+    traced; likely the list's rounded clip changing with its height, as
+    a part under one is painted again, never shifted); and a list past 65,536 px was refused,
+    its rows' cells framing for depth under the rounded clip (the order
+    card at about 1,260 orders). Tom chose (2026-11-27) to put frame
+    clips on the clip table first, so a framed lane can be under a
+    rounded clip; F3.2c's order card waits for it, and the lane decline
+    is retired with it.
   - **F3.2c:** gui-bench's order card clips its rows, its header's own
     corners and the relaxed guard retired, compared with zgui idle and
     with the last row hovered.
