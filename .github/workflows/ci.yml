@@ -329,12 +329,15 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst cold run, 206 s (run 42714931127), plus about
-    # 9 s for the step added with the surface_gradient check: about 215 s,
-    # 2.5 x 215 s = 538 s, rounded up to 9 minutes. The uncached 733 s
-    # apt install in run 39803145234 is excluded: it is the slow mirror
-    # the cache avoids. Cleared by Tom on 2026-11-10.
-    timeout-minutes: 9
+    # About 2.5x the worst measured run plus the live_timer step: the
+    # slowest of 41 passing window jobs from 2026-11-25 to 27 took 229 s
+    # (run 45915289797), and the live_timer step took 5 s on the runner
+    # (run 45922653681, where a deliberate break failed it after its full
+    # 3.4 s check). 2.5 x 234 s = 585 s, rounded up to 10 minutes. The
+    # uncached 733 s apt install in run 39803145234 is excluded: it is the
+    # slow mirror the cache avoids. Earlier limit cleared by Tom on
+    # 2026-11-10.
+    timeout-minutes: 10
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
@@ -410,5 +413,5 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 10
         run: .github/scripts/report-timeout.sh
