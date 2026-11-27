@@ -70,6 +70,27 @@ impl FrameDraw {
             (clip, outer) => clip.or(outer),
         }
     }
+
+    /// A batch item's clip on the page, as [`Frames::item`] puts it there:
+    /// moved by the shift and cut to the frame's clip
+    /// ([`vapors_scene::Clip::cut`]), so a rounded clip keeps its corners.
+    /// For the debug check that places the kept batches on the page.
+    #[must_use]
+    // Exact: a zero shift is exactly zero.
+    #[allow(clippy::float_cmp)]
+    pub fn clip_on_page(&self, clip: Option<vapors_scene::Clip>) -> Option<vapors_scene::Clip> {
+        let moved = |clip: vapors_scene::Clip| {
+            if self.shift == [0.0, 0.0] {
+                clip
+            } else {
+                clip.offset(self.shift)
+            }
+        };
+        match (clip.map(moved), self.clip) {
+            (Some(clip), Some(outer)) => Some(clip.cut(outer)),
+            (clip, outer) => clip.or(outer.map(vapors_scene::Clip::square)),
+        }
+    }
 }
 
 impl Frames {

@@ -7,6 +7,7 @@
 use std::borrow::Borrow;
 
 pub use crate::batch_clips::Clips;
+use crate::clip::Clip;
 use crate::display::{Item, Quad, Rect, Scene, Shadow};
 use crate::shape::{Shape, ShapeKind};
 
@@ -60,7 +61,7 @@ impl Scene {
     /// (device pixels), in order: [`batched`] over its items and clips.
     #[must_use]
     pub fn batches(&self, view: Rect) -> Batched {
-        let clips = self.clips().iter().copied();
+        let clips = self.clips();
         batched(self.items().iter().zip(clips), view)
     }
 }
@@ -72,7 +73,7 @@ impl Scene {
 /// instead keeps its place in a batch marked [`Batch::culled`], so the
 /// painter refuses it as it refuses a clipped one.
 pub fn batched<I: Borrow<Item>>(
-    items: impl IntoIterator<Item = (I, Option<Rect>)>,
+    items: impl IntoIterator<Item = (I, Option<Clip>)>,
     view: Rect,
 ) -> Batched {
     let mut batched = Batched::default();
@@ -91,8 +92,8 @@ pub const ROWS_PER_BATCH: usize = 128;
 /// True when nothing `item` paints falls inside `view` cut to `clip`:
 /// the rule [`batched`] culls by.
 #[must_use]
-pub fn culled(item: &Item, clip: Option<Rect>, view: Rect) -> bool {
-    let region = clip.map_or(view, |clip| clip.intersection(view));
+pub fn culled(item: &Item, clip: Option<Clip>, view: Rect) -> bool {
+    let region = clip.map_or(view, |clip| clip.bounds().intersection(view));
     region.is_empty() || item.bounds().is_disjoint(&region)
 }
 
@@ -103,7 +104,7 @@ impl Batched {
     /// it falls in the view. Whether it was added to a batch. For items
     /// each culled in a view of its own (the rows of a lane, each in its
     /// own frame's coordinates).
-    pub fn add(&mut self, item: &Item, clip: Option<Rect>, view: Rect) -> bool {
+    pub fn add(&mut self, item: &Item, clip: Option<Clip>, view: Rect) -> bool {
         self.add_culled(item, clip, culled(item, clip, view))
     }
 
@@ -113,7 +114,7 @@ impl Batched {
     /// moved into the lane's, so items of different rows under equal clips
     /// in their rows are not batched under one scissor; and so one test
     /// serves the caller's split and the batching.
-    pub fn add_culled(&mut self, item: &Item, clip: Option<Rect>, is_culled: bool) -> bool {
+    pub fn add_culled(&mut self, item: &Item, clip: Option<Clip>, is_culled: bool) -> bool {
         if !is_culled {
             self.push(item, clip, false);
             return true;
@@ -129,7 +130,7 @@ impl Batched {
     /// Adds `item` under `clip` to the last batch when it is of the same
     /// kind and culling, and of the same clip or a kind the clip table
     /// clips; else as a new batch.
-    fn push(&mut self, item: &Item, clip: Option<Rect>, culled: bool) {
+    fn push(&mut self, item: &Item, clip: Option<Clip>, culled: bool) {
         if let Some(last) = self.batches.last_mut()
             && last.culled == culled
             && (last.clips.last() == clip || last.run.clipped_by_table())

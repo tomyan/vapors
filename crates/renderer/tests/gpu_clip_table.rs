@@ -2,7 +2,8 @@
 //! quad drawn under a clip entry covers only the clip's pixels, with no
 //! scissor; the clip moves with its frame's entry; a chain of two
 //! intersects them; a row-relative clip moves with the row; a given-back
-//! entry covers nothing (the relaxed backstop, item 11).
+//! entry covers nothing (the relaxed backstop, item 11); a rounded entry
+//! cuts its corners (F3.2, item 13).
 
 #[path = "support/frame.rs"]
 mod frame;
@@ -147,4 +148,27 @@ fn gpu_a_given_back_clip_entry_covers_nothing() {
         red_xs(&drawn, 8).is_empty(),
         "a poisoned clip covered pixels"
     );
+}
+
+#[test]
+fn gpu_a_rounded_clip_entry_cuts_the_corners_off() {
+    // When: clipped to the whole square with a radius of 8 at each corner,
+    // a circle of the square's side
+    let drawn = drawn_under(([0.0, 0.0], &[], 0), |table, at| {
+        let frame = table.frame;
+        let entry = ClipEntry::rounded([0.0, 0.0, 16.0, 16.0], [8.0; 4], frame);
+        clip_entry(table, at, entry)
+    });
+
+    // Then: the corners empty, the middle full, as a square clip's are not
+    for (x, y) in [(0, 0), (15, 0), (15, 15), (0, 15), (1, 1)] {
+        assert_eq!(
+            pixel(&drawn, SIDE, x, y),
+            BACKGROUND,
+            "corner pixel {x},{y}"
+        );
+    }
+    assert_eq!(pixel(&drawn, SIDE, 8, 8), RED);
+    let across = red_xs(&drawn, 8);
+    assert!((2..14).all(|x| across.contains(&x)), "{across:?}");
 }

@@ -16,12 +16,12 @@ use std::collections::HashMap;
 
 use vapors_elements::{BatchFrame, FrameDraw};
 use vapors_renderer::{ClipEntry, ClipTable, Target, TransformTable};
-use vapors_scene::Rect;
+use vapors_scene::{Clip, Rect};
 
 /// The table, and the entry each frame's clip holds in it.
 pub(super) struct Clips {
     pub(super) table: ClipTable,
-    held: HashMap<(BatchFrame, [u32; 4]), Held>,
+    held: HashMap<(BatchFrame, [u32; 8]), Held>,
     /// Counts the frames: an entry drawn in this one has it as `drawn`.
     frame: u64,
     /// The scratch a batch's clip entries are worked out in, reused batch
@@ -37,9 +37,16 @@ struct Held {
     drawn: u64,
 }
 
-/// A rectangle's key: its edges to the bit.
-fn bits(rect: Rect) -> [u32; 4] {
-    [rect.left, rect.top, rect.right, rect.bottom].map(f32::to_bits)
+/// A clip's key: its edges and corner radii to the bit.
+fn bits(clip: Clip) -> [u32; 8] {
+    let Rect {
+        left,
+        top,
+        right,
+        bottom,
+    } = clip.rect;
+    let [a, b, c, d] = clip.radii;
+    [left, top, right, bottom, a, b, c, d].map(f32::to_bits)
 }
 
 impl Clips {
@@ -69,27 +76,38 @@ impl Clips {
         &mut self,
         target: &Target<'_>,
         (frame, frame_entry): (BatchFrame, u32),
-        clip: Rect,
+        clip: Clip,
     ) -> Option<u32> {
-        assert_whole(clip);
+        assert_whole(clip.rect);
+        assert!(
+            clip.outer.is_none(),
+            "clip {clip:?} reached the clip table cut to an outer rectangle: a batch's clips are \
+             in its frame, whose own clip is the scissor (painter_runs.rs), and only a clip put on \
+             the page carries one (vapors-scene clip.rs `cut`); reproduce with `cargo xtask test`"
+        );
         let key = (frame, bits(clip));
         let at = match self.held.get(&key) {
             Some(held) => held.at,
             None => self.table.take(target.encoder, 1)?,
         };
-        let rect = [clip.left, clip.top, clip.right, clip.bottom];
+        let rect = [
+            clip.rect.left,
+            clip.rect.top,
+            clip.rect.right,
+            clip.rect.bottom,
+        ];
         self.table.set(
             target.encoder,
             target.queue,
             at,
-            ClipEntry::rect(rect, frame_entry),
+            ClipEntry::rounded(rect, clip.radii, frame_entry),
         );
         self.hold(key, at, frame_entry);
         Some(at)
     }
 
     /// `at` held for `key`, naming `frame_entry`, drawn this frame.
-    fn hold(&mut self, key: (BatchFrame, [u32; 4]), at: u32, frame_entry: u32) {
+    fn hold(&mut self, key: (BatchFrame, [u32; 8]), at: u32, frame_entry: u32) {
         let drawn = self.frame;
         self.held.insert(
             key,

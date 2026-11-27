@@ -43,9 +43,11 @@ fn painted(doc: &mut Document, scale: f32) -> (Vec<&'static str>, Vec<Drawn>) {
         .iter()
         .zip(scene.clips())
         .filter_map(|(item, clip)| match item {
-            Item::Surface { surface, rect } => {
-                Some((painted.surface(*surface).to_owned(), *rect, *clip))
-            }
+            Item::Surface { surface, rect } => Some((
+                painted.surface(*surface).to_owned(),
+                *rect,
+                clip.map(|clip| clip.rect),
+            )),
             _ => None,
         })
         .collect();

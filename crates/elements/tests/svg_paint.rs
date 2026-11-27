@@ -50,7 +50,9 @@ fn icons(painted: &Painted) -> Vec<(IconId, Rect, Color, Option<Rect>)> {
     let pairs = scene.items().iter().zip(scene.clips());
     pairs
         .filter_map(|(item, clip)| match *item {
-            Item::Icon { icon, rect, colour } => Some((icon, rect, colour, *clip)),
+            Item::Icon { icon, rect, colour } => {
+                Some((icon, rect, colour, clip.map(|clip| clip.rect)))
+            }
             _ => None,
         })
         .collect()

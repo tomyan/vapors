@@ -52,7 +52,7 @@ fn a_long_search_keeps_its_caret_and_text_in_the_inputs_content_box() {
     let clips: Vec<_> = items
         .iter()
         .filter(|(item, _)| matches!(item, Item::Text { .. }))
-        .filter_map(|(_, clip)| clip.map(|c| (c.left, c.right)))
+        .filter_map(|(_, clip)| clip.map(|c| (c.rect.left, c.rect.right)))
         .filter(|clip| *clip == content)
         .collect();
     assert_eq!(clips.len(), 1, "the search text under the content box");
