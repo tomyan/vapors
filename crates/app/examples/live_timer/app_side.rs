@@ -76,7 +76,7 @@ fn toggle(live: &mut Live) {
 /// Each tick is shown by a frame wake.
 async fn ticks((record, shown, waker): (Shared, Arc<AtomicU64>, Waker)) -> Result<(), String> {
     let mut interval = tokio::time::interval(TICK);
-    interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
     interval.tick().await;
     loop {
         interval.tick().await;
