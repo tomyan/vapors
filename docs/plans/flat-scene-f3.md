@@ -263,6 +263,22 @@ The six recommendations of the first draft are taken:
     the other (Tom, 2026-11-27); any other overlap is refused naming
     clip chains, which would retire it. An image, surface or svg under
     a rounded clip stays refused until F3.1b moves them onto the table.
+    Two decisions (Tom, 2026-11-27): elements carries a box's clip as
+    its rectangle and the slot of the box whose rounded padding box it
+    is, if any (under the nesting rule a clip is always one box's
+    padding box or wholly inside it), and paint and hit testing read
+    that box's radii; a kept box's slot stays within its 224 bytes. A
+    rounded `overflow: auto` or `scroll` stays refused, naming F3.1b:
+    a scroller's clip is its frame's scissor, which F3.1b moves onto
+    the table.
+    A lane whose container is a rounded clipping box declines to frame
+    its children (Tom, 2026-11-27): a framed child's clip is its frame's
+    scissor, which cuts square, and gui-bench's order card is such a
+    lane once it has 32 rows. Its children then paint under the rounded
+    clip on the table, and an insert repaints the rows after it; F3.1b,
+    with frame clips on the table, would retire the decline. A framed
+    lane whose container's clip is rounded by a box above it is refused
+    naming F3.1b.
   - **F3.2c:** gui-bench's order card clips its rows, its header's own
     corners and the relaxed guard retired, compared with zgui idle and
     with the last row hovered.
@@ -284,8 +300,9 @@ The six recommendations of the first draft are taken:
   today clip changes split runs; across frames, unchanged until F3.3.
 - The tests named in items 2, 4, 5, 6, 11 and 13; the kept-bytes
   compare covering the clip index.
-- F3.2: a Chromium fixture of a rounded scroller holding text, an image
-  and a shadow passes the paint rules at 1x and 2x, with the corner
+- F3.2: a Chromium fixture of a rounded `overflow: hidden` box holding
+  text and a shadow (a rounded scroller and an image under a rounded
+  clip stay refused until F3.1b) passes the paint rules at 1x and 2x, with the corner
   tolerance of item 8; a click outside a rounded corner but inside its
   rectangle misses, as in Chromium (events oracle).
 

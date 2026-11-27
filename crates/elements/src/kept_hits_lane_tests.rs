@@ -35,7 +35,9 @@ fn list(rows: usize) -> (Document, Vec<NodeId>) {
 fn hit_in(rows: usize, point: [f32; 2]) -> (Option<NodeId>, usize, Vec<NodeId>) {
     let (mut doc, nodes) = list(rows);
     let painted = doc.update(VIEWPORT).expect("updates");
-    let (hit, tested) = painted.kept_hits().hit_counted(point, &painted.frames);
+    let (hit, tested) = painted
+        .kept_hits()
+        .hit_counted(point, &painted.frames, &|_| None);
     (hit, tested, nodes)
 }
 
@@ -101,7 +103,12 @@ fn hit_grid(doc: &mut Document, view: Viewport, (step, bottom): (f32, f32)) -> u
     let mut y = 0.0;
     while y < bottom {
         for x in [2.0, 30.0, 120.0] {
-            hits += usize::from(painted.kept_hits().hit([x, y], &painted.frames).is_some());
+            hits += usize::from(
+                painted
+                    .kept_hits()
+                    .hit([x, y], &painted.frames, &|_| None)
+                    .is_some(),
+            );
         }
         y += step;
     }

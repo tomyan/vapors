@@ -55,9 +55,8 @@ fn item_non_finite(item: &Item) -> Option<&'static str> {
 }
 
 fn clip_finite(clip: &crate::Clip) -> bool {
-    rect_finite(clip.rect)
-        && clip.radii.iter().all(|r| r.is_finite())
-        && clip.outer.is_none_or(rect_finite)
+    // Its radii need no check: `Clip::rounded` refuses a non-finite one.
+    rect_finite(clip.rect()) && clip.outer().is_none_or(rect_finite)
 }
 
 fn rect_finite(rect: Rect) -> bool {

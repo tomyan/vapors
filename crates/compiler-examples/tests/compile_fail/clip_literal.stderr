@@ -1,0 +1,9 @@
+error[E0451]: fields `rect`, `radii` and `outer` of struct `Clip` are private
+ --> tests/compile_fail/clip_literal.rs:6:9
+  |
+5 |     let _ = Clip {
+  |             ---- in this type
+6 |         radii: [-4.0, 0.0, 0.0, 0.0],
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+7 |         ..Clip::square(rect)
+  |           ^^^^^^^^^^^^^^^^^^ fields `rect` and `outer` are private

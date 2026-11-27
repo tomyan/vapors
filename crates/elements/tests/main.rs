@@ -13,6 +13,9 @@ mod compiled_winners;
 mod honoured_compiled;
 mod honoured_declared;
 mod paint_finite;
+mod rounded_clip;
+mod rounded_clip_lanes;
+mod rounded_clip_refused;
 mod rust_sheets_refused;
 mod support;
 

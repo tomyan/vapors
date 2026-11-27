@@ -180,7 +180,7 @@ pub(super) fn scissor_clip(run: &Run, clips: &Clips) -> Option<Rect> {
          an image, surface or mesh under one from F3.2b, until F3.1b moves them onto the \
          table); reproduce with `cargo xtask test`"
     );
-    Some(clip.rect)
+    Some(clip.rect())
 }
 
 /// The clip a batch's items under `clip` read from the clip table: `clip`

@@ -28,6 +28,7 @@ pub mod positioned_rows;
 pub mod random_css;
 pub mod range_page;
 pub mod roles_page;
+pub mod rounded_page;
 pub mod rows_page;
 pub mod scene_hits_page;
 pub mod scroll_list;

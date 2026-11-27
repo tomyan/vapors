@@ -10,8 +10,10 @@
 //! the clip parent itself.
 
 use crate::slot_list::SlotList;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::clip::BoxClip;
+use crate::clip_refusals::RoundedRefusal;
 use crate::clip_tree::ClipTree;
 use crate::frames::PAGE;
 use crate::layout::BoxRect;
@@ -19,13 +21,24 @@ use crate::layout::BoxRect;
 /// What clips read of each box.
 pub(crate) trait ClipInputs {
     /// What box `slot` gives its content, from `own`, its own clip.
-    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect>;
+    fn inner(&self, slot: usize, own: Option<BoxClip>) -> InnerClip;
     /// Whether box `slot` scrolls, so its content is a frame of its own.
     fn scrolls(&self, slot: usize) -> bool;
     /// Whether box `slot` is a lane child in a frame of its own: its own
     /// box and everything below it are in that frame
     /// (`docs/plans/splice-layout.md`, section 11).
     fn lane_frame(&self, slot: usize) -> bool;
+}
+
+/// What a box gives its content, as [`ClipInputs::inner`] works it out.
+pub(crate) struct InnerClip {
+    /// The clip.
+    pub(crate) clip: Option<BoxClip>,
+    /// What a rounded clip refuses of the box (`clip_refusals.rs`).
+    pub(crate) refused: Option<RoundedRefusal>,
+    /// Its own padding box and radii, CSS pixels, when it rounds its
+    /// content.
+    pub(crate) rounding: Option<(BoxRect, [f32; 4])>,
 }
 
 /// The boxes' clip inputs.
@@ -35,9 +48,15 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 /// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
-    own: SlotList<Option<BoxRect>>,
-    inner: SlotList<Option<BoxRect>>,
+    own: SlotList<Option<BoxClip>>,
+    inner: SlotList<Option<BoxClip>>,
     frame: SlotList<usize>,
+    /// The slots a rounded clip refuses, and why: refused after paint
+    /// (`clip_refusals.rs`).
+    refused: FxHashMap<usize, RoundedRefusal>,
+    /// Each box that rounds its content: its padding box and radii, CSS
+    /// pixels in its content's frame, which hits are cut by.
+    rounding: FxHashMap<usize, (BoxRect, [f32; 4])>,
 }
 
 impl Clips {
@@ -56,6 +75,8 @@ impl Clips {
             own: vec![None; tree.len()].into(),
             inner: vec![None; tree.len()].into(),
             frame: vec![PAGE; tree.len()].into(),
+            refused: FxHashMap::default(),
+            rounding: FxHashMap::default(),
         };
         let mut redone = Vec::new();
         if tree.len() > 0 {
@@ -72,22 +93,30 @@ impl Clips {
         self.frame.resize(len, PAGE);
         for slot in freed {
             (self.own[slot], self.inner[slot], self.frame[slot]) = (None, None, PAGE);
+            self.refused.remove(&slot);
+            self.rounding.remove(&slot);
         }
     }
 
     /// Clips of slots with these `inner` clips in these frames, for
     /// tests.
     #[cfg(test)]
-    pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
+    pub(crate) fn with(inner: Vec<Option<crate::layout::BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
             own: vec![None; inner.len()].into(),
-            inner: inner.into(),
+            inner: inner
+                .into_iter()
+                .map(|clip| clip.map(BoxClip::square))
+                .collect::<Vec<_>>()
+                .into(),
             frame: frame.into(),
+            refused: FxHashMap::default(),
+            rounding: FxHashMap::default(),
         }
     }
 
     /// Box `slot`'s own clip: the one it paints under.
-    pub(crate) fn own(&self, slot: usize) -> Option<BoxRect> {
+    pub(crate) fn own(&self, slot: usize) -> Option<BoxClip> {
         self.own[slot]
     }
 
@@ -96,8 +125,25 @@ impl Clips {
         self.frame.len()
     }
 
+    /// The padding box and radii, CSS pixels, of box `slot` when it
+    /// rounds its content.
+    pub(crate) fn rounding(&self, slot: usize) -> Option<(BoxRect, [f32; 4])> {
+        self.rounding.get(&slot).copied()
+    }
+
+    /// The slots a rounded clip refuses, and why, in slot order.
+    pub(crate) fn refused(&self) -> Vec<(usize, RoundedRefusal)> {
+        let mut refused: Vec<_> = self
+            .refused
+            .iter()
+            .map(|(&slot, &why)| (slot, why))
+            .collect();
+        refused.sort_unstable();
+        refused
+    }
+
     /// Box `slot`'s inner clip: the one it gives its content.
-    pub(crate) fn inner(&self, slot: usize) -> Option<BoxRect> {
+    pub(crate) fn inner(&self, slot: usize) -> Option<BoxClip> {
         self.inner[slot]
     }
 
@@ -184,11 +230,28 @@ impl Clips {
             Some(parent) => self.frame_inside(parent, inner),
             None => PAGE,
         };
-        let new = inner.inner(slot, own);
+        let InnerClip {
+            clip: new,
+            refused,
+            rounding,
+        } = inner.inner(slot, own);
+        self.note_refused(slot, refused);
+        match rounding {
+            Some(rounding) => self.rounding.insert(slot, rounding),
+            None => self.rounding.remove(&slot),
+        };
         self.own[slot] = own;
         let was = (self.inner[slot], self.frame[slot]);
         (self.inner[slot], self.frame[slot]) = (new, frame);
         was != (new, frame)
+    }
+
+    /// Notes what a rounded clip refuses of box `slot`, if anything.
+    fn note_refused(&mut self, slot: usize, refused: Option<RoundedRefusal>) {
+        match refused {
+            Some(why) => self.refused.insert(slot, why),
+            None => self.refused.remove(&slot),
+        };
     }
 
     /// The frame of the content of box `slot`: its own when it scrolls,
@@ -204,17 +267,26 @@ impl Clips {
     /// The first slot whose clips differ from `other`'s, with both.
     pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
         let at = |clips: &Self, slot: usize| {
-            let get = |clips: &[Option<BoxRect>]| clips.get(slot).copied();
+            let get = |clips: &[Option<BoxClip>]| clips.get(slot).copied();
             (
                 get(&clips.own),
                 get(&clips.inner),
                 clips.frame.get(slot).copied(),
+                clips.refused.get(&slot).copied(),
+                clips.rounding.get(&slot).copied(),
             )
         };
-        let slots = self.own.len().max(other.own.len());
+        // the refusals and roundings of slots past both lists' ends too
+        let past = self.refused.keys().chain(other.refused.keys());
+        let past = past
+            .chain(self.rounding.keys())
+            .chain(other.rounding.keys());
+        let slots = past
+            .map(|&slot| slot + 1)
+            .fold(self.own.len().max(other.own.len()), usize::max);
         let slot = (0..slots).find(|&slot| at(self, slot) != at(other, slot))?;
         Some(format!(
-            "clips at slot {slot}: kept (own, inner, frame) {:?}, fresh {:?}",
+            "clips at slot {slot}: kept (own, inner, frame, refused, rounding) {:?}, fresh {:?}",
             at(self, slot),
             at(other, slot)
         ))

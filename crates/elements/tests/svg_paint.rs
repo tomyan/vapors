@@ -51,7 +51,7 @@ fn icons(painted: &Painted) -> Vec<(IconId, Rect, Color, Option<Rect>)> {
     pairs
         .filter_map(|(item, clip)| match *item {
             Item::Icon { icon, rect, colour } => {
-                Some((icon, rect, colour, clip.map(|clip| clip.rect)))
+                Some((icon, rect, colour, clip.map(|clip| clip.rect())))
             }
             _ => None,
         })

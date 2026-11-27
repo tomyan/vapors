@@ -46,7 +46,7 @@ fn painted(doc: &mut Document, scale: f32) -> (Vec<&'static str>, Vec<Drawn>) {
             Item::Surface { surface, rect } => Some((
                 painted.surface(*surface).to_owned(),
                 *rect,
-                clip.map(|clip| clip.rect),
+                clip.map(|clip| clip.rect()),
             )),
             _ => None,
         })

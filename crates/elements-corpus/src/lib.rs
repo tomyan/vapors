@@ -102,6 +102,7 @@ fixtures![
     progress_fill::ProgressFill,
     range::Range,
     roles::Roles,
+    rounded_clip::RoundedClip,
     scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,

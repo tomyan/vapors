@@ -1,0 +1,13 @@
+# The bordered card: border box x 140..248, y 16..104, 20px corners; its
+# padding box 4px in, 16px corners, both curves about (160, 36). A click
+# between the two curves at the top-left is inside the card's rounded
+# border box and outside its rounded clip, so it misses the wide child
+# across the card's top and lands on the card, as in Chromium; inside
+# the padding curve it is the child's. (A click outside both curves is
+# Chromium's body, as it hits a box by its rounded border box, which
+# vapors does not yet: that is not a clip and not compared here.)
+listen click
+click 147 23                  between the curves: the card
+expect event click div#bordered
+click 153 29                  inside the padding curve: the child
+expect event click div#wide

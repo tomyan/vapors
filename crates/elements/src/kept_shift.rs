@@ -20,6 +20,7 @@
 
 use vapors_scene::{Item, Rect, Scene};
 
+use crate::clip::BoxClip;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_shift_items::{shifted_item, text_item, whole_item};
 use crate::layout::{BoxRect, Content, LayoutBox};
@@ -65,6 +66,12 @@ impl Shift {
         from: BoxFrom,
         (scale, edges): (f32, impl Fn(BoxRect) -> [BoxRect; 2]),
     ) -> Option<Self> {
+        // A part under a rounded clip is painted again, not shifted: its
+        // clip's radii are its rounding box's, which a shift does not read.
+        let rounded = |clip: Option<BoxClip>| clip.is_some_and(|clip| clip.rounded_by().is_some());
+        if rounded(part.from.clip) || rounded(from.clip) {
+            return None;
+        }
         let delta = whole_delta(part.from.rect, from.rect, scale)?;
         let (old, new) = (edges(part.from.rect), edges(from.rect));
         let shiftable = snaps_by(old, new, delta, scale)
@@ -73,8 +80,8 @@ impl Shift {
             && part.own.positions_only_in_scene_and_hits()
             && hits_shiftable(part, content)
             && items_shiftable(part, content)
-            && under_one_clip(part, crate::paint::device_clip(part.from.clip, scale));
-        let clip = crate::paint::device_clip(from.clip, scale);
+            && under_one_clip(part, square_device_clip(part.from.clip, scale));
+        let clip = square_device_clip(from.clip, scale);
         shiftable.then_some(Self {
             slot,
             from,
@@ -91,7 +98,10 @@ impl Shift {
             self.shift_scene(outline, slabs, scale);
         }
         if let Some((_, hit)) = kept.own.hits.first_mut() {
-            *hit = crate::clip::within(self.from.clip, self.from.rect);
+            *hit = crate::clip::within(
+                self.from.clip.map(crate::clip::BoxClip::square_rect),
+                self.from.rect,
+            );
         }
         kept.from = self.from;
     }
@@ -112,6 +122,16 @@ impl Shift {
         }
         scene.set_every_clip(self.clip);
     }
+}
+
+/// A square clip as the scene takes it (`paint.rs` `device_clip`).
+fn square_device_clip(clip: Option<BoxClip>, scale: f32) -> Option<vapors_scene::Clip> {
+    crate::paint::device_clip(clip, scale, &|slot| {
+        panic!(
+            "a kept part under the rounded clip of box slot {slot} was shifted: `Shift::of` \
+             paints one again; reproduce with `cargo xtask test`"
+        )
+    })
 }
 
 /// Shifts each of `shifts`' parts in `painted` at `scale`, counting

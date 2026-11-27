@@ -26,7 +26,7 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) cache: &'a mut crate::layout::TextCache,
     pub(crate) scale: f32,
     /// The clip of the box being painted; set by `paint`.
-    pub(crate) clip: Option<BoxRect>,
+    pub(crate) clip: Option<crate::clip::BoxClip>,
     /// Each scroll container's offset and range, for its thumbs.
     pub(crate) scroll: &'a crate::scroll::Offsets,
     /// How opaque thumbs are drawn now, 0 (hidden) to 255 (on touch they
@@ -139,21 +139,44 @@ pub(crate) fn started(input: &mut PaintInput<'_>) -> Painted {
     Painted::empty(canvas, canvas_from, input.scale)
 }
 
-/// Sets the clip the next step paints under.
-pub(crate) fn clip_to(clip: Option<BoxRect>, input: &mut PaintInput<'_>, scene: &mut Scene) {
+/// Sets the clip the next step paints under; a rounded clip takes the
+/// radii of the box it names, one of `boxes` at `rects`.
+pub(crate) fn clip_to(
+    clip: Option<crate::clip::BoxClip>,
+    (boxes, rects): (&[LayoutBox], &[BoxRect]),
+    input: &mut PaintInput<'_>,
+    scene: &mut Scene,
+) {
     // Two forms of one clip, on purpose: hits are cut to it in CSS
     // pixels, unsnapped, as border boxes are hit unsnapped, so hit
     // testing follows layout geometry as Chromium's does; the scene
     // gets it snapped to device pixels, as every painted edge is.
     // They differ by under a device pixel at an edge.
+    let radii_of = |slot| crate::clip::radii(boxes, rects, slot, input);
+    let device = device_clip(clip, input.scale, &radii_of);
     input.clip = clip;
-    scene.set_rounded_clip(device_clip(clip, input.scale));
+    scene.set_rounded_clip(device);
 }
 
-/// A clip in CSS pixels as the scene takes it: snapped to device pixels.
-/// One answer for paint and a kept part's shift (`kept_shift.rs`).
-pub(crate) fn device_clip(clip: Option<BoxRect>, scale: f32) -> Option<vapors_scene::Clip> {
-    clip.map(|clip| vapors_scene::Clip::square(snapped(clip, scale)))
+/// A clip in CSS pixels as the scene takes it: snapped to device pixels,
+/// a rounded one with the radii `radii_of` gives the box it names,
+/// scaled and fitted to the snapped rectangle. One answer for paint and
+/// a kept part's shift (`kept_shift.rs`).
+pub(crate) fn device_clip(
+    clip: Option<crate::clip::BoxClip>,
+    scale: f32,
+    radii_of: &dyn Fn(usize) -> [f32; 4],
+) -> Option<vapors_scene::Clip> {
+    clip.map(|clip| {
+        let rect = snapped(clip.rect, scale);
+        match clip.rounded_by() {
+            None => vapors_scene::Clip::square(rect),
+            Some(slot) => {
+                let radii = radii_of(slot).map(|r| r * scale);
+                vapors_scene::Clip::rounded(rect, crate::corners::fitted(radii, rect))
+            }
+        }
+    })
 }
 
 /// Box `index`'s own step: its own painting and its replaced content,

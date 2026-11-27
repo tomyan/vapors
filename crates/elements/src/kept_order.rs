@@ -129,7 +129,8 @@ impl KeptOrder {
         input: &PaintInput<'_>,
         changed: &ChangedSlots,
     ) -> Self {
-        let slots = changed.rebuilt.iter().chain(&changed.moved).copied();
+        let slots = changed.rebuilt.iter().chain(&changed.moved);
+        let slots = slots.chain(&changed.reframed).copied();
         self.redone = self.clips.redo_under(
             slots.collect(),
             &self.tree,
@@ -158,8 +159,24 @@ struct BoxClips<'a, 'b> {
 }
 
 impl ClipInputs for BoxClips<'_, '_> {
-    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect> {
-        crate::clip::inner(self.boxes, self.rects, slot, own, self.input)
+    fn inner(
+        &self,
+        slot: usize,
+        own: Option<crate::clip::BoxClip>,
+    ) -> crate::kept_clips::InnerClip {
+        let inner = crate::clip::inner(self.boxes, self.rects, slot, own, self.input);
+        let framing = self.input.placement.framing.get(&slot);
+        let frames = self.scrolls(slot) || matches!(framing, Some(Ok(())));
+        let clips = (own, inner.clip);
+        let input = (self.boxes, self.rects, self.input);
+        let field_text = crate::clip_refusals::field_text_overlaps(input, slot, clips);
+        let overlaps = (inner.overlaps, field_text);
+        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, overlaps, frames);
+        crate::kept_clips::InnerClip {
+            clip: inner.clip,
+            refused,
+            rounding: inner.rounding,
+        }
     }
 
     fn scrolls(&self, slot: usize) -> bool {
