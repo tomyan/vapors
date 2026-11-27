@@ -80,6 +80,7 @@ mod field_overflow;
 mod field_scroll;
 mod field_scroll_input;
 mod field_scrollbar;
+mod field_text_centre;
 mod focus;
 mod focus_fixup;
 mod focus_fixup_composing;
