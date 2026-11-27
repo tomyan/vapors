@@ -2,6 +2,7 @@
 //! longer than `start`'s, and a handler that blocks past `stop`'s. The
 //! blocked threads end on their own when their sleep does.
 
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use super::{AppThread, AppThreadError, Deadlines};
@@ -121,35 +122,82 @@ fn a_pending_task_whose_drop_blocks_past_the_stop_deadline_is_refused_naming_it(
     );
 }
 
+/// A `SlowDrop` that records when its drop began.
+struct TimedSlowDrop(Arc<OnceLock<Instant>>);
+
+impl Drop for TimedSlowDrop {
+    fn drop(&mut self) {
+        // Err: already set; this value is dropped once
+        let _ = self.0.set(Instant::now());
+        std::thread::sleep(BLOCK);
+    }
+}
+
 #[test]
 fn a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline() {
     // Given: an app side that leaves a task holding a slow drop and
-    // panics at once, so its thread ends past the whole start deadline.
-    // No sleep before the panic: one could push start into its Timeout
-    // arm, which names the same deadline without the code under test
+    // panics at once. The thread drops the task only after `ready` is
+    // gone, which is what sends start down this path; its drop then
+    // outlasts what is left of the deadline
     let deadlines = Deadlines {
         start: SHORT,
         stop: SHORT,
     };
-    let make = || -> fn(()) {
-        let held = SlowDrop;
+    let dropping = Arc::new(OnceLock::new());
+    let panicking = Arc::new(OnceLock::new());
+    let held = TimedSlowDrop(Arc::clone(&dropping));
+    let reached = Arc::clone(&panicking);
+    let make = move || -> fn(()) {
         // Deadline::User: a test task that never ends; the thread drops it
         vapors_signals::spawn(vapors_signals::Deadline::User, async move {
             let _held = held;
             std::future::pending::<Result<(), String>>().await
         });
+        // Err: already set; make runs once
+        let _ = reached.set(Instant::now());
         panic!("the app side fails after spawning");
     };
 
     // When
+    let called = Instant::now();
     let started = AppThread::<()>::start_within(make, ignore, deadlines);
 
-    // Then
+    // Then: the whole deadline, reached by waiting for the thread's end.
+    // Start's Timeout arm names the same deadline. It is taken once
+    // `called + SHORT` has passed with the thread still holding `ready`.
+    // A drop that began after make's panic was the thread's teardown,
+    // which follows `ready`: that rests on Body::run's drop order, where
+    // nothing unwound between the panic and `ready` (the runtime, its
+    // context, Body) holds a task; a change there that drops tasks
+    // earlier stops this test guarding the path. Begun before
+    // `called + SHORT`, the drop rules the Timeout arm out. Left: start's
+    // receiver preempted for the whole deadline between its last check
+    // that sees the channel open and its comparison with the deadline
     assert_eq!(
         started.err(),
         Some(AppThreadError::Deadline {
             what: "build the app side",
             after: SHORT
         })
+    );
+    let (began, panicked) = (dropping.get(), panicking.get());
+    assert!(
+        began.is_some_and(|began| *began < called + SHORT),
+        "the thread had not begun dropping its tasks within {SHORT:?} of the call (began: \
+         {began:?}): start took its Timeout arm (the thread delayed before it built the app \
+         side), the thread was descheduled between dropping `ready` and dropping its tasks, \
+         or the task was never dropped (spawn hung, or the executor leaked it); either way \
+         the path under test did not decide the result; fix: rerun it alone, and if it \
+         still fails, what delays the thread's start or its teardown (Body::run); \
+         reproduce: cargo nextest run -p vapors-app --lib \
+         a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline"
+    );
+    assert!(
+        panicked.is_some_and(|panicked| began.is_some_and(|began| panicked <= began)),
+        "the task was dropped at {began:?}, not after make's panic at {panicked:?}: spawn, \
+         or something else in make before the panic, dropped it before `ready` went; fix: \
+         the spawn in make, or Body::run's order; reproduce: cargo nextest run -p vapors-app \
+         --lib \
+         a_start_whose_thread_ends_slowly_is_refused_naming_the_whole_deadline"
     );
 }
