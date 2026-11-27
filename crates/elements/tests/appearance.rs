@@ -223,3 +223,23 @@ fn a_class_that_sets_appearance_none_takes_an_unsized_checkboxs_content_away() {
     // Then: the user-agent border alone
     assert_eq!(size(&mut doc), (2.0, 2.0));
 }
+
+#[test]
+fn a_range_type_written_in_capitals_computes_appearance_auto() {
+    // Given: `type=Range` with no `appearance` of the author's; Chromium 157
+    // computes `auto` (docs/appearance.md)
+    let mut doc = document();
+    let body = doc.body();
+    let input = element(&mut doc, body, "input", "");
+    doc.set_attribute(input, "type", "Range");
+    let sheet = "body { margin: 0 } input { display: block; margin: 0; width: 100px }";
+    doc.add_stylesheet("app.css", sheet).expect("parses");
+
+    // When
+    doc.update(viewport(400.0, 200.0)).expect("updates");
+
+    // Then
+    let style = doc.computed_style(input).expect("styled");
+    let appearance = style.get_by_name("appearance").expect("a property");
+    assert_eq!(appearance.to_css(), "auto");
+}

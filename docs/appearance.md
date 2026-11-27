@@ -51,8 +51,8 @@ size, where Chromium, which has no switch, would have 0 x 0.
   `<compat-special>` (`textfield`, `menulist-button`) and
   `<compat-auto>` (`checkbox`, `radio` and the rest), and the draft's
   `base` and `base-select`.
-- `-webkit-appearance` and `-moz-appearance`, as unknown properties,
-  naming `appearance` to write instead.
+- `-webkit-appearance` and `-moz-appearance`, refused naming
+  `appearance` to write instead.
 
 `type` is matched without regard to case (`input[type=checkbox i]` in
 the user-agent sheet), as HTML and Chromium 157 do: `type=Checkbox` is

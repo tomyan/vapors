@@ -193,7 +193,11 @@ fn vendor_prefixed_properties_off_the_allowlist_are_refused() {
     let err = refusal(".x { -moz-appearance: none; }");
 
     // Then
-    assert!(err.message.contains("-moz-appearance"), "{err}");
+    assert!(
+        err.message.contains("-moz-appearance")
+            && err.message.contains("write \"appearance\" alone"),
+        "{err}"
+    );
 }
 
 #[test]

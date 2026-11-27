@@ -93,7 +93,7 @@ impl Context<'_> {
             to_viewport,
             range,
         } = self;
-        let facts = [
+        let facts: [&bool; FACTS] = [
             flex_item,
             in_inline,
             text_like_field,
@@ -102,13 +102,17 @@ impl Context<'_> {
             to_viewport,
             range,
         ];
-        facts.iter().enumerate().fold(0, |bits, (at, &&fact)| {
-            let at = u32::try_from(at).expect("a handful of facts");
-            let bit = u8::from(fact).checked_shl(at);
-            bits | bit.expect("Context holds more facts than the key's 8 bits; widen `bits`")
-        })
+        facts
+            .iter()
+            .enumerate()
+            .fold(0, |bits, (at, &&fact)| bits | (u8::from(fact) << at))
     }
 }
+
+/// How many facts `Context::bits` holds, one bit each.
+const FACTS: usize = 7;
+// a fact past the key's width fails the build here, not a share at run time
+const _: () = assert!(FACTS <= u8::BITS as usize, "widen Context::bits's key");
 
 /// The used style of an element whose computed styles (its own and its
 /// parent's) are `styles`.
