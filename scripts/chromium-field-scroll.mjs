@@ -12,10 +12,18 @@
 // and the same input with a green scrollbar-color and no
 // scrollbar-width, then auto, then thin, is typed into 60 times and
 // wheel-scrolled; scrolling divs styled the same, auto and thin, are
-// the controls that a thumb would be seen. Each step prints the case, the computed scrollbar-width, the
-// scrollLeft and the columns painted green ("-" for none).
+// the controls that a thumb would be seen. Each step prints the case,
+// the computed scrollbar-width, the scrollLeft and the columns painted
+// green ("-" for none).
 //
-// Usage: node scripts/chromium-field-scroll.mjs [scrollbar]
+// With `overflow` (tests/field_overflow.rs), the same input under each
+// author overflow (none given, hidden, overflow-x: hidden, clip,
+// visible) is typed into 60 times, wheeled by -100 on x, blurred, and
+// focused again. Each step prints the case, the computed overflow-x,
+// the scrollLeft, the red caret's columns and the text's ink columns
+// (dark pixels, the text colour) in the field's rows.
+//
+// Usage: node scripts/chromium-field-scroll.mjs [scrollbar | overflow]
 // Needs node 22 or later and the pinned Chromium (.config/tools.toml
 // `chromium.version`, installed by `cargo xtask setup` under
 // ~/.local/share/factory); $CHROME overrides. Exits 1 naming the step
@@ -36,8 +44,8 @@ const WHEEL_MS = 500;
 // apart cover more than one blink period
 const SHOTS = 6, SHOT_GAP_MS = 200;
 const MODE = process.argv[2];
-if (MODE !== undefined && MODE !== 'scrollbar') {
-  console.error(`chromium-field-scroll: unknown argument ${MODE}; fix: give none or \`scrollbar\``);
+if (process.argv.length > 3 || ![undefined, 'scrollbar', 'overflow'].includes(MODE)) {
+  console.error(`chromium-field-scroll: unknown arguments ${process.argv.slice(2).join(' ')}; fix: give none, \`scrollbar\` or \`overflow\``);
   process.exit(1);
 }
 const SCROLLBAR = MODE === 'scrollbar';
@@ -55,6 +63,14 @@ const BAR_CASES = [
   ['div, auto (control)', BAR('auto', DIV)],
   ['div, thin (control)', BAR('thin', DIV)],
 ];
+// the overflow cases: [name, the author's declarations]
+const OVERFLOW_CASES = [
+  ['none given', ''],
+  ['overflow: hidden', 'overflow:hidden'],
+  ['overflow-x: hidden', 'overflow-x:hidden'],
+  ['overflow: clip', 'overflow:clip'],
+  ['overflow: visible', 'overflow:visible'],
+];
 
 function pinned() {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -68,6 +84,8 @@ function pinned() {
 // non-interlaced PNG: red for the caret, green for a thumb.
 const RED = (r, g, b) => r > 0xc0 && g < 0x40 && b < 0x40;
 const GREEN = (r, g, b) => r < 0x40 && g > 0xc0 && b < 0x40;
+// the text's colour, #111827, and its antialiased edge
+const INK = (r, g, b) => r < 0x80 && g < 0x80 && b < 0x90;
 function columns(png, is) {
   let p = 8, w, h, ct;
   const idat = [];
@@ -111,7 +129,8 @@ async function main() {
     await run(proc, deadline);
   } finally {
     proc.kill();
-    rmSync(profile, {recursive: true, force: true});
+    // Chromium may still be writing the profile as it exits
+    rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
   }
 }
 
@@ -156,6 +175,7 @@ async function run(proc, deadline) {
     await new Promise(r => setTimeout(r, WHEEL_MS));
   };
   if (SCROLLBAR) return bars(s, load, value, wheel, await send('Browser.getVersion'));
+  if (MODE === 'overflow') return overflows(s, load, value, wheel, await send('Browser.getVersion'));
   await load(PAGE);
   console.log(`# ${(await send('Browser.getVersion')).product}\nop\tlength\tscrollLeft\tcaret x\tcaret columns`);
   await value("document.getElementById('s').focus()");
@@ -187,8 +207,10 @@ async function bars(s, load, value, wheel, version) {
     await load(html);
     await value("document.getElementById('s').focus()");
     if (name.startsWith('input')) for (let k = 1; k <= 60; k++) await s('Input.insertText', {text: 'W'});
-    for (const op of ['typed 60', 'wheel deltaX -100']) {
-      if (op !== 'typed 60') await wheel(-100, 0);
+    // a div's text starts at scrollLeft 0, so its control wheels right
+    const delta = name.startsWith('div') ? 100 : -100;
+    for (const op of ['typed 60', `wheel deltaX ${delta}`]) {
+      if (op !== 'typed 60') await wheel(delta, 0);
       const [width, left] = await value("[getComputedStyle(document.getElementById('s')).scrollbarWidth, document.getElementById('s').scrollLeft]");
       const shot = await s('Page.captureScreenshot', {format: 'png'});
       console.log(`${name}\t${op}\t${width}\t${left}\t${columns(Buffer.from(shot.data, 'base64'), GREEN)}`);
@@ -196,7 +218,33 @@ async function bars(s, load, value, wheel, version) {
   }
 }
 
+async function overflows(s, load, value, wheel, version) {
+  console.log(`# ${version.product}\ncase\top\toverflow-x\tscrollLeft\tcaret columns\tink columns`);
+  const at = async (name, op) => {
+    const [x, left] = await value("[getComputedStyle(document.getElementById('s')).overflowX, document.getElementById('s').scrollLeft]");
+    let caret = '-', ink = '-';
+    for (let k = 0; k < SHOTS && caret === '-'; k++) {
+      if (k) await new Promise(r => setTimeout(r, SHOT_GAP_MS));
+      const png = Buffer.from((await s('Page.captureScreenshot', {format: 'png'})).data, 'base64');
+      [caret, ink] = [columns(png, RED), columns(png, INK)];
+    }
+    console.log(`${name}\t${op}\t${x}\t${left}\t${caret}\t${ink}`);
+  };
+  for (const [name, css] of OVERFLOW_CASES) {
+    await load(`${STYLE}<style>#s{${css}}</style>${INPUT}`);
+    await value("document.getElementById('s').focus()");
+    for (let k = 1; k <= 60; k++) await s('Input.insertText', {text: 'W'});
+    await at(name, 'typed 60');
+    await wheel(-100, 0);
+    await at(name, 'wheel deltaX -100');
+    await value("document.getElementById('s').blur()");
+    await at(name, 'blur()');
+    await value("document.getElementById('s').focus()");
+    await at(name, 'focus()');
+  }
+}
+
 main().then(() => process.exit(0), error => {
-  console.error(`chromium-field-scroll: ${error.message}; rerun: node scripts/chromium-field-scroll.mjs${SCROLLBAR ? ' scrollbar' : ''}`);
+  console.error(`chromium-field-scroll: ${error.message}; rerun: node scripts/chromium-field-scroll.mjs${MODE ? ` ${MODE}` : ''}`);
   process.exit(1);
 });

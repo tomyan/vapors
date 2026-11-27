@@ -144,24 +144,25 @@ fn a_rounded_text_field_whose_padding_does_not_clear_its_corners_is_refused() {
 }
 
 #[test]
-fn a_rounded_text_field_that_does_not_scroll_is_refused_whatever_its_padding() {
-    // Given: padding that clears the corners, but `overflow: hidden`,
-    // whose clip is the square padding box
+fn a_rounded_text_field_with_overflow_hidden_scrolls_so_is_refused_by_its_padding() {
+    // Given: `overflow: hidden` scrolls a text field's text, as Chromium
+    // does (tests/field_overflow.rs), and 6 px padding falls short of
+    // an 8 px radius over a 1 px border
     let mut doc = document();
     let body = doc.body();
     let field = element(&mut doc, body, "input", "field");
     doc.set_attribute(field, "type", "text");
-    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 7px; overflow: hidden; }";
+    let css = ".field { display: block; width: 6em; border-radius: 8px; padding: 0 6px; overflow: hidden; }";
     doc.add_stylesheet("app.css", css).expect("parses");
 
     // When
     let errors = refusals(&mut doc);
 
-    // Then
+    // Then: the advice for scrolling text, not "or the clip"
     assert!(
-        errors.iter().any(|e| e.contains("border-radius")
-            && e.contains("or the clip")
-            && !e.contains("side padding")),
+        errors
+            .iter()
+            .any(|e| e.contains("border-radius") && e.contains("side padding")),
         "{errors:?}"
     );
 }
