@@ -72,11 +72,6 @@ fn a_click_toggles_it_and_paints_the_track_and_knob_of_each_state() {
     );
 }
 
-fn rgb(color: u32) -> vapors_scene::Color {
-    let [_, r, g, b] = color.to_be_bytes();
-    vapors_scene::Color::from_rgba8(r, g, b, 255)
-}
-
 #[test]
 fn space_toggles_the_focused_switch_and_enter_does_not() {
     // Given: focused by a click (then off again by Space)
