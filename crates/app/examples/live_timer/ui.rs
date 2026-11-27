@@ -195,11 +195,12 @@ fn clear(frame: &Frame<'_>, color: Color) {
 }
 
 /// A window whose loop ends before `--check` judges, or closed in an
-/// interactive run, still stops the application thread: its panic is
-/// printed, and the run exits 1.
+/// interactive run, still stops the application thread and prints its
+/// panic. An interactive run then exits 1; under `--check` the outcome
+/// stays unset, so `main` also says the check never judged.
 impl Drop for Window {
     fn drop(&mut self) {
-        if self.stop_and_report() {
+        if self.stop_and_report() && !self.check {
             self.outcome.set(Some(false));
         }
     }
