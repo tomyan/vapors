@@ -4,10 +4,10 @@
    placed by `left` where the top bar uses `right`, at its spec position
    and with its aria-label; a second, checked one is the state after a
    click, its knob moved by a `:checked +` rule of the shape the top bar
-   uses. Each is a
-   checkbox with `appearance: none` whose background is the track, and
-   its knob a decorative `aria-hidden` sibling that takes no pointer
-   (docs/appearance.md). The oracle holds the boxes, a click on the knob
+   uses (`live`'s knob does not move: no answer is taken after its
+   click). Each is a checkbox with `appearance: none` whose background
+   is the track, and its knob a decorative `aria-hidden` sibling that
+   takes no pointer (docs/appearance.md). The oracle holds the boxes, a click on the knob
    and Space, the role, name and checked state to Chromium, and that the
    knobs are not in the tree; the painted look is held by gui-bench's
    tests/switch_knob.rs. */

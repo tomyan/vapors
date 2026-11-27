@@ -2,7 +2,7 @@
 //! the checkbox's background (`appearance: none`) and its sibling knob.
 //! Its keyboard, name and checked state are in `switch_keys.rs`, its
 //! knob's shadow in `switch_knob.rs`; the corpus fixture `live_switch`
-//! holds the same to Chromium.
+//! holds its box, events, name and checked state to Chromium.
 use super::support::*;
 use crate::app::Mounted;
 use crate::dashboard::*;

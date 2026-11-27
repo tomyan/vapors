@@ -57,6 +57,12 @@ impl Switch {
         input
     }
 
+    /// The app's state for the switch: its signal, which the rest of the
+    /// page reads.
+    pub fn on(&self, mounted: &Mounted) -> bool {
+        (self.state)(&mounted.controls).get_untracked()
+    }
+
     /// Sets the switch's state through its signal, as a frame's state is set.
     pub fn set(&self, mounted: &Mounted, on: bool) {
         (self.state)(&mounted.controls).set(on);
