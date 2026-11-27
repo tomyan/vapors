@@ -32,8 +32,13 @@ pub(crate) fn paint_spans(
         }
         for &fragment in &fragments {
             if used.takes_pointer {
-                out.hits
-                    .push((span.node, crate::clip::within(input.clip, fragment)));
+                out.hits.push((
+                    span.node,
+                    crate::clip::within(
+                        input.clip.map(crate::clip::BoxClip::square_rect),
+                        fragment,
+                    ),
+                ));
                 out.cursors.insert(span.node, used.cursor);
             }
             if used.background.a > 0.0 {

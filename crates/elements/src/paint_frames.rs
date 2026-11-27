@@ -96,7 +96,9 @@ fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBas
     LaneBase {
         parent: clips.frame(container),
         origin,
-        inner: clips.inner(container),
+        inner: clips
+            .inner(container)
+            .map(crate::clip::BoxClip::square_rect),
     }
 }
 

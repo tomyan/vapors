@@ -158,7 +158,11 @@ struct BoxClips<'a, 'b> {
 }
 
 impl ClipInputs for BoxClips<'_, '_> {
-    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect> {
+    fn inner(
+        &self,
+        slot: usize,
+        own: Option<crate::clip::BoxClip>,
+    ) -> Option<crate::clip::BoxClip> {
         crate::clip::inner(self.boxes, self.rects, slot, own, self.input)
     }
 

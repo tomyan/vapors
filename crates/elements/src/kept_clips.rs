@@ -12,14 +12,14 @@
 use crate::slot_list::SlotList;
 use rustc_hash::FxHashSet;
 
+use crate::clip::BoxClip;
 use crate::clip_tree::ClipTree;
 use crate::frames::PAGE;
-use crate::layout::BoxRect;
 
 /// What clips read of each box.
 pub(crate) trait ClipInputs {
     /// What box `slot` gives its content, from `own`, its own clip.
-    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect>;
+    fn inner(&self, slot: usize, own: Option<BoxClip>) -> Option<BoxClip>;
     /// Whether box `slot` scrolls, so its content is a frame of its own.
     fn scrolls(&self, slot: usize) -> bool;
     /// Whether box `slot` is a lane child in a frame of its own: its own
@@ -35,8 +35,8 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 /// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
-    own: SlotList<Option<BoxRect>>,
-    inner: SlotList<Option<BoxRect>>,
+    own: SlotList<Option<BoxClip>>,
+    inner: SlotList<Option<BoxClip>>,
     frame: SlotList<usize>,
 }
 
@@ -78,16 +78,20 @@ impl Clips {
     /// Clips of slots with these `inner` clips in these frames, for
     /// tests.
     #[cfg(test)]
-    pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
+    pub(crate) fn with(inner: Vec<Option<crate::layout::BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
             own: vec![None; inner.len()].into(),
-            inner: inner.into(),
+            inner: inner
+                .into_iter()
+                .map(|clip| clip.map(BoxClip::square))
+                .collect::<Vec<_>>()
+                .into(),
             frame: frame.into(),
         }
     }
 
     /// Box `slot`'s own clip: the one it paints under.
-    pub(crate) fn own(&self, slot: usize) -> Option<BoxRect> {
+    pub(crate) fn own(&self, slot: usize) -> Option<BoxClip> {
         self.own[slot]
     }
 
@@ -97,7 +101,7 @@ impl Clips {
     }
 
     /// Box `slot`'s inner clip: the one it gives its content.
-    pub(crate) fn inner(&self, slot: usize) -> Option<BoxRect> {
+    pub(crate) fn inner(&self, slot: usize) -> Option<BoxClip> {
         self.inner[slot]
     }
 
@@ -204,7 +208,7 @@ impl Clips {
     /// The first slot whose clips differ from `other`'s, with both.
     pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
         let at = |clips: &Self, slot: usize| {
-            let get = |clips: &[Option<BoxRect>]| clips.get(slot).copied();
+            let get = |clips: &[Option<BoxClip>]| clips.get(slot).copied();
             (
                 get(&clips.own),
                 get(&clips.inner),

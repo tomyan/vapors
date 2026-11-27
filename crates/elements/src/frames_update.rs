@@ -98,7 +98,12 @@ impl Frames {
     fn clip_entered(&self, slot: usize, inputs: &FrameInputs<'_>) -> Option<Rect> {
         let snap = |clip| snapped(clip, self.scale);
         let widened = |r: Rect| Rect::new(r.left - 1.0, r.top - 1.0, r.right + 1.0, r.bottom + 1.0);
-        inputs.clips.inner(slot).map(snap).map(widened)
+        inputs
+            .clips
+            .inner(slot)
+            .map(crate::clip::BoxClip::square_rect)
+            .map(snap)
+            .map(widened)
     }
 
     /// Works out `start` and, below each frame that came out different,
@@ -159,7 +164,10 @@ impl Frames {
         );
         let own = (inputs.shift)(slot);
         if self.under_lane(outer, inputs.lane_frame) {
-            let inner = inputs.clips.inner(slot);
+            let inner = inputs
+                .clips
+                .inner(slot)
+                .map(crate::clip::BoxClip::square_rect);
             return self.insert_relative(slot, Relative { outer, own, inner });
         }
         let outer = self.at(outer);
@@ -167,7 +175,7 @@ impl Frames {
         let inner = inputs
             .clips
             .inner(slot)
-            .map(|clip| self.css_rect(outer, clip));
+            .map(|clip| self.css_rect(outer, clip.square_rect()));
         self.insert((slot, outer.class), shift, meet(inner, outer.clip))
     }
 

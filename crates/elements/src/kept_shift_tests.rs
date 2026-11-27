@@ -50,7 +50,7 @@ pub(super) fn shift_of(kept: &KeptBox, to: BoxFrom) -> Option<Shift> {
 fn a_whole_move_shifts_the_quad_and_cuts_the_hit_from_the_new_rect() {
     // Given: a part under a clip whose box moves to cross its bottom
     let mut part = kept(painting(rect(0.0, 0.0)), rect(0.0, 0.0));
-    part.from.clip = Some(rect(0.0, 20.0));
+    part.from.clip = Some(crate::clip::BoxClip::square(rect(0.0, 20.0)));
     part.own
         .scene
         .set_every_clip(Some(Rect::new(0.0, 20.0, 10.0, 30.0).into()));
@@ -75,12 +75,12 @@ fn a_whole_move_shifts_the_quad_and_cuts_the_hit_from_the_new_rect() {
 fn a_moved_clip_is_set_on_the_items_and_cuts_the_hit() {
     // Given: a part whose clip moves with it, as a clipping box's child's does
     let mut part = kept(painting(rect(0.0, 0.0)), rect(0.0, 0.0));
-    part.from.clip = Some(rect(0.0, 5.0));
+    part.from.clip = Some(crate::clip::BoxClip::square(rect(0.0, 5.0)));
     part.own
         .scene
         .set_every_clip(Some(Rect::new(0.0, 5.0, 10.0, 15.0).into()));
     let mut to = from(rect(0.0, 24.0));
-    to.clip = Some(rect(0.0, 29.0));
+    to.clip = Some(crate::clip::BoxClip::square(rect(0.0, 29.0)));
 
     // When
     let shift = shift_of(&part, to).expect("a clip that moved is set anew");

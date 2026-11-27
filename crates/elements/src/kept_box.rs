@@ -24,7 +24,7 @@ pub(crate) struct BoxFrom {
     /// Its border box, scroll offsets applied.
     pub(crate) rect: BoxRect,
     /// The clip of the boxes that cut it off.
-    pub(crate) clip: Option<BoxRect>,
+    pub(crate) clip: Option<crate::clip::BoxClip>,
     /// Its padding widths, for its padding and content box (% padding
     /// follows the containing block's width).
     pub(crate) padding: taffy::Rect<f32>,
@@ -58,7 +58,7 @@ impl BoxFrom {
     /// frame `frame`.
     pub(crate) fn of(
         (boxes, rects): (&[LayoutBox], &[BoxRect]),
-        (clip, frame): (Option<BoxRect>, usize),
+        (clip, frame): (Option<crate::clip::BoxClip>, usize),
         index: usize,
     ) -> Self {
         Self {

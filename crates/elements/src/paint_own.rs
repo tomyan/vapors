@@ -32,7 +32,8 @@ pub(crate) fn paint_own(
 fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painting) {
     let used = &input.used[&node];
     if used.visible && used.takes_pointer {
-        out.hits.push((node, crate::clip::within(input.clip, rect)));
+        let clip = input.clip.map(crate::clip::BoxClip::square_rect);
+        out.hits.push((node, crate::clip::within(clip, rect)));
         out.cursors.insert(node, used.cursor);
     }
     if !used.visible {

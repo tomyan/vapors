@@ -55,7 +55,10 @@ pub(crate) fn paint(
     let text = TextId(out.slabs.texts.insert(layout));
     let before = input.clip;
     clip_to(
-        Some(crate::clip::within(before, content)),
+        Some(crate::clip::BoxClip::square(crate::clip::within(
+            before.map(crate::clip::BoxClip::square_rect),
+            content,
+        ))),
         input,
         &mut out.scene,
     );

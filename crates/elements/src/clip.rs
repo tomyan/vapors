@@ -6,10 +6,49 @@
 //! one, whose containing block is the viewport (box 0, the root, which
 //! never clips).
 
+use std::num::NonZeroU32;
+
 use vapors_dom::NodeId;
 
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::PaintInput;
+
+/// A box's clip, CSS pixels: a rectangle, rounded when `rounded_by`
+/// names the box whose rounded padding box it is, whose radii it takes
+/// (flat-scene F3.2b, `docs/plans/flat-scene-f3.md`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct BoxClip {
+    /// The rectangle.
+    pub(crate) rect: BoxRect,
+    /// The slot of the box whose rounded padding box this is, plus 1, so
+    /// a kept box's clip stays 24 bytes (`kept_box_size_tests.rs`).
+    rounded_by: Option<NonZeroU32>,
+}
+
+impl BoxClip {
+    /// `rect` with square corners.
+    pub(crate) const fn square(rect: BoxRect) -> Self {
+        Self {
+            rect,
+            rounded_by: None,
+        }
+    }
+
+    /// The rectangle of a clip that must be square, as a scroll frame's
+    /// clip is: a scissor cuts square.
+    ///
+    /// # Panics
+    ///
+    /// When the clip is rounded.
+    pub(crate) fn square_rect(self) -> BoxRect {
+        assert!(
+            self.rounded_by.is_none(),
+            "a rounded clip {self:?} reached a place only a square clip can go (a scroll \
+             frame's clip, a hit's rectangle); reproduce with `cargo xtask test`"
+        );
+        self.rect
+    }
+}
 
 /// The clip box `index` gives its content, from `own`, the clip it
 /// paints under, CSS pixels, `None` for none: its padding box within
@@ -19,11 +58,15 @@ pub(crate) fn inner(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     index: usize,
-    own: Option<BoxRect>,
+    own: Option<BoxClip>,
     input: &PaintInput<'_>,
-) -> Option<BoxRect> {
+) -> Option<BoxClip> {
     if clipping(boxes, index, input) {
-        Some(within(own, content_clip(&boxes[index], rects[index])))
+        let own = own.map(BoxClip::square_rect);
+        Some(BoxClip::square(within(
+            own,
+            content_clip(&boxes[index], rects[index]),
+        )))
     } else {
         own
     }

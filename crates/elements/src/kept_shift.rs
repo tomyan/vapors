@@ -91,7 +91,10 @@ impl Shift {
             self.shift_scene(outline, slabs, scale);
         }
         if let Some((_, hit)) = kept.own.hits.first_mut() {
-            *hit = crate::clip::within(self.from.clip, self.from.rect);
+            *hit = crate::clip::within(
+                self.from.clip.map(crate::clip::BoxClip::square_rect),
+                self.from.rect,
+            );
         }
         kept.from = self.from;
     }
