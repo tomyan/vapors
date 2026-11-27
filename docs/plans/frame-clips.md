@@ -1,6 +1,6 @@
 # Frame clips on the clip table (before F3.2c)
 
-Status: slices 1 and 2 built (see "As built"); slice 3 is a proposal.
+Status: slices 1, 2 and 3 built (see "As built").
 
 ## Why
 
@@ -223,6 +223,38 @@ the rounded frame's entry. A frame's entry is on the page and met with
 its outer frames' rectangles, so the outer corners are lost. Trigger: the
 first real page that needs a frame crossing a rounded corner. Until
 then, `NestedFrame` refuses it.
+
+## As built: slice 3
+
+- `LaneDecline::LaneFrameRoundedClip` is removed, with
+  `LayoutBox::rounded_clip` and `Decoration::rounds_its_padding_box`,
+  which only fed it. A list whose own box rounds its clip frames its
+  rows. Their frame's clip takes its rounding (slice 2).
+- Measured: one row put in at the middle of 100 and of 1000 rows moves
+  and paints the same boxes under `overflow: hidden; border-radius: 8px`
+  as under `overflow: hidden`
+  (`a_row_put_in_a_rounded_list_costs_what_it_does_in_a_square_one`).
+  F3.2c had measured 306 and 3006 boxes painted while the list declined
+  to frame. A 4000-row rounded list (80,000 px) updates; before slice 2
+  it was refused.
+- `assert_no_parent_in` with entries given back: the dashboard does not
+  give any back. Its four order filters were toggled 10 times on 2000
+  orders and then scrolled, in release with the order card clipped: 776
+  frames, at most 6 entries held, none given back, mean 77 ns, max
+  710 ns. Its rows have no clip of their own, and a filter leaves the
+  frames, so the walk with entries given back is still unmeasured; on
+  the dashboard it would be at most 6 held times the entries given back.
+  (~/.cache/vapors-evidence/parent-check, NOTES.md and run-filters.sh.)
+
+**Blocker before rounded scrollers land:** two answers to "is this lane
+frame rounded". `kept_clips_round.rs` `round_frame` reads the container's
+rounded clip even when the container scrolls, and `paint_frames.rs`
+`lane_base` gives no rounding to a scrolling container. A rounded
+scroller whose rows are framed would keep its rows' scrollers as nested
+in a rounded frame that has no rounded clip, and `nested_frames` would
+panic. This is unreachable while `style/overflow.rs` refuses a rounded
+scroller. Rounded scrollers must make the two one answer, or hold them
+together with an assertion, before they land.
 
 ## Questions for the lead and Tom
 

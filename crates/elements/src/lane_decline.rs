@@ -90,14 +90,6 @@ pub enum LaneDecline {
     /// until lane frames are named apart (`docs/plans/splice-layout.md`,
     /// section 11.1). A scroll container inside a child is framed.
     LaneFrameScrollingChild,
-    /// A lane's children cannot be frames of their own because the
-    /// container clips them to rounded corners (`overflow: hidden` or
-    /// `clip` with a `border-radius`): a frame's clip is a scissor, which
-    /// cuts square, so its children keep the placement from before lane
-    /// frames and paint under the rounded clip (Tom, 2026-11-27,
-    /// `docs/plans/flat-scene-f3.md` F3.2b), until F3.1b puts frame
-    /// clips on the clip table.
-    LaneFrameRoundedClip,
     /// The items overflow the column's height and one of them can
     /// shrink (its `flex-shrink` is above 0 and its minimum height is
     /// below its hypothetical height), so its height depends on the
