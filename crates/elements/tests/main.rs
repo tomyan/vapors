@@ -13,6 +13,7 @@ mod compiled_winners;
 mod honoured_compiled;
 mod honoured_declared;
 mod paint_finite;
+mod rounded_clip;
 mod rust_sheets_refused;
 mod support;
 

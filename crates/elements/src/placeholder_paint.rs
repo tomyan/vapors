@@ -6,6 +6,7 @@
 //! content box. It is no hit, no mark and no part of the editor:
 //! the pointer and the selection never reach it.
 
+use crate::clip_rounded::Met;
 use vapors_scene::{Item, TextId};
 
 use crate::layout::{BoxRect, InlineRun, LayoutBox};
@@ -54,14 +55,14 @@ pub(crate) fn paint(
     let ink = layout.ink().offset(origin);
     let text = TextId(out.slabs.texts.insert(layout));
     let before = input.clip;
-    clip_to(
-        Some(crate::clip::BoxClip::square(crate::clip::within(
-            before.map(crate::clip::BoxClip::square_rect),
-            content,
-        ))),
-        input,
-        &mut out.scene,
-    );
+    // The field's content box is inside its own content clip, which a
+    // rounded clip it is under holds or the field is refused
+    // (`clip_refusals.rs`), so an overlap here is refused already.
+    let radii_of = |slot| crate::clip::radii(boxes, rects, slot, input);
+    let square = crate::clip::BoxClip::square(content);
+    let (Met::Clip(clip) | Met::Overlap(clip)) =
+        crate::clip_rounded::meet(before, square, &radii_of);
+    clip_to(Some(clip), (boxes, rects), input, &mut out.scene);
     out.scene.push(Item::Text { text, origin, ink });
-    clip_to(before, input, &mut out.scene);
+    clip_to(before, (boxes, rects), input, &mut out.scene);
 }

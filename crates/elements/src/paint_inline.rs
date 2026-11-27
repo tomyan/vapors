@@ -34,10 +34,7 @@ pub(crate) fn paint_spans(
             if used.takes_pointer {
                 out.hits.push((
                     span.node,
-                    crate::clip::within(
-                        input.clip.map(crate::clip::BoxClip::square_rect),
-                        fragment,
-                    ),
+                    crate::clip::within(input.clip.map(|clip| clip.rect), fragment),
                 ));
                 out.cursors.insert(span.node, used.cursor);
             }

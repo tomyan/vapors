@@ -75,10 +75,20 @@ impl<'a> Repaint<'a> {
         self.scratch.slabs = take(&mut painted.slabs);
         input.class = Some(painted.frames.class_of(from.frame));
         let clip = self.order.clips.own(slot);
-        clip_to(clip, input, &mut self.scratch.scene);
+        clip_to(
+            clip,
+            (self.boxes, self.rects),
+            input,
+            &mut self.scratch.scene,
+        );
         paint_box(self.boxes, self.rects, slot, input, &mut self.scratch);
         let own = Part::take(&mut self.scratch);
-        clip_to(clip, input, &mut self.scratch.scene);
+        clip_to(
+            clip,
+            (self.boxes, self.rects),
+            input,
+            &mut self.scratch.scene,
+        );
         let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
         crate::paint_outline::paint_outline(layout_box, rect, input, &mut self.scratch);
         painted.slabs = take(&mut self.scratch.slabs);
@@ -96,7 +106,13 @@ impl<'a> Repaint<'a> {
         for &slot in slots {
             let frame = kept_mut(painted, slot).from.frame;
             input.class = Some(painted.frames.class_of(frame));
-            clip_to(self.order.clips.own(slot), input, &mut self.scratch.scene);
+            let clip = self.order.clips.own(slot);
+            clip_to(
+                clip,
+                (self.boxes, self.rects),
+                input,
+                &mut self.scratch.scene,
+            );
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);

@@ -3,8 +3,9 @@
 //! and `scroll` and `auto`, which do that and make it a scroll
 //! container (`crate::scroll`). Axes that differ are refused: CSS turns
 //! `hidden` beside `visible` into a scroll container on one axis, and a
-//! one-axis `clip` is not built. A clip with rounded corners is refused
-//! until a slice needs it. The root's overflow, and the body's when the
+//! one-axis `clip` is not built. A scroll container with rounded
+//! corners is refused until F3.1b; `hidden` and `clip` round their clip
+//! (`clip_rounded.rs`). The root's overflow, and the body's when the
 //! root's is `visible`, belong to the viewport (CSS Overflow 3 section
 //! 3.3), which vapors does not scroll: there `scroll` and `auto` are
 //! refused.
@@ -37,17 +38,20 @@ pub(crate) fn overflow(reader: &mut Reader<'_>, style: &mut Style) {
     style.overflow = Point { x, y };
 }
 
-/// Refuses a clip with rounded corners, except on a text field whose
-/// text scrolls on x, so is clipped to its content box on x
-/// (`clip.rs`), clear of every corner's curve, where the rectangle is
-/// the rounded clip.
+/// Refuses a scroll container with rounded corners: its content's
+/// clip is its frame's, a scissor, which cuts square until F3.1b puts
+/// frame clips on the clip table (`docs/plans/flat-scene-f3.md` F3.2b).
+/// `hidden` and `clip` round their clip (`clip_rounded.rs`). A text
+/// field whose text scrolls on x is clipped to its content box on x
+/// (`clip.rs`), and is let through when that is clear of every corner's
+/// curve, where the rectangle is the rounded clip.
 pub(crate) fn refuse_rounded_clip(
     reader: &mut Reader<'_>,
     style: &Style,
     decoration: &Decoration,
     text_field: bool,
 ) {
-    if !clips(style) || decoration.radii.iter().all(|r| *r <= 0.0) {
+    if !scrolls(style) || decoration.radii.iter().all(|r| *r <= 0.0) {
         return;
     }
     let scrolling_text = text_field && style.overflow.x == Overflow::Scroll;
@@ -57,11 +61,11 @@ pub(crate) fn refuse_rounded_clip(
     let fix = if scrolling_text {
         "remove the radius, or give the field side padding at least its corners' radius less its border"
     } else {
-        "remove the radius or the clip"
+        "remove the radius, or use overflow: hidden or clip, which round their clip"
     };
     reader.refuse(
         OVERFLOW_X,
-        format!("clips to a box with a border-radius, and rounded clips are refused until a slice needs them (docs/F2c.md); {fix}"),
+        format!("scrolls a box with a border-radius, and a scroll container's clip is square until F3.1b (docs/plans/flat-scene-f3.md F3.2b); {fix}"),
     );
 }
 

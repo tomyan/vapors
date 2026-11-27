@@ -9,7 +9,9 @@ use vapors_dom::Dom;
 fn what_overflow_cannot_do_yet_is_refused_naming_it() {
     let cases = [
         ("overflow-x: clip; overflow-y: visible;", "overflow-y"),
-        ("overflow: hidden; border-radius: 4px;", "border-radius"),
+        // a rounded scroller: its frame's clip is a square scissor until
+        // F3.1b; `hidden` with a radius rounds its clip (rounded_clip.rs)
+        ("overflow: auto; border-radius: 4px;", "border-radius"),
     ];
     for (css, named) in cases {
         // Given

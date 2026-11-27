@@ -96,9 +96,8 @@ fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBas
     LaneBase {
         parent: clips.frame(container),
         origin,
-        inner: clips
-            .inner(container)
-            .map(crate::clip::BoxClip::square_rect),
+        // A rounded one is refused after paint (`clip_refusals.rs` `Frame`).
+        inner: clips.inner(container).map(|clip| clip.rect),
     }
 }
 

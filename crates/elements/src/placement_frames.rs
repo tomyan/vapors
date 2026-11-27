@@ -14,6 +14,15 @@ impl Walk<'_, '_> {
     pub(crate) fn frame_lane(&mut self, slot: usize, inner: (f32, f32)) -> bool {
         let lanes = self.boxes.lanes;
         let decision = lanes.framing(slot, f64::from(inner.1), self.boxes.scale);
+        let rounded = self.boxes.boxes[slot].rounded_clip;
+        let declined = Err(crate::lane_decline::LaneDecline::LaneFrameRoundedClip);
+        let decision = decision.map(|framable| {
+            if rounded {
+                framable.and(declined)
+            } else {
+                framable
+            }
+        });
         if let Some(Err(decline)) = decision {
             self.placed.unframed.push((slot, decline));
         }

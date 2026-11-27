@@ -101,7 +101,7 @@ impl Frames {
         inputs
             .clips
             .inner(slot)
-            .map(crate::clip::BoxClip::square_rect)
+            .map(|clip| clip.rect)
             .map(snap)
             .map(widened)
     }
@@ -164,10 +164,7 @@ impl Frames {
         );
         let own = (inputs.shift)(slot);
         if self.under_lane(outer, inputs.lane_frame) {
-            let inner = inputs
-                .clips
-                .inner(slot)
-                .map(crate::clip::BoxClip::square_rect);
+            let inner = inputs.clips.inner(slot).map(|clip| clip.rect);
             return self.insert_relative(slot, Relative { outer, own, inner });
         }
         let outer = self.at(outer);
@@ -175,7 +172,7 @@ impl Frames {
         let inner = inputs
             .clips
             .inner(slot)
-            .map(|clip| self.css_rect(outer, clip.square_rect()));
+            .map(|clip| self.css_rect(outer, clip.rect));
         self.insert((slot, outer.class), shift, meet(inner, outer.clip))
     }
 

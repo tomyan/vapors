@@ -45,6 +45,8 @@ mod checkbox_paint;
 mod clip;
 mod clip_chain;
 mod clip_chain_frames;
+mod clip_refusals;
+mod clip_rounded;
 mod clip_tree;
 mod compiled_sheets;
 mod corners;

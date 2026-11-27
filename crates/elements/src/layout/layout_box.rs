@@ -57,6 +57,10 @@ pub(crate) struct LayoutBox {
     pub(crate) checked: Option<bool>,
     /// Whether that checkbox is a switch (`switch.rs`).
     pub(crate) switch: bool,
+    /// Whether the element clips its content and has a corner radius, so
+    /// a lane it holds declines to frame its children
+    /// (`LaneDecline::LaneFrameRoundedClip`, `placement_frames.rs`).
+    pub(crate) rounded_clip: bool,
     /// Whether the element is a text or number field (E6a, 3-E3c).
     pub(crate) text_field: bool,
     /// The placeholder an empty text or number field shows, for paint
@@ -93,6 +97,7 @@ impl LayoutBox {
             range: None,
             checked: None,
             switch: false,
+            rounded_clip: false,
             text_field: false,
             placeholder: None,
             run_of_field: None,

@@ -133,6 +133,7 @@ pub(super) fn element_box(source: &Source<'_>, node: NodeId) -> (LayoutBox, Opti
         .get(node, "build")
         .element()
         .is_some_and(crate::switch::is_switch);
+    own.rounded_clip = style.clips() && style.decoration.radii.iter().any(|r| *r > 0.0);
     let field_text = super::field_box::fill(source, node, &mut own);
     (own, field_text)
 }
