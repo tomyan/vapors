@@ -39,10 +39,12 @@ runs:
     # code ran: the gpu job of run 45917865410 (attempt 1) and the window
     # job of run 46068857188, 2026-11-27. The source files naming it are
     # removed before the update; when none does, it says so and goes on.
+    # Remove this step once the image lists no such source, or once the
+    # source is signed again and stays so.
     - name: remove the runner image's packages.microsoft.com apt source
       shell: bash
       run: |
-        found=$(grep -rl --include="*.list" --include="*.sources" packages.microsoft.com /etc/apt || [ $? -eq 1 ])
+        found=$(grep -rlF --include="*.list" --include="*.sources" packages.microsoft.com /etc/apt || [ $? -eq 1 ])
         [ -n "$found" ] || { echo "no apt source names packages.microsoft.com"; exit 0; }
         echo "$found" | xargs sudo rm -v --
     - name: restore the .debs
