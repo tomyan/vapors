@@ -277,8 +277,10 @@ The six recommendations of the first draft are taken:
     lane once it has 32 rows. Its children then paint under the rounded
     clip on the table, and an insert repaints the rows after it; F3.1b,
     with frame clips on the table, would retire the decline. A framed
-    lane whose container's clip is rounded by a box above it is refused
-    naming F3.1b.
+    lane whose container's clip is rounded by a box above it was refused
+    naming F3.1b, until frame clips went on the table
+    (`docs/plans/frame-clips.md`, slice 2), which rounds its frame's
+    clip.
     Measured in F3.2c (2026-11-27, one row inserted mid-list, counts):
     under a rounded `overflow: hidden` list an insert painted 306 boxes
     at 100 rows and 3006 at 1000, against 6 under a square one (not

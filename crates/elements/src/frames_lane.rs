@@ -26,6 +26,9 @@ pub(crate) struct LaneBase {
     /// when it scrolls, its scroll frame clipping already, or clips
     /// nothing.
     pub(crate) inner: Option<BoxRect>,
+    /// `inner`'s rounding, when the container's clip is rounded: the
+    /// rounding box's padding radii, CSS pixels, and its slot.
+    pub(crate) rounding: Option<([f32; 4], usize)>,
 }
 
 /// The lanes the frames read and each framed container's base.

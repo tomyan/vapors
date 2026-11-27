@@ -8,6 +8,7 @@ fn a_batchs_clip_in_its_frame_is_moved_by_the_shift_and_cut_to_the_frames_clip()
     let frame = FrameDraw {
         shift: [0.0, -30.0],
         clip: Some(Rect::new(0.0, 0.0, 100.0, 50.0)),
+        rounded: None,
     };
 
     // When
@@ -25,6 +26,7 @@ fn a_batch_in_the_pages_frame_keeps_its_clip() {
     let page = FrameDraw {
         shift: [0.0; 2],
         clip: None,
+        rounded: None,
     };
     let clip = Some(Rect::new(10.0, 40.0, 90.0, 100.0));
 

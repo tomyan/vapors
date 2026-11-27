@@ -91,14 +91,38 @@ fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBas
             parent: container,
             origin,
             inner: None,
+            rounding: None,
         };
     }
+    let inner = clips.inner(container);
     LaneBase {
         parent: clips.frame(container),
         origin,
-        // A rounded one is refused after paint (`clip_refusals.rs` `Frame`).
-        inner: clips.inner(container).map(|clip| clip.rect),
+        inner: inner.map(|clip| clip.rect),
+        rounding: inner.and_then(|clip| rounding(clips, container, clip)),
     }
+}
+
+/// The radii and rounding box of lane container `container`'s clip
+/// `clip`, when it is rounded.
+///
+/// # Panics
+///
+/// When the box it names rounds nothing: `Clips` keeps a rounding for
+/// every box a clip names.
+fn rounding(
+    clips: &Clips,
+    container: usize,
+    clip: crate::clip::BoxClip,
+) -> Option<([f32; 4], usize)> {
+    let by = clip.rounded_by()?;
+    let (_, radii) = clips.rounding(by).unwrap_or_else(|| {
+        panic!(
+            "lane container {container}'s clip is rounded by box slot {by}, which rounds \
+             nothing (kept_clips.rs `rounding`); reproduce with `cargo xtask test`"
+        )
+    });
+    Some((radii, by))
 }
 
 /// `painted`'s frames made afresh for the scroll containers `thumbs`;

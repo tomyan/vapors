@@ -163,19 +163,28 @@ impl ClipInputs for BoxClips<'_, '_> {
         &self,
         slot: usize,
         own: Option<crate::clip::BoxClip>,
+        round: Option<usize>,
     ) -> crate::kept_clips::InnerClip {
         let inner = crate::clip::inner(self.boxes, self.rects, slot, own, self.input);
-        let framing = self.input.placement.framing.get(&slot);
-        let frames = self.scrolls(slot) || matches!(framing, Some(Ok(())));
+        // a framed lane under a rounded clip rounds its frame's clip
+        // (`frames_lane_prime.rs`); a scroller's stays refused
+        let scrolls = self.scrolls(slot);
         let clips = (own, inner.clip);
         let input = (self.boxes, self.rects, self.input);
         let field_text = crate::clip_refusals::field_text_overlaps(input, slot, clips);
         let overlaps = (inner.overlaps, field_text);
-        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, overlaps, frames);
+        let refused = crate::clip_refusals::of(&self.boxes[slot], clips, overlaps, scrolls);
+        let (in_round, nested) = round.map_or((None, None), |by| {
+            let framed = matches!(self.input.placement.framing.get(&slot), Some(Ok(())));
+            let clipping = crate::clip::clipping(self.boxes, slot, self.input);
+            let is_frame = scrolls || framed;
+            crate::clip_refusals::in_round_frame(&self.boxes[slot], by, (is_frame, clipping))
+        });
         crate::kept_clips::InnerClip {
             clip: inner.clip,
-            refused,
+            refused: refused.or(in_round),
             rounding: inner.rounding,
+            nested,
         }
     }
 

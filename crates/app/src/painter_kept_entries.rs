@@ -32,9 +32,16 @@ impl ScenePainter {
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
         // a run on the table is cut by its frame's clip there too
+        assert!(
+            moved.draw.clip.is_some() || moved.draw.rounded.is_none(),
+            "frame {:?} has a rounded clip and no square one: a lane's rounded clip comes with \
+             its container's clip (vapors-elements frames_lane_prime.rs `lane_template`); \
+             reproduce with `cargo xtask test`",
+            moved.frame
+        );
         let frame_clip = moved.draw.clip.filter(|_| run.clipped_by_table());
         let parent = match frame_clip {
-            Some(rect) => self.clips.frame_clip(target, (moved.frame, rect))?,
+            Some(rect) => self.frame_entries(target, (moved.frame, rect), moved.draw.rounded)?,
             None => 0,
         };
         // the scratch, reused batch after batch: no allocation a batch
@@ -51,6 +58,21 @@ impl ScenePainter {
             .transforms
             .rows_base(target, moved.rows_key, moved.offsets)?;
         Some((frame, clips, rows_base))
+    }
+
+    /// The entry a frame's item entries are under: its clip `rect`'s, or
+    /// its rounded clip's when it has one, that under the square one.
+    fn frame_entries(
+        &mut self,
+        target: &Target<'_>,
+        (frame, rect): (vapors_elements::BatchFrame, vapors_scene::Rect),
+        rounded: Option<vapors_scene::Clip>,
+    ) -> Option<u32> {
+        let square = self.clips.frame_clip(target, (frame, rect))?;
+        match rounded {
+            Some(round) => self.clips.frame_round(target, (frame, round, square)),
+            None => Some(square),
+        }
     }
 
     /// The entry of `clip` in `moved`'s frame, whose transform entry is

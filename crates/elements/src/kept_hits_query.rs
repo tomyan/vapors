@@ -40,7 +40,7 @@ impl KeptHits {
         point: [f32; 2],
         (frames, rounding): (&Frames, Rounding<'_>),
     ) -> bool {
-        if !holds(&frames.hit(frame, rect), point) {
+        if !holds(&frames.hit(frame, rect), point) || !frames.round_holds(frame, point) {
             return false;
         }
         let Some(&slot) = self.rounded.get(&label) else {

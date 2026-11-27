@@ -61,6 +61,8 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     let long = crate::clip_chain_frames::long_chains(&order, &mut painted, &again_slots);
     input.long_chains.extend(long);
+    let nested = crate::clip_refusals::nested_frames(&order.clips, &painted.frames);
+    input.frame_refused.extend(nested);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
     crate::paint_lane_ink::note_painted(&mut painted, input, (walked(&order), &patched));

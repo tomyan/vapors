@@ -1,7 +1,7 @@
 //! The started rows' lane frames resolved in one pass (`frames_lane.rs`;
 //! `docs/plans/splice-layout.md`, section 11.2, 4d).
 
-use super::super::{FrameAt, Frames, meet};
+use super::super::{FrameAt, FrameRound, Frames, meet};
 use super::LaneBase;
 use crate::paint::snapped;
 
@@ -41,10 +41,19 @@ impl Frames {
             Some(inner) => meet(Some(self.css_rect(outer, inner)), outer.clip),
             None => outer.clip,
         };
+        let rounded = base
+            .inner
+            .zip(base.rounding)
+            .map(|(inner, (radii, by))| FrameRound {
+                rect: self.css_rect(outer, inner),
+                radii,
+                by,
+            });
         FrameAt {
             shift: outer.shift,
             clip,
             device_clip: clip.map(|clip| snapped(clip, self.scale)),
+            rounded,
             class: outer.class,
         }
     }
