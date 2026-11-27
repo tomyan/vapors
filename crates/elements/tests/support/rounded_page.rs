@@ -53,3 +53,19 @@ pub fn fill_clip(doc: &Document) -> Option<Clip> {
         });
     fills.next().expect("the fill is painted")
 }
+
+/// A rounded card holding a list of 40 rows, a lane taller than the card,
+/// so its content clip is the card's rounded one; `css` added. The card,
+/// and the rows.
+pub fn card_list(css: &str) -> (Document, NodeId, Vec<NodeId>) {
+    let mut doc = document();
+    let body = doc.body();
+    let card = element(&mut doc, body, "div", "card");
+    let list = element(&mut doc, card, "div", "list");
+    let rows: Vec<NodeId> = (0..40)
+        .map(|_| element(&mut doc, list, "div", "row"))
+        .collect();
+    let css = format!("{CARD} .list {{ height: 400px; }} .row {{ height: 10px; }} {css}");
+    doc.add_stylesheet("page.css", &css).expect("parses");
+    (doc, card, rows)
+}

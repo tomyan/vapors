@@ -1,7 +1,6 @@
 # Frame clips on the clip table (before F3.2c)
 
-Status: slice 1 built (see "As built: slice 1"); slices 2 and 3 are
-proposals.
+Status: slices 1 and 2 built (see "As built"); slice 3 is a proposal.
 
 ## Why
 
@@ -175,17 +174,40 @@ held clear of its corners. That applies Tom's nesting rule to frames.
   (`Frames::round_holds`).
 - `RoundedRefusal::Frame` is now for scrollers only. A scroller's clip
   is not rounded while rounded scrollers are deferred.
-- At paint (`repaint.rs` `in_rounded_frame`, `clip_refusals.rs`
-  `in_frame`), a box in a rounded frame is refused when it is an img or
-  a gpu-surface (`Image`, `Surface`). It is also refused when it is a
-  frame of its own (a scroller or a framed lane) whose region on the
-  page is not held clear of the corners (`NestedFrame`, naming the
-  frame, the box that rounds the outer frame and this follow-up). The
-  debug fresh paint holds those refusals to the update's.
+- What a rounded frame refuses (`clip_refusals.rs`):
+  - Decided with each box's clips, not its place (`in_round_frame`, kept
+    by `Clips`, `kept_clips_round.rs`): a box in a rounded lane row is
+    refused when it is an img, a gpu-surface or an svg drawing shapes
+    (`Image`, `Surface`, `Svg`), which draw under the scissor. A framed
+    lane there that does not clip is refused too, since its rows reach
+    past its box (`NestedFrame`).
+  - A scroller or clipping framed lane in a rounded lane row is checked
+    after every paint against the frame's rounded clip on the page
+    (`nested_frames`, one check per such frame), because rows move with
+    none of their boxes painted again. One not held clear of the corners
+    is refused (`NestedFrame`, naming the frame, the box that rounds the
+    outer frame and this follow-up). One wider than the rounding box is
+    refused too, though its square clip would draw right: that is more
+    than needed, but loud.
+  - The debug fresh paint holds the after-paint refusals to the
+    update's. A box both refuse is reported once (`by_slot`).
+- An svg drawing shapes under a rounded item clip is refused (`Svg`),
+  which F3.2b missed. A path is tessellated into a mesh, and meshes draw
+  under the scissor. Before this, the painter's panic was the only
+  guard.
+- Elements' chain count counts a rounded lane row's boundary as two
+  links, the painter's rounded entry under its square one
+  (`clip_chain.rs` `boundary`), so it stays an upper bound on the
+  painter's chain, at most 3 today. `assert_no_parent_in` also refuses
+  giving back a frame's square entry while its rounded one is held.
 - `assert_no_parent_in` returns early when nothing is given back.
   Measured over 1723 frames of a 2000-order dashboard scrolled down and
   back, every call took that return: at most 5 entries held, none given
-  back, mean 70 ns, max 600 ns with the timer's own cost.
+  back, mean 70 ns, max 600 ns with the timer's own cost. Method: a
+  release `vapors-bench` with a temporary timer around the call
+  (`VAPORS_PARENT_TIMING`), not committed;
+  ~/.cache/vapors-evidence/parent-check (NOTES.md, run.sh). The walk
+  with entries given back was not reached, so it is not measured.
 
 **Follow-up: frame entries chained to their outer frame's.** A frame
 whose clip crosses a rounded frame's corners would need its entry under

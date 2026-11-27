@@ -136,12 +136,12 @@ impl Frames {
 }
 
 impl Frames {
-    /// `round` in device pixels: its rectangle snapped, its radii scaled
-    /// and fitted to it, as paint sets an item's (`paint.rs` `device_clip`).
+    /// `round` in device pixels, as paint sets an item's rounded clip:
+    /// `paint.rs` `device_clip`, the one answer.
     fn device_round(&self, round: crate::frames::FrameRound) -> vapors_scene::Clip {
-        let rect = crate::paint::snapped(round.rect, self.scale());
-        let radii = round.radii.map(|r| r * self.scale());
-        vapors_scene::Clip::rounded(rect, crate::corners::fitted(radii, rect))
+        let clip = crate::clip::BoxClip::rounded(round.rect, round.by);
+        let device = crate::paint::device_clip(Some(clip), self.scale(), &|_| round.radii);
+        device.expect("a clip given")
     }
 }
 

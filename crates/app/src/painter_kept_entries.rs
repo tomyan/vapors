@@ -32,6 +32,13 @@ impl ScenePainter {
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
         // a run on the table is cut by its frame's clip there too
+        assert!(
+            moved.draw.clip.is_some() || moved.draw.rounded.is_none(),
+            "frame {:?} has a rounded clip and no square one: a lane's rounded clip comes with \
+             its container's clip (vapors-elements frames_lane_prime.rs `lane_template`); \
+             reproduce with `cargo xtask test`",
+            moved.frame
+        );
         let frame_clip = moved.draw.clip.filter(|_| run.clipped_by_table());
         let parent = match frame_clip {
             Some(rect) => self.frame_entries(target, (moved.frame, rect), moved.draw.rounded)?,

@@ -110,7 +110,8 @@ fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> 
         sorted(fresh_frame),
         sorted(input.frame_refused.clone()),
         "the boxes a rounded frame refuses in a fresh paint differ from the update's (fresh \
-         first): a kept box's frame became rounded unseen (repaint.rs `in_rounded_frame`); \
+         first): the frames in a rounded lane frame (`Clips::nested`) or their places differ \
+         between the two (clip_refusals.rs `nested_frames`); \
          reproduce with `cargo xtask test`"
     );
     *input.cache = cache;

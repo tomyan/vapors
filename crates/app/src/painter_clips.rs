@@ -199,6 +199,10 @@ impl Clips {
         }
         let orphan = self.held.iter().find_map(|(key, held)| match key {
             Key::Item(_, _, parent) if released.contains(parent) => Some((held.at, *parent)),
+            // a rounded frame entry is under its frame's square one
+            Key::FrameRound(frame) if !self.held.contains_key(&Key::Frame(*frame)) => {
+                Some((held.at, 0))
+            }
             _ => None,
         });
         if let Some((at, parent)) = orphan {

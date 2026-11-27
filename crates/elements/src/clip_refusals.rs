@@ -25,6 +25,9 @@ pub(crate) enum RoundedRefusal {
     Image,
     /// A `gpu-surface` under a rounded clip, as an image.
     Surface,
+    /// An svg drawing shapes under a rounded clip: a path is tessellated
+    /// into a mesh, which draws under the scissor, as an image.
+    Svg,
     /// A scroll container that a rounded clip above it reaches: its
     /// content's clip is its frame's, which is not rounded while a rounded
     /// scroller is deferred (`docs/plans/frame-clips.md`).
@@ -60,6 +63,8 @@ pub(crate) fn of(
         Some(RoundedRefusal::Image)
     } else if rounded(own) && layout_box.surface.is_some() {
         Some(RoundedRefusal::Surface)
+    } else if rounded(own) && layout_box.svg_shapes.is_some() {
+        Some(RoundedRefusal::Svg)
     } else if frames && rounded(inner) {
         Some(RoundedRefusal::Frame)
     } else {
@@ -67,28 +72,51 @@ pub(crate) fn of(
     }
 }
 
-/// What a rounded frame, `round`, refuses of box `layout_box` painted in
-/// it: an img or a gpu-surface, which draw under the scissor; and a
-/// frame of its own (`frames`), its content's region on the page
-/// `region`, not held clear of the frame's corners (`clip_rounded.rs`
-/// `holds`). The first frame entries chain to their outer frame's lifts
-/// the second (`docs/plans/frame-clips.md`, the follow-up).
-pub(crate) fn in_frame(
+/// What a lane frame rounded by box `by` refuses of box `layout_box` in
+/// it, decided with its clips, not its place: an img, a gpu-surface and
+/// an svg drawing shapes, which draw under the scissor; and a framed
+/// lane that does not clip (`is_frame`, `clips`), whose rows' reach is
+/// not its box. A frame that clips is returned to be checked against the
+/// corners after paint (`nested_frames`), as rows move with none of their
+/// boxes painted again.
+pub(crate) fn in_round_frame(
     layout_box: &LayoutBox,
-    round: crate::frames::FrameRound,
-    (frames, region): (bool, BoxRect),
-) -> Option<RoundedRefusal> {
-    if layout_box.image.is_some() {
+    by: usize,
+    (is_frame, clips): (bool, bool),
+) -> (Option<RoundedRefusal>, Option<usize>) {
+    let refused = if layout_box.image.is_some() {
         Some(RoundedRefusal::Image)
     } else if layout_box.surface.is_some() {
         Some(RoundedRefusal::Surface)
-    } else if frames && !crate::clip_rounded::holds(round.rect, round.radii, region) {
-        Some(RoundedRefusal::NestedFrame {
-            rounded_by: round.by,
-        })
+    } else if layout_box.svg_shapes.is_some() {
+        Some(RoundedRefusal::Svg)
+    } else if is_frame && !clips {
+        Some(RoundedRefusal::NestedFrame { rounded_by: by })
     } else {
         None
-    }
+    };
+    (refused, (refused.is_none() && is_frame).then_some(by))
+}
+
+/// The frames in a rounded lane frame not held clear of its corners
+/// (`clip_rounded.rs` `holds`), each refused as `NestedFrame`: their
+/// content clips on the page against the frame's rounded clip, every
+/// update, one check a frame (`Clips::nested`). The first frame entries
+/// chain to their outer frame's lifts this (`docs/plans/frame-clips.md`,
+/// the follow-up).
+pub(crate) fn nested_frames(
+    clips: &crate::kept_clips::Clips,
+    frames: &crate::frames::Frames,
+) -> Vec<(usize, RoundedRefusal)> {
+    let crosses = |&(slot, by): &(usize, usize)| {
+        let frame = clips.frame(slot);
+        let round = frames.get(frame).and_then(|at| at.rounded)?;
+        let clip = clips.inner(slot)?;
+        let region = frames.on_page(frame, clip.rect);
+        let held = crate::clip_rounded::holds(round.rect, round.radii, region);
+        (!held).then_some((slot, RoundedRefusal::NestedFrame { rounded_by: by }))
+    };
+    clips.nested().iter().filter_map(crosses).collect()
 }
 
 /// Whether box `slot` of `boxes` at `rects` is a text field whose content
@@ -117,6 +145,18 @@ pub(crate) fn field_text_overlaps(
     };
     // one check when the field does not clip, and gives what it is under
     crosses(own) || (inner != own && crosses(inner))
+}
+
+/// `clips`' refusals and the rounded frames' `frames`, one a slot, in
+/// slot order: a box both refuse is counted once.
+pub(crate) fn by_slot(
+    clips: Vec<(usize, RoundedRefusal)>,
+    frames: Vec<(usize, RoundedRefusal)>,
+) -> Vec<(usize, RoundedRefusal)> {
+    let mut refused = [clips, frames].concat();
+    refused.sort_unstable();
+    refused.dedup_by_key(|&mut (slot, _)| slot);
+    refused
 }
 
 impl Document {
@@ -179,6 +219,11 @@ fn message(element: &str, why: RoundedRefusal, others: usize) -> String {
         RoundedRefusal::Image => (
             "is an img under a rounded clip, and an image draws under a square scissor until \
              F3.1b",
+            "remove the border-radius or the clip from the box above it",
+        ),
+        RoundedRefusal::Svg => (
+            "is an svg drawing shapes under a rounded clip, and a path draws as a mesh under a \
+             square scissor until F3.1b",
             "remove the border-radius or the clip from the box above it",
         ),
         RoundedRefusal::Surface => (
