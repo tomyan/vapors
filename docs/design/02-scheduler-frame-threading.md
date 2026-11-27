@@ -97,6 +97,8 @@ from this box.
 
 ## Threading
 
+> Overridden on desktop by Tom's decision of 2026-11-22: app-authored code, including handlers and every continuation after an `.await`, runs on a dedicated application thread with Tokio timers and IO, and winit owns the UI thread. Frame preparation moves with app code; by default frames are also submitted and presented on the application thread (chosen, awaiting measurement), with UI-thread presentation kept available through an owned frame description (`docs/plans/desktop-app-thread.md`, section 4 and 4a). This section is rewritten when F1 lands.
+
 **The rule: the UI thread owns the graph, the tree, the scene and the
 GPU queue's submission order.** Nothing else touches them. Everything
 else is a worker that takes owned data and returns owned data through
