@@ -92,6 +92,46 @@ and their parent in the container frame's.
      list's 6. A 4000-row rounded list updates.
    - Then F3.2c's branch rebases and ships.
 
+## As built: slice 1
+
+Answered (entry 99, action 43, the lead within Tom's approved work): the
+scissor stays as the bounding rectangle, slice 1 lands alone, and the
+repaint policy under a rounded item clip waits for a measurement.
+Rounded scrollers stay outside the agreed scope.
+
+Built (`crates/app/src/painter_clips.rs` `frame_clip`,
+`painter_kept_entries.rs`) differently from the proposal above in one
+respect: a frame's entry is its clip **on the page**, under transform
+entry 0, the identity, not under its outer frame's transform.
+- `FrameDraw::clip` is already the frame's clip met with its outer
+  frames', so an entry needs no parent of its own. Every chain is at most
+  two links, an item's clip and its frame's.
+- The entry is held by its frame (a lane's rows are one frame,
+  `BatchFrame::lane`, so they share it), not by its rectangle. A frame's
+  clip does not move when its own content scrolls, so that scroll writes
+  nothing. When an outer frame scrolls, a nested frame's entry is set
+  again in place, one write per nested frame in view. Its index stays,
+  so the entries under it and the kept bytes naming them stay. Holding
+  it by its rectangle gave it a new index on every outer scroll, and
+  vapors-perf's `gpu_f3_baselines` caught that: nested scrollers wrote
+  18 batches where 2 are written, and code blocks 6 where 3 are.
+- Elements' chain count (`clip_chain_frames.rs`), a link per enclosing
+  frame, stays an upper bound on the painter's two. Holding the two to
+  one answer is left to slice 2, where a rounded frame clip cannot be
+  folded into its outer frames' rectangle and chains grow.
+
+Tests (`crates/app/src/painter_frame_clips_tests.rs`, GPU tier): with
+every scissor widened to the target (a `cfg(test)` field), each of these
+ends at the list's bottom, with the same pixels as under the scissor:
+- a clipping row crossing a scroll frame's edge (its entry under the
+  frame's);
+- a row with no clip (its entry the frame's);
+- a framed lane's clipping row (its entry, in its row's transform, under
+  the lane template's).
+
+`tests/gpu_clip_entries.rs` counts one entry more for the list's frame
+clip, and a scroll still writes only the two row entries.
+
 ## Questions for the lead and Tom
 
 1. **Keep the scissor as the bounding rectangle** (recommended), or

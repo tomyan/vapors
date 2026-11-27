@@ -21,12 +21,25 @@ use vapors_scene::{Clip, Rect};
 /// The table, and the entry each frame's clip holds in it.
 pub(super) struct Clips {
     pub(super) table: ClipTable,
-    held: HashMap<(BatchFrame, [u32; 8]), Held>,
+    held: HashMap<Key, Held>,
     /// Counts the frames: an entry drawn in this one has it as `drawn`.
     frame: u64,
     /// The scratch a batch's clip entries are worked out in, reused batch
     /// after batch so a frame allocates none (`painter_kept_entries.rs`).
     pub(super) runs: Vec<(u32, u32)>,
+}
+
+/// What an entry is held by.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Key {
+    /// An item clip: its frame, its edges and radii, and the entry it is
+    /// under.
+    Item(BatchFrame, [u32; 8], u32),
+    /// A frame's clip, by the frame alone: when an outer frame scrolls,
+    /// the clip moves on the page and its entry is set again in place,
+    /// so the entries under it, and the kept bytes naming them, stay
+    /// (vapors-perf `gpu_f3_baselines`).
+    Frame(BatchFrame),
 }
 
 /// An entry held: where, the frame entry it names, and the frame that
@@ -65,8 +78,9 @@ impl Clips {
     }
 
     /// The entry of `clip`, in `frame` whose transform entry is
-    /// `frame_entry`, set to them for this frame; `None` when the table
-    /// could not grow (the refusal is on the target's encoder).
+    /// `frame_entry`, under entry `parent` (its frame's clip, 0 for
+    /// none), set to them for this frame; `None` when the table could not
+    /// grow (the refusal is on the target's encoder).
     ///
     /// # Panics
     ///
@@ -76,7 +90,7 @@ impl Clips {
         &mut self,
         target: &Target<'_>,
         (frame, frame_entry): (BatchFrame, u32),
-        clip: Clip,
+        (clip, parent): (Clip, u32),
     ) -> Option<u32> {
         assert_whole(clip.rect());
         assert!(
@@ -85,29 +99,45 @@ impl Clips {
              in its frame, whose own clip is the scissor (painter_runs.rs), and only a clip put on \
              the page carries one (vapors-scene clip.rs `cut`); reproduce with `cargo xtask test`"
         );
-        let key = (frame, bits(clip));
+        let entry = ClipEntry::rounded(edges(clip.rect()), clip.radii(), frame_entry).under(parent);
+        self.held_entry(target, Key::Item(frame, bits(clip), parent), entry)
+    }
+
+    /// The entry of `frame`'s clip `rect`, on the page (device pixels,
+    /// transform entry 0, the identity): what every entry of the frame's
+    /// items on the table is under, and the entry of its items with no
+    /// clip of their own (`docs/plans/frame-clips.md`, slice 1). Held by
+    /// the frame, set to `rect` each frame drawn: a frame's own scroll
+    /// leaves its clip where it is; an outer frame's moves it, in place.
+    /// `None` when the table could not grow.
+    ///
+    /// # Panics
+    ///
+    /// When an edge of `rect` is not a whole device pixel.
+    pub(super) fn frame_clip(
+        &mut self,
+        target: &Target<'_>,
+        (frame, rect): (BatchFrame, Rect),
+    ) -> Option<u32> {
+        assert_whole(rect);
+        let entry = ClipEntry::rounded(edges(rect), [0.0; 4], 0);
+        self.held_entry(target, Key::Frame(frame), entry)
+    }
+
+    /// The entry held by `key`, taken when it is not, set to `entry` for
+    /// this frame.
+    fn held_entry(&mut self, target: &Target<'_>, key: Key, entry: ClipEntry) -> Option<u32> {
         let at = match self.held.get(&key) {
             Some(held) => held.at,
             None => self.table.take(target.encoder, 1)?,
         };
-        let rect = [
-            clip.rect().left,
-            clip.rect().top,
-            clip.rect().right,
-            clip.rect().bottom,
-        ];
-        self.table.set(
-            target.encoder,
-            target.queue,
-            at,
-            ClipEntry::rounded(rect, clip.radii(), frame_entry),
-        );
-        self.hold(key, at, frame_entry);
+        self.table.set(target.encoder, target.queue, at, entry);
+        self.hold(key, at, entry.frame);
         Some(at)
     }
 
     /// `at` held for `key`, naming `frame_entry`, drawn this frame.
-    fn hold(&mut self, key: (BatchFrame, [u32; 8]), at: u32, frame_entry: u32) {
+    fn hold(&mut self, key: Key, at: u32, frame_entry: u32) {
         let drawn = self.frame;
         self.held.insert(
             key,
@@ -154,6 +184,11 @@ impl Clips {
             );
         }
     }
+}
+
+/// `rect`'s edges as a clip entry holds them.
+fn edges(rect: Rect) -> [f32; 4] {
+    [rect.left, rect.top, rect.right, rect.bottom]
 }
 
 /// Panics, naming the clip, when an edge of `clip` is not a whole device

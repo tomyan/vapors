@@ -51,6 +51,12 @@ impl ScenePainter {
                 continue;
             };
             let scissor = Self::scissor((target, &clipped), batch, frame);
+            #[cfg(test)]
+            let scissor = if self.scissor_widened {
+                *target
+            } else {
+                scissor
+            };
             self.draw_placed(&scissor, (painted, kept), (places, at, frame))?;
         }
         Ok(())
@@ -193,3 +199,7 @@ pub(super) fn table_clip(run: &Run, clip: Option<Clip>) -> Option<Clip> {
 #[cfg(test)]
 #[path = "painter_runs_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "painter_frame_clips_tests.rs"]
+mod frame_clips_tests;
