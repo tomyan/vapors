@@ -34,7 +34,7 @@ pub(crate) struct Shift {
     /// The move in device pixels, whole.
     delta: [f32; 2],
     /// The new clip in device pixels, as paint sets it on each item.
-    clip: Option<Rect>,
+    clip: Option<vapors_scene::Clip>,
 }
 
 impl Shift {
@@ -73,8 +73,8 @@ impl Shift {
             && part.own.positions_only_in_scene_and_hits()
             && hits_shiftable(part, content)
             && items_shiftable(part, content)
-            && under_one_clip(part, part.from.clip.map(|clip| snapped(clip, scale)));
-        let clip = from.clip.map(|clip| snapped(clip, scale));
+            && under_one_clip(part, crate::paint::device_clip(part.from.clip, scale));
+        let clip = crate::paint::device_clip(from.clip, scale);
         shiftable.then_some(Self {
             slot,
             from,
@@ -110,7 +110,7 @@ impl Shift {
                 | Item::Shape(_)) => shifted_item(moved, self.delta),
             };
         }
-        scene.clips_mut().fill(self.clip);
+        scene.set_every_clip(self.clip);
     }
 }
 
@@ -196,9 +196,9 @@ fn items_shiftable(part: &KeptBox, content: &Content) -> bool {
 
 /// Whether every item of `part` is under `clip`, the part's own, so
 /// setting the new clip on every item is what paint does.
-fn under_one_clip(part: &KeptBox, clip: Option<Rect>) -> bool {
-    let own = part.own.scene.clips().iter().all(|each| *each == clip);
-    own && part.outline().clips().iter().all(|each| *each == clip)
+fn under_one_clip(part: &KeptBox, clip: Option<vapors_scene::Clip>) -> bool {
+    let own = part.own.scene.clips().all(|each| each == clip);
+    own && part.outline().clips().all(|each| each == clip)
 }
 
 #[cfg(test)]

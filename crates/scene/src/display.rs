@@ -3,6 +3,7 @@
 //! top-left of the target, y down.
 
 use crate::Color;
+use crate::clip::Clip;
 use crate::shape::Shape;
 
 /// An axis-aligned rectangle in device pixels.
@@ -166,12 +167,21 @@ pub enum Item {
 }
 
 /// Items in painting order: later items draw over earlier ones, each
-/// with the clip that was set when it was pushed.
-#[derive(Clone, Debug, Default, PartialEq)]
+/// with the clip that was set when it was pushed. Each item names its
+/// clip by its place in the scene's own list of the clips it uses
+/// (`scene_clips.rs`), 4 bytes an item where a clip is 32: a kept box
+/// holds a scene, and its slot is held to a budget
+/// (`vapors-elements` `kept_box_size_tests.rs`).
+#[derive(Clone, Debug, Default)]
 pub struct Scene {
-    items: Vec<Item>,
-    clips: Vec<Option<Rect>>,
-    clip: Option<Rect>,
+    pub(crate) items: Vec<Item>,
+    /// Each item's clip: 0 for none, else 1 + its place in `palette`.
+    pub(crate) clip_of: Vec<u32>,
+    /// The distinct clips the items name, in the order first set; none
+    /// until a clip is set.
+    pub(crate) palette: Option<Box<[Clip]>>,
+    /// The clip the next item is pushed under, as `clip_of` names one.
+    pub(crate) pen: u32,
 }
 
 impl Scene {
@@ -180,8 +190,9 @@ impl Scene {
     pub const fn new() -> Self {
         Self {
             items: Vec::new(),
-            clips: Vec::new(),
-            clip: None,
+            clip_of: Vec::new(),
+            palette: None,
+            pen: 0,
         }
     }
 
@@ -189,13 +200,19 @@ impl Scene {
     /// clip.
     pub fn push(&mut self, item: Item) {
         self.items.push(item);
-        self.clips.push(self.clip);
+        self.clip_of.push(self.pen);
     }
 
-    /// Clips the items pushed from now on to `clip` (device pixels), or
-    /// lifts the clip with `None`.
+    /// Clips the items pushed from now on to `clip` (device pixels), a
+    /// rectangle, or lifts the clip with `None`.
     pub fn set_clip(&mut self, clip: Option<Rect>) {
-        self.clip = clip;
+        self.set_rounded_clip(clip.map(Clip::square));
+    }
+
+    /// Clips the items pushed from now on to `clip` (device pixels), which
+    /// may have rounded corners, or lifts the clip with `None`.
+    pub fn set_rounded_clip(&mut self, clip: Option<Clip>) {
+        self.pen = self.name(clip);
     }
 
     /// The items, first drawn first.
@@ -207,16 +224,5 @@ impl Scene {
     /// The items, to change in place; their clips stay.
     pub fn items_mut(&mut self) -> &mut [Item] {
         &mut self.items
-    }
-
-    /// Each item's clip, in the order of [`Scene::items`].
-    #[must_use]
-    pub fn clips(&self) -> &[Option<Rect>] {
-        &self.clips
-    }
-
-    /// Each item's clip, to change in place.
-    pub fn clips_mut(&mut self) -> &mut [Option<Rect>] {
-        &mut self.clips
     }
 }

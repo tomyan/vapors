@@ -6,14 +6,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use vapors_scene::{IconId, ImageId, Item, Rect, Scene, SurfaceId, TextId};
+use vapors_scene::{IconId, ImageId, Item, Scene, SurfaceId, TextId};
 
 use crate::paint_order::Step;
 use crate::painted::Painted;
 use crate::slab::{Named, Slabs};
 
 /// One scene item with its clip and the step that painted it.
-type Placed = (Item, Option<Rect>, Step);
+type Placed = (Item, Option<vapors_scene::Clip>, Step);
 
 /// The first scene item at which `kept` and `fresh` differ, ids
 /// resolved, with the steps (each naming its slot) that painted it.
@@ -34,9 +34,9 @@ fn placed(painted: &Painted) -> Vec<Placed> {
 
 /// `scene`'s items, each with its clip and `step`.
 fn step_items((step, scene): (Step, &Scene)) -> impl Iterator<Item = Placed> + '_ {
-    let clips = scene.clips().iter();
+    let clips = scene.clips();
     let items = scene.items().iter().zip(clips);
-    items.map(move |(item, clip)| (*item, *clip, step))
+    items.map(move |(item, clip)| (*item, clip, step))
 }
 
 /// Whether two placed items and their clips are the same, ids resolved.

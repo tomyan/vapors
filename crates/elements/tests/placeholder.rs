@@ -40,7 +40,7 @@ fn texts(page: &Page) -> Vec<Painted> {
                 run.color,
                 run.size,
                 *origin,
-                *clip,
+                clip.map(|clip| clip.rect),
                 layout.height(),
             ));
         }

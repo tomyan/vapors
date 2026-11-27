@@ -51,12 +51,12 @@ impl ScenePainter {
     fn clip_entry(
         &mut self,
         target: &Target<'_>,
-        (frame, clip): (u32, vapors_scene::Rect),
+        (frame, clip): (u32, vapors_scene::Clip),
         moved: &Moved<'_>,
     ) -> Option<u32> {
         let at = self.clips.entry(target, (moved.frame, frame), clip)?;
         let tables = (&self.transforms.table, &self.clips.table);
-        crate::painter::clips::assert_agrees(tables, at, (clip, moved.draw));
+        crate::painter::clips::assert_agrees(tables, at, (clip.rect, moved.draw));
         Some(at)
     }
 }

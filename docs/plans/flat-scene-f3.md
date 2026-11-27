@@ -247,6 +247,25 @@ The six recommendations of the first draft are taken:
 - **F3.2:** rounded clips with the radii rules, the four refusals
   retired (each test converted into a test of the clip drawn), the
   elliptical refusal, the Chromium fixture, hit testing.
+  In parts (entry 47, 2026-11-27; the order card first):
+  - **F3.2a:** the scene's clip a rectangle with corner radii
+    (`vapors-scene` `Clip`), carried by the painter into the clip
+    table (an entry per clip and radii); a run the scissor clips
+    (images, surfaces, meshes) under a rounded clip refused; a rounded
+    clip cut on the page by a frame it does not fit keeps its corners
+    and the frame as `outer`, which the table refuses (a batch's clips
+    are in its frame, whose clip is the scissor). No CSS change.
+  - **F3.2b:** `overflow: hidden` or `clip` with a radius clips
+    descendants' quads, shadows, shapes, text and icons to the padding
+    box's radii (item 13), hit testing by the rounded shape (item 14),
+    the overflow refusal retired, a Chromium paint and events fixture.
+    A rounded clip meets another clipping ancestor only where one holds
+    the other (Tom, 2026-11-27); any other overlap is refused naming
+    clip chains, which would retire it. An image, surface or svg under
+    a rounded clip stays refused until F3.1b moves them onto the table.
+  - **F3.2c:** gui-bench's order card clips its rows, its header's own
+    corners and the relaxed guard retired, compared with zgui idle and
+    with the last row hovered.
 - **F3.3 (on a measurement):** batches joined across frames, if W4
   shows draws costing more than the fragment work a union scissor
   would add.

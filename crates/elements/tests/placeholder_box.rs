@@ -27,7 +27,7 @@ fn placeholder(css: &str) -> Vec<([f32; 2], Option<Rect>, f32)> {
         if let Item::Text { text, origin, .. } = item {
             let layout = painted.text(*text);
             if layout.text() == "Search" {
-                found.push((*origin, *clip, layout.height()));
+                found.push((*origin, clip.map(|clip| clip.rect), layout.height()));
             }
         }
     }

@@ -87,7 +87,12 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         boxes: border_boxes(painted, &nodes),
         styles,
         items: items(painted),
-        clips: painted.scene().to_scene().clips().to_vec(),
+        clips: painted
+            .scene()
+            .to_scene()
+            .clips()
+            .map(|clip| clip.map(|clip| clip.rect))
+            .collect(),
         hits: hits(painted, viewport),
         focus,
         selections,

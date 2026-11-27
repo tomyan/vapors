@@ -53,8 +53,7 @@ fn a_whole_move_shifts_the_quad_and_cuts_the_hit_from_the_new_rect() {
     part.from.clip = Some(rect(0.0, 20.0));
     part.own
         .scene
-        .clips_mut()
-        .fill(Some(Rect::new(0.0, 20.0, 10.0, 30.0)));
+        .set_every_clip(Some(Rect::new(0.0, 20.0, 10.0, 30.0).into()));
     let mut to = from(rect(0.0, 24.0));
     to.clip = part.from.clip;
 
@@ -79,8 +78,7 @@ fn a_moved_clip_is_set_on_the_items_and_cuts_the_hit() {
     part.from.clip = Some(rect(0.0, 5.0));
     part.own
         .scene
-        .clips_mut()
-        .fill(Some(Rect::new(0.0, 5.0, 10.0, 15.0)));
+        .set_every_clip(Some(Rect::new(0.0, 5.0, 10.0, 15.0).into()));
     let mut to = from(rect(0.0, 24.0));
     to.clip = Some(rect(0.0, 29.0));
 
@@ -90,8 +88,8 @@ fn a_moved_clip_is_set_on_the_items_and_cuts_the_hit() {
 
     // Then
     assert_eq!(
-        part.own.scene.clips(),
-        [Some(Rect::new(0.0, 29.0, 10.0, 39.0))]
+        part.own.scene.clips().collect::<Vec<_>>(),
+        [Some(Rect::new(0.0, 29.0, 10.0, 39.0).into())]
     );
     assert_eq!(part.own.hits, [(NODE, rect(0.0, 24.0).cut_to(29.0, 39.0))]);
 }
