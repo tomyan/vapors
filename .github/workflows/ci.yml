@@ -372,6 +372,13 @@ jobs:
       # the loop is LoopClosed. Step text cleared by Tom 2026-11-10.
       - name: a gpu-surface in a window, idle, invalidated, animating and stopped
         run: xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
+      # The Live timer on the application thread (desktop-app-thread.md,
+      # L1b): handlers, toggles and ticks on that thread, no frame and no
+      # turns with Live off beyond the script's, one frame per tick within
+      # 50 ms, 80 to 120 ms between ticks, Live off disposing the interval.
+      # Its own watchdog ends a hung run at 15 s.
+      - name: the Live timer on the application thread, in a window
+        run: xvfb-run -a cargo run -p vapors-app --example live_timer -- --check
       # The clipboard's image for Event::Paste: a PNG xclip sets reads
       # back as its pixels, text alone as no image, an unreachable
       # display as unreadable.
