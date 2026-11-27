@@ -1,9 +1,10 @@
 <style>
 /* viewport 800x100 */
-/* The gui-bench top bar's live switch (`ui/topbar.wisp`): its rules, placed
-   by `left` here where the top bar uses `right`, at its spec position,
-   with the aria-label it has there; the knob is moved by `:checked +`, as
-   there; a second, checked one is the state after a click. Each is a
+/* The gui-bench top bar's live switch (`ui/topbar.wisp`): its rules,
+   placed by `left` where the top bar uses `right`, at its spec position
+   and with its aria-label; a second, checked one is the state after a
+   click, its knob moved by a `:checked +` rule of the shape the top bar
+   uses. Each is a
    checkbox with `appearance: none` whose background is the track, and
    its knob a decorative `aria-hidden` sibling that takes no pointer
    (docs/appearance.md). The oracle holds the boxes, a click on the knob
@@ -16,7 +17,6 @@ body { margin: 0; height: 64px; position: relative; }
 .live-knob { position: absolute; top: 23px; width: 18px; height: 18px; border-radius: 9px; background-color: #ffffff; box-shadow: 0 1px 3px #11182740; pointer-events: none; }
 #live { left: 736px; }
 #live + .live-knob { left: 738px; }
-#live:checked + .live-knob { left: 756px; }
 #on { left: 600px; }
 #on + .live-knob { left: 602px; }
 #on:checked + .live-knob { left: 620px; }

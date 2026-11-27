@@ -2,17 +2,21 @@
 //! state's signal, its name, and what the tree says of it.
 use super::support::by_class;
 use crate::app::Mounted;
+use crate::controls::Controls;
 use crate::dashboard::*;
 use vapors_dom::NodeId;
 use vapors_elements::BoxRect;
 use vapors_scene::Rect;
+use vapors_signals::Signal;
 
-/// A switch by its class, its box's top left in the window and its name.
+/// A switch by its class, its box's top left in the window, its name and
+/// the signal it binds.
 pub struct Switch {
     pub class: &'static str,
     pub x: f32,
     pub y: f32,
     pub label: &'static str,
+    pub state: fn(&Controls) -> Signal<bool>,
 }
 
 pub const SWITCHES: [Switch; 2] = [
@@ -21,12 +25,14 @@ pub const SWITCHES: [Switch; 2] = [
         x: LIVE_X,
         y: LIVE_Y,
         label: LIVE_LABEL,
+        state: |controls| controls.live.on,
     },
     Switch {
         class: "switch",
         x: SWITCH_X,
         y: SWITCH_Y,
         label: COMPARE_LABEL,
+        state: |controls| controls.compare,
     },
 ];
 
@@ -40,15 +46,20 @@ pub type AxFacts = (String, String, Option<bool>);
 
 impl Switch {
     pub fn input(&self, mounted: &Mounted) -> NodeId {
-        by_class(&mounted.document.borrow(), self.class)[0]
+        let found = by_class(&mounted.document.borrow(), self.class);
+        let [input] = found[..] else {
+            panic!(
+                "{} elements of class {}, not one; fix SWITCHES in tests/switches.rs (cargo test -p vapors-gui-bench-app switch)",
+                found.len(),
+                self.class
+            )
+        };
+        input
     }
 
     /// Sets the switch's state through its signal, as a frame's state is set.
     pub fn set(&self, mounted: &Mounted, on: bool) {
-        match self.class {
-            "live-switch" => mounted.controls.live.on.set(on),
-            _ => mounted.controls.compare.set(on),
-        }
+        (self.state)(&mounted.controls).set(on);
     }
 
     pub fn inside(&self, rect: Rect) -> bool {
