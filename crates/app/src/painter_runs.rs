@@ -51,6 +51,12 @@ impl ScenePainter {
                 continue;
             };
             let scissor = Self::scissor((target, &clipped), batch, frame);
+            #[cfg(test)]
+            let scissor = if self.scissor_widened {
+                *target
+            } else {
+                scissor
+            };
             self.draw_placed(&scissor, (painted, kept), (places, at, frame))?;
         }
         Ok(())

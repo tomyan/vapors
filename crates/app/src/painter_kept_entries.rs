@@ -16,9 +16,10 @@ pub(super) type TableEntries = (u32, Vec<(u32, u32)>, u32);
 
 impl ScenePainter {
     /// A run's frame's entry in the transform table, set to its shift;
-    /// its items' clip entries as runs `(first item, entry)` (entry 0 for
-    /// none, and for images, surfaces and meshes, still under the
-    /// scissor: `painter_clips.rs`); and the first of its lane part's rows'
+    /// its items' clip entries as runs `(first item, entry)`, each under
+    /// its frame's clip entry, which an item with no clip takes (entry 0
+    /// for a frame with no clip, and for images, surfaces and meshes,
+    /// still under the scissor: `painter_clips.rs`); and the first of its lane part's rows'
     /// entries (0 for a batch in one frame). `None` when a table could not
     /// grow (the refusal is on the target's encoder).
     pub(super) fn table_entries(
@@ -30,13 +31,19 @@ impl ScenePainter {
         let frame = self
             .transforms
             .frame_entry(target, moved.frame, moved.shift)?;
+        // a run on the table is cut by its frame's clip there too
+        let frame_clip = moved.draw.clip.filter(|_| run.clipped_by_table());
+        let parent = match frame_clip {
+            Some(rect) => self.clips.frame_clip(target, (moved.frame, rect))?,
+            None => 0,
+        };
         // the scratch, reused batch after batch: no allocation a batch
         let mut clips = std::mem::take(&mut self.clips.runs);
         clips.clear();
         for &(first, clip) in moved.clips.runs() {
             let entry = match table_clip(run, clip) {
-                Some(clip) => self.clip_entry(target, (frame, clip), moved)?,
-                None => 0,
+                Some(clip) => self.clip_entry(target, (frame, clip, parent), moved)?,
+                None => parent,
             };
             clips.push((first, entry));
         }
@@ -47,16 +54,23 @@ impl ScenePainter {
     }
 
     /// The entry of `clip` in `moved`'s frame, whose transform entry is
-    /// `frame`, checked against the scissor path's placing of it.
+    /// `frame`, under entry `parent`, checked against the scissor path's
+    /// placing of it.
     fn clip_entry(
         &mut self,
         target: &Target<'_>,
-        (frame, clip): (u32, vapors_scene::Clip),
+        (frame, clip, parent): (u32, vapors_scene::Clip, u32),
         moved: &Moved<'_>,
     ) -> Option<u32> {
-        let at = self.clips.entry(target, (moved.frame, frame), clip)?;
+        let at = self
+            .clips
+            .entry(target, (moved.frame, frame), (clip, parent))?;
         let tables = (&self.transforms.table, &self.clips.table);
         crate::painter::clips::assert_agrees(tables, at, (clip.rect(), moved.draw));
         Some(at)
     }
 }
+
+#[cfg(test)]
+#[path = "painter_frame_clips_tests.rs"]
+mod frame_clips_tests;

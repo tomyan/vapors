@@ -40,6 +40,10 @@ pub struct ScenePainter {
     /// Its 4x colour textures, at 4 samples.
     multisampled: Multisampled,
     counts: FrameCounts,
+    /// Tests only: every batch drawn under the whole target, so the clip
+    /// table alone cuts what is on it (`painter_frame_clips_tests.rs`).
+    #[cfg(test)]
+    scissor_widened: bool,
 }
 
 impl ScenePainter {
@@ -101,6 +105,8 @@ impl ScenePainter {
             places: places::BatchPlaces::default(),
             multisampled: Multisampled::new(pass),
             counts: FrameCounts::default(),
+            #[cfg(test)]
+            scissor_widened: false,
         })
     }
 

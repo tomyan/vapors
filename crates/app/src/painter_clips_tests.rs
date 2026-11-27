@@ -76,14 +76,14 @@ fn gpu_clip_entry_follows_its_frame_entry_after_the_frame_leaves_and_returns() {
     let mut first = 0;
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        first = clips.entry(at, (frame, 5), clip.into()).expect("room");
+        first = clips.entry(at, (frame, 5), (clip.into(), 0)).expect("room");
     });
 
     // When: drawn again, its frame's entry now 9
     let mut again = 0;
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        again = clips.entry(at, (frame, 9), clip.into()).expect("room");
+        again = clips.entry(at, (frame, 9), (clip.into(), 0)).expect("room");
     });
 
     // Then: the same entry, naming the frame's new one
@@ -99,11 +99,37 @@ fn gpu_a_frame_entry_given_back_under_a_held_clip_is_refused() {
     let mut clips = Clips::new(&gpu.device);
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        clips.entry(at, (a_frame(), 5), Rect::new(0.0, 0.0, 4.0, 4.0).into());
+        clips.entry(
+            at,
+            (a_frame(), 5),
+            (Rect::new(0.0, 0.0, 4.0, 4.0).into(), 0),
+        );
     });
 
     // When: frame entry 5 is given back
     clips.assert_none_names(&[5]);
+}
+
+#[test]
+#[should_panic(expected = "given back while it is held")]
+fn gpu_a_frames_entry_given_back_under_a_held_item_entry_is_refused() {
+    // Given: a frame's entry and an item entry under it, drawn
+    let gpu = gpu();
+    let mut clips = Clips::new(&gpu.device);
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let mut parent = 0;
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        parent = clips.frame_clip(at, (a_frame(), rect)).expect("room");
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+
+    // When: a frame draws the item entry alone
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+    clips.release_undrawn(&gpu.queue);
 }
 
 #[test]
@@ -132,8 +158,8 @@ fn gpu_a_rounded_clip_takes_its_own_entry_holding_its_radii() {
     // When
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        square_at = clips.entry(at, (frame, 5), rect.into()).expect("room");
-        rounded_at = clips.entry(at, (frame, 5), rounded).expect("room");
+        square_at = clips.entry(at, (frame, 5), (rect.into(), 0)).expect("room");
+        rounded_at = clips.entry(at, (frame, 5), (rounded, 0)).expect("room");
     });
 
     // Then: two entries, the rounded one with its radii
@@ -154,6 +180,6 @@ fn gpu_a_clip_cut_to_an_outer_rectangle_is_refused() {
     // When, Then
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        clips.entry(at, (a_frame(), 5), cut);
+        clips.entry(at, (a_frame(), 5), (cut, 0));
     });
 }

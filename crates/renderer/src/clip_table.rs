@@ -51,6 +51,13 @@ impl ClipEntry {
             given_back: false,
         }
     }
+
+    /// The entry also cut by entry `parent`, which the clip shader walks
+    /// to next (`clip.wgsl` `clip_coverage`); 0 for none.
+    #[must_use]
+    pub const fn under(self, parent: u32) -> Self {
+        Self { parent, ..self }
+    }
 }
 
 impl EntryValue for ClipEntry {
