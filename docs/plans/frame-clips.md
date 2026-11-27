@@ -242,8 +242,18 @@ then, `NestedFrame` refuses it.
   orders and then scrolled, in release with the order card clipped: 776
   frames, at most 6 entries held, none given back, mean 77 ns, max
   710 ns. Its rows have no clip of their own, and a filter leaves the
-  frames, so the walk with entries given back is still unmeasured; on
-  the dashboard it would be at most 6 held times the entries given back.
+  frames, so the walk with entries given back is unmeasured (the lead,
+  after #640: no synthetic case). Its cost is held × given back; held
+  was 6 at most in this run, which bounds nothing beyond it.
+- What slice 2 refuses in a rounded lane row now also applies to a list
+  that rounds itself: an img, a gpu-surface or an svg drawing shapes in
+  its rows is refused wherever it sits, though the list used to decline
+  and accept them under a square clip. A scroller or clipping box in
+  its rows is checked against the corners after every paint
+  (`nested_frames`), one check per such frame, in view or not, each
+  update: 10,000 rows each holding a scroller would be 10,000 checks an
+  update. No page or scaling case has that shape, and it is not
+  measured.
   (~/.cache/vapors-evidence/parent-check, NOTES.md and run-filters.sh.)
 
 **Blocker before rounded scrollers land:** two answers to "is this lane

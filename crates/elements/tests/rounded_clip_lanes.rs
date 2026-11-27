@@ -30,16 +30,17 @@ fn a_row_put_in_a_rounded_list_costs_what_it_does_in_a_square_one() {
 
         // Then: framed, the same boxes moved and painted (F3.2c measured
         // 306 and 3006 painted while a rounded list declined to frame)
-        assert_eq!(rounded.lanes_unframed, 0, "{rounded:?}");
+        assert_eq!(rounded.lanes_framed, 1, "{rounded:?}");
         let costs = |c: &vapors_elements::UpdateCounts| (c.boxes_moved, c.boxes_painted);
         assert_eq!(costs(&rounded), costs(&square), "{count} rows");
     }
 }
 
 #[test]
-fn a_rounded_list_past_the_framing_depth_is_framed_not_refused() {
+fn a_rounded_list_past_the_framing_depth_updates() {
     // Given: 4000 rows of 20 px, 80,000 px, past the 65,536 px at which a
-    // lane frames whatever its children, its rows' cells framed too
+    // lane frames whatever its children (refused before slice 2, while
+    // the list declined to frame and its rows' cells framed for depth)
     let css = format!(
         "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
          .list {{ overflow: hidden; border-radius: 8px; }}"
@@ -48,10 +49,12 @@ fn a_rounded_list_past_the_framing_depth_is_framed_not_refused() {
     // When: laid out (an update the page makes, `header_list`)
     let page = header_list(4000, &css, at(1.0));
 
-    // Then
+    // Then: updated (`header_list` expects it) with its rows framed
+    let doc = page.doc.borrow();
     assert!(
-        page.doc.borrow().painted().is_some(),
-        "updated, not refused"
+        doc.update_counts().lanes_framed >= 1,
+        "{:?}",
+        doc.update_counts()
     );
 }
 
@@ -108,4 +111,76 @@ fn a_clipped_box_in_a_rounded_lane_row_counts_the_rounded_link() {
     // entry under its square one, two links, so three, as the painter's
     // chain (docs/plans/frame-clips.md, slice 2)
     assert_eq!(painted.longest_clip_chain(), 3);
+}
+
+/// A list of 40 rows whose own box clips to 8 px corners when its class
+/// holds `round`; the page.
+fn self_rounded_list() -> support::lane_page::HeaderList {
+    let css = format!(
+        "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
+         .list {{ overflow: hidden; }} .round {{ border-radius: 8px; }}"
+    );
+    let page = header_list(40, &css, at(1.0));
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.list, "class", "list round");
+    page.doc.borrow_mut().update(at(1.0)).expect("updates");
+    page
+}
+
+#[test]
+fn a_list_that_rounds_itself_frames_its_rows_cut_by_its_curve() {
+    // Given: the list at y 10, its 8 px top-left curve about (8, 18),
+    // laid out in one update
+    let css = format!(
+        "body {{ margin: 0; }} .head {{ height: 10px; }} {ROWS} \
+         .list {{ overflow: hidden; border-radius: 8px; }}"
+    );
+    let page = header_list(40, &css, at(1.0));
+    let doc = page.doc.borrow();
+
+    // Then: framed; outside the curve the list is hit, inside it the first
+    // row (its first cell, there)
+    assert_eq!(doc.update_counts().lanes_framed, 1, "the rows are framed");
+    let painted = doc.painted().expect("painted");
+    assert_eq!(
+        painted.hit([1.0, 11.0]),
+        Some(page.list),
+        "outside the curve"
+    );
+    let inside = painted.hit([5.0, 15.0]).expect("a box inside the curve");
+    let in_row = inside == page.rows[0] || doc.children(page.rows[0]).contains(&inside);
+    assert!(
+        in_row,
+        "inside the curve: the first row or a cell of it, not {inside:?}"
+    );
+}
+
+#[test]
+fn an_img_in_a_list_that_rounds_itself_follows_its_radius() {
+    // Given: the rounded list, an image in its first row
+    let page = self_rounded_list();
+    let mut doc = page.doc.borrow_mut();
+    let image = vapors_scene::RgbaImage {
+        size: vapors_scene::Size {
+            width: 2,
+            height: 2,
+        },
+        rgba: [0, 0, 0, 255].repeat(4),
+    };
+    doc.register_image("a.png", image).expect("registers");
+    let img = doc.create_element("img");
+    doc.set_attribute(img, "src", "a.png");
+    doc.append(page.rows[0], img);
+
+    // Then: refused while rounded; accepted once square; refused again
+    let refused = |doc: &mut Document| doc.update(at(1.0)).is_err();
+    assert!(
+        refused(&mut doc),
+        "rounded: the image draws under a scissor"
+    );
+    doc.set_attribute(page.list, "class", "list");
+    doc.update(at(1.0)).expect("square: accepted");
+    doc.set_attribute(page.list, "class", "list round");
+    assert!(refused(&mut doc), "rounded again");
 }

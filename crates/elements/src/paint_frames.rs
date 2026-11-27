@@ -83,7 +83,11 @@ fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBas
 
 /// The base of the framed lane container `container`: its content is
 /// in its own scroll frame when it scrolls, clipped there already; else
-/// in the frame its box is in, under the clip it gives its content.
+/// in the frame its box is in, under the clip it gives its content. Its
+/// rounding is one of two answers to "is this lane frame rounded", with
+/// `kept_clips_round.rs` `round_frame`, which reads a scrolling
+/// container's clip too: they agree only while a rounded scroller is
+/// refused (`docs/plans/frame-clips.md`, slice 3).
 fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBase {
     let origin = input.placement.rects[container].y;
     if input.stackings.scrolls(container) {
