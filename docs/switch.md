@@ -41,7 +41,9 @@ is a boolean attribute, written `switch=""`; `switch="false"` and
 
 ## Left
 
-- A knob shadow, a rounded ring, motion, `appearance`, `::part()`, a
-  Chromium oracle fixture for the sizes.
+- A knob shadow, a rounded ring, motion, `::part()`, a Chromium oracle
+  fixture for the sizes. A knob with a shadow can be drawn from CSS
+  instead: `appearance: none` takes the track and knob away
+  (`docs/appearance.md`), and a decorative sibling is the knob.
 - An absolutely placed switch needs `display: block`: the user-agent
   `inline-block` input is laid out only as a flex or grid item.

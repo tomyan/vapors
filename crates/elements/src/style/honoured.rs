@@ -48,6 +48,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("animation-name", Deferred("a slice after F2c")),
     ("animation-play-state", Deferred("a slice after F2c")),
     ("animation-timing-function", Deferred("a slice after F2c")),
+    ("appearance", Read),
     ("aspect-ratio", Read),
     ("background-color", Read),
     ("border-bottom-color", Read),

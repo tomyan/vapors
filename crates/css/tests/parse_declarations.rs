@@ -188,10 +188,39 @@ fn vendor_prefixed_properties_on_the_allowlist_are_dropped() {
 }
 
 #[test]
-fn vendor_prefixed_properties_off_the_allowlist_are_refused() {
+fn a_moz_prefixed_twin_names_the_plain_property() {
     // When
     let err = refusal(".x { -moz-appearance: none; }");
 
     // Then
-    assert!(err.message.contains("-moz-appearance"), "{err}");
+    assert!(
+        err.message.contains("-moz-appearance")
+            && err.message.contains("write \"appearance\" alone"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_prefixed_twin_of_a_supported_property_is_refused_naming_the_plain_one() {
+    // When
+    let err = refusal(".x { -webkit-appearance: none; }");
+
+    // Then
+    assert!(
+        err.message.contains("-webkit-appearance")
+            && err.message.contains("write \"appearance\" alone"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_prefixed_name_whose_plain_form_no_author_writes_is_an_unknown_property() {
+    // When: the plain forms are a custom property and vapors' internal one
+    let custom = refusal(".x { -webkit---x: none; }");
+    let internal = refusal(".x { -webkit--vapors-placeholder-color: red; }");
+
+    // Then
+    for err in [custom, internal] {
+        assert!(err.message.contains("unknown property"), "{err}");
+    }
 }
