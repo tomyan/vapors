@@ -111,6 +111,28 @@ fn gpu_a_frame_entry_given_back_under_a_held_clip_is_refused() {
 }
 
 #[test]
+#[should_panic(expected = "given back while it is held")]
+fn gpu_a_frames_entry_given_back_under_a_held_item_entry_is_refused() {
+    // Given: a frame's entry and an item entry under it, drawn
+    let gpu = gpu();
+    let mut clips = Clips::new(&gpu.device);
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let mut parent = 0;
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        parent = clips.frame_clip(at, (a_frame(), rect)).expect("room");
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+
+    // When: a frame draws the item entry alone
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+    clips.release_undrawn(&gpu.queue);
+}
+
+#[test]
 fn a_clip_with_whole_device_pixel_edges_is_accepted() {
     assert_whole(Rect::new(-3.0, 0.0, 16.0, 11.0));
 }

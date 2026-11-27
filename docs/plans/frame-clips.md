@@ -1,6 +1,7 @@
 # Frame clips on the clip table (before F3.2c)
 
-Status: proposal, for the lead and Tom. Nothing here is built.
+Status: slice 1 built (see "As built: slice 1"); slices 2 and 3 are
+proposals.
 
 ## Why
 
@@ -122,12 +123,29 @@ entry 0, the identity, not under its outer frame's transform.
 
 Tests (`crates/app/src/painter_frame_clips_tests.rs`, GPU tier): with
 every scissor widened to the target (a `cfg(test)` field), each of these
-ends at the list's bottom, with the same pixels as under the scissor:
+ends at the list's bottom on the page, with the same pixels as under the
+scissor:
 - a clipping row crossing a scroll frame's edge (its entry under the
   frame's);
 - a row with no clip (its entry the frame's);
-- a framed lane's clipping row (its entry, in its row's transform, under
-  the lane template's).
+- a list scrolled 2 px, and a list in a scroller scrolled 2 px (the
+  frame's entry on the page, not under its own transform);
+- a framed lane's clipping row. Its clip is moved into the lane
+  template's coordinates (`framed_batches_rows.rs` `moved`) under the
+  lane's transform entry, and its parent is the lane template's entry.
+  No entry is row-relative.
+A held entry's parent is held: release refuses to give back an entry a
+held one is under (`painter_clips.rs` `assert_no_parent_in`).
+
+Not built from the proposal's list:
+- the CPU-side chain tests: the GPU tests above read the chains through
+  the shader;
+- a check holding each frame entry to the scissor. The two are made
+  from one value, `FrameDraw::clip`: the scissor is `on_page(None)`, the
+  entry its rectangle, and `assert_whole` holds it to whole pixels.
+`assert_agrees` still checks each item entry against the scissor path;
+it cuts by `FrameDraw::clip` rather than by walking `parent`, which
+gives the same answer while the parent is made from that value.
 
 `tests/gpu_clip_entries.rs` counts one entry more for the list's frame
 clip, and a scroll still writes only the two row entries.
@@ -154,6 +172,8 @@ clip, and a scroll still writes only the two row entries.
 - **Kept bytes.** A frame entry's index is in every item entry's
   `parent`. Plan item 2's rebuild on an index change applies; slice 1
   pins that a scroll moves no entry index.
-- **Lane rows.** Each row's entries are in the row's transform and their
-  parent in the container's. The shader applies each link's own
-  transform, which slice 1's lane test pins.
+- **Lane rows.** A lane's item clips are in the lane template's
+  coordinates and its parent on the page. The shader applies each link's
+  own transform. Slice 1's lane test draws an unscrolled lane, where
+  both are the identity; a row-relative entry under a page one does not
+  occur yet.

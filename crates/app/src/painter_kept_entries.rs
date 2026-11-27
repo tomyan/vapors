@@ -70,3 +70,7 @@ impl ScenePainter {
         Some(at)
     }
 }
+
+#[cfg(test)]
+#[path = "painter_frame_clips_tests.rs"]
+mod frame_clips_tests;

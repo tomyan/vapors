@@ -1,16 +1,16 @@
 //! The painter's clip table (flat-scene F3.1, `docs/plans/flat-scene-f3.md`):
-//! an entry per clip its quad, shadow and shape batches are drawn under,
-//! keyed by the batch's frame and the clip's rectangle in that frame
-//! (device pixels, as the scene gives it), holding the rectangle and the
-//! frame's entry in the transform table. Set every frame it is drawn, so
-//! a frame entry that moved is followed (item 4); kept while drawn and
-//! given back after a frame that does not draw it, before the frame
-//! entries are (item 2's order). A batch joined across clips (step 2)
-//! names an entry for each run of its items under one clip. Text and
-//! icons are on the table too (F3.1b, part 1); image, surface and mesh
-//! batches keep the scissor until the rest of F3.1b moves them onto it,
-//! which retires the agreement check below. A clip's edges are whole
-//! device pixels until F4a (`assert_whole`).
+//! an entry per clip its quad, shadow, shape, text and icon batches are
+//! drawn under, holding the rectangle, its radii, the frame's entry in the
+//! transform table and the entry it is under. An item clip is held by its
+//! frame, edges, radii and parent; a frame's clip by its frame alone, on
+//! the page under transform entry 0, every item entry of the frame under
+//! it (`docs/plans/frame-clips.md`, slice 1). Set every frame it is drawn,
+//! so an entry whose frame entry moved follows (item 4); kept while drawn
+//! and given back after a frame that does not draw it, before the frame
+//! entries are (item 2's order), and never while a held entry is under
+//! it. Image, surface and mesh batches keep the scissor until F3.1b moves
+//! them onto the table, which retires the agreement check below. A clip's
+//! edges are whole device pixels until F4a (`assert_whole`).
 
 use std::collections::HashMap;
 
@@ -160,11 +160,30 @@ impl Clips {
             .extract_if(|_, held| held.drawn != frame)
             .map(|(_, held)| held.at)
             .collect();
+        self.assert_no_parent_in(&undrawn);
         for &at in &undrawn {
             self.table.give(at, 1);
         }
         self.table.prepare(queue);
         undrawn
+    }
+
+    /// Panics, naming both, when a held entry is under one of `released`:
+    /// a frame's entry is drawn with every entry under it
+    /// (`painter_kept_entries.rs` `table_entries`), so it is held while
+    /// they are, and the shader never walks to a freed entry.
+    fn assert_no_parent_in(&self, released: &[u32]) {
+        let orphan = self.held.iter().find_map(|(key, held)| match key {
+            Key::Item(_, _, parent) if released.contains(parent) => Some((held.at, *parent)),
+            _ => None,
+        });
+        if let Some((at, parent)) = orphan {
+            panic!(
+                "clip entry {at} is under clip entry {parent}, given back while it is held: a \
+                 frame's clip entry is drawn with every entry under it (painter_kept_entries.rs \
+                 `table_entries`, docs/plans/frame-clips.md); reproduce with `cargo xtask test`"
+            );
+        }
     }
 
     /// Panics, naming the entry, when a held clip names one of the frame

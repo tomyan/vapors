@@ -199,7 +199,3 @@ pub(super) fn table_clip(run: &Run, clip: Option<Clip>) -> Option<Clip> {
 #[cfg(test)]
 #[path = "painter_runs_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "painter_frame_clips_tests.rs"]
-mod frame_clips_tests;
