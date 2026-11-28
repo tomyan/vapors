@@ -4,9 +4,11 @@
 //! edits changed from those places (4h): it searches and compares none
 //! of its children one by one, on a list of 100 rows or of 400. Every
 //! build checks the lane's place holds the child; debug builds check the
-//! run against a compare (`slots_edit_places.rs`, `reshaped.rs`). Where
-//! the lane cannot answer (a second insert in one update, an owner
-//! without a lane), the search is counted.
+//! run against a compare (`slots_edit_places.rs`, `reshaped.rs`). An
+//! insert is put after its previous sibling's slot and the children are
+//! assembled once (action 49), so a second insert in one update searches
+//! nothing. Where the lane cannot answer the changed run's place (an
+//! owner without a lane), that search is counted.
 
 use crate::support;
 
@@ -52,19 +54,18 @@ fn inserted_twice(page: &HeaderList) -> UpdateCounts {
 }
 
 #[test]
-fn a_second_insert_in_one_owner_in_one_update_searches_the_children() {
+fn a_second_insert_in_one_owner_in_one_update_scans_no_child() {
     // Given
     let (small, large) = (list(100), list(400));
 
     // When
     let (a, b) = (inserted_twice(&small), inserted_twice(&large));
 
-    // Then: the first insert's place comes from the lane, which takes
-    // the new row only at the next layout; the owner then has a child
-    // more than its lane, so the second's place is searched for, up to
-    // it: a known term for an update that inserts more than once
-    // (splice-layout.md, section 12)
-    assert_eq!((a.children_scanned, b.children_scanned), (96, 396));
+    // Then: each insert goes after its previous sibling's slot and the
+    // children are assembled once, so the second insert's place is not
+    // searched for (it was, up to it: 96 and 396 entries, the known term
+    // splice-layout.md section 12 named, removed by #648, action 49)
+    assert_eq!((a.children_scanned, b.children_scanned), (0, 0));
 }
 
 /// The counts of a row put in before row 5 in a grid list, which no
@@ -77,11 +78,13 @@ fn inserted_into_grid() -> UpdateCounts {
 }
 
 #[test]
-fn an_insert_into_an_owner_without_a_lane_searches_the_children() {
+fn an_insert_into_an_owner_without_a_lane_searches_once_for_the_changed_run() {
     // Given, when
     let counts = inserted_into_grid();
 
-    // Then: row 4, the new row's previous, is searched for twice, up to
-    // it: for the changed run and to put the new row after it
-    assert_eq!(counts.children_scanned, 10);
+    // Then: row 4, the new row's previous, is searched for once, up to
+    // it, for the changed run's place (`reshaped_by`); the new row is put
+    // after row 4's slot with no search (before action 49, a second
+    // search put it there: 10 entries)
+    assert_eq!(counts.children_scanned, 5);
 }

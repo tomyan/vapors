@@ -67,6 +67,7 @@ mod checkbox_layout;
 mod child_edits;
 mod child_edits_declined;
 mod child_edits_for;
+mod child_edits_many;
 mod child_edits_marks;
 mod clipping;
 mod clipping_refused;
