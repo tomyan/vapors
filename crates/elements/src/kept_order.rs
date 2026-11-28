@@ -178,7 +178,9 @@ impl ClipInputs for BoxClips<'_, '_> {
             let framed = matches!(self.input.placement.framing.get(&slot), Some(Ok(())));
             let clipping = crate::clip::clipping(self.boxes, slot, self.input);
             let is_frame = scrolls || framed;
-            crate::clip_refusals::in_round_frame(&self.boxes[slot], by, (is_frame, clipping))
+            let rounds = inner.rounding.is_some();
+            let shape = (is_frame, clipping, rounds);
+            crate::clip_refusals::in_round_frame(&self.boxes[slot], by, shape)
         });
         crate::kept_clips::InnerClip {
             clip: inner.clip,

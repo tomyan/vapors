@@ -24,6 +24,7 @@ mod menu_anchor;
 mod order_parts;
 mod order_rows;
 mod orders_behaviour;
+mod orders_clip;
 mod pages;
 mod progress_fill;
 mod search_hint;
