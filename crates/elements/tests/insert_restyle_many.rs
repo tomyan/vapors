@@ -45,9 +45,10 @@ fn page(css: &str, marks: &[bool]) -> (Document, NodeId, Vec<NodeId>) {
 }
 
 /// Removes every third row, inserts three new rows (one marked), moves
-/// the last original row, which the removals' walks reached, to the
-/// front, then appends a fourth new row; returns the marks in the
-/// final order.
+/// the last original row to the front, then appends a fourth new row;
+/// returns the marks in the final order. Under the sheets that reach
+/// every later sibling, the removals' walks reached the moved row
+/// (`Walked`); under the others no unbounded walk did.
 fn edit(doc: &mut Document, column: NodeId, rows: &[NodeId], marks: &[bool]) -> Vec<bool> {
     let mut order: Vec<(NodeId, bool)> = rows.iter().copied().zip(marks.iter().copied()).collect();
     for i in (0..ROWS).step_by(3) {
