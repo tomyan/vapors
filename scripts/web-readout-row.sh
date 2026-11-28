@@ -70,15 +70,23 @@ chrome=$(browser)
 version=$("$chrome" --version 2>/dev/null) && [ -n "$version" ] || { echo "$chrome --version failed or printed nothing; fix: check the browser starts" >&2; exit 1; }
 VK_DRIVER_FILES=$(vulkan_driver "$chrome" "$version")
 export VK_DRIVER_FILES
+# One demo's DOM in $work/readout.dom, from a launch in its own profile
+# (browser.sh's in_profile), so a profile it cannot remove stops the script.
+launch_readout() {
+  env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=new --no-sandbox \
+    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
+    --window-size=412,915 --enable-logging=stderr --v=0 --user-data-dir="$profile" \
+    --dump-dom "http://127.0.0.1:$port/readout.html?demo=$1&samples=4" \
+    2>"$work/chrome-$1.log" >"$work/readout.dom"
+}
 failed=0
 for demo in one-scene racer; do
-  line=$(env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=new --no-sandbox \
-    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
-    --window-size=412,915 --enable-logging=stderr --v=0 --dump-dom "http://127.0.0.1:$port/readout.html?demo=$demo&samples=4" \
-    2>"$work/chrome-$demo.log" | sed -n 's#.*<pre id="readout-check">\([^<]*\)</pre>.*#\1#p') || true
+  rm -f "$work/readout.dom"
+  in_profile launch_readout "$demo" || true
+  line=$(sed -n 's#.*<pre id="readout-check">\([^<]*\)</pre>.*#\1#p' "$work/readout.dom" 2>/dev/null) || true
   case $line in
     "shown; canvas fills; "*) echo "readout row, $demo: $line" ;;
-    '') echo "readout row, $demo: no result in ${RUN_S} s ($version); Chrome's last lines:" >&2; tail -5 "$work/chrome-$demo.log" | sed 's#^#    #' >&2; failed=1 ;;
+    '') echo "readout row, $demo: no result in ${RUN_S} s ($version), or its launch could not start (any reason is above); Chrome's last lines:" >&2; tail -5 "$work/chrome-$demo.log" | sed 's#^#    #' >&2; failed=1 ;;
     *) echo "readout row, $demo: $line; expected the row shown in full and the canvas filling the rest" >&2; failed=1 ;;
   esac
 done

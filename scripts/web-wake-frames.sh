@@ -112,14 +112,20 @@ version=$("$chrome" --version 2>/dev/null) && [ -n "$version" ] || { echo "$chro
 VK_DRIVER_FILES=$(vulkan_driver "$chrome" "$version")
 export VK_DRIVER_FILES
 started=$(date +%s)
-counts=$(env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=new --no-sandbox \
-  --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
-  --window-size=640,400 --enable-logging=stderr --v=0 --dump-dom "http://127.0.0.1:$port/wake.html?demo=wake" 2>"$work/chrome.log" \
-  | sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p') || true
+# The page's DOM in $work/wake.dom, from a launch in its own profile
+# (browser.sh's in_profile), so a profile it cannot remove stops the script.
+launch_wake() {
+  env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=new --no-sandbox \
+    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
+    --window-size=640,400 --enable-logging=stderr --v=0 --user-data-dir="$profile" \
+    --dump-dom "http://127.0.0.1:$port/wake.html?demo=wake" 2>"$work/chrome.log" >"$work/wake.dom"
+}
+in_profile launch_wake || true
+counts=$(sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p' "$work/wake.dom" 2>/dev/null) || true
 took=$(( $(date +%s) - started ))
 case $counts in
   "idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2") echo "wake: $counts ($version, ${took} s)"; rm -rf "$work"; exit 0 ;;
-  '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
+  '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s), or its launch could not start (any reason is above); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
   *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2" >&2 ;;
 esac
 echo "  the page's console and Chrome's last lines:" >&2

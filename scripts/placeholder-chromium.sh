@@ -9,13 +9,18 @@ pin=$(sed -n 's/^chromium.version = "\(.*\)"/\1/p' .config/tools.toml)
 chrome="$HOME/.local/share/factory/chromium-$pin/chrome-linux/chrome"
 [ -x "$chrome" ] || { echo "$chrome: missing; fix: cargo xtask setup" >&2; exit 1; }
 version=$("$chrome" --version)
-profile=$(mktemp -d)
-trap 'rm -rf "$profile"' EXIT
-# 60 s: the whole script took 0.44 s here (2026-11-23); the rest is room
-# for a cold start on a loaded machine.
-dom=$(timeout 60 "$chrome" --headless --disable-gpu \
-  --user-data-dir="$profile" --dump-dom "file://$PWD/$dir/probe.html")
-rows=$(sed -n '/<pre id="out">/,/<\/pre>/p' <<<"$dom" | sed 's/<[^>]*>//g' | sed '/^$/d')
+. "$(dirname "$0")/browser.sh"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+# The launch runs in an expiry profile (browser.sh's in_profile), as the
+# page checks' do. 60 s: the whole script took 0.44 s here (2026-11-23);
+# the rest is room for a cold start on a loaded machine.
+dump_probe() {
+  timeout 60 "$chrome" --headless --disable-gpu \
+    --user-data-dir="$profile" --dump-dom "file://$PWD/$dir/probe.html" >"$work/probe.dom"
+}
+in_profile dump_probe
+rows=$(sed -n '/<pre id="out">/,/<\/pre>/p' "$work/probe.dom" | sed 's/<[^>]*>//g' | sed '/^$/d')
 want=$(grep -c '<input ' "$dir/probe.html")
 [ "$(wc -l <<<"$rows")" -eq "$want" ] || { echo "expected $want rows from $chrome, got: $rows" >&2; exit 1; }
 printf '# chromium.version %s (%s), %s/probe.html\n%s\n' "$pin" "$version" "$dir" "$rows" >"$dir/computed.txt"
