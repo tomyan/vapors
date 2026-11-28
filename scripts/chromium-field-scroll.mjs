@@ -152,25 +152,37 @@ function extent(png, is, axis) {
 async function main() {
   const chrome = process.env.CHROME || pinned();
   const profile = mkdtempSync(join(tmpdir(), 'field-scroll-'));
-  // its own process group, so its zygotes and renderers go with it
-  const proc = spawn(chrome, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'],
-    {detached: true, stdio: ['ignore', 'ignore', 'pipe']});
-  closeOnExit(proc, profile);
+  const chromium = {proc: undefined};
+  closeOnExit(chromium, profile);
+  chromium.proc = start(chrome, profile);
   const deadline = setTimeout(() => { console.error(`no Chromium page within ${START_MS} ms; fix: check ${chrome} starts headless`); process.exit(1); }, START_MS);
-  await run(proc, deadline);
+  await run(chromium.proc, deadline);
 }
+
+// in its own process group, so its zygotes and renderers go with it
+function start(chrome, profile) {
+  try {
+    return spawn(chrome, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+      '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'],
+      {detached: true, stdio: ['ignore', 'ignore', 'pipe']});
+  } catch (error) {
+    // most spawn failures throw here; ENOENT, EACCES and EAGAIN come as 'error' in run
+    throw cannotStart(error);
+  }
+}
+
+const cannotStart = error => new Error(`cannot start Chromium: ${error.message}; fix: run \`cargo xtask setup\` or set $CHROME to a Chromium`);
 
 // Chromium and its profile go on every exit: the end of a run, a
 // failed step, process.exit and SIGINT, SIGTERM or SIGHUP. SIGKILL,
 // SIGQUIT and other signals that end node without its exit handlers
 // leave both
-function closeOnExit(proc, profile) {
+function closeOnExit(chromium, profile) {
   let closed = false;
   process.on('exit', () => {
     if (closed) return;
     closed = true;
-    killGroup(proc);
+    killGroup(chromium.proc);
     removeProfile(profile);
   });
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
@@ -181,10 +193,10 @@ function closeOnExit(proc, profile) {
 // a failure here prints its fix and sets exit 1 rather than throwing,
 // so the profile is still removed
 function killGroup(proc) {
-  if (proc.pid === undefined) return; // it never started
+  if (proc?.pid === undefined) return; // it never started
   try { process.kill(-proc.pid, 'SIGKILL'); } catch (error) {
     if (error.code === 'ESRCH') return;
-    console.error(`chromium-field-scroll: cannot kill Chromium's process group ${proc.pid}: ${error.message}; fix: kill -KILL -${proc.pid}`);
+    console.error(`chromium-field-scroll: cannot kill Chromium's process group ${proc.pid}: ${error.message}; fix: kill -KILL -- -${proc.pid}`);
     process.exitCode = 1;
   }
 }
@@ -192,17 +204,18 @@ function killGroup(proc) {
 function removeProfile(profile) {
   // Chromium may still be writing the profile as it exits
   try { rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100}); } catch (error) {
-    console.error(`chromium-field-scroll: cannot remove ${profile}: ${error.message}; fix: rm -rf ${profile}`);
+    console.error(`chromium-field-scroll: cannot remove ${profile}: ${error.message}; fix: rm -rf '${profile}'`);
     process.exitCode = 1;
   }
 }
 
 async function run(proc, deadline) {
   const wsUrl = await new Promise((ok, no) => {
+    // before stderr, which is null when the spawn failed (EMFILE)
+    proc.on('error', e => no(cannotStart(e)));
     let buf = '';
-    proc.stderr.on('data', d => { buf += d; const m = buf.match(/ws:\/\/[^\s]+/); if (m) ok(m[0]); });
+    proc.stderr?.on('data', d => { buf += d; const m = buf.match(/ws:\/\/[^\s]+/); if (m) ok(m[0]); });
     proc.on('exit', c => no(new Error(`chrome exited ${c}: ${buf}`)));
-    proc.on('error', e => no(new Error(`cannot start Chromium: ${e.message}; fix: run \`cargo xtask setup\` or set $CHROME to a Chromium`)));
   });
   const browser = new WebSocket(wsUrl);
   await new Promise(r => browser.addEventListener('open', r));
