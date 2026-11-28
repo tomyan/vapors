@@ -33,14 +33,15 @@
 // Usage: node scripts/chromium-field-scroll.mjs [scrollbar | overflow | centre]
 // Needs node 22 or later and the pinned Chromium (.config/tools.toml
 // `chromium.version`, installed by `cargo xtask setup` under
-// ~/.local/share/factory); $CHROME overrides. Exits 1 naming the step
+// ~/.local/share/factory); $CHROME overrides. Chromium is started,
+// and closed on every exit, by chromium-devtools.mjs. Exits 1 naming the step
 // that failed.
-import {spawn} from 'node:child_process';
-import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
-import {homedir, tmpdir} from 'node:os';
+import {readFileSync} from 'node:fs';
+import {homedir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {inflateSync} from 'node:zlib';
+import {connect, launch} from './chromium-devtools.mjs';
 
 // a cold Chromium took 58 s to its first page here
 // (COLD_START in crates/text/src/comparison/chromium_warm.rs)
@@ -150,87 +151,13 @@ function extent(png, is, axis) {
 }
 
 async function main() {
-  const chrome = process.env.CHROME || pinned();
-  const profile = mkdtempSync(join(tmpdir(), 'field-scroll-'));
-  const chromium = {proc: undefined};
-  closeOnExit(chromium, profile);
-  chromium.proc = start(chrome, profile);
-  const deadline = setTimeout(() => { console.error(`no Chromium page within ${START_MS} ms; fix: check ${chrome} starts headless`); process.exit(1); }, START_MS);
-  await run(chromium.proc, deadline);
+  const {wsUrl, deadline} = await launch({chrome: process.env.CHROME || pinned(), name: 'chromium-field-scroll', startMs: START_MS,
+    args: ['--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank']});
+  const {browser, page} = await connect(wsUrl, deadline);
+  await run(browser, page);
 }
 
-// in its own process group, so its zygotes and renderers go with it
-function start(chrome, profile) {
-  try {
-    return spawn(chrome, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-      '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'],
-      {detached: true, stdio: ['ignore', 'ignore', 'pipe']});
-  } catch (error) {
-    // most spawn failures throw here; ENOENT, EACCES and EAGAIN come as 'error' in run
-    throw cannotStart(error);
-  }
-}
-
-const cannotStart = error => new Error(`cannot start Chromium: ${error.message}; fix: run \`cargo xtask setup\` or set $CHROME to a Chromium`);
-
-// Chromium and its profile go on every exit: the end of a run, a
-// failed step, process.exit and SIGINT, SIGTERM or SIGHUP. SIGKILL,
-// SIGQUIT and other signals that end node without its exit handlers
-// leave both
-function closeOnExit(chromium, profile) {
-  let closed = false;
-  process.on('exit', () => {
-    if (closed) return;
-    closed = true;
-    killGroup(chromium.proc);
-    removeProfile(profile);
-  });
-  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
-    process.on(signal, () => { console.error(`chromium-field-scroll: stopped by ${signal}; closing Chromium and removing ${profile}`); process.exit(code); });
-  }
-}
-
-// a failure here prints its fix and sets exit 1 rather than throwing,
-// so the profile is still removed
-function killGroup(proc) {
-  if (proc?.pid === undefined) return; // it never started
-  try { process.kill(-proc.pid, 'SIGKILL'); } catch (error) {
-    if (error.code === 'ESRCH') return;
-    console.error(`chromium-field-scroll: cannot kill Chromium's process group ${proc.pid}: ${error.message}; fix: kill -KILL -- -${proc.pid}`);
-    process.exitCode = 1;
-  }
-}
-
-function removeProfile(profile) {
-  // Chromium may still be writing the profile as it exits
-  try { rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100}); } catch (error) {
-    console.error(`chromium-field-scroll: cannot remove ${profile}: ${error.message}; fix: rm -rf '${profile}'`);
-    process.exitCode = 1;
-  }
-}
-
-async function run(proc, deadline) {
-  const wsUrl = await new Promise((ok, no) => {
-    // before stderr, which is null when the spawn failed (EMFILE)
-    proc.on('error', e => no(cannotStart(e)));
-    let buf = '';
-    proc.stderr?.on('data', d => { buf += d; const m = buf.match(/ws:\/\/[^\s]+/); if (m) ok(m[0]); });
-    proc.on('exit', c => no(new Error(`chrome exited ${c}: ${buf}`)));
-  });
-  const browser = new WebSocket(wsUrl);
-  await new Promise(r => browser.addEventListener('open', r));
-  clearTimeout(deadline);
-  let id = 0;
-  const waiting = new Map();
-  browser.addEventListener('message', e => { const m = JSON.parse(e.data); waiting.get(m.id)?.(m); waiting.delete(m.id); });
-  const send = (method, params = {}, sessionId) => new Promise((ok, no) => {
-    const n = ++id;
-    waiting.set(n, m => m.error ? no(new Error(`${method}: ${JSON.stringify(m.error)}`)) : ok(m.result));
-    browser.send(JSON.stringify({id: n, method, params, sessionId}));
-  });
-  const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
-  const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
-  const s = (m, p) => send(m, p, sessionId);
+async function run(send, s) {
   const {frameTree} = await s('Page.getFrameTree');
   const load = html => s('Page.setDocumentContent', {frameId: frameTree.frame.id, html});
   const value = async expr => (await s('Runtime.evaluate', {expression: expr, returnByValue: true})).result.value;

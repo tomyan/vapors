@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// Extensions the rule covers.
-const EXTENSIONS: [&str; 5] = ["rs", "wgsl", "html", "js", "toml"];
+const EXTENSIONS: [&str; 6] = ["rs", "wgsl", "html", "js", "mjs", "toml"];
 
 /// Directory names never walked, at any depth: build output, git,
 /// dependencies, fonts. Matched by exact component, so `crates/targets`
