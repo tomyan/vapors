@@ -27,6 +27,7 @@ fn recording(dir: &Path, record: &Path, code: i32) -> Chromium {
     Chromium {
         binary: script,
         deadline: Duration::from_secs(5),
+        profiles: dir.join("profiles"),
     }
 }
 

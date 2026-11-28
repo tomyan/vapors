@@ -66,6 +66,7 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
     let chromium = Chromium {
         binary: script,
         deadline: std::time::Duration::from_secs(1),
+        profiles: dir.join("profiles"),
     };
 
     // When
@@ -178,6 +179,7 @@ fn a_failed_screenshot_names_the_browser_it_launched() {
     let chromium = Chromium {
         binary: std::path::PathBuf::from("/bin/false"),
         deadline: std::time::Duration::from_secs(5),
+        profiles: dir.join("profiles"),
     };
 
     // When

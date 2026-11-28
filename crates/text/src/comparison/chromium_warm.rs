@@ -43,6 +43,7 @@ impl Chromium {
         let cold = Chromium {
             binary: self.binary.clone(),
             deadline: COLD_START,
+            profiles: self.profiles.clone(),
         };
         cold.screenshot(&page, &work.join("warm.png"), 640, 400, 1)?;
         Ok(started.elapsed())

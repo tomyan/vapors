@@ -18,6 +18,8 @@ mod chromium_pin;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_process;
 #[cfg(not(target_family = "wasm"))]
+mod chromium_profile;
+#[cfg(not(target_family = "wasm"))]
 mod chromium_tmp;
 #[cfg(not(target_family = "wasm"))]
 mod chromium_warm;
