@@ -8,8 +8,12 @@ use vapors_css::property::{PROPERTIES, PropertyId, is_shorthand};
 #[test]
 fn every_initial_value_parses_under_its_own_syntax() {
     for def in PROPERTIES.iter() {
-        // When
-        let s = sheet(&format!("a {{ {}: {}; }}", def.name, def.initial));
+        // When: the placeholder's longhand is written as `::placeholder`'s
+        let rule = match def.name {
+            "-vapors-placeholder-color" => format!("a::placeholder {{ color: {}; }}", def.initial),
+            name => format!("a {{ {name}: {}; }}", def.initial),
+        };
+        let s = sheet(&rule);
 
         // Then
         let longhands = &s.rules[0].declarations[0].longhands;

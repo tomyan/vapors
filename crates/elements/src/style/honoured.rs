@@ -35,6 +35,7 @@ const GRID_JUSTIFY: Treatment = if cfg!(feature = "grid") {
 
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
+    ("-vapors-placeholder-color", Read),
     ("accent-color", Read),
     ("align-content", Read),
     ("align-items", Read),
@@ -47,6 +48,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("animation-name", Deferred("a slice after F2c")),
     ("animation-play-state", Deferred("a slice after F2c")),
     ("animation-timing-function", Deferred("a slice after F2c")),
+    ("appearance", Read),
     ("aspect-ratio", Read),
     ("background-color", Read),
     ("border-bottom-color", Read),

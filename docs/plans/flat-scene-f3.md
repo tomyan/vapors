@@ -247,6 +247,52 @@ The six recommendations of the first draft are taken:
 - **F3.2:** rounded clips with the radii rules, the four refusals
   retired (each test converted into a test of the clip drawn), the
   elliptical refusal, the Chromium fixture, hit testing.
+  In parts (entry 47, 2026-11-27; the order card first):
+  - **F3.2a:** the scene's clip a rectangle with corner radii
+    (`vapors-scene` `Clip`), carried by the painter into the clip
+    table (an entry per clip and radii); a run the scissor clips
+    (images, surfaces, meshes) under a rounded clip refused; a rounded
+    clip cut on the page by a frame it does not fit keeps its corners
+    and the frame as `outer`, which the table refuses (a batch's clips
+    are in its frame, whose clip is the scissor). No CSS change.
+  - **F3.2b:** `overflow: hidden` or `clip` with a radius clips
+    descendants' quads, shadows, shapes, text and icons to the padding
+    box's radii (item 13), hit testing by the rounded shape (item 14),
+    the overflow refusal retired, a Chromium paint and events fixture.
+    A rounded clip meets another clipping ancestor only where one holds
+    the other (Tom, 2026-11-27); any other overlap is refused naming
+    clip chains, which would retire it. An image, surface or svg under
+    a rounded clip stays refused until F3.1b moves them onto the table.
+    Two decisions (Tom, 2026-11-27): elements carries a box's clip as
+    its rectangle and the slot of the box whose rounded padding box it
+    is, if any (under the nesting rule a clip is always one box's
+    padding box or wholly inside it), and paint and hit testing read
+    that box's radii; a kept box's slot stays within its 224 bytes. A
+    rounded `overflow: auto` or `scroll` stays refused, naming F3.1b:
+    a scroller's clip is its frame's scissor, which F3.1b moves onto
+    the table.
+    A lane whose container is a rounded clipping box declined to frame
+    its children (Tom, 2026-11-27), as a framed child's clip was its
+    frame's scissor, which cuts square; frame clips on the table retired
+    the decline (`docs/plans/frame-clips.md`, slice 3), and such a lane
+    frames its rows under its rounded clip. A framed
+    lane whose container's clip is rounded by a box above it was refused
+    naming F3.1b, until frame clips went on the table
+    (`docs/plans/frame-clips.md`, slice 2), which rounds its frame's
+    clip.
+    Measured in F3.2c (2026-11-27, one row inserted mid-list, counts):
+    under a rounded `overflow: hidden` list an insert painted 306 boxes
+    at 100 rows and 3006 at 1000, against 6 under a square one (not
+    traced; likely the list's rounded clip changing with its height, as
+    a part under one is painted again, never shifted); and a list past 65,536 px was refused,
+    its rows' cells framing for depth under the rounded clip (the order
+    card at about 1,260 orders). Tom chose (2026-11-27) to put frame
+    clips on the clip table first, so a framed lane can be under a
+    rounded clip; F3.2c's order card waited for it, and the lane decline
+    was retired with it (frame-clips slice 3).
+  - **F3.2c:** gui-bench's order card clips its rows, its header's own
+    corners and the relaxed guard retired, compared with zgui idle and
+    with the last row hovered.
 - **F3.3 (on a measurement):** batches joined across frames, if W4
   shows draws costing more than the fragment work a union scissor
   would add.
@@ -265,8 +311,9 @@ The six recommendations of the first draft are taken:
   today clip changes split runs; across frames, unchanged until F3.3.
 - The tests named in items 2, 4, 5, 6, 11 and 13; the kept-bytes
   compare covering the clip index.
-- F3.2: a Chromium fixture of a rounded scroller holding text, an image
-  and a shadow passes the paint rules at 1x and 2x, with the corner
+- F3.2: a Chromium fixture of a rounded `overflow: hidden` box holding
+  text and a shadow (a rounded scroller and an image under a rounded
+  clip stay refused until F3.1b) passes the paint rules at 1x and 2x, with the corner
   tolerance of item 8; a click outside a rounded corner but inside its
   rectangle misses, as in Chromium (events oracle).
 

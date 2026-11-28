@@ -182,18 +182,17 @@ fn an_empty_child_declines_the_list_as_collapsing_through() {
 }
 
 #[test]
-fn a_restyled_text_field_is_laned_with_its_run() {
-    // Given: a text field in a flex row (an input is laid out only as
-    // a flex or grid item), laid out once
+fn a_restyled_text_field_is_declined_for_its_centred_run() {
+    // Given: a block text field beside the rows, laid out once
     let list = list(
         2,
-        &format!("{ROWS} input {{ width: 6em; }} .wide {{ width: 9em; }}"),
+        &format!("{ROWS} input {{ display: block; width: 6em; }} .wide {{ width: 9em; }}"),
     );
     let field = {
         let mut doc = list.doc.borrow_mut();
         let field = doc.create_element("input");
         doc.set_attribute(field, "type", "text");
-        doc.append(list.rows[1], field);
+        doc.append(list.parent, field);
         field
     };
     list.update();
@@ -202,10 +201,13 @@ fn a_restyled_text_field_is_laned_with_its_run() {
     list.doc.borrow_mut().set_attribute(field, "class", "wide");
     let counts = list.update();
 
-    // Then: body, the list and the field are lanes (the field's one
-    // child is its run); its row, a flex container, is the one decline
-    assert_eq!((counts.lanes, counts.lanes_declined), (3, 1), "{counts:?}");
-    assert_eq!(counts.lane_decline, Some(LaneDecline::FlexRow));
+    // Then: the field, whose run is centred by a `justify-content: center`
+    // column (layout/field_box.rs, entry 84), is declined. Teaching
+    // lane_flex_column a single-line `center` would lane the field
+    // again and retire this test.
+    // body and the field's parent stay lanes: only the field is declined
+    assert_eq!((counts.lanes, counts.lanes_declined), (2, 1), "{counts:?}");
+    assert_eq!(counts.lane_decline, Some(LaneDecline::JustifyContent));
     assert_matches_full(&list.doc, VIEW(), "field restyled");
 }
 

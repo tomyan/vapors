@@ -35,15 +35,19 @@ impl Document {
     /// offset (as [`Document::scroll_offset`] answers it) changed since
     /// its last `scroll`, by any route (wheel, touch, fling,
     /// `scroll_to`, a press's scroll into view, or an update clamping it
-    /// to content that shrank), in node order. The app calls this once
-    /// per frame before the update, so what a listener changes is drawn
-    /// in that frame.
+    /// to content that shrank), in node order; then the `resize` each
+    /// owes, at each whose client size the last update changed
+    /// (`resize_event.rs`). `Document::update_frame` calls this once a
+    /// frame, before its first update, so what a listener changes is
+    /// drawn in that frame and a container fires at most one `scroll` a
+    /// frame.
     pub fn settle_scroll(document: &Rc<RefCell<Document>>) {
         let owed = document.borrow_mut().take_owed_scrolls();
         for (node, offset) in owed {
             let event = Event::new("scroll").with_scroll_offset(offset);
             dispatch_here(document, node, event);
         }
+        let _ = Document::settle_resize(document);
     }
 
     /// Whether any scroll container owes a `scroll`

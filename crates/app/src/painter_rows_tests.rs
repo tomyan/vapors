@@ -78,6 +78,7 @@ fn moved<'a>(rows: BatchRows<'a>, offsets: &'a [[f32; 2]]) -> Moved<'a> {
         draw: vapors_elements::FrameDraw {
             shift: [3.0, 5.0],
             clip: None,
+            rounded: None,
         },
     }
 }

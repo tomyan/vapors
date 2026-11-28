@@ -1,6 +1,6 @@
 <script>
 use crate::dashboard::COLUMNS;
-use crate::list::{LIST_HEIGHT, keys};
+use crate::list::keys;
 use crate::order_row::{OrderRow, OrderRowProps};
 use vapors_components::virtual_list::{VirtualList, VirtualListProps};
 #[prop] let count: usize = 0;
@@ -18,10 +18,12 @@ let toggle = move || sorted.update(|on| *on = !*on);
 .col-title:nth-child(1) { left: 24px; } .col-title:nth-child(2) { left: 140px; } .col-title:nth-child(3) { left: 440px; } .col-title:nth-child(4) { left: 600px; }
 .sort { right: 24px; width: 120px; justify-content: flex-end; }
 .sort.sorted { color: #4f46e5; }
+/* the rest of the window below the header, which the list fills */
+.list-rows { position: absolute; top: 44px; bottom: 0; left: 0; right: 0; }
 </style>
 
 <div class="list-head">
   <div class="col-title">{titles[0]}</div><div class="col-title">{titles[1]}</div><div class="col-title">{titles[2]}</div><div class="col-title">{titles[3]}</div>
   <div class="col-title sort" class:sorted={sorted.get()} onclick={toggle}>{titles[4]}</div>
 </div>
-<VirtualList keys={keys} row_height={52.0} height={LIST_HEIGHT}>{snippet row(key: usize)}<OrderRow index={key.get()} amount_at_end={true} />{/snippet}</VirtualList>
+<div class="list-rows"><VirtualList keys={keys} row_height={52.0}>{snippet row(key: usize)}<OrderRow index={key.get()} amount_at_end={true} />{/snippet}</VirtualList></div>

@@ -2986,6 +2986,7 @@ dependencies = [
  "png",
  "send_wrapper",
  "serde_json",
+ "tokio",
  "tracing",
  "vapors-canvas",
  "vapors-css",
@@ -3041,6 +3042,7 @@ dependencies = [
  "vapors-css",
  "vapors-dom",
  "vapors-elements",
+ "vapors-scene",
  "vapors-signals",
  "vapors-text",
 ]

@@ -90,6 +90,16 @@ pub(super) fn check_transition_properties(value: &Value, at: Position) -> Result
     };
     for item in items {
         if let Some(name) = item.as_keyword()
+            && name == super::longhands::PLACEHOLDER_COLOR.name()
+        {
+            return Err(Error::new(
+                at,
+                format!(
+                    "transition-property: {name:?} is the placeholder's colour, which only `::placeholder {{ color: .. }}` names; transitions of it are not supported"
+                ),
+            ));
+        }
+        if let Some(name) = item.as_keyword()
             && !["all", "none"].contains(&name)
             && !super::is_supported(name)
         {
@@ -119,9 +129,18 @@ pub fn resolve_pending<'a>(
         .map_err(|e| Error::new(at, format!("{property}: {e}")))?;
     let longhands = parse_declaration(property, &substituted, at)
         .map_err(|e| Error::new(at, format!("after var() substitution, {}", e.message)))?;
-    longhands
+    let value = longhands
         .into_iter()
         .find(|l| l.id == id)
         .map(|l| l.value)
-        .ok_or_else(|| Error::new(at, format!("{property} does not set {}", id.name())))
+        .ok_or_else(|| Error::new(at, format!("{property} does not set {}", id.name())))?;
+    if id == super::longhands::PLACEHOLDER_COLOR
+        && matches!(
+            value,
+            Specified::Inherit | Specified::Initial | Specified::Unset
+        )
+    {
+        return Err(Error::new(at, "after var() substitution, a ::placeholder colour is `inherit`, `initial` or `unset`, which would name the input's longhand, not the placeholder's default; give the variable a colour".to_owned()));
+    }
+    Ok(value)
 }

@@ -227,6 +227,9 @@ pub enum Tier {
     /// Needs what only the host has (bwrap making a user namespace); run by ci and the gate,
     /// never in an API builder's sandbox.
     Host,
+    /// The private SDK harness's host tests, which the host tier leaves out; never run by ci,
+    /// ci.yml or the gate.
+    SdkHost,
     /// Needs hardware performance counters and a GPU adapter; run in a quiet window, never by ci.
     Pmu,
 }

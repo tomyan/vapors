@@ -290,6 +290,7 @@ fn main() -> ExitCode {
                 Tier::Unit => steps::unit_tests(),
                 Tier::Gpu => steps::gpu_tests(),
                 Tier::Host => steps::host_tests(),
+                Tier::SdkHost => steps::sdk_host_tests(),
                 Tier::Pmu => steps::pmu_tests(),
             }
         }

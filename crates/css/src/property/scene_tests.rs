@@ -83,3 +83,13 @@ fn a_longhand_a_tag_does_not_read_names_what_to_use_instead() {
     assert!(instead(width).contains("<Mesh geometry>"));
     assert!(instead(opacity).contains("each `mesh`") && instead(opacity).contains("D3"));
 }
+
+#[test]
+fn a_placeholder_colour_on_a_scene_node_names_the_placeholder_rule() {
+    // Given: `::placeholder { color }` lowers to `*`, which a mesh matches
+    let placeholder = super::super::longhands::PLACEHOLDER_COLOR;
+
+    // Then
+    assert!(instead(placeholder).contains("`::placeholder` colour"));
+    assert!(instead(placeholder).contains("input::placeholder"));
+}

@@ -1,0 +1,18 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":120,"tag":"html","width":640,"x":0,"y":0},
+{"height":120,"tag":"body","width":640,"x":0,"y":0},
+{"height":80,"tag":"div","width":100,"x":16,"y":16},
+{"height":30,"tag":"div","width":160,"x":16,"y":16},
+{"height":88,"tag":"div","width":108,"x":140,"y":16},
+{"height":30,"tag":"div","width":160,"x":144,"y":20},
+{"height":80,"tag":"div","width":100,"x":272,"y":16},
+{"height":40,"tag":"div","width":60,"x":322,"y":46},
+{"height":80,"tag":"div","width":100,"x":396,"y":16},
+{"height":30,"tag":"div","width":100,"x":396,"y":36},
+{"height":30,"tag":"div","width":160,"x":396,"y":36},
+{"height":80,"tag":"div","width":100,"x":520,"y":16},
+{"height":18,"tag":"div","width":80,"x":540,"y":46}
+]}
+]}

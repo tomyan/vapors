@@ -64,6 +64,13 @@ button {
 input { display: inline-block; }
 input[type=range] { margin: 2px; }
 
+/* The controls vapors draws parts of (a range's track and thumb, a
+   checkbox's mark, a switch's track and knob) have `appearance: auto`,
+   as Chromium's do; `none` takes the parts away (docs/appearance.md).
+   `i`: HTML matches `type` without regard to case, as vapors' input
+   checks do, so `type=Checkbox` is a checkbox here too. */
+input[type=range i], input[type=checkbox i] { appearance: auto; }
+
 /* A checkbox (3-E3b): Chromium's margins, and its 13 x 13 px size
    from checkbox.rs (a size of its own, so a flex row stretches it as
    Chromium does), with a vapors look (a 1px grey border, a small
@@ -103,6 +110,19 @@ input[type=number], input[type=text], input:not([type]) {
   border: 1px solid #8f8f9d;
   background-color: #ffffff;
   overflow: hidden;
+}
+
+/* A text field's text scrolls on x inside its content box, as
+   Chromium's inner editor does (entry 44): it is cut off at
+   the content box (elements clip.rs), kept scrolled to the caret
+   while focused and back at its start when blurred
+   (elements scroll_reveal.rs), and a horizontal wheel scrolls it. A
+   rounded field is let clip where its side padding clears its
+   corners. It draws no thumb whatever its scrollbar-width, as
+   Chromium's does not (elements thumb.rs). */
+input[type=text], input:not([type]) {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* Chromium draws an hr's 1px border `inset` (two greys); vapors draws

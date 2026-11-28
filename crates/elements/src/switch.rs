@@ -5,6 +5,8 @@
 //! when not; the knob is white, inset by an eleventh of the height
 //! (2 px of a 22 px track) and at the end when checked. Behaviour is the
 //! checkbox's (`checkbox.rs`); the role is `switch` (`a11y_roles.rs`).
+//! With `appearance: none` it draws neither, so the box's own
+//! background and radius can be the track and a sibling the knob.
 
 use vapors_scene::Color;
 
@@ -48,8 +50,8 @@ pub(crate) fn paint(
         return;
     };
     let used = &input.used[&node];
-    if !used.visible {
-        return;
+    if !used.visible || !used.native() {
+        return; // `appearance: none` draws neither (`style/appearance.rs`)
     }
     let track = crate::clip::content_box(layout_box, border_box);
     let fill = if checked {

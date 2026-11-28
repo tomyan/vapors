@@ -9,7 +9,7 @@ use vapors_elements::Document;
 use super::{document, element, refusals_at, text, viewport};
 
 const CSS: &str = "body { font-size: 16px; } .row { display: flex; } .hidden { display: none; } \
-    .key { font-size: 13px; } .pad { padding: 2px; } .round { overflow: hidden; border-radius: 3px; } .odd { --pointer: cell; cursor: var(--pointer); } \
+    .key { font-size: 13px; } .pad { padding: 2px; } .round { overflow: auto; border-radius: 3px; } .odd { --pointer: cell; cursor: var(--pointer); } \
     @media (max-width: 50px) { .narrow { display: none; } }";
 
 /// A document with `css` after the page's sheet.

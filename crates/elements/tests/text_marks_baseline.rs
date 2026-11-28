@@ -5,7 +5,10 @@
 //! the caret comes down to them. Headless Chromium 155 puts a span's
 //! content area, where the caret stands, 1 px above the line at 1x and
 //! 0.5 px at 2x (`inline_baseline.rs`); the field's content box starts
-//! 2 px down (a 1 px border and 1 px padding).
+//! 2 px down (a 1 px border and 1 px padding) and is 20 px tall, so its
+//! 12 px line is centred 4 px further down, at 6, as Chromium 157
+//! centres an input's inner editor (entry 84; `field_text_centre.rs`).
+//! Chromium draws this field's caret 7 px down: its border is 2 px.
 
 use crate::support;
 
@@ -68,8 +71,8 @@ fn at_1x_the_caret_starts_1_px_above_the_line() {
     // When
     let top = mark_top(&page, 1.0, true);
 
-    // Then: the content box at 2, less 1
-    assert_eq!(top, 1.0);
+    // Then: the line at 6, less 1
+    assert_eq!(top, 5.0);
 }
 
 #[test]
@@ -80,8 +83,8 @@ fn at_2x_the_caret_comes_down_half_a_pixel_with_the_glyphs() {
     // When
     let top = mark_top(&page, 2.0, true);
 
-    // Then: the content box at 4 device px, less 1 (0.5 CSS px)
-    assert_eq!(top, 3.0);
+    // Then: the line at 12 device px, less 1 (0.5 CSS px)
+    assert_eq!(top, 11.0);
 }
 
 #[test]
@@ -94,7 +97,7 @@ fn at_2x_a_selection_comes_down_with_the_glyphs_too() {
     let top = mark_top(&page, 2.0, false);
 
     // Then: as the caret
-    assert_eq!(top, 3.0);
+    assert_eq!(top, 11.0);
 }
 
 /// The top of the underline an IME's composition gets, device pixels,
@@ -140,7 +143,7 @@ fn at_2x_an_imes_underline_comes_down_with_the_glyphs_too() {
     let top = underline_top(&page, 2.0);
 
     // Then: the composition's content area ends 12.5 CSS px below the
-    // line's top (its top -0.5, 13 tall), 29 device px down the field;
+    // line's top (its top -0.5, 13 tall), 37 device px down the field;
     // the 2 device px underline stands just inside it
-    assert_eq!(top, 27.0);
+    assert_eq!(top, 35.0);
 }

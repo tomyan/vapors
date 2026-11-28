@@ -27,14 +27,21 @@ impl KeptHits {
         self.relabel(&relabelled);
     }
 
-    /// The hits of each `(old, new)` of `relabelled` labelled `new`: every
-    /// one found by its old label first, while each frame's list is in
+    /// The hits of each `(old, new)` of `relabelled` labelled `new`, with
+    /// the rounded clip they are under: every one found by its old label
+    /// first, while each frame's list is in
     /// order and no new label stands for an old one, then relabelled.
     fn relabel(&mut self, relabelled: &[(Label, Label)]) {
         let held: Vec<(usize, Label, Label)> = relabelled
             .iter()
             .filter_map(|&(old, new)| Some((self.frames.remove(&old)?, old, new)))
             .collect();
+        // taken out first, as a new label may be another's old one
+        let rounded: Vec<(Label, usize)> = relabelled
+            .iter()
+            .filter_map(|&(old, new)| Some((new, self.rounded.remove(&old)?)))
+            .collect();
+        self.rounded.extend(rounded);
         let found: Vec<(usize, std::ops::Range<usize>, Label)> = held
             .into_iter()
             .map(|(frame, old, new)| (frame, self.positions(frame, old), new))

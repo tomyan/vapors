@@ -34,6 +34,8 @@ pub(crate) struct Refused {
     pub(crate) unplaced: Vec<NotPlaced>,
     /// The boxes whose clip chain is past `MAX_CLIP_CHAIN`, with its links.
     pub(crate) long_chains: Vec<(usize, usize)>,
+    /// The boxes a rounded clip refuses, and why (`clip_refusals.rs`).
+    pub(crate) rounded: Vec<(usize, crate::clip_refusals::RoundedRefusal)>,
 }
 
 impl Document {

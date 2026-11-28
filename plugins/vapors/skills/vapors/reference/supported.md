@@ -41,7 +41,7 @@ These HTML boolean attributes are on by being present, so the compiler refuses t
 
 ## Events
 
-The element tree fires these; `on<name>={handler}` listens for one: `click`, `dblclick`, `pointerdown`, `pointermove`, `pointerup`, `gotpointercapture`, `lostpointercapture`, `pointercancel`, `keydown`, `keyup`, `focus`, `blur`, `focusin`, `focusout`, `input`, `change`, `selectionchange`, `paste`, `scroll`.
+The element tree fires these; `on<name>={handler}` listens for one: `click`, `dblclick`, `pointerdown`, `pointermove`, `pointerup`, `gotpointercapture`, `lostpointercapture`, `pointercancel`, `keydown`, `keyup`, `focus`, `blur`, `focusin`, `focusout`, `input`, `change`, `selectionchange`, `paste`, `scroll`, `resize`.
 
 ## CSS properties
 
@@ -61,6 +61,7 @@ The parser's table: each property, whether it inherits, and its grammar. Custom 
 | `animation-name` | no | `[ none \| <custom-ident> ]#` |
 | `animation-play-state` | no | `[ running \| paused ]#` |
 | `animation-timing-function` | no | `<easing-function>#` |
+| `appearance` | no | `none \| auto` |
 | `aspect-ratio` | no | `auto \| <ratio>` |
 | `background-color` | no | `<color>` |
 | `border-bottom-color` | no | `<color>` |
@@ -194,7 +195,7 @@ Vendor-prefixed properties are refused, except these, which are dropped:
 
 Type, `*`, `.class`, `#id`, attribute selectors and the combinators (descendant, `>`, `+`, `~`). Pseudo-classes accepted: `active`, `checked`, `disabled`, `empty`, `enabled`, `first-child`, `first-of-type`, `focus`, `focus-visible`, `focus-within`, `hover`, `invalid`, `last-child`, `last-of-type`, `only-child`, `only-of-type`, `root`, `has`, `is`, `not`, `where`, `nth-child`, `nth-last-child`, `nth-of-type`, `nth-last-of-type`.
 
-Refused: `any-link`, `default`, `defined`, `fullscreen`, `in-range`, `indeterminate`, `link`, `optional`, `out-of-range`, `placeholder-shown`, `read-only`, `read-write`, `required`, `target`, `valid`, `visited`, `lang`, `dir`, and every pseudo-element (`::before`, `::after`).
+Refused: `any-link`, `default`, `defined`, `fullscreen`, `in-range`, `indeterminate`, `link`, `optional`, `out-of-range`, `placeholder-shown`, `read-only`, `read-write`, `required`, `target`, `valid`, `visited`, `lang`, `dir`, and every pseudo-element (`::before`, `::after`) but `::placeholder` at the end of a selector, with only `color`.
 
 ## At-rules
 

@@ -52,8 +52,10 @@ pub struct Painted {
     pub(crate) order: crate::kept_order::KeptOrder,
     /// Each range input's track, for the pointer (3-E3a).
     pub(crate) ranges: NodeMap<crate::range_paint::Track>,
-    /// Each text field's text origin, for the pointer (E6a).
-    pub(crate) text_origins: NodeMap<[f32; 2]>,
+    /// Each text field's text origin, for the pointer (E6a), and the
+    /// scroll frame it is in: its run's, the field's own when the field
+    /// scrolls (entry 44), not the field's entries' frame.
+    pub(crate) text_origins: NodeMap<([f32; 2], usize)>,
     /// What this was painted from (`kept_paint`).
     pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the
@@ -259,7 +261,8 @@ impl Painted {
     /// scrolling starts here, at the box under the pointer.
     #[must_use]
     pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
-        self.kept_hits().hit([x, y], &self.frames)
+        let rounding = |slot| self.order.clips.rounding(slot);
+        self.kept_hits().hit([x, y], &self.frames, &rounding)
     }
 
     /// The kept hits, gathered from the scene view when none are kept.

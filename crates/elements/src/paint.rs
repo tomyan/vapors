@@ -26,7 +26,7 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) cache: &'a mut crate::layout::TextCache,
     pub(crate) scale: f32,
     /// The clip of the box being painted; set by `paint`.
-    pub(crate) clip: Option<BoxRect>,
+    pub(crate) clip: Option<crate::clip::BoxClip>,
     /// Each scroll container's offset and range, for its thumbs.
     pub(crate) scroll: &'a crate::scroll::Offsets,
     /// How opaque thumbs are drawn now, 0 (hidden) to 255 (on touch they
@@ -54,6 +54,10 @@ pub(crate) struct PaintInput<'a> {
     /// [`crate::MAX_CLIP_CHAIN`], with the count: refused by the update
     /// after paint (`paint_refusals.rs`).
     pub(crate) long_chains: Vec<(usize, usize)>,
+    /// The boxes painted in a rounded frame that it refuses, and why
+    /// (`clip_refusals.rs` `in_frame`): refused by the update after
+    /// paint, with the rounded clips' other refusals.
+    pub(crate) frame_refused: Vec<(usize, crate::clip_refusals::RoundedRefusal)>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -88,6 +92,7 @@ impl<'a> PaintInput<'a> {
             class: None,
             unresolvable: Vec::new(),
             long_chains: Vec::new(),
+            frame_refused: Vec::new(),
         }
     }
 
@@ -139,15 +144,44 @@ pub(crate) fn started(input: &mut PaintInput<'_>) -> Painted {
     Painted::empty(canvas, canvas_from, input.scale)
 }
 
-/// Sets the clip the next step paints under.
-pub(crate) fn clip_to(clip: Option<BoxRect>, input: &mut PaintInput<'_>, scene: &mut Scene) {
+/// Sets the clip the next step paints under; a rounded clip takes the
+/// radii of the box it names, one of `boxes` at `rects`.
+pub(crate) fn clip_to(
+    clip: Option<crate::clip::BoxClip>,
+    (boxes, rects): (&[LayoutBox], &[BoxRect]),
+    input: &mut PaintInput<'_>,
+    scene: &mut Scene,
+) {
     // Two forms of one clip, on purpose: hits are cut to it in CSS
     // pixels, unsnapped, as border boxes are hit unsnapped, so hit
     // testing follows layout geometry as Chromium's does; the scene
     // gets it snapped to device pixels, as every painted edge is.
     // They differ by under a device pixel at an edge.
+    let radii_of = |slot| crate::clip::radii(boxes, rects, slot, input);
+    let device = device_clip(clip, input.scale, &radii_of);
     input.clip = clip;
-    scene.set_clip(clip.map(|clip| snapped(clip, input.scale)));
+    scene.set_rounded_clip(device);
+}
+
+/// A clip in CSS pixels as the scene takes it: snapped to device pixels,
+/// a rounded one with the radii `radii_of` gives the box it names,
+/// scaled and fitted to the snapped rectangle. One answer for paint and
+/// a kept part's shift (`kept_shift.rs`).
+pub(crate) fn device_clip(
+    clip: Option<crate::clip::BoxClip>,
+    scale: f32,
+    radii_of: &dyn Fn(usize) -> [f32; 4],
+) -> Option<vapors_scene::Clip> {
+    clip.map(|clip| {
+        let rect = snapped(clip.rect, scale);
+        match clip.rounded_by() {
+            None => vapors_scene::Clip::square(rect),
+            Some(slot) => {
+                let radii = radii_of(slot).map(|r| r * scale);
+                vapors_scene::Clip::rounded(rect, crate::corners::fitted(radii, rect))
+            }
+        }
+    })
 }
 
 /// Box `index`'s own step: its own painting and its replaced content,
@@ -160,6 +194,8 @@ pub(crate) fn paint_box(
     out: &mut crate::painting::Painting,
 ) {
     let (layout_box, rect) = (&boxes[index], rects[index]);
+    // a field's run: its marks under its text (`text_paint.rs`)
+    crate::text_paint::paint(boxes, rects, index, input, out);
     crate::paint_own::paint_own(boxes, rects, index, input, out);
     crate::images::paint(layout_box, rect, input, out);
     crate::svg_paint::paint(layout_box, rect, input, out);
@@ -167,7 +203,8 @@ pub(crate) fn paint_box(
     crate::range_paint::paint(layout_box, rect, input, out);
     crate::checkbox_paint::paint(layout_box, rect, input, out);
     crate::switch::paint(layout_box, rect, input, out);
-    crate::text_paint::paint(boxes, rects, index, input, out);
+    // an empty field's placeholder, on its own box (`placeholder_paint.rs`)
+    crate::placeholder_paint::paint(boxes, rects, index, input, out);
 }
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so

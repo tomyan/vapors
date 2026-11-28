@@ -2,10 +2,10 @@
 
 use super::component::{split_commas, values_until};
 use super::stream::{Stream, describe};
-use super::{at_rules, declarations};
-use crate::ast::{ComponentValue, Condition, Rule, Stylesheet};
+use super::{at_rules, declarations, placeholder};
+use crate::ast::{ComponentValue, Condition, Declaration, Rule, Stylesheet};
 use crate::token::TokenKind;
-use crate::{Error, Result};
+use crate::{Error, Position, Result};
 
 /// Parse the whole stream.
 pub(super) fn stylesheet(stream: &mut Stream) -> Result<Stylesheet> {
@@ -53,16 +53,39 @@ fn qualified_rule(
         )));
     }
     let decls = declarations::block(stream)?;
-    let parsed = crate::selector::parse_from_prelude(&prelude, position)?;
-    for (selector, parsed) in split_commas(&prelude).into_iter().zip(parsed) {
-        let position = selector.first().map_or(position, ComponentValue::position);
-        sheet.rules.push(Rule {
-            prelude: selector,
-            selector: parsed,
-            conditions: conditions.to_vec(),
-            declarations: decls.clone(),
-            position,
-        });
-    }
+    sheet
+        .rules
+        .extend(rules_of(&prelude, &decls, conditions, position)?);
     Ok(())
+}
+
+/// One rule per selector of `prelude`, a `::placeholder` one with its
+/// declarations lowered to the originating element's
+/// (`placeholder.rs`).
+fn rules_of(
+    prelude: &[ComponentValue],
+    decls: &[Declaration],
+    conditions: &[Condition],
+    position: Position,
+) -> Result<Vec<Rule>> {
+    let (prelude, lowered) = placeholder::rewritten(prelude);
+    let placeholder_decls = if lowered.contains(&true) {
+        placeholder::lowered(decls)?
+    } else {
+        Vec::new()
+    };
+    let parsed = crate::selector::parse_from_prelude(&prelude, position)?;
+    let selectors = split_commas(&prelude).into_iter().zip(lowered);
+    let rule = |((selector, lowered), parsed): ((Vec<ComponentValue>, bool), _)| Rule {
+        position: selector.first().map_or(position, ComponentValue::position),
+        prelude: selector,
+        selector: parsed,
+        conditions: conditions.to_vec(),
+        declarations: if lowered {
+            placeholder_decls.clone()
+        } else {
+            decls.to_vec()
+        },
+    };
+    Ok(selectors.zip(parsed).map(rule).collect())
 }

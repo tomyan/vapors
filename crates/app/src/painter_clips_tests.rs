@@ -76,14 +76,14 @@ fn gpu_clip_entry_follows_its_frame_entry_after_the_frame_leaves_and_returns() {
     let mut first = 0;
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        first = clips.entry(at, (frame, 5), clip).expect("room");
+        first = clips.entry(at, (frame, 5), (clip.into(), 0)).expect("room");
     });
 
     // When: drawn again, its frame's entry now 9
     let mut again = 0;
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        again = clips.entry(at, (frame, 9), clip).expect("room");
+        again = clips.entry(at, (frame, 9), (clip.into(), 0)).expect("room");
     });
 
     // Then: the same entry, naming the frame's new one
@@ -99,11 +99,60 @@ fn gpu_a_frame_entry_given_back_under_a_held_clip_is_refused() {
     let mut clips = Clips::new(&gpu.device);
     with_target(&gpu, &mut clips, |clips, at| {
         clips.begin_frame();
-        clips.entry(at, (a_frame(), 5), Rect::new(0.0, 0.0, 4.0, 4.0));
+        clips.entry(
+            at,
+            (a_frame(), 5),
+            (Rect::new(0.0, 0.0, 4.0, 4.0).into(), 0),
+        );
     });
 
     // When: frame entry 5 is given back
     clips.assert_none_names(&[5]);
+}
+
+#[test]
+#[should_panic(expected = "given back while it is held")]
+fn gpu_a_frames_entry_given_back_under_a_held_item_entry_is_refused() {
+    // Given: a frame's entry and an item entry under it, drawn
+    let gpu = gpu();
+    let mut clips = Clips::new(&gpu.device);
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let mut parent = 0;
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        parent = clips.frame_clip(at, (a_frame(), rect)).expect("room");
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+
+    // When: a frame draws the item entry alone
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        clips.entry(at, (a_frame(), 5), (rect.into(), parent));
+    });
+    clips.release_undrawn(&gpu.queue);
+}
+
+#[test]
+#[should_panic(expected = "given back while it is held")]
+fn gpu_a_frames_square_entry_given_back_under_its_held_rounded_one_is_refused() {
+    // Given: a frame's square entry and its rounded one, drawn
+    let gpu = gpu();
+    let mut clips = Clips::new(&gpu.device);
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let round = vapors_scene::Clip::rounded(rect, [1.0; 4]);
+    let mut square = 0;
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        square = clips.frame_clip(at, (a_frame(), rect)).expect("room");
+        clips.frame_round(at, (a_frame(), round, square));
+    });
+
+    // When: a frame draws the rounded entry alone
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        clips.frame_round(at, (a_frame(), round, square));
+    });
+    clips.release_undrawn(&gpu.queue);
 }
 
 #[test]
@@ -118,4 +167,42 @@ fn a_clip_with_whole_device_pixel_edges_is_accepted() {
 )]
 fn a_clip_with_an_edge_half_a_device_pixel_off_is_refused() {
     assert_whole(Rect::new(0.0, 0.0, 16.5, 11.0));
+}
+
+#[test]
+fn gpu_a_rounded_clip_takes_its_own_entry_holding_its_radii() {
+    // Given: one rectangle, square and with rounded corners
+    let rect = Rect::new(0.0, 0.0, 4.0, 4.0);
+    let rounded = vapors_scene::Clip::rounded(rect, [2.0; 4]);
+    let (gpu, frame) = (gpu(), a_frame());
+    let mut clips = Clips::new(&gpu.device);
+    let (mut square_at, mut rounded_at) = (0, 0);
+
+    // When
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        square_at = clips.entry(at, (frame, 5), (rect.into(), 0)).expect("room");
+        rounded_at = clips.entry(at, (frame, 5), (rounded, 0)).expect("room");
+    });
+
+    // Then: two entries, the rounded one with its radii
+    assert_ne!(square_at, rounded_at);
+    assert_eq!(clips.table.entry(square_at).radii, [0.0; 4]);
+    assert_eq!(clips.table.entry(rounded_at).radii, [2.0; 4]);
+}
+
+#[test]
+#[should_panic(expected = "reached the clip table cut to an outer rectangle")]
+fn gpu_a_clip_cut_to_an_outer_rectangle_is_refused() {
+    // Given: a rounded clip cut on the page, as only the flat page view cuts one
+    let rounded = vapors_scene::Clip::rounded(Rect::new(0.0, 0.0, 8.0, 8.0), [2.0; 4]);
+    let cut = rounded.cut(Rect::new(0.0, 0.0, 4.0, 4.0));
+    let gpu = gpu();
+    let mut clips = Clips::new(&gpu.device);
+
+    // When, Then
+    with_target(&gpu, &mut clips, |clips, at| {
+        clips.begin_frame();
+        clips.entry(at, (a_frame(), 5), (cut, 0));
+    });
 }

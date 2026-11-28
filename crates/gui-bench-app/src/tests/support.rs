@@ -76,6 +76,12 @@ pub fn click(mounted: &Mounted, point: [f32; 2]) {
     refresh(mounted);
 }
 
+/// A `0xRRGGBB` colour, opaque, as the scene holds it.
+pub fn rgb(color: u32) -> vapors_scene::Color {
+    let [_, r, g, b] = color.to_be_bytes();
+    vapors_scene::Color::from_rgba8(r, g, b, 255)
+}
+
 /// A `0xAARRGGBB` colour as vapors prints it.
 pub fn css(color: u32) -> String {
     let [_, r, g, b] = color.to_be_bytes();

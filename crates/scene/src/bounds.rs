@@ -102,6 +102,15 @@ impl Rect {
             || self.bottom <= other.top
             || other.bottom <= self.top
     }
+
+    /// True when `other` lies wholly inside, edges included.
+    #[must_use]
+    pub fn contains(&self, other: &Rect) -> bool {
+        self.left <= other.left
+            && self.top <= other.top
+            && other.right <= self.right
+            && other.bottom <= self.bottom
+    }
 }
 
 #[cfg(test)]

@@ -147,6 +147,12 @@ fn rule_text(rule: &Rule, out: &mut String) {
         let _ = write!(out, "{name} {} {{ ", component_values(body));
     }
     out.push_str(&component_values(&rule.prelude));
+    // a lowered `::placeholder` rule (parse/placeholder.rs) is written
+    // back as one, so it parses to the same rule
+    let placeholder = crate::property::longhands::PLACEHOLDER_COLOR.name();
+    if rule.declarations.iter().any(|d| d.name == placeholder) {
+        out.push_str("::placeholder");
+    }
     out.push_str(" { ");
     declarations(&rule.declarations, out);
     out.push('}');
@@ -158,7 +164,12 @@ fn rule_text(rule: &Rule, out: &mut String) {
 
 fn declarations(decls: &[Declaration], out: &mut String) {
     for d in decls {
-        let _ = write!(out, "{}: {}", d.name, component_values(&d.value));
+        let name = if d.name == crate::property::longhands::PLACEHOLDER_COLOR.name() {
+            "color"
+        } else {
+            &d.name
+        };
+        let _ = write!(out, "{name}: {}", component_values(&d.value));
         if d.important {
             out.push_str(" !important");
         }

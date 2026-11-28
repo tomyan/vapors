@@ -48,6 +48,7 @@ mod cascade_supports;
 mod parse_at_rules;
 mod parse_declarations;
 mod parse_keyframes;
+mod parse_placeholder;
 mod parse_rules;
 mod parse_rules_refusals;
 mod parse_stream;

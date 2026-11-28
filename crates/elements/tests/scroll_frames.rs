@@ -40,7 +40,9 @@ fn scrolled(list_css: &str, scrolled: f32) -> List {
 fn row_quads(painted: &Painted) -> Vec<(Rect, Option<Rect>)> {
     let items = painted.scene().items();
     let rows = items.filter_map(|(item, clip)| match item {
-        Item::Quad(quad) if quad.background == ROW => Some((quad.rect, clip)),
+        Item::Quad(quad) if quad.background == ROW => {
+            Some((quad.rect, clip.map(|clip| clip.rect())))
+        }
         _ => None,
     });
     rows.collect()
