@@ -80,9 +80,9 @@ fn inserting_rows_under_a_subject_nth_child_marks_each_later_row_once() {
     // When
     insert_every_step(&mut doc, &rows);
 
-    // Then: each inserted row is a root twice, by its class set
-    // (`mark_changed`) and by its insert; each row from the first
-    // insert's place on is marked once, the inserted rows included
+    // Then: each inserted row is a root, twice, by its class set
+    // (`mark_changed`) and by its insert, and has no element mark; each
+    // original row from the first insert's place on is marked once
     let (elements, roots) = marks(&doc);
     assert!(
         elements <= ROWS && roots == 2 * CHANGES,

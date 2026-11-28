@@ -44,28 +44,48 @@ fn page(css: &str, marks: &[bool]) -> (Document, NodeId, Vec<NodeId>) {
     (doc, column, rows)
 }
 
-/// Removes every third row, inserts four new rows (one marked), and
-/// moves the last row to the front; returns the marks in the final order.
+/// Removes every third row, inserts three new rows (one marked), moves
+/// the last original row, which the removals' walks reached, to the
+/// front, then appends a fourth new row; returns the marks in the
+/// final order.
 fn edit(doc: &mut Document, column: NodeId, rows: &[NodeId], marks: &[bool]) -> Vec<bool> {
     let mut order: Vec<(NodeId, bool)> = rows.iter().copied().zip(marks.iter().copied()).collect();
     for i in (0..ROWS).step_by(3) {
         doc.remove(rows[i]);
     }
     order.retain(|(node, _)| !rows.iter().step_by(3).any(|r| r == node));
-    // `usize::MAX`: appended, past the last row
-    for (at, marked) in [(1, false), (5, true), (9, false), (usize::MAX, false)] {
-        let new = doc.create_element("div");
-        doc.set_attribute(new, "class", if marked { "row mark" } else { "row" });
-        let cell = doc.create_element("div");
-        doc.set_attribute(cell, "class", "cell");
-        doc.append(new, cell);
-        doc.insert_before(column, new, order.get(at).map(|o| o.0));
-        order.insert(at.min(order.len()), (new, marked));
+    for (at, marked) in [(1, false), (5, true), (9, false)] {
+        insert_new(doc, column, &mut order, at, marked);
     }
     let last = order.pop().expect("rows remain");
+    assert_eq!(
+        last.0,
+        rows[ROWS - 1],
+        "the row moved is the last original row"
+    );
     doc.insert_before(column, last.0, Some(order[0].0));
     order.insert(0, last);
+    // `usize::MAX`: appended, past the last row
+    insert_new(doc, column, &mut order, usize::MAX, false);
     order.into_iter().map(|o| o.1).collect()
+}
+
+/// A new row with one cell inserted at `at` of `order`, or appended
+/// past its end, in the document and in `order`.
+fn insert_new(
+    doc: &mut Document,
+    column: NodeId,
+    order: &mut Vec<(NodeId, bool)>,
+    at: usize,
+    marked: bool,
+) {
+    let new = doc.create_element("div");
+    doc.set_attribute(new, "class", if marked { "row mark" } else { "row" });
+    let cell = doc.create_element("div");
+    doc.set_attribute(cell, "class", "cell");
+    doc.append(new, cell);
+    doc.insert_before(column, new, order.get(at).map(|o| o.0));
+    order.insert(at.min(order.len()), (new, marked));
 }
 
 /// Each row's and its cell's computed style, in the column's order.
