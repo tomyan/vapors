@@ -266,3 +266,19 @@ fn a_rounded_clipping_box_in_a_rounded_frame_crossing_its_corners_is_refused() {
         "overlap without either holding the other",
     );
 }
+
+#[test]
+fn a_rounded_box_whose_clip_is_a_square_one_it_holds_is_accepted() {
+    // Given: in the first row, a square clipping box as wide as the card,
+    // across its top corners (accepted alone: the frame's rounded clip
+    // cuts it), holding a rounded box larger than it, whose clip is then
+    // the square one
+    let css = ".cut { overflow: hidden; height: 5px; } \
+        .bubble { overflow: hidden; border-radius: 2px; margin: -10px; height: 30px; }";
+    let (mut doc, _, rows) = card_list(css);
+    let cut = element(&mut doc, rows[0], "div", "cut");
+    element(&mut doc, cut, "div", "bubble");
+
+    // Then: the update is not refused
+    doc.update(at(1.0)).expect("updates");
+}

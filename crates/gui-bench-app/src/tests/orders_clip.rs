@@ -84,8 +84,8 @@ fn a_hovered_rows_background_is_under_the_cards_rounded_clip() {
 
 #[test]
 fn the_cards_rows_are_framed_under_its_rounded_clip() {
-    // When: 40 orders, and 30, whose card holds 31 children, under the 32
-    // a lane frames
+    // When: 40 orders; 31, whose card holds 32 children (a header and
+    // the rows), the fewest a lane frames; and 30, one child fewer
     let framed = |orders: usize| {
         let mounted = with_rows(orders);
         let counts = mounted.document.borrow().update_counts();
@@ -94,5 +94,6 @@ fn the_cards_rows_are_framed_under_its_rounded_clip() {
 
     // Then: the card's lane is the one framed, and none declined
     assert_eq!(framed(ORDERS), (1, 0));
+    assert_eq!(framed(31), (1, 0));
     assert_eq!(framed(30), (0, 0));
 }

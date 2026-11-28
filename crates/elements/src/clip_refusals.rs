@@ -1,8 +1,8 @@
 //! The boxes a rounded clip refuses (flat-scene F3.2b,
 //! `docs/plans/flat-scene-f3.md`): worked out with each box's clips
-//! (`kept_clips.rs` keeps them by slot), and the update refused once,
-//! after paint, naming the first in tree order and counting the others,
-//! as a clip chain past `MAX_CLIP_CHAIN` is (`paint_chain_refusals.rs`).
+//! (`kept_clips.rs` keeps them by slot), and, for the boxes in a rounded
+//! lane frame, against its corners after paint. Reporting them is
+//! `clip_refusals_report.rs`.
 
 use crate::clip::BoxClip;
 use crate::layout::{BoxRect, LayoutBox};
@@ -77,11 +77,21 @@ pub(crate) fn of(
     }
 }
 
+/// Whether box `slot` rounds what it holds: the clip it gives its content,
+/// `clip`, is its own rounded one. One answer for whether such a box is
+/// checked against a rounded frame's corners (`in_round_frame`) and for
+/// the reason it is refused (`nested_frames`): a box whose clip is a
+/// square one it holds, `meet` having kept that, is neither.
+pub(crate) fn rounds_itself(clip: Option<BoxClip>, slot: usize) -> bool {
+    clip.and_then(|clip| clip.rounded_by()) == Some(slot)
+}
+
 /// What a lane frame rounded by box `by` refuses of box `layout_box` in
 /// it, decided with its clips, not its place: an img, a gpu-surface and
 /// an svg drawing shapes, which draw under the scissor; and a framed
 /// lane that does not clip (`is_frame`, `clips`), whose rows' reach is
-/// not its box. A frame that clips is returned to be checked against the
+/// not its box. A frame that clips, and a box rounding what it holds
+/// (`rounds`, `rounds_itself`), are returned to be checked against the
 /// corners after paint (`nested_frames`), as rows move with none of their
 /// boxes painted again.
 pub(crate) fn in_round_frame(
@@ -108,8 +118,10 @@ pub(crate) fn in_round_frame(
     )
 }
 
-/// The frames in a rounded lane frame not held clear of its corners
-/// (`clip_rounded.rs` `holds`), each refused as `NestedFrame`: their
+/// The frames, and the boxes rounding what they hold, in a rounded lane
+/// frame not held clear of its corners (`clip_rounded.rs` `holds`), each
+/// refused, as `Overlap` for a box rounding itself and `NestedFrame` for
+/// a frame: their
 /// content clips on the page against the frame's rounded clip, every
 /// update, one check a frame (`Clips::nested`). The first frame entries
 /// chain to their outer frame's lifts this (`docs/plans/frame-clips.md`,
@@ -123,8 +135,7 @@ pub(crate) fn nested_frames(
         let region = frames.on_page(frame, nested_clip(clips, slot));
         let round = frame_round(frames, (slot, by, frame));
         let held = crate::clip_rounded::holds(round.rect, round.radii, region);
-        let rounds = clips.inner(slot).and_then(|clip| clip.rounded_by()) == Some(slot);
-        let why = if rounds {
+        let why = if rounds_itself(clips.inner(slot), slot) {
             RoundedRefusal::Overlap
         } else {
             RoundedRefusal::NestedFrame { rounded_by: by }
@@ -160,7 +171,8 @@ fn frame_round(
 ///
 /// # Panics
 ///
-/// When it gives none: only a clipping frame is kept nested.
+/// When it gives none: only a box that clips is kept nested, a frame or
+/// a box rounding what it holds.
 fn nested_clip(clips: &crate::kept_clips::Clips, slot: usize) -> crate::layout::BoxRect {
     let clip = clips.inner(slot).unwrap_or_else(|| {
         panic!(
