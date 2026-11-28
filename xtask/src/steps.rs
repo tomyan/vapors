@@ -10,7 +10,7 @@ use crate::steps_checks::{
 
 #[path = "steps_tiers.rs"]
 mod tiers;
-use tiers::{gpu, host, pmu, unit};
+use tiers::{gpu, host, pmu, sdk_host, unit};
 
 fn tools() -> Step {
     Step::new(
@@ -261,6 +261,12 @@ pub fn gpu_tests() -> Vec<Step> {
 /// The host tier: what only the host has (`steps_tiers.rs` `HOST_TESTS`).
 pub fn host_tests() -> Vec<Step> {
     vec![host()]
+}
+
+/// The SDK harness's host tests: never part of `ci`
+/// (`steps_tiers.rs` `SDK_HARNESS_TESTS`).
+pub fn sdk_host_tests() -> Vec<Step> {
+    vec![sdk_host()]
 }
 
 /// The hardware-counter tier: never part of `ci`.

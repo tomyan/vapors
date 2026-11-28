@@ -83,12 +83,16 @@ fn hits_patched_at_several_places_in_one_update_keep_paint_order() {
     assert_kept_equals_fresh(&mut doc, "a ghosted, b and c made wide");
     let painted = doc.update(VIEWPORT).expect("updates");
     assert_eq!(
-        painted.kept_hits().hit([10.0, 50.0], &painted.frames),
+        painted
+            .kept_hits()
+            .hit([10.0, 50.0], &painted.frames, &|_| None),
         None,
         "a takes no hit"
     );
     assert_eq!(
-        painted.kept_hits().hit([100.0, 50.0], &painted.frames),
+        painted
+            .kept_hits()
+            .hit([100.0, 50.0], &painted.frames, &|_| None),
         Some(c)
     );
 

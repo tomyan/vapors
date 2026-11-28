@@ -15,13 +15,19 @@ fail-fast = false
 failure-output = "immediate-final"
 slow-timeout = { period = "30s", terminate-after = 2 }
 
-# The compile-fail fixture (crates/compiler-examples/tests/must_use.rs)
-# builds its own crate on a cold target: 52.9 s measured at load 33,
-# 0.4 s warm. Four minutes leaves room for a gate's cold build under load.
+# The compile-fail fixtures (crates/compiler-examples/tests/compile_fail.rs)
+# run as one trybuild run, which builds compiler-examples and all its
+# dependencies and dev-dependencies (vapors-elements, vapors-text, ...) in
+# its own target/tests/trybuild, so it cannot reuse the test build's
+# artifacts: a gate's cold target pays for that build. Measured cold, 12
+# cores: 152.4 s at load 3.0 (a fresh worktree, sccache, 2026-11-27) and
+# 174.9 s in #638's gate at load 3.5; 46.9 s with only its own target
+# cold; 0.4 s warm. Five minutes is 1.7 times the slowest; a gate under
+# heavier load than these is unmeasured, and would fail here, naming it.
 [[profile.default.overrides]]
-filter = 'package(vapors-compiler-examples) & binary(must_use)'
-slow-timeout = { period = "60s", terminate-after = 4 }
+filter = 'package(vapors-compiler-examples) & binary(compile_fail)'
+slow-timeout = { period = "60s", terminate-after = 5 }
 
 [[profile.ci.overrides]]
-filter = 'package(vapors-compiler-examples) & binary(must_use)'
-slow-timeout = { period = "60s", terminate-after = 4 }
+filter = 'package(vapors-compiler-examples) & binary(compile_fail)'
+slow-timeout = { period = "60s", terminate-after = 5 }

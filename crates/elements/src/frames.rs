@@ -24,11 +24,23 @@ pub(crate) struct FrameAt {
     pub(crate) clip: Option<BoxRect>,
     /// `clip` in device pixels, as items are cut.
     pub(crate) device_clip: Option<Rect>,
+    /// Its rounded clip, when a lane's container rounds its content
+    /// (`docs/plans/frame-clips.md`, slice 2): cut by `clip` too.
+    pub(crate) rounded: Option<FrameRound>,
     /// Its composed transform to the target, which decides whether its
     /// items are snapped (`docs/plans/flat-scene.md` section 4.3): each
     /// frame takes the class of the frame it is in, and the page's is a
     /// whole translation, so every frame's is until transforms (F4a).
     pub(crate) class: TransformClass,
+}
+
+/// A frame's rounded clip: the padding box of the box that rounds it, on
+/// the page, CSS pixels, its padding radii, and that box's slot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FrameRound {
+    pub(crate) rect: BoxRect,
+    pub(crate) radii: [f32; 4],
+    pub(crate) by: usize,
 }
 
 /// Each frame of a paint, by its scroll container's slot; the scroll
@@ -73,6 +85,7 @@ impl Frames {
             shift: [0.0; 2],
             clip: None,
             device_clip: None,
+            rounded: None,
             class: TransformClass::WholeTranslate,
         };
         Self {
@@ -136,6 +149,7 @@ impl Frames {
             shift,
             clip,
             device_clip: clip.map(|clip| crate::paint::snapped(clip, self.scale)),
+            rounded: None,
             class,
         }
     }

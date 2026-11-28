@@ -39,8 +39,11 @@ impl Placed {
         let slot = self.slot_for(key, taken);
         let boxed = !edits.removed.is_empty() || !edits.inserted.is_empty();
         let mut children = old_children(taken, slot, boxed);
+        let order = InsertOrder::of(source, &edits.inserted);
+        let mut shared = None;
         if boxed {
-            let reshaped = self.reshaped_by(source, (slot, &children, edits), taken);
+            let reshaped = self.reshaped_by((slot, &children, edits), &order.heads, taken);
+            shared = Some(reshaped.shared);
             taken.reshaped.insert(slot, reshaped);
         }
         for &removed in &edits.removed {
@@ -51,18 +54,9 @@ impl Placed {
                 .child_removed(slot, removed, children.get(at).copied());
         }
         let mut put = vec![slot];
-        let mut roots = Vec::new();
-        let mut pending = edits.inserted.clone();
-        while let Some(child) = next_in_order(source, &mut pending) {
-            let at = self.after_previous(source, (slot, child, &children), taken);
-            let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
-            let after = at.checked_sub(1).map(|before| children[before]);
-            children.insert(at, built[0]);
-            roots.push(built[0]);
-            self.lanes
-                .borrow_mut()
-                .child_inserted(slot, built[0], after);
-            put.extend(built);
+        let inserted = self.put_inserted(source, (slot, &order.sequence), taken, &mut put);
+        if let Some(shared) = shared {
+            inserted.splice_into(&mut children, shared);
         }
         let (mut own, field_text) = element_box(source, owner);
         assert!(
@@ -72,7 +66,33 @@ impl Placed {
         own.children = children;
         self.hold(key, slot);
         self.boxes[slot] = own;
-        (put, roots)
+        (put, inserted.roots)
+    }
+
+    /// Builds and puts each child of `sequence`, in order, under the
+    /// owner's box in `owner`, each after the slot of its previous
+    /// sibling with a box (already put, as the order guarantees), and
+    /// tells the owner's lane; the slots built go to `put`. The children
+    /// list's changed run is assembled once after (`Inserted::splice_into`),
+    /// not by a search and an insert per child (action 49).
+    fn put_inserted(
+        &mut self,
+        source: &Source<'_>,
+        (owner, sequence): (usize, &[Insert]),
+        taken: &mut Taken,
+        put: &mut Vec<usize>,
+    ) -> Inserted {
+        let mut inserted = Inserted::default();
+        for &(child, previous) in sequence {
+            let after = previous.map(|p| self.slot_held(p, taken));
+            let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
+            inserted.put_after(after, built[0]);
+            self.lanes
+                .borrow_mut()
+                .child_inserted(owner, built[0], after);
+            put.extend(built);
+        }
+        inserted
     }
 
     /// The slot `node`'s box holds, or held when another owner rebuilt
@@ -82,35 +102,6 @@ impl Placed {
         let slot = self.slots.of(key).or_else(|| taken.held(key));
         slot.unwrap_or_else(|| panic!("{node:?}, before an inserted child, has no box"))
     }
-
-    /// Where `child` goes among `children`, the owner's in `owner`: after
-    /// the box of its nearest previous sibling that makes one, or first.
-    fn after_previous(
-        &self,
-        source: &Source<'_>,
-        (owner, child, children): (usize, NodeId, &[usize]),
-        taken: &Taken,
-    ) -> usize {
-        match previous_box(source, child) {
-            Some(node) => self.child_position(owner, children, self.slot_held(node, taken)) + 1,
-            None => 0,
-        }
-    }
-}
-
-/// Takes out of `pending` an inserted child whose previous sibling with
-/// a box is not pending too, so each is put in after a box already put:
-/// in DOM order, whatever order they were inserted in (review of #285,
-/// H2). None when nothing is pending.
-fn next_in_order(source: &Source<'_>, pending: &mut Vec<NodeId>) -> Option<NodeId> {
-    let waits = |child: &NodeId| previous_box(source, *child).is_some_and(|p| pending.contains(&p));
-    let ready = pending.iter().position(|child| !waits(child));
-    if pending.is_empty() {
-        return None;
-    }
-    let ready =
-        ready.expect("inserted children form a chain of previous siblings, so one is first");
-    Some(pending.remove(ready))
 }
 
 /// `child`'s nearest previous sibling that makes a box, past empty text
@@ -161,5 +152,9 @@ pub(super) fn position(children: &[usize], slot: usize) -> usize {
         .unwrap_or_else(|| panic!("slot {slot} is not a child of the edited owner's box"))
 }
 
+#[path = "slots_edit_order.rs"]
+mod order;
 #[path = "slots_edit_places.rs"]
 mod places;
+
+use order::{Insert, InsertOrder, Inserted};

@@ -165,6 +165,14 @@ pub fn is_ignored(name: &str) -> bool {
 /// # Errors
 /// Unknown properties and sumi's terminal extras.
 pub fn check_name(name: &str, position: Position) -> Result<()> {
+    if name == longhands::PLACEHOLDER_COLOR.name() {
+        return Err(Error::new(
+            position,
+            format!(
+                "{name:?} is the placeholder's colour, set only by `::placeholder {{ color: .. }}`; write that rule instead"
+            ),
+        ));
+    }
     if is_supported(name) {
         return Ok(());
     }
@@ -172,6 +180,16 @@ pub fn check_name(name: &str, position: Position) -> Result<()> {
         return Err(Error::new(
             position,
             format!("shorthand {name:?} is not supported; {hint}"),
+        ));
+    }
+    if let Some(plain) =
+        names::unprefixed(name).filter(|plain| !plain.starts_with('-') && is_supported(plain))
+    {
+        return Err(Error::new(
+            position,
+            format!(
+                "property {name:?} is the vendor-prefixed twin of {plain:?}, which vapors supports; write {plain:?} alone"
+            ),
         ));
     }
     if let Some(hint) = names::sumi_extra_hint(name) {

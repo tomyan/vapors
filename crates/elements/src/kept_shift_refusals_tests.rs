@@ -11,8 +11,7 @@ fn an_item_under_another_clip_than_the_parts_is_painted_again() {
     let mut part = kept(painting(rect(0.0, 0.0)), rect(0.0, 0.0));
     part.own
         .scene
-        .clips_mut()
-        .fill(Some(Rect::new(0.0, 0.0, 5.0, 5.0)));
+        .set_every_clip(Some(Rect::new(0.0, 0.0, 5.0, 5.0).into()));
 
     // Then: the part's clip is none, its item's is not
     assert!(shift_of(&part, from(rect(0.0, 24.0))).is_none());

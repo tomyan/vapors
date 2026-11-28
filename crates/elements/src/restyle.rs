@@ -11,6 +11,7 @@ use vapors_dom::NodeId;
 
 use crate::document::Document;
 use crate::error::ElementError;
+use crate::restyle_children::Walked;
 use crate::style::{Styles, UsedMap};
 use crate::update::Viewport;
 
@@ -27,6 +28,9 @@ pub(crate) struct Dirty {
     /// the sheets reach (`restyle_children`): debug builds check the
     /// restyle against a fresh one (`restyle_check`).
     pub(crate) narrowed: bool,
+    /// The siblings an unbounded sibling walk reached this update
+    /// (`restyle_children`).
+    pub(crate) walked: Walked,
 }
 
 impl Dirty {

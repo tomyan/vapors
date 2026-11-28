@@ -17,11 +17,8 @@ let toggle = move || sorted.update(|on| *on = !*on);
 </script>
 
 <style>
-/* Relaxed guard (FLAGS.md, "orders card corners"): vapors defers a rounded clip, so the card cannot
-   clip its rows. The header rounds its own top corners instead, and the last row's hover has square
-   bottom corners over the card's round ones. Retire both when `overflow: hidden` honours a radius. */
-.orders { position: relative; flex: none; box-sizing: border-box; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 12px #1118271a; }
-.orders-head { position: relative; height: 44px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb; border-radius: 12px 12px 0 0; background-color: #f9fafb; }
+.orders { position: relative; flex: none; box-sizing: border-box; overflow: hidden; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 12px #1118271a; }
+.orders-head { position: relative; height: 44px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; }
 .col-title { position: absolute; top: 0; height: 43px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #6b7280; }
 .col-title:nth-child(1) { left: 24px; } .col-title:nth-child(2) { left: 140px; } .col-title:nth-child(3) { left: 440px; } .col-title:nth-child(4) { left: 600px; }
 .sort { left: 848px; width: 120px; justify-content: flex-end; }

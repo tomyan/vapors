@@ -21,7 +21,11 @@ fn one_hit_under(label: u64) -> KeptHits {
         height: 10.0,
     };
     let mut hits = KeptHits::default();
-    hits.put(label, std::iter::once((0, (vapors_dom::NodeId(1), rect))));
+    hits.put(
+        label,
+        std::iter::once((0, (vapors_dom::NodeId(1), rect))),
+        None,
+    );
     hits
 }
 
@@ -41,4 +45,27 @@ fn hits_in_the_same_order_under_another_label_are_named_by_the_check() {
         Some("kept hits' label 5: in frame Some(0), gathered afresh None")
     );
     assert_eq!(kept.first_label_differing(&one_hit_under(5)), None);
+}
+
+#[test]
+fn a_relabel_moves_the_rounded_clip_its_hits_are_under() {
+    // Given: label 5's hits under the rounded clip of box 3, label 6's
+    // under none, relabelled 5 to 7 and 6 to 5
+    let rect = crate::layout::BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: 10.0,
+        height: 10.0,
+    };
+    let mut hits = KeptHits::default();
+    let hit = |node| std::iter::once((0, (vapors_dom::NodeId(node), rect)));
+    hits.put(5, hit(1), Some(3));
+    hits.put(6, hit(2), None);
+
+    // When
+    hits.relabel(&[(5, 7), (6, 5)]);
+
+    // Then
+    assert_eq!(hits.rounded.get(&7), Some(&3));
+    assert_eq!(hits.rounded.get(&5), None);
 }

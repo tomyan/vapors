@@ -13,6 +13,7 @@ use vapors_elements::Document;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod answer_files;
 pub mod ax;
 pub mod ax_projection;
 pub mod ax_tree;
@@ -69,6 +70,7 @@ macro_rules! fixtures {
 }
 
 fixtures![
+    appearance::Appearance,
     block_margins::BlockMargins,
     borders::Borders,
     buttons::Buttons,
@@ -100,6 +102,7 @@ fixtures![
     progress_fill::ProgressFill,
     range::Range,
     roles::Roles,
+    rounded_clip::RoundedClip,
     scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,

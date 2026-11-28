@@ -6,7 +6,7 @@
 
 use vapors_elements::{BatchKey, KeptBatched, Painted};
 use vapors_renderer::Target;
-use vapors_scene::{Clips, Rect, Run};
+use vapors_scene::{Clip, Clips, Rect, Run};
 
 use super::ScenePainter;
 use super::errors::PaintError;
@@ -51,6 +51,12 @@ impl ScenePainter {
                 continue;
             };
             let scissor = Self::scissor((target, &clipped), batch, frame);
+            #[cfg(test)]
+            let scissor = if self.scissor_widened {
+                *target
+            } else {
+                scissor
+            };
             self.draw_placed(&scissor, (painted, kept), (places, at, frame))?;
         }
         Ok(())
@@ -165,20 +171,28 @@ pub(super) fn scissor_clip(run: &Run, clips: &Clips) -> Option<Rect> {
     if run.clipped_by_table() {
         return None;
     }
-    clips.uniform().unwrap_or_else(|| {
+    let clip = clips.uniform().unwrap_or_else(|| {
         panic!(
             "a {run:?} batch the scissor clips has items under several clips {:?}: only runs on \
              the clip table join across clips (vapors-scene batch.rs `push`); reproduce with \
              `cargo xtask test`",
             clips.runs()
         )
-    })
+    })?;
+    assert!(
+        !clip.is_rounded(),
+        "a {run:?} batch the scissor clips is under the rounded clip {clip:?}: a scissor cuts \
+         square, so only runs on the clip table can be rounded (vapors-elements is to refuse \
+         an image, surface or mesh under one from F3.2b, until F3.1b moves them onto the \
+         table); reproduce with `cargo xtask test`"
+    );
+    Some(clip.rect())
 }
 
 /// The clip a batch's items under `clip` read from the clip table: `clip`
 /// for a run on the table; none, entry 0, for the rest
 /// (`painter_kept_entries.rs`).
-pub(super) fn table_clip(run: &Run, clip: Option<Rect>) -> Option<Rect> {
+pub(super) fn table_clip(run: &Run, clip: Option<Clip>) -> Option<Clip> {
     clip.filter(|_| run.clipped_by_table())
 }
 

@@ -2,7 +2,8 @@
 
 `vapors_components::virtual_list::VirtualList` is a vertical scroll
 container that holds only the rows in and near its window. Every row is
-`row_height` px tall; the window is `height` px. The rows any part of
+`row_height` px tall; the window is the container's laid-out height,
+which follows the page as it resizes. The rows any part of
 which is in the window exist, and `overscan` more beyond each edge (4 by
 default), cut to the keys there are (`crates/components/src/virtual_window.rs`).
 
@@ -25,8 +26,16 @@ row. The list's `scroll` event sets the offset the rows follow, so a
 scroll draws its new rows in the same frame (`docs/plans/virtual-list.md`,
 V1). With no scroll and no change to `keys`, nothing changes.
 
-The container is `overflow-y: auto` with its height bound to `height`;
-its content is a box `keys.len() * row_height` tall holding a spacer as
+The container is `overflow-y: auto`. With `height` above 0 its height
+is bound to `height`; at 0, the default, it is `height: 100%`, so it
+fills a parent whose height is definite (a box with a set height, or
+an absolutely placed box between `top` and `bottom`). Either way the
+window is the height its `resize` last reported
+(`docs/components.md`, "Resize"), `height` until the first. The
+frame's first update lays the list out at its new height, its `resize`
+fires, and the frame's second update builds the rows of that height,
+so the first frame drawn, and each frame after a resize, shows the
+rows of the height it lays out. Its content is a box `keys.len() * row_height` tall holding a spacer as
 tall as the rows above the first that exists, then the rows. Inside it:
 `.virtual-list`, `.virtual-content`, `.virtual-above`, `.virtual-row`.
 
@@ -42,6 +51,5 @@ are refused from 7,873 (33.25 or 33.5 px hold far more).
 Every prop has a default, because a tag from another crate cannot pass
 a required prop yet (`docs/components.md`, "Required props").
 
-Not built: rows of differing heights, horizontal lists, a height that
-follows the container's laid-out size (`height` is read at mount), and
-keys other than `usize`.
+Not built: rows of differing heights, horizontal lists, and keys other
+than `usize`.

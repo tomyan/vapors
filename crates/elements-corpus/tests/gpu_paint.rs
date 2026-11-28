@@ -248,6 +248,7 @@ paint_tests![
     outline_paint,
     paint_boxes,
     image_paint,
+    rounded_clip,
     stacking,
     svg_shapes_paint;
     only_1x:

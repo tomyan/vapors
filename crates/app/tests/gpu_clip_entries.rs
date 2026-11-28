@@ -70,13 +70,15 @@ fn gpu_the_first_frame_writes_the_clips_drawn_under_and_a_scroll_none() {
     let (_, scroll) = drawn(&mut rig, &doc);
     let (_, idle) = drawn(&mut rig, &doc);
 
-    // Then: one entry for each of the 3 rows in view; written as a new
-    // table's 64 entries when the first batch binds it, then each of the
-    // 3 as it is set, 48 bytes each; none after
-    assert_eq!(first.clip_entries_changed, 3, "{first:?}");
+    // Then: one entry for each of the 3 rows in view and one for the
+    // list's frame clip, which their entries are under
+    // (docs/plans/frame-clips.md); written as a new table's 64 entries
+    // when the first batch binds it, then each of the 4 as it is set, 48
+    // bytes each; none after, the frame's clip not moving as it scrolls
+    assert_eq!(first.clip_entries_changed, 4, "{first:?}");
     assert_eq!(
         (first.clip_writes, first.clip_bytes),
-        (67, 67 * 48),
+        (68, 68 * 48),
         "{first:?}"
     );
     assert_eq!(

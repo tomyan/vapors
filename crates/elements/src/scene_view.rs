@@ -45,7 +45,7 @@ impl<'a> SceneView<'a> {
 
     /// Each item on the page, first drawn first, with its clip (device
     /// pixels).
-    pub fn items(&self) -> impl Iterator<Item = (Item, Option<Rect>)> + 'a {
+    pub fn items(&self) -> impl Iterator<Item = (Item, Option<vapors_scene::Clip>)> + 'a {
         let (boxes, frames) = (self.boxes, self.frames);
         self.drawn
             .steps()
@@ -76,7 +76,7 @@ impl<'a> SceneView<'a> {
     pub fn to_scene(&self) -> Scene {
         let mut scene = Scene::new();
         for (item, clip) in self.items() {
-            scene.set_clip(clip);
+            scene.set_rounded_clip(clip);
             scene.push(item);
         }
         scene
@@ -115,10 +115,10 @@ impl<'a> SceneView<'a> {
 pub(crate) fn step_items<'a>(
     (boxes, frames): (&'a [Option<KeptBox>], &'a Frames),
     step: Step,
-) -> impl Iterator<Item = (Item, Option<Rect>)> + 'a {
+) -> impl Iterator<Item = (Item, Option<vapors_scene::Clip>)> + 'a {
     let kept = kept(boxes, step.index(), step);
     let scene = kept.scene_of(step);
-    let clips = scene.clips().iter().copied();
+    let clips = scene.clips();
     let on_page = move |(item, clip)| frames.item(kept.from.frame, item, clip);
     scene.items().iter().zip(clips).map(on_page)
 }
@@ -128,11 +128,14 @@ pub(crate) fn step_items<'a>(
 pub(crate) fn frame_items(
     boxes: &[Option<KeptBox>],
     step: Step,
-) -> (usize, impl Iterator<Item = (Item, Option<Rect>)> + '_) {
+) -> (
+    usize,
+    impl Iterator<Item = (Item, Option<vapors_scene::Clip>)> + '_,
+) {
     let kept = kept(boxes, step.index(), step);
     let scene = kept.scene_of(step);
     let items = scene.items().iter().copied();
-    (kept.from.frame, items.zip(scene.clips().iter().copied()))
+    (kept.from.frame, items.zip(scene.clips()))
 }
 
 /// The items `step` paints: its slot's own part, outline or thumbs.

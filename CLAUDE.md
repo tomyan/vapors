@@ -73,6 +73,12 @@ scripts/web-wake-frames.sh target/web <new dir>
 xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
                           a gpu-surface in a window: 0 frames and renders idle, 2 frames
                           and 1 render per invalidate, LoopClosed after the loop ends
+xvfb-run -a cargo run -p vapors-app --example live_timer -- --check
+                          the Live timer on the application thread (AppThread) in a
+                          window: handlers and ticks on that thread, one frame per tick,
+                          none before Live goes on, at most one within a period after it
+                          goes off, nothing timed by winit; exits 1 naming
+                          each rule broken (Space toggles Live without --check)
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save

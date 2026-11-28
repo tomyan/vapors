@@ -89,6 +89,7 @@ impl Document {
         drop(paint_span);
         self.refuse_unplaced(&refused.unplaced, &slotted, viewport.scale)?;
         self.refuse_long_chains(&refused.long_chains, &slotted)?;
+        self.refuse_rounded(&refused.rounded, &slotted)?;
         self.ax.touch_slots(&changed, &slotted.slots);
         self.counts.boxes_kept = self.boxes.keep(slotted, viewport.scale, &changed.rebuilt);
         (painted.from, painted.stackings) = (from, stackings);

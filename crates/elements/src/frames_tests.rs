@@ -90,7 +90,7 @@ fn an_item_is_moved_by_its_frame_and_cut_to_its_frame_clip() {
     ));
 
     // When
-    let (moved, clip) = frames.item(1, &quad, Some(Rect::new(0.0, 0.0, 200.0, 100.0)));
+    let (moved, clip) = frames.item(1, &quad, Some(Rect::new(0.0, 0.0, 200.0, 100.0).into()));
     let (_, unclipped) = frames.item(1, &quad, None);
 
     // Then
@@ -98,8 +98,8 @@ fn an_item_is_moved_by_its_frame_and_cut_to_its_frame_clip() {
         panic!("a quad stays a quad")
     };
     assert_eq!(moved.rect, Rect::new(0.0, 10.0, 50.0, 30.0));
-    assert_eq!(clip, Some(Rect::new(10.0, 10.0, 110.0, 70.0)));
-    assert_eq!(unclipped, Some(Rect::new(10.0, 10.0, 110.0, 110.0)));
+    assert_eq!(clip, Some(Rect::new(10.0, 10.0, 110.0, 70.0).into()));
+    assert_eq!(unclipped, Some(Rect::new(10.0, 10.0, 110.0, 110.0).into()));
 }
 
 #[test]

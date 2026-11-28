@@ -35,7 +35,7 @@ pub(crate) fn frame_links(order: &KeptOrder, frames: &Frames, mut frame: usize) 
         steps += 1;
         assert!(steps <= order.clips.len(), "{}", looped(frame));
         let (link, outer) = boundary(order, frames, frame);
-        links += usize::from(link);
+        links += link;
         frame = outer;
     }
     links
@@ -49,14 +49,20 @@ fn looped(frame: usize) -> String {
     )
 }
 
-/// Whether the boundary of `frame` (its container's slot) is under a
-/// clip, and the frame outside it. A scroll container clips its content
-/// and sits in the frame outside; a lane frame's row is its own frame
-/// (`kept_clips.rs`), under its parent's content clip.
-fn boundary(order: &KeptOrder, frames: &Frames, frame: usize) -> (bool, usize) {
+/// The links of the boundary of `frame` (its container's slot), and the
+/// frame outside it. A scroll container clips its content and sits in
+/// the frame outside; a lane frame's row is its own frame
+/// (`kept_clips.rs`), under its parent's content clip, and that clip
+/// rounded is two links, the painter's rounded entry under its square
+/// one (`docs/plans/frame-clips.md`, slice 2), so the count stays an
+/// upper bound on the painter's chain.
+fn boundary(order: &KeptOrder, frames: &Frames, frame: usize) -> (usize, usize) {
     let clips = &order.clips;
     if clips.frame(frame) != frame {
-        return (clips.inner(frame).is_some(), clips.frame(frame));
+        return (
+            usize::from(clips.inner(frame).is_some()),
+            clips.frame(frame),
+        );
     }
     let parent = order.tree.parent(frame).unwrap_or_else(|| {
         panic!(
@@ -65,7 +71,11 @@ fn boundary(order: &KeptOrder, frames: &Frames, frame: usize) -> (bool, usize) {
              reproduce with `cargo xtask test`"
         )
     });
-    under(order, frames, parent)
+    let (link, outer) = under(order, frames, parent);
+    let rounded = clips
+        .inner(parent)
+        .is_some_and(|clip| clip.rounded_by().is_some());
+    (usize::from(link) + usize::from(rounded), outer)
 }
 
 /// Whether a framed lane's rows under `container` are under its content

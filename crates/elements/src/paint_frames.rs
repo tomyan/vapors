@@ -27,7 +27,7 @@ pub(crate) fn updated(
 ) -> bool {
     // a lane that started or stopped framing moved the scroll containers
     // in its rows to other frames, which a kept update cannot follow
-    let reshaped = !kept || order.walks.reshaped() || changed.reframed;
+    let reshaped = !kept || order.walks.reshaped() || !changed.reframed.is_empty();
     let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
     // Relaxed in a release build: the scan runs only when the frames are
     // made afresh. The scroll containers change only when paint order is
@@ -83,7 +83,11 @@ fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBas
 
 /// The base of the framed lane container `container`: its content is
 /// in its own scroll frame when it scrolls, clipped there already; else
-/// in the frame its box is in, under the clip it gives its content.
+/// in the frame its box is in, under the clip it gives its content. Its
+/// rounding is one of two answers to "is this lane frame rounded", with
+/// `kept_clips_round.rs` `round_frame`, which reads a scrolling
+/// container's clip too: they agree only while a rounded scroller is
+/// refused (`docs/plans/frame-clips.md`, slice 3).
 fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBase {
     let origin = input.placement.rects[container].y;
     if input.stackings.scrolls(container) {
@@ -91,13 +95,38 @@ fn lane_base(input: &PaintInput<'_>, clips: &Clips, container: usize) -> LaneBas
             parent: container,
             origin,
             inner: None,
+            rounding: None,
         };
     }
+    let inner = clips.inner(container);
     LaneBase {
         parent: clips.frame(container),
         origin,
-        inner: clips.inner(container),
+        inner: inner.map(|clip| clip.rect),
+        rounding: inner.and_then(|clip| rounding(clips, container, clip)),
     }
+}
+
+/// The radii and rounding box of lane container `container`'s clip
+/// `clip`, when it is rounded.
+///
+/// # Panics
+///
+/// When the box it names rounds nothing: `Clips` keeps a rounding for
+/// every box a clip names.
+fn rounding(
+    clips: &Clips,
+    container: usize,
+    clip: crate::clip::BoxClip,
+) -> Option<([f32; 4], usize)> {
+    let by = clip.rounded_by()?;
+    let (_, radii) = clips.rounding(by).unwrap_or_else(|| {
+        panic!(
+            "lane container {container}'s clip is rounded by box slot {by}, which rounds \
+             nothing (kept_clips.rs `rounding`); reproduce with `cargo xtask test`"
+        )
+    });
+    Some((radii, by))
 }
 
 /// `painted`'s frames made afresh for the scroll containers `thumbs`;

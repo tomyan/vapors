@@ -33,10 +33,10 @@ pub(crate) struct Placed {
     /// The lane containers placed whose children could not be frames
     /// of their own, with why (`placement_frames.rs`).
     pub(crate) unframed: Vec<(usize, crate::lane_decline::LaneDecline)>,
-    /// A lane container placed whose children became frames of their own
-    /// or stopped being, which moves their subtrees to other frames
+    /// The lane containers placed whose children became frames of their
+    /// own or stopped being, which moves their subtrees to other frames
     /// (`placement_frames.rs`).
-    pub(crate) reframed: bool,
+    pub(crate) reframed: Vec<usize>,
 }
 
 impl<'a> Changes<'a> {

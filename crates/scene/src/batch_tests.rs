@@ -96,13 +96,17 @@ fn a_change_of_clip_starts_a_batch_of_a_kind_the_scissor_clips() {
     let batches = batches(&scene);
 
     // Then: three batches, each under one clip
-    let shape: Vec<(Option<Option<Rect>>, usize)> = batches
+    let shape: Vec<(Option<Option<crate::Clip>>, usize)> = batches
         .iter()
         .map(|batch| (batch.clips.uniform(), batch.run.len()))
         .collect();
     assert_eq!(
         shape,
-        [(Some(None), 1), (Some(Some(clip)), 2), (Some(None), 1)]
+        [
+            (Some(None), 1),
+            (Some(Some(clip.into())), 2),
+            (Some(None), 1)
+        ]
     );
 }
 
@@ -126,7 +130,7 @@ fn quads_join_across_clip_changes_each_keeping_its_clip() {
     assert_eq!(batches[0].run.len(), 4);
     assert_eq!(
         batches[0].clips.runs(),
-        [(0, None), (1, Some(clip)), (3, None)]
+        [(0, None), (1, Some(clip.into())), (3, None)]
     );
 }
 
@@ -140,10 +144,10 @@ fn each_item_keeps_the_clip_it_was_pushed_under() {
     scene.push(text(1));
 
     // When
-    let clips = scene.clips();
+    let clips: Vec<_> = scene.clips().collect();
 
     // Then
-    assert_eq!(clips, [None, Some(clip)]);
+    assert_eq!(clips, [None, Some(clip.into())]);
 }
 
 fn picture(id: u32) -> Item {
@@ -242,8 +246,8 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
 fn quads_shadows_shapes_text_and_icons_join_across_clips_and_every_other_kind_splits() {
     // Given: each kind, two items under two clips
     let (a, b) = (
-        Some(Rect::new(0.0, 0.0, 4.0, 4.0)),
-        Some(Rect::new(4.0, 0.0, 8.0, 4.0)),
+        Some(Rect::new(0.0, 0.0, 4.0, 4.0).into()),
+        Some(Rect::new(4.0, 0.0, 8.0, 4.0).into()),
     );
     let kinds: [(Item, bool); 8] = [
         (quad(0.0), true),

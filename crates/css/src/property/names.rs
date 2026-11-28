@@ -22,6 +22,12 @@ pub static IGNORED_VENDOR_PROPERTIES: &[(&str, &str)] = &[
     ),
 ];
 
+/// `name` without a `-webkit-` or `-moz-` prefix, when it has one.
+pub(super) fn unprefixed(name: &str) -> Option<&str> {
+    name.strip_prefix("-webkit-")
+        .or_else(|| name.strip_prefix("-moz-"))
+}
+
 /// A CSS shorthand the crate knows of but does not expand, and the
 /// longhands to write instead.
 pub(super) fn unsupported_shorthand_hint(name: &str) -> Option<&'static str> {

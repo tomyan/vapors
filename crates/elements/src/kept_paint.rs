@@ -98,12 +98,22 @@ fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> 
     let cache = input.cache.clone();
     let unresolvable = std::mem::take(&mut input.unresolvable);
     let long_chains = std::mem::take(&mut input.long_chains);
+    let frame_refused = std::mem::take(&mut input.frame_refused);
     let painted = paint(boxes, rects, input);
     let found = (
         std::mem::replace(&mut input.unresolvable, unresolvable),
         std::mem::replace(&mut input.long_chains, long_chains),
     );
     assert_same_refusals(found, (&input.unresolvable, &input.long_chains));
+    let fresh_frame = std::mem::replace(&mut input.frame_refused, frame_refused);
+    assert_eq!(
+        sorted(fresh_frame),
+        sorted(input.frame_refused.clone()),
+        "the boxes a rounded frame refuses in a fresh paint differ from the update's (fresh \
+         first): the frames in a rounded lane frame (`Clips::nested`) or their places differ \
+         between the two (clip_refusals.rs `nested_frames`); \
+         reproduce with `cargo xtask test`"
+    );
     *input.cache = cache;
     painted
 }

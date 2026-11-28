@@ -33,6 +33,20 @@ runs:
       run: |
         [ -n "${ImageOS:-}" ] && [ -n "${ImageVersion:-}" ] || { echo "::error::ImageOS or ImageVersion is unset; the apt cache key needs the runner image"; exit 1; }
         echo "key=apt-$ImageOS-$ImageVersion-$(printf %s "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+    # The runner image lists packages.microsoft.com as an apt source. No
+    # package installed here comes from it, and its InRelease has answered
+    # 403 "no longer signed", failing apt-get update before any vapors
+    # code ran: the gpu job of run 45917865410 (attempt 1) and the window
+    # job of run 46068857188, 2026-11-27. The source files naming it are
+    # removed before the update; when none does, it says so and goes on.
+    # Remove this step once the image lists no such source, or once the
+    # source is signed again and stays so.
+    - name: remove the runner image's packages.microsoft.com apt source
+      shell: bash
+      run: |
+        found=$(grep -rlF --include="*.list" --include="*.sources" packages.microsoft.com /etc/apt || [ $? -eq 1 ])
+        [ -n "$found" ] || { echo "no apt source names packages.microsoft.com"; exit 0; }
+        echo "$found" | xargs sudo rm -v --
     - name: restore the .debs
       id: cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

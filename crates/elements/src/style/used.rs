@@ -2,7 +2,9 @@
 //! or every refusal its computed style earns.
 
 use vapors_css::cascade::ComputedStyle;
-use vapors_css::property::longhands::{BACKGROUND_COLOR, CURSOR, DISPLAY, Z_INDEX};
+use vapors_css::property::longhands::{
+    BACKGROUND_COLOR, CURSOR, DISPLAY, PLACEHOLDER_COLOR, Z_INDEX,
+};
 use vapors_scene::Color;
 
 use super::box_style;
@@ -31,8 +33,14 @@ pub(crate) struct Used {
     /// `z-index` where it applies (a positioned box, or a flex or grid
     /// item), `None` for auto and where it does not.
     pub(crate) z_index: Option<i32>,
+    /// `::placeholder { color }` (`-vapors-placeholder-color`): an empty
+    /// text or number field's placeholder is painted in it.
+    pub(crate) placeholder: Color,
     /// `accent-color`, `None` for `auto` (a switch's checked track).
     pub(crate) accent: Option<Color>,
+    /// `appearance`: with `none` a checkbox draws no mark and a switch
+    /// no track or knob (`appearance.rs`).
+    pub(crate) appearance: super::Appearance,
     /// How its thumb is drawn, when it scrolls.
     pub(crate) scrollbar: super::Scrollbar,
     /// How its track and thumb are drawn, when it is a range (3-E3a).
@@ -59,8 +67,13 @@ pub(crate) struct Context<'a> {
     /// The element is an `input type=number` or a text field, which
     /// needs a width of its own (3-E3c, E6a).
     pub(crate) text_like_field: bool,
+    /// Of those, an `input type=number`, whose text does not scroll.
+    pub(crate) number_field: bool,
     /// The element is a `gpu-surface` (docs/gpu-surface.md).
     pub(crate) surface: bool,
+    /// The element is an `input type=range`, which refuses
+    /// `appearance: none`.
+    pub(crate) range: bool,
 }
 
 impl Context<'_> {
@@ -75,10 +88,20 @@ impl Context<'_> {
             flex_item,
             in_inline,
             text_like_field,
+            number_field,
             surface,
             to_viewport,
+            range,
         } = self;
-        let facts = [flex_item, in_inline, text_like_field, surface, to_viewport];
+        let facts: [&bool; FACTS] = [
+            flex_item,
+            in_inline,
+            text_like_field,
+            number_field,
+            surface,
+            to_viewport,
+            range,
+        ];
         facts
             .iter()
             .enumerate()
@@ -86,40 +109,44 @@ impl Context<'_> {
     }
 }
 
+/// How many facts `Context::bits` holds, one bit each.
+const FACTS: usize = 7;
+// a fact past the key's width fails the build here, not a share at run time
+const _: () = assert!(FACTS <= u8::BITS as usize, "widen Context::bits's key");
+
 /// The used style of an element whose computed styles (its own and its
 /// parent's) are `styles`.
 pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Vec<Refusal>> {
     let mut reader = Reader::new(styles);
     let text = text_style(&mut reader);
     let decoration = decoration(&mut reader, context.scale, text.color);
-    let layout = box_style(&mut reader, context.flex_item, decoration.border);
+    let mut layout = box_style(&mut reader, context.flex_item, decoration.border);
     let inline = inline::is_inline(&mut reader, context.flex_item);
     if inline {
         inline::refuse_box_edges(&mut reader, &layout);
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse(DISPLAY, inline::BLOCK_IN_INLINE.to_owned());
     }
-    // pushed directly: `Reader::refuse` leaves an undeclared value to
-    // its declarer, and `auto` here is nobody's declaration
-    if context.text_like_field && layout.size.width == taffy::Dimension::auto() {
-        reader.refusals.push(Refusal {
-            property: "width",
-            value: "auto".to_owned(),
-            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
-            declared: None,
-        });
+    if context.text_like_field {
+        refuse_field_auto_width(&mut reader, &layout);
     }
     if context.surface {
         super::surface::refuse(&mut reader, &layout, &decoration, inline);
     }
-    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
+    let text_field = context.text_like_field && !context.number_field;
+    if text_field {
+        super::overflow::scroll_field_text(&mut layout);
+    }
+    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration, text_field);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
-    super::overflow::refuse_scrolling_field(&mut reader, &layout, context.text_like_field);
+    super::overflow::refuse_scrolling_field(&mut reader, &layout, context.number_field);
     let mut result = Used {
         parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
         accent: super::accent::accent(&mut reader),
+        appearance: super::appearance::appearance(&mut reader, context.range),
+        placeholder: reader.read(PLACEHOLDER_COLOR, color, Color::default()),
         layout,
         inline,
         text,
@@ -141,7 +168,27 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
 }
 
+/// Refuses a number or text field whose width is `auto`.
+fn refuse_field_auto_width(reader: &mut Reader<'_>, layout: &taffy::Style) {
+    // pushed directly: `Reader::refuse` leaves an undeclared value to
+    // its declarer, and `auto` here is nobody's declaration
+    if layout.size.width == taffy::Dimension::auto() {
+        reader.refusals.push(Refusal {
+            property: "width",
+            value: "auto".to_owned(),
+            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
+            declared: None,
+        });
+    }
+}
+
 impl Used {
+    /// `appearance: auto`: a checkbox draws its mark, a switch its track
+    /// and knob (`appearance.rs`).
+    pub(crate) fn native(&self) -> bool {
+        self.appearance == super::Appearance::Auto
+    }
+
     /// `overflow` is `hidden` or `clip`: descendants are cut off at the
     /// padding box.
     pub(crate) fn clips(&self) -> bool {
@@ -165,6 +212,8 @@ impl Used {
             z_index,
             scrollbar,
             accent,
+            appearance,
+            placeholder,
             parts,
             svg,
         } = self;
@@ -180,6 +229,8 @@ impl Used {
             ("z_index", *z_index == other.z_index),
             ("scrollbar", *scrollbar == other.scrollbar),
             ("accent", *accent == other.accent),
+            ("appearance", *appearance == other.appearance),
+            ("placeholder", *placeholder == other.placeholder),
             ("parts", *parts == other.parts),
             ("svg", *svg == other.svg),
         ]

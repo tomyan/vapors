@@ -68,7 +68,7 @@ impl Parts {
         &mut self,
         ((frame, row), slots): ((usize, Row), &mut LaneSlots),
         item: &Item,
-        clip: Option<Rect>,
+        clip: Option<vapors_scene::Clip>,
     ) {
         let is_culled = vapors_scene::culled(item, clip, row.view);
         if is_culled && !is_surface(item) {
@@ -166,7 +166,7 @@ fn is_surface(item: &Item) -> bool {
 /// -0.0 from 0.0).
 // Exact: a zero offset is exactly zero.
 #[allow(clippy::float_cmp)]
-fn moved(clip: Rect, offset: [f32; 2]) -> Rect {
+fn moved(clip: vapors_scene::Clip, offset: [f32; 2]) -> vapors_scene::Clip {
     if offset == [0.0, 0.0] {
         clip
     } else {

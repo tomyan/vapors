@@ -2,7 +2,7 @@
 //! a point, a hit or a scene item in a frame's coordinates put on the
 //! page by the frame's shift and cut to its clip.
 
-use vapors_scene::{Item, Rect};
+use vapors_scene::{Clip, Item};
 
 use super::{FrameAt, Frames, PAGE};
 use crate::layout::BoxRect;
@@ -66,6 +66,28 @@ impl Frames {
         self.get(frame).map(|at| self.hit_at(at, rect))
     }
 
+    /// Whether frame `frame`'s rounded clip, if it has one, holds `point`
+    /// on the page, CSS pixels: a hit in a rounded frame is cut by its
+    /// shape too (`kept_hits_query.rs`).
+    pub(crate) fn round_holds(&self, frame: usize, [x, y]: [f32; 2]) -> bool {
+        self.get(frame)
+            .and_then(|at| at.rounded)
+            .is_none_or(|round| {
+                let at = BoxRect {
+                    x,
+                    y,
+                    width: 0.0,
+                    height: 0.0,
+                };
+                crate::clip_rounded::holds(round.rect, round.radii, at)
+            })
+    }
+
+    /// `rect` in frame `frame` on the page, uncut.
+    pub(crate) fn on_page(&self, frame: usize, rect: BoxRect) -> BoxRect {
+        self.css_rect(self.at(frame), rect)
+    }
+
     fn hit_at(&self, at: FrameAt, rect: BoxRect) -> BoxRect {
         crate::clip::within(at.clip, self.css_rect(at, rect))
     }
@@ -78,8 +100,8 @@ impl Frames {
         &self,
         frame: usize,
         item: &Item,
-        clip: Option<Rect>,
-    ) -> (Item, Option<Rect>) {
+        clip: Option<Clip>,
+    ) -> (Item, Option<Clip>) {
         let at = self.at(frame);
         // An unshifted frame keeps every coordinate's bits: adding 0.0
         // turns -0.0 into 0.0, which the kept batches' keys tell apart
@@ -93,11 +115,11 @@ impl Frames {
                 clip.map(|clip| clip.offset(at.shift)),
             )
         };
-        let clip = match (clip, at.device_clip) {
-            (Some(clip), Some(frame)) => Some(clip.intersection(frame)),
-            (clip, frame) => clip.or(frame),
-        };
-        (item, clip)
+        let round = at.rounded.map(|round| self.device_round(round));
+        (
+            item,
+            crate::frames_draw::on_page(clip, (at.device_clip, round)),
+        )
     }
 
     /// `rect` in a frame at `at`, on the page.

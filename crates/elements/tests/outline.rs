@@ -175,7 +175,7 @@ fn an_overflow_hidden_ancestor_clips_a_childs_outline_but_not_its_own() {
             .enumerate()
             .find_map(|(i, item)| match item {
                 Item::Quad(q) if q.border_colors[0].to_rgba8() == rgba && q.border[0] > 0.0 => {
-                    Some(scene.clips()[i])
+                    Some(scene.clip_at(i))
                 }
                 _ => None,
             })

@@ -29,6 +29,7 @@ fn covered_extensions_are_found_and_others_are_not() {
     file(&root, "crates/a/shader.wgsl", "x\n");
     file(&root, "crates/a/page.html", "x\n");
     file(&root, "crates/a/glue.js", "x\n");
+    file(&root, "scripts/probe.mjs", "x\n");
     file(&root, "Cargo.toml", "x\n");
     file(&root, "crates/a/notes.md", "not covered\n");
     file(&root, "crates/a/image.png", "x");
@@ -41,7 +42,8 @@ fn covered_extensions_are_found_and_others_are_not() {
             "crates/a/glue.js",
             "crates/a/lib.rs",
             "crates/a/page.html",
-            "crates/a/shader.wgsl"
+            "crates/a/shader.wgsl",
+            "scripts/probe.mjs"
         ]
     );
 }

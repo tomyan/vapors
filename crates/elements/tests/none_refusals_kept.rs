@@ -20,13 +20,13 @@ fn a_hidden_img_naming_an_unregistered_image_is_refused() {
 }
 
 #[test]
-fn a_hidden_element_with_a_rounded_clip_is_refused() {
+fn a_hidden_scroll_container_with_a_radius_is_refused() {
     // Given: refused by the used-style reader, inline or not
     let (mut doc, row) = row("hidden");
     element(&mut doc, row, "div", "round");
 
     // Then
-    assert_refused(&mut doc, "rounded clips");
+    assert_refused(&mut doc, "scroll container's clip is square");
 }
 
 #[test]

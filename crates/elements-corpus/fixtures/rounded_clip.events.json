@@ -1,0 +1,40 @@
+{
+  "steps": [
+    {
+      "action": "Click(147.0, 23.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#bordered",
+          "type": "click"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 10,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Click(153.0, 29.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#wide",
+          "type": "click"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 12,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}
