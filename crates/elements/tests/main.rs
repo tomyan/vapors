@@ -117,6 +117,7 @@ mod inline_metrics;
 mod inline_styles;
 mod insert_checks_rows;
 mod insert_restyle;
+mod insert_restyle_many;
 mod insert_restyle_rows;
 mod kept_batch_keys;
 mod kept_batches;

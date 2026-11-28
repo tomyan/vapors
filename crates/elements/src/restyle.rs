@@ -27,6 +27,25 @@ pub(crate) struct Dirty {
     /// the sheets reach (`restyle_children`): debug builds check the
     /// restyle against a fresh one (`restyle_check`).
     pub(crate) narrowed: bool,
+    /// The siblings an unbounded sibling walk reached this update
+    /// (`restyle_children`).
+    pub(crate) walked: Walked,
+}
+
+/// The siblings every-later and every-earlier walks reached this
+/// update: a walk that meets one stops there.
+#[derive(Default)]
+pub(crate) struct Walked {
+    pub(crate) later: NodeSet,
+    pub(crate) earlier: NodeSet,
+}
+
+impl Walked {
+    /// `node` was inserted, perhaps moved: a walk that meets it goes on.
+    pub(crate) fn forget(&mut self, node: NodeId) {
+        self.later.remove(&node);
+        self.earlier.remove(&node);
+    }
 }
 
 impl Dirty {
