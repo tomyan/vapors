@@ -10,11 +10,11 @@ use super::WORKFLOW;
 /// Matched anywhere in a line, so a quoted `uses: '…'` is found too.
 const ACTION: &str = "cargo-bins/cargo-binstall@";
 
-/// The steps that install binstall: one in each job that runs
-/// `cargo xtask setup --ci` (ci, web, gpu, window). A count that changes
-/// fails here, so a moved workflow or a match that stops finding them is
-/// never read as "every step agrees".
-const EXPECTED_STEPS: usize = 4;
+/// The command that needs binstall: it installs each pinned tool with
+/// `cargo binstall` (`setup_install.rs`), so the workflow needs one binstall
+/// step per line that runs it. Counting both sides, instead of a constant,
+/// keeps one answer to "which jobs install binstall".
+const SETUP: &str = "cargo xtask setup --ci";
 
 /// Each use of the action: its line number, the tag in its `# vX.Y.Z`
 /// comment, and its `version:` input, if any.
@@ -41,15 +41,22 @@ fn version_input(after: &[&str]) -> Option<String> {
         .find_map(|line| line.trim().strip_prefix("version: ").map(str::to_string))
 }
 
-/// `file`'s binstall steps each install the release their SHA is
-/// commented with, and there are [`EXPECTED_STEPS`] of them; else the
-/// first disagreement, naming the file and line and the fix.
+/// `file` runs `SETUP` at least once, has one binstall step per run, and
+/// each installs the release its SHA is commented with; else the first
+/// disagreement, naming the file (and line) and the fix.
 fn check(file: &str, workflow: &str) -> Result<(), String> {
-    let uses = binstall_uses(workflow);
-    if uses.len() != EXPECTED_STEPS {
+    let setups = workflow.lines().filter(|line| line.contains(SETUP)).count();
+    if setups == 0 {
         return Err(format!(
-            "{file}: {} steps use {ACTION}, expected {EXPECTED_STEPS}; fix: find the missing \
-             steps, or change EXPECTED_STEPS in gate_binstall_pin_tests.rs if a job was added or removed",
+            "{file}: no line runs `{SETUP}`, so there is nothing to hold the binstall steps to; \
+             fix: point the check at the workflow that installs the pinned tools"
+        ));
+    }
+    let uses = binstall_uses(workflow);
+    if uses.len() != setups {
+        return Err(format!(
+            "{file}: {} steps use {ACTION} but {setups} lines run `{SETUP}`; fix: give each job \
+             that runs it a pinned binstall step, or find the step the match missed",
             uses.len()
         ));
     }
@@ -79,25 +86,53 @@ fn every_binstall_action_installs_the_release_its_sha_is_commented_with() {
     assert_eq!(checked, Ok(()));
 }
 
+/// A job that installs binstall pinned to 1.28.0 and runs setup.
+const PINNED_JOB: &str = "      - uses: cargo-bins/cargo-binstall@abc # v1.28.0\n        with:\n          version: 1.28.0\n      - name: install pinned tools\n        run: cargo xtask setup --ci\n";
+
+/// A job that runs setup with no binstall step of its own.
+const UNINSTALLED_JOB: &str =
+    "      - name: install pinned tools\n        run: cargo xtask setup --ci\n";
+
 #[test]
-fn a_workflow_with_no_binstall_step_is_refused_naming_the_file() {
+fn a_workflow_that_runs_no_setup_is_refused_naming_the_file() {
+    // Given
+    let empty = "";
+
     // When
-    let refused = check("empty.yml", "").expect_err("nothing to check");
+    let refused = check("empty.yml", empty).expect_err("nothing to check");
 
     // Then
-    assert!(refused.starts_with("empty.yml: 0 steps use"), "{refused}");
+    assert!(
+        refused.starts_with("empty.yml: no line runs `cargo xtask setup --ci`"),
+        "{refused}"
+    );
 }
 
 #[test]
-fn fewer_binstall_steps_than_expected_are_refused() {
-    // Given: three of the four, each pinned
-    let step = "      - uses: cargo-bins/cargo-binstall@abc # v1.28.0\n        with:\n          version: 1.28.0\n";
+fn a_fifth_setup_job_without_a_binstall_step_is_refused_naming_both_counts() {
+    // Given: four pinned jobs and a fifth that runs setup with no binstall
+    let workflow = PINNED_JOB.repeat(4) + UNINSTALLED_JOB;
 
     // When
-    let refused = check("ci.yml", &step.repeat(3)).expect_err("one is missing");
+    let refused = check("ci.yml", &workflow).expect_err("a job is missing its step");
 
     // Then
-    assert!(refused.contains("3 steps use"), "{refused}");
+    assert!(
+        refused.starts_with("ci.yml: 4 steps use cargo-bins/cargo-binstall@ but 5 lines run"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn as_many_pinned_steps_as_setup_jobs_pass() {
+    // Given
+    let workflow = PINNED_JOB.repeat(5);
+
+    // When
+    let checked = check("ci.yml", &workflow);
+
+    // Then
+    assert_eq!(checked, Ok(()));
 }
 
 #[test]
