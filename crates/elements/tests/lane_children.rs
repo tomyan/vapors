@@ -64,7 +64,7 @@ fn a_second_insert_in_one_owner_in_one_update_scans_no_child() {
     // Then: each insert goes after its previous sibling's slot and the
     // children are assembled once, so the second insert's place is not
     // searched for (it was, up to it: 96 and 396 entries, the known term
-    // splice-layout.md section 12 named, removed by action 49)
+    // splice-layout.md section 12 named, removed by #648, action 49)
     assert_eq!((a.children_scanned, b.children_scanned), (0, 0));
 }
 
