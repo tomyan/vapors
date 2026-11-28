@@ -83,7 +83,12 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
-      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.26.1, committed 2026-10-24
+      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.28.0
+        # Without version the action installs binstall's latest release,
+        # whatever the SHA above; it must name the tag in the comment, and a
+        # bump of the SHA must move it too.
+        with:
+          version: 1.28.0
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -170,7 +175,12 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.26.1, committed 2026-10-24
+      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.28.0
+        # Without version the action installs binstall's latest release,
+        # whatever the SHA above; it must name the tag in the comment, and a
+        # bump of the SHA must move it too.
+        with:
+          version: 1.28.0
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -267,7 +277,12 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
-      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.26.1, committed 2026-10-24
+      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.28.0
+        # Without version the action installs binstall's latest release,
+        # whatever the SHA above; it must name the tag in the comment, and a
+        # bump of the SHA must move it too.
+        with:
+          version: 1.28.0
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -358,7 +373,12 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.26.1, committed 2026-10-24
+      - uses: cargo-bins/cargo-binstall@4b6fa09d0d1ef9740a0c332e31b9ae336f97efa0 # v1.28.0
+        # Without version the action installs binstall's latest release,
+        # whatever the SHA above; it must name the tag in the comment, and a
+        # bump of the SHA must move it too.
+        with:
+          version: 1.28.0
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.

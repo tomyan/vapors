@@ -1,4 +1,6 @@
-# One pull request per dependency, weekly, merged by CI when green.
+# One pull request per dependency, weekly. Nothing merges one on its own:
+# each is reviewed and merged on the local gate, as every PR (CLAUDE.md,
+# Slice loop).
 version: 2
 updates:
   - package-ecosystem: cargo

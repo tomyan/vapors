@@ -215,3 +215,7 @@ pub(crate) fn git(dir: &str, args: &[&str]) -> Result<String, String> {
 #[cfg(test)]
 #[path = "gate_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gate_binstall_pin_tests.rs"]
+mod binstall_pin_tests;
