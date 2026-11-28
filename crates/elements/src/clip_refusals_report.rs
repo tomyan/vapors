@@ -86,8 +86,8 @@ fn wording(why: RoundedRefusal) -> (&'static str, &'static str) {
         RoundedRefusal::Overlap => (
             "its clip and a rounded clip it is under (overflow: hidden or clip with a \
              border-radius) overlap without either holding the other, which needs clip chains",
-            "keep the clipping box inside the rounded box's padding box clear of its corners, or \
-             let it hold the rounded box whole",
+            "keep the clipping box inside the rounded box's padding box clear of its corners, or, \
+             outside a framed lane's rows, let it hold the rounded box whole",
         ),
         RoundedRefusal::FieldText => (
             "is a text field and its content box, where its text and placeholder paint, crosses \

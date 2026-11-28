@@ -1,7 +1,8 @@
 //! What `Clips` keeps of rounded clips beside the clips themselves
 //! (flat-scene F3.2b, `docs/plans/frame-clips.md` slice 2): each box's
-//! refusal, each rounding box's padding box and radii, and the frames in
-//! a rounded lane frame, which each update checks against its corners
+//! refusal, each rounding box's padding box and radii, and the frames
+//! and boxes rounding what they hold in a rounded lane frame, which each
+//! update checks against its corners
 //! after paint (`clip_refusals.rs` `nested_frames`), as rows move with no
 //! box painted again.
 
@@ -73,8 +74,8 @@ impl Clips {
         made.clip
     }
 
-    /// The frames in a rounded lane frame, with the box rounding it, in
-    /// slot order.
+    /// The frames and the boxes rounding what they hold in a rounded lane
+    /// frame, with the box rounding it, in slot order.
     pub(crate) fn nested(&self) -> Vec<(usize, usize)> {
         let mut nested: Vec<_> = self.nested.iter().map(|(&slot, &by)| (slot, by)).collect();
         nested.sort_unstable();

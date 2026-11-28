@@ -258,7 +258,11 @@ then, `NestedFrame` refuses it.
   not refused: a framed row gives its boxes no clip of its own, so its
   clip entry chains under the row frame's rounded entry, and the shader
   cuts the corners (three links,
-  `a_clipped_box_in_a_rounded_lane_row_counts_the_rounded_link`).
+  `a_clipped_box_in_a_rounded_lane_row_counts_the_rounded_link`). A box
+  rounding what it holds in a row is checked against the frame's corners
+  after paint and refused as `Overlap` when it crosses them (#643); one
+  whose clip is a square one it holds is a plain clipping box
+  (`clip_refusals.rs` `rounds_itself`).
 
 **Blocker before rounded scrollers land:** two answers to "is this lane
 frame rounded". `kept_clips_round.rs` `round_frame` reads the container's
