@@ -121,11 +121,10 @@ pub(crate) fn in_round_frame(
 /// The frames, and the boxes rounding what they hold, in a rounded lane
 /// frame not held clear of its corners (`clip_rounded.rs` `holds`), each
 /// refused, as `Overlap` for a box rounding itself and `NestedFrame` for
-/// a frame: their
-/// content clips on the page against the frame's rounded clip, every
-/// update, one check a frame (`Clips::nested`). The first frame entries
-/// chain to their outer frame's lifts this (`docs/plans/frame-clips.md`,
-/// the follow-up).
+/// a frame: their content clips on the page against the frame's rounded
+/// clip, every update, one check a frame (`Clips::nested`). The first
+/// frame entries chain to their outer frame's lifts this
+/// (`docs/plans/frame-clips.md`, the follow-up).
 pub(crate) fn nested_frames(
     clips: &crate::kept_clips::Clips,
     frames: &crate::frames::Frames,
@@ -160,7 +159,7 @@ fn frame_round(
         .and_then(|at| at.rounded)
         .unwrap_or_else(|| {
             panic!(
-                "box slot {slot} is kept as a frame in a lane frame rounded by box slot {by} \
+                "box slot {slot} is kept nested in a lane frame rounded by box slot {by} \
              (`Clips::nested`), and its frame {frame} has no rounded clip: the two must agree \
              (kept_clips_round.rs, frames_lane_prime.rs); reproduce with `cargo xtask test`"
             )
@@ -176,7 +175,8 @@ fn frame_round(
 fn nested_clip(clips: &crate::kept_clips::Clips, slot: usize) -> crate::layout::BoxRect {
     let clip = clips.inner(slot).unwrap_or_else(|| {
         panic!(
-            "box slot {slot}, kept as a clipping frame in a rounded lane frame, gives no clip \
+            "box slot {slot}, kept nested in a rounded lane frame as a frame or a box rounding \
+             what it holds, gives no clip \
              (clip_refusals.rs `in_round_frame`); reproduce with `cargo xtask test`"
         )
     });

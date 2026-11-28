@@ -7,7 +7,7 @@
 use super::support::*;
 use vapors_scene::{Clip, Item};
 
-/// The rows the card holds: past the 32 a lane frames.
+/// The rows the card holds: more than the 31 from which its rows frame.
 const ORDERS: usize = 40;
 
 /// The first element of `class`'s quad painted with `background`: its
