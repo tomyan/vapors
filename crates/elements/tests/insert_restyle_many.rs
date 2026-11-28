@@ -136,6 +136,6 @@ fn a_late_row_moved_early_then_a_change_before_it_restyles_as_a_fresh_page() {
     doc.update(viewport(400.0, 2000.0)).expect("updates");
 
     // Then
-    let (fresh, fresh_column, _) = page(css, &vec![false; ROWS - 2]);
+    let (fresh, fresh_column, _) = page(css, &[false; ROWS - 2]);
     assert_eq!(styles(&doc, column), styles(&fresh, fresh_column));
 }
