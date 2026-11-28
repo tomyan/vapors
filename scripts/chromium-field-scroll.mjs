@@ -162,20 +162,38 @@ async function main() {
 }
 
 // Chromium and its profile go on every exit: the end of a run, a
-// failed step, process.exit and SIGINT, SIGTERM or SIGHUP (a SIGKILL
-// cannot be caught and leaves both)
+// failed step, process.exit and SIGINT, SIGTERM or SIGHUP. SIGKILL,
+// SIGQUIT and other signals that end node without its exit handlers
+// leave both
 function closeOnExit(proc, profile) {
   let closed = false;
-  const close = () => {
+  process.on('exit', () => {
     if (closed) return;
     closed = true;
-    try { process.kill(-proc.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-    // Chromium may still be writing the profile as it exits
-    rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
-  };
-  process.on('exit', close);
+    killGroup(proc);
+    removeProfile(profile);
+  });
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
-    process.on(signal, () => { console.error(`chromium-field-scroll: stopped by ${signal}; Chromium closed and ${profile} removed`); process.exit(code); });
+    process.on(signal, () => { console.error(`chromium-field-scroll: stopped by ${signal}; closing Chromium and removing ${profile}`); process.exit(code); });
+  }
+}
+
+// a failure here prints its fix and sets exit 1 rather than throwing,
+// so the profile is still removed
+function killGroup(proc) {
+  if (proc.pid === undefined) return; // it never started
+  try { process.kill(-proc.pid, 'SIGKILL'); } catch (error) {
+    if (error.code === 'ESRCH') return;
+    console.error(`chromium-field-scroll: cannot kill Chromium's process group ${proc.pid}: ${error.message}; fix: kill -KILL -${proc.pid}`);
+    process.exitCode = 1;
+  }
+}
+
+function removeProfile(profile) {
+  // Chromium may still be writing the profile as it exits
+  try { rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100}); } catch (error) {
+    console.error(`chromium-field-scroll: cannot remove ${profile}: ${error.message}; fix: rm -rf ${profile}`);
+    process.exitCode = 1;
   }
 }
 
@@ -184,6 +202,7 @@ async function run(proc, deadline) {
     let buf = '';
     proc.stderr.on('data', d => { buf += d; const m = buf.match(/ws:\/\/[^\s]+/); if (m) ok(m[0]); });
     proc.on('exit', c => no(new Error(`chrome exited ${c}: ${buf}`)));
+    proc.on('error', e => no(new Error(`cannot start Chromium: ${e.message}; fix: run \`cargo xtask setup\` or set $CHROME to a Chromium`)));
   });
   const browser = new WebSocket(wsUrl);
   await new Promise(r => browser.addEventListener('open', r));
