@@ -95,13 +95,12 @@ pub(crate) fn inner(
     }
     let radii_of = |slot| radii(boxes, rects, slot, input);
     let candidate = cut_to(boxes, rects, index, input);
-    let rounding = candidate
-        .rounded_by()
-        .map(|slot| (candidate.rect, radii_of(slot)));
     let (clip, overlaps) = match crate::clip_rounded::meet(own, candidate, &radii_of) {
         Met::Clip(clip) => (clip, false),
         Met::Overlap(clip) => (clip, true),
     };
+    let rounding = crate::clip_refusals::rounds_itself(Some(clip), index)
+        .then(|| (clip.rect, radii_of(index)));
     Inner {
         clip: Some(clip),
         overlaps,
@@ -117,8 +116,9 @@ pub(crate) struct Inner {
     /// Whether that clip and the clip it is under overlap as a rounded
     /// clip must not.
     pub(crate) overlaps: bool,
-    /// Its own padding box and padding radii, CSS pixels, when it rounds
-    /// its content: hit testing cuts by them (`kept_hits_query.rs`).
+    /// Its own padding box and padding radii, CSS pixels, when its clip is
+    /// its own rounded one (`clip_refusals.rs` `rounds_itself`). Hit
+    /// testing cuts by them (`kept_hits_query.rs`).
     pub(crate) rounding: Option<(BoxRect, [f32; 4])>,
 }
 

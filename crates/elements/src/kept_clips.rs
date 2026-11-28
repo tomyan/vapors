@@ -41,7 +41,8 @@ pub(crate) struct InnerClip {
     /// Its own padding box and radii, CSS pixels, when it rounds its
     /// content.
     pub(crate) rounding: Option<(BoxRect, [f32; 4])>,
-    /// When it is a frame in a rounded lane frame, rounded by this box:
+    /// When it is a frame, or a box rounding what it holds, in a rounded
+    /// lane frame, rounded by this box:
     /// checked against the corners after paint (`kept_clips_round.rs`).
     pub(crate) nested: Option<usize>,
 }
@@ -66,7 +67,8 @@ pub(crate) struct Clips {
     /// Each box that rounds its content: its padding box and radii, CSS
     /// pixels in its content's frame, which hits are cut by.
     rounding: FxHashMap<usize, (BoxRect, [f32; 4])>,
-    /// The frames in a rounded lane frame, and the box rounding it: each
+    /// The frames and the boxes rounding what they hold in a rounded lane
+    /// frame, and the box rounding it: each
     /// update checks them against its corners (`kept_clips_round.rs`).
     nested: FxHashMap<usize, usize>,
 }
