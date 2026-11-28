@@ -152,15 +152,30 @@ function extent(png, is, axis) {
 async function main() {
   const chrome = process.env.CHROME || pinned();
   const profile = mkdtempSync(join(tmpdir(), 'field-scroll-'));
+  // its own process group, so its zygotes and renderers go with it
   const proc = spawn(chrome, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
-  const deadline = setTimeout(() => { console.error(`no Chromium page within ${START_MS} ms; fix: check ${chrome} starts headless`); proc.kill(); process.exit(1); }, START_MS);
-  try {
-    await run(proc, deadline);
-  } finally {
-    proc.kill();
+    '--window-size=1280,800', ...(SCROLLBAR ? [] : ['--hide-scrollbars']), '--force-device-scale-factor=1', 'about:blank'],
+    {detached: true, stdio: ['ignore', 'ignore', 'pipe']});
+  closeOnExit(proc, profile);
+  const deadline = setTimeout(() => { console.error(`no Chromium page within ${START_MS} ms; fix: check ${chrome} starts headless`); process.exit(1); }, START_MS);
+  await run(proc, deadline);
+}
+
+// Chromium and its profile go on every exit: the end of a run, a
+// failed step, process.exit and SIGINT, SIGTERM or SIGHUP (a SIGKILL
+// cannot be caught and leaves both)
+function closeOnExit(proc, profile) {
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    try { process.kill(-proc.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
     // Chromium may still be writing the profile as it exits
     rmSync(profile, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
+  };
+  process.on('exit', close);
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
+    process.on(signal, () => { console.error(`chromium-field-scroll: stopped by ${signal}; Chromium closed and ${profile} removed`); process.exit(code); });
   }
 }
 
