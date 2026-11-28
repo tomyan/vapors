@@ -1,8 +1,10 @@
-//! Many rows inserted under one list in one update put each in its
-//! place with bounded work (entry 122, action 49): the keyed filter of
-//! gui-bench's dashboard brings back thousands of rows at once, and
-//! ordering the inserts compared each pending row with every other.
-//! Each case also matches a full update.
+//! Many rows inserted under one list in one update are put in place
+//! with no search of the list's children (entry 122, action 49): the
+//! keyed filter of gui-bench's dashboard brings back thousands of rows at
+//! once, and each insert searched for its place, as ordering them
+//! compared each pending row with every other. `children_scanned` counts
+//! the searches; the ordering itself (a heap, one `previous_box` a row)
+//! is not counted. Each case also matches a full update.
 
 use crate::support;
 
@@ -59,16 +61,18 @@ fn edited_scanned(list: &List) -> usize {
 }
 
 #[test]
-fn rows_brought_back_last_first_are_ordered_with_bounded_work() {
+fn rows_brought_back_last_first_search_no_child() {
     // Given: 50 of 400 rows left, as a filter leaves them
     let (list, removed) = filtered();
 
     // When: the 350 come back from the last, each before the row after it (a keyed list's order)
     let scanned = brought_back(&list, &removed, removed.clone().into_iter().rev());
 
-    // Then: work linear in the rows, where comparing each pending row with the rest is about 350² / 2
-    assert!(
-        scanned <= COUNT,
+    // Then: the 50 kept rows' places come from the list's lane, and each
+    // brought-back row goes after its previous row's slot
+    assert_eq!(
+        scanned,
+        0,
         "{scanned} child entries scanned bringing back {} of {COUNT} rows",
         removed.len()
     );
@@ -76,7 +80,7 @@ fn rows_brought_back_last_first_are_ordered_with_bounded_work() {
 }
 
 #[test]
-fn rows_brought_back_first_first_are_ordered_with_bounded_work() {
+fn rows_brought_back_first_first_search_no_child() {
     // Given
     let (list, removed) = filtered();
 
@@ -84,8 +88,9 @@ fn rows_brought_back_first_first_are_ordered_with_bounded_work() {
     let scanned = brought_back(&list, &removed, removed.clone().into_iter());
 
     // Then
-    assert!(
-        scanned <= COUNT,
+    assert_eq!(
+        scanned,
+        0,
         "{scanned} child entries scanned bringing back {} of {COUNT} rows",
         removed.len()
     );
@@ -107,7 +112,7 @@ fn rows_brought_back_in_a_scattered_order_land_in_the_lists_order() {
 }
 
 #[test]
-fn every_row_inserted_into_an_empty_list_is_ordered_with_bounded_work() {
+fn every_row_inserted_into_an_empty_list_searches_no_child() {
     // Given: every row removed
     let list = list(COUNT, ROWS);
     for &row in &list.rows {
@@ -125,8 +130,8 @@ fn every_row_inserted_into_an_empty_list_is_ordered_with_bounded_work() {
     let scanned = edited_scanned(&list);
 
     // Then
-    assert!(
-        scanned <= COUNT,
+    assert_eq!(
+        scanned, 0,
         "{scanned} child entries scanned inserting {COUNT} rows into an empty list"
     );
     assert_matches_full(&list.doc, VIEW(), "every row inserted into an empty list");

@@ -40,8 +40,10 @@ impl Placed {
         let boxed = !edits.removed.is_empty() || !edits.inserted.is_empty();
         let mut children = old_children(taken, slot, boxed);
         let order = InsertOrder::of(source, &edits.inserted);
+        let mut shared = None;
         if boxed {
-            let reshaped = self.reshaped_by(source, (slot, &children, edits), &order.heads, taken);
+            let reshaped = self.reshaped_by((slot, &children, edits), &order.heads, taken);
+            shared = Some(reshaped.shared);
             taken.reshaped.insert(slot, reshaped);
         }
         for &removed in &edits.removed {
@@ -53,7 +55,9 @@ impl Placed {
         }
         let mut put = vec![slot];
         let inserted = self.put_inserted(source, (slot, &order.sequence), taken, &mut put);
-        let children = inserted.spliced_into(&children);
+        if let Some(shared) = shared {
+            inserted.splice_into(&mut children, shared);
+        }
         let (mut own, field_text) = element_box(source, owner);
         assert!(
             field_text.is_none(),
@@ -69,18 +73,18 @@ impl Placed {
     /// owner's box in `owner`, each after the slot of its previous
     /// sibling with a box (already put, as the order guarantees), and
     /// tells the owner's lane; the slots built go to `put`. The children
-    /// list is assembled once after (`Inserted::spliced_into`), not by a
-    /// search and an insert per child (action 49).
+    /// list's changed run is assembled once after (`Inserted::splice_into`),
+    /// not by a search and an insert per child (action 49).
     fn put_inserted(
         &mut self,
         source: &Source<'_>,
-        (owner, sequence): (usize, &[NodeId]),
+        (owner, sequence): (usize, &[Insert]),
         taken: &mut Taken,
         put: &mut Vec<usize>,
     ) -> Inserted {
         let mut inserted = Inserted::default();
-        for &child in sequence {
-            let after = previous_box(source, child).map(|p| self.slot_held(p, taken));
+        for &(child, previous) in sequence {
+            let after = previous.map(|p| self.slot_held(p, taken));
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             inserted.put_after(after, built[0]);
             self.lanes
@@ -153,4 +157,4 @@ mod order;
 #[path = "slots_edit_places.rs"]
 mod places;
 
-use order::{InsertOrder, Inserted};
+use order::{Insert, InsertOrder, Inserted};

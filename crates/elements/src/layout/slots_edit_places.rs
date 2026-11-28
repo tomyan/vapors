@@ -6,10 +6,10 @@
 
 use vapors_dom::NodeId;
 
-use super::super::super::boxes::Source;
 use super::super::super::child_edits::Edits;
 use super::super::super::reshaped::{Reshaped, Shared};
-use super::{Placed, Taken, position, previous_box};
+use super::order::Insert;
+use super::{Placed, Taken, position};
 
 impl Placed {
     /// The index of the child in `child` among `children`, the owner's
@@ -38,9 +38,8 @@ impl Placed {
     /// touches to the last, the shared head and tail outside it.
     pub(super) fn reshaped_by(
         &self,
-        source: &Source<'_>,
         (owner, old, edits): (usize, &[usize], &Edits),
-        heads: &[NodeId],
+        heads: &[Insert],
         taken: &Taken,
     ) -> Reshaped {
         let (mut from, mut to) = (old.len(), 0);
@@ -49,8 +48,8 @@ impl Placed {
             (from, to) = (from.min(at), to.max(at + 1));
         }
         // every child of a run of inserts has its head's place among `old`
-        for &head in heads {
-            let at = self.old_place(source, (owner, old), head, taken);
+        for &(_, previous) in heads {
+            let at = self.old_place((owner, old), previous, taken);
             (from, to) = (from.min(at), to.max(at));
         }
         let to = to.max(from);
@@ -64,17 +63,16 @@ impl Placed {
         }
     }
 
-    /// Where the inserted `head` goes among `old`, the owner's children
-    /// before the edits: after its nearest previous sibling with a box,
+    /// Where a run of inserts goes among `old`, the owner's children
+    /// before the edits: after its head's `previous` sibling with a box,
     /// which is not inserted, or first.
     fn old_place(
         &self,
-        source: &Source<'_>,
         (owner, old): (usize, &[usize]),
-        head: NodeId,
+        previous: Option<NodeId>,
         taken: &Taken,
     ) -> usize {
-        match previous_box(source, head) {
+        match previous {
             Some(previous) => self.child_position(owner, old, self.slot_held(previous, taken)) + 1,
             None => 0,
         }
