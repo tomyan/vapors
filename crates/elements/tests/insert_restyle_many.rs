@@ -52,14 +52,15 @@ fn edit(doc: &mut Document, column: NodeId, rows: &[NodeId], marks: &[bool]) -> 
         doc.remove(rows[i]);
     }
     order.retain(|(node, _)| !rows.iter().step_by(3).any(|r| r == node));
-    for (at, marked) in [(1, false), (5, true), (9, false), (order.len(), false)] {
+    // `usize::MAX`: appended, past the last row
+    for (at, marked) in [(1, false), (5, true), (9, false), (usize::MAX, false)] {
         let new = doc.create_element("div");
         doc.set_attribute(new, "class", if marked { "row mark" } else { "row" });
         let cell = doc.create_element("div");
         doc.set_attribute(cell, "class", "cell");
         doc.append(new, cell);
         doc.insert_before(column, new, order.get(at).map(|o| o.0));
-        order.insert(at, (new, marked));
+        order.insert(at.min(order.len()), (new, marked));
     }
     let last = order.pop().expect("rows remain");
     doc.insert_before(column, last.0, Some(order[0].0));

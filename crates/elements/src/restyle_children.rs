@@ -37,29 +37,9 @@ impl Document {
 
     /// Marks the siblings of `child` that `deps` reaches: each alone,
     /// or with its subtree when a use is in a group before the subject's.
-    /// A walk over every later (or earlier) sibling stops at one an
-    /// earlier such walk of this update reached: every sibling past it
-    /// is marked already, or was inserted since and marked itself, so
-    /// the marks of an update are bounded by the children and the
-    /// changes, not their product (entry 117, action 48).
     fn mark_siblings(&mut self, child: NodeId, deps: SiblingDeps) {
         let element = ElementRef::new(&self.arena, child);
-        let walked = &mut self.dirty.walked;
-        let mut reached = if deps.later {
-            unwalked(element, ElementRef::next_sibling, &mut walked.later)
-        } else {
-            siblings(element, ElementRef::next_sibling, deps.next)
-        };
-        reached.extend(if deps.earlier {
-            unwalked(element, ElementRef::previous_sibling, &mut walked.earlier)
-        } else {
-            siblings(
-                element,
-                ElementRef::previous_sibling,
-                usize::from(deps.previous),
-            )
-        });
-        for node in reached {
+        for node in reached(element, deps, &mut self.dirty.walked) {
             if deps.descendants {
                 self.dirty.subtree(node);
             } else {
@@ -69,15 +49,55 @@ impl Document {
     }
 }
 
+/// The siblings an every-later and an every-earlier walk reached this
+/// update (`Dirty::walked`): a walk that meets one stops there, so the
+/// marks of an update are bounded by the children and the changes, not
+/// their product (entry 117, action 48).
+#[derive(Default)]
+pub(crate) struct Walked {
+    later: NodeSet,
+    earlier: NodeSet,
+}
+
+impl Walked {
+    /// `node` was inserted, perhaps moved: a walk that meets it goes on.
+    /// A guard no test can pin: the insert's own walk already covers
+    /// what lies past the new place.
+    fn forget(&mut self, node: NodeId) {
+        self.later.remove(&node);
+        self.earlier.remove(&node);
+    }
+}
+
+/// The siblings of `element` that `deps` reaches, later then earlier.
+fn reached(element: ElementRef<'_>, deps: SiblingDeps, walked: &mut Walked) -> Vec<NodeId> {
+    let mut out = if deps.later {
+        unwalked(element, ElementRef::next_sibling, &mut walked.later)
+    } else {
+        siblings(element, ElementRef::next_sibling, deps.next)
+    };
+    out.extend(if deps.earlier {
+        unwalked(element, ElementRef::previous_sibling, &mut walked.earlier)
+    } else {
+        siblings(
+            element,
+            ElementRef::previous_sibling,
+            usize::from(deps.previous),
+        )
+    });
+    out
+}
+
 /// The element siblings of `from` in `step`'s direction up to the
 /// first one already in `walked`, each added to it.
 ///
 /// The stop holds by this invariant: every sibling past a node in
 /// `walked`, in its direction, is marked this update. The walk that
-/// added the node went on to the end. A child inserted since, a moved
-/// one included, is marked with its subtree and runs its own walk from
-/// its new place under the same sheets, and is dropped from `walked`
-/// on insert (`Walked::forget`). A removal leaves no unmarked sibling.
+/// added the node went on to the end, or to a walked node past which
+/// the same holds. A child inserted since, a moved one included, is
+/// marked with its subtree and runs its own walk from its new place
+/// under the same sheets (and is dropped from `walked`,
+/// `Walked::forget`). A removal leaves no unmarked sibling.
 fn unwalked<'a>(
     from: ElementRef<'a>,
     step: fn(&ElementRef<'a>) -> Option<ElementRef<'a>>,
